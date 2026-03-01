@@ -1,0 +1,27 @@
+{
+    "name": "taw/core",
+    "description": "TAW Theme Framework — block system, metabox engine, Vite asset pipeline for WordPress",
+    "type": "library",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Marco Del Riego",
+            "email": "marck94zac1@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "symfony/console": "^7.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "TAW\\": "src/"
+        },
+        "files": [
+            "src/Support/vite-loader.php",
+            "src/Support/performance.php"
+        ]
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
