@@ -11,7 +11,7 @@ declare(strict_types=1);
  */
 
 if (!defined('ABSPATH')) {
-    exit; // Exit if accessed directly
+    return; // Exit if accessed directly
 }
 
 /**
@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
  */
 
 if (function_exists('add_action')) {
-    
+
     add_action('wp_head', function () {
         $preconnects = [
             // Add external domains your theme uses, for example:
