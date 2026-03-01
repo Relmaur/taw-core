@@ -164,13 +164,9 @@ class Framework
         static $version = null;
 
         if ($version === null) {
-            $composerJson = self::path('composer.json');
-            if (file_exists($composerJson)) {
-                $data = json_decode(file_get_contents($composerJson), true);
-                $version = $data['version'] ?? '0.0.0';
-            } else {
-                $version = '0.0.0';
-            }
+            // Composer resolves this from git tags automatically —
+            // no "version" field needed in composer.json
+            $version = \Composer\InstalledVersions::getPrettyVersion('taw/core') ?? '0.0.0';
         }
 
         return $version;

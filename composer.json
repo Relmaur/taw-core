@@ -1,5 +1,6 @@
 {
     "name": "taw/core",
+    "version": "1.0.0",
     "description": "TAW Theme Framework — block system, metabox engine, Vite asset pipeline for WordPress",
     "type": "library",
     "license": "GPL-2.0-or-later",

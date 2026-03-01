@@ -21,10 +21,10 @@ class ImportBlockCommand extends Command
 {
     private string $themeDir;
 
-    public function __construct()
+    public function __construct(string $themeDir)
     {
         parent::__construct();
-        $this->themeDir = dirname(__DIR__, 2);
+        $this->themeDir = $themeDir;
     }
 
     protected function configure(): void

@@ -127,8 +127,6 @@ class Metabox
             true
         );
 
-        // THE KEY CHANGE: Framework::url() resolves the path
-        // regardless of whether the code lives in inc/Core/ or vendor/taw/core/
         wp_enqueue_style(
             'taw-metaboxes',
             Framework::url('assets/admin.css'),
@@ -136,7 +134,56 @@ class Metabox
             Framework::version()  // Bonus: auto cache-bust with package version
         );
 
-        // ... rest of method (image, color, post_select, repeater) stays the same ...
+        $has_image = array_filter($this->fields, fn($f) => ($f['type'] ?? '') === 'image');
+
+        if ($has_image) {
+            wp_enqueue_media();
+            $this->enqueue_image_script();
+        }
+
+        $has_color = array_filter($this->fields, fn($f) => ($f['type'] ?? '') === 'color');
+
+        if ($has_color) {
+            wp_enqueue_style('wp-color-picker');
+            wp_enqueue_script('wp-color-picker');
+            $this->enqueue_color_script();
+        }
+
+        $has_post_select = array_filter($this->fields, fn($f) => ($f['type'] ?? '') === 'post_select');
+
+        if ($has_post_select) {
+            $this->enqueue_post_selector_script();
+        }
+
+        $has_repeater = array_filter($this->fields, fn($f) => ($f['type'] ?? '') === 'repeater');
+
+        if ($has_repeater) {
+            $this->enqueue_repeater_script();
+
+            // Repeater sub-fields might need their own assets
+            foreach ($this->fields as $field) {
+                if (($field['type'] ?? '') !== 'repeater') continue;
+                $sub_fields = $field['fields'] ?? [];
+
+                $sub_has_image = array_filter($sub_fields, fn($f) => ($f['type'] ?? '') === 'image');
+                if ($sub_has_image) {
+                    wp_enqueue_media();
+                    $this->enqueue_image_script();
+                }
+
+                $sub_has_color = array_filter($sub_fields, fn($f) => ($f['type'] ?? '') === 'color');
+                if ($sub_has_color) {
+                    wp_enqueue_style('wp-color-picker');
+                    wp_enqueue_script('wp-color-picker');
+                    $this->enqueue_color_script();
+                }
+
+                $sub_has_post_select = array_filter($sub_fields, fn($f) => ($f['type'] ?? '') === 'post_select');
+                if ($sub_has_post_select) {
+                    $this->enqueue_post_selector_script();
+                }
+            }
+        }
     }
     /**
      * Outputs the image-upload JS exactly once, using event delegation so it

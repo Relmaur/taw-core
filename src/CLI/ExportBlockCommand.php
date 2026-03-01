@@ -12,11 +12,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * Import a block from a TAW block ZIP archive.
+ * Export a block as a portable ZIP archive.
  *
  * PORTABILITY: Receives $themeDir via injection (see MakeBlockCommand).
  */
-class ImportBlockCommand extends Command
+class ExportBlockCommand extends Command
 {
     private string $themeDir;
 
@@ -29,95 +29,79 @@ class ImportBlockCommand extends Command
     protected function configure(): void
     {
         $this
-            ->setName('import:block')
-            ->setDescription('Import a block from a TAW block ZIP')
-            ->addArgument('path', InputArgument::REQUIRED, 'Path to the block ZIP file')
-            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Overwrite if block already exists');
+            ->setName('export:block')
+            ->setDescription('Export a block as a portable ZIP')
+            ->addArgument('name', InputArgument::REQUIRED, 'Block name to export')
+            ->addOption('output', 'o', InputOption::VALUE_REQUIRED, 'Output directory', '.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $io      = new SymfonyStyle($input, $output);
-        $zipPath = $input->getArgument('path');
-        $force   = $input->getOption('force');
+        $io   = new SymfonyStyle($input, $output);
+        $name = $input->getArgument('name');
 
-        if (!file_exists($zipPath)) {
-            $io->error("File not found: {$zipPath}");
+        $blockDir = $this->themeDir . '/Blocks/' . $name;
+
+        if (!is_dir($blockDir)) {
+            $io->error("Block '{$name}' not found at {$blockDir}");
             return Command::FAILURE;
         }
 
+        $outputDir = rtrim($input->getOption('output'), '/');
+        $zipName   = "taw-block-{$name}.zip";
+        $zipPath   = $outputDir . '/' . $zipName;
+
         if (!class_exists(\ZipArchive::class)) {
-            $io->error('The PHP zip extension is not installed.');
+            $io->error([
+                'The PHP zip extension is not installed.',
+                'Install it: sudo apt install php-zip (Linux) or brew install php (macOS).',
+            ]);
             return Command::FAILURE;
         }
 
         $zip = new \ZipArchive();
-        if ($zip->open($zipPath) !== true) {
-            $io->error("Could not open ZIP: {$zipPath}");
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            $io->error("Could not create ZIP at {$zipPath}");
             return Command::FAILURE;
         }
 
-        $firstEntry = $zip->getNameIndex(0);
-        $name       = explode('/', $firstEntry)[0];
-
-        $manifestJson = $zip->getFromName($name . '/block.json');
-        $manifest     = $manifestJson ? json_decode($manifestJson, true) : null;
-
-        if ($manifest) {
-            $io->section('Block Manifest');
-            $io->table(
-                ['Property', 'Value'],
-                [
-                    ['Name', $manifest['name'] ?? $name],
-                    ['Exported', $manifest['exported_at'] ?? 'Unknown'],
-                    ['TAW Version', $manifest['taw_version'] ?? 'Unknown'],
-                    ['Files', count($manifest['files'] ?? [])],
-                ]
-            );
-        }
-
-        $targetDir = $this->themeDir . '/Blocks/' . $name;
-
-        if (is_dir($targetDir) && !$force) {
-            if (!$io->confirm("Block '{$name}' already exists. Overwrite?", false)) {
-                $io->warning('Import cancelled.');
-                $zip->close();
-                return Command::SUCCESS;
-            }
-            $this->removeDirectory($targetDir);
-        }
-
-        $blocksDir = $this->themeDir . '/Blocks';
-        $zip->extractTo($blocksDir);
-        $zip->close();
-
-        $manifestFile = $targetDir . '/block.json';
-        if (file_exists($manifestFile)) {
-            unlink($manifestFile);
-        }
-
-        $io->success("Block '{$name}' imported!");
-
-        $io->section('Next Steps');
-        $io->listing([
-            'Run <info>composer dump-autoload</info> to register the class',
-            'Review the block at <info>Blocks/' . $name . '/</info>',
-        ]);
-
-        return Command::SUCCESS;
-    }
-
-    private function removeDirectory(string $dir): void
-    {
-        $items = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($blockDir, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::LEAVES_ONLY
         );
 
-        foreach ($items as $item) {
-            $item->isDir() ? rmdir($item->getRealPath()) : unlink($item->getRealPath());
+        $fileList = [];
+        foreach ($files as $file) {
+            $relativePath = $name . '/' . substr($file->getRealPath(), strlen($blockDir) + 1);
+            $zip->addFile($file->getRealPath(), $relativePath);
+            $fileList[] = substr($file->getRealPath(), strlen($blockDir) + 1);
         }
 
-        rmdir($dir);
+        $manifest = [
+            'name'        => $name,
+            'exported_at' => date('c'),
+            'taw_version' => '1.0.0',
+            'php_version'  => PHP_VERSION,
+            'files'       => $fileList,
+        ];
+
+        $zip->addFromString(
+            $name . '/block.json',
+            json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+        );
+        $zip->close();
+
+        $sizeBytes = filesize($zipPath);
+        $sizeFormatted = $sizeBytes > 1024
+            ? round($sizeBytes / 1024, 1) . ' KB'
+            : $sizeBytes . ' bytes';
+
+        $io->success("Exported '{$name}' → {$zipPath} ({$sizeFormatted})");
+        $io->table(
+            ['File', 'Included'],
+            array_map(fn($f) => [$f, '✓'], $fileList)
+        );
+
+        return Command::SUCCESS;
     }
 }
