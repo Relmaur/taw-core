@@ -1,8 +1,10 @@
 <?php
 // inc/vite-loader.php
 
-define('VITE_SERVER', 'http://localhost:5173');
-define('VITE_ENTRY_POINT', 'resources/js/app.js'); // Relative to theme root
+if (!defined('VITE_SERVER')) {
+    define('VITE_SERVER', 'http://localhost:5173');
+    define('VITE_ENTRY_POINT', 'resources/js/app.js'); // Relative to theme root
+}
 
 function vite_is_dev()
 {
@@ -129,20 +131,22 @@ function vite_preload_assets()
     // NOTE: critical.scss is NOT preloaded — it's inlined, no request needed
 }
 
-add_action('wp_head', 'vite_preload_assets', 2);
+if (function_exists('add_action')) {
+    add_action('wp_head', 'vite_preload_assets', 2);
 
-// Add type="module" for Vite
-add_filter('script_loader_tag', function ($tag, $handle, $src) {
-    // Dev: all Vite server scripts
-    if (str_starts_with($src, VITE_SERVER)) {
-        return '<script type="module" src="' . esc_url($src) . '"></script>';
-    }
-    // Prod: theme-app and any component scripts
-    if ($handle === 'theme-app' || str_starts_with($handle, 'taw-component-')) {
-        return '<script type="module" src="' . esc_url($src) . '"></script>';
-    }
-    return $tag;
-}, 10, 3);
+    // Add type="module" for Vite
+    add_filter('script_loader_tag', function ($tag, $handle, $src) {
+        // Dev: all Vite server scripts
+        if (str_starts_with($src, VITE_SERVER)) {
+            return '<script type="module" src="' . esc_url($src) . '"></script>';
+        }
+        // Prod: theme-app and any component scripts
+        if ($handle === 'theme-app' || str_starts_with($handle, 'taw-component-')) {
+            return '<script type="module" src="' . esc_url($src) . '"></script>';
+        }
+        return $tag;
+    }, 10, 3);
+}
 
 /**
  * Resolve a theme asset path, checking the Vite manifest first.
