@@ -50,7 +50,8 @@ class MakeBlockCommand extends Command
 
                 Examples:
                   <info>php bin/taw make:block Hero --type=meta --with-style</info>
-                  <info>php bin/taw make:block Badge --type=ui</info>
+                  <info>php bin/taw make:block Badge --type=ui --group=ui</info>
+                  <info>php bin/taw make:block Hero --group=sections/landing</info>
                   <info>php bin/taw make:block PricingTable</info> (interactive mode)
                 HELP)
             ->addArgument(
@@ -59,6 +60,7 @@ class MakeBlockCommand extends Command
                 'Block name in PascalCase (e.g., Hero, PricingTable)'
             )
             ->addOption('type', 't', InputOption::VALUE_REQUIRED, 'Block type: meta or ui')
+            ->addOption('group', 'g', InputOption::VALUE_REQUIRED, 'Group subfolder path (e.g. sections, ui/cards)')
             ->addOption('with-style', 's', InputOption::VALUE_NONE, 'Include a style.scss file')
             ->addOption('with-script', 'j', InputOption::VALUE_NONE, 'Include a script.js file')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Overwrite existing block');
@@ -80,6 +82,20 @@ class MakeBlockCommand extends Command
             return Command::INVALID;
         }
 
+        // --- Validate group ---
+        $group = $input->getOption('group');
+
+        if ($group !== null) {
+            $group = trim($group, '/');
+            if (!preg_match('#^[a-zA-Z_][a-zA-Z0-9_]*(\/[a-zA-Z_][a-zA-Z0-9_]*)*$#', $group)) {
+                $io->error([
+                    "Invalid group path: '{$group}'",
+                    'Group paths must use letters, digits, underscores, and forward slashes (e.g. sections, ui/cards).',
+                ]);
+                return Command::INVALID;
+            }
+        }
+
         // --- Determine type ---
         $type = $input->getOption('type');
 
@@ -98,14 +114,16 @@ class MakeBlockCommand extends Command
             return Command::INVALID;
         }
 
-        // --- Check existing ---
-        $blockDir = $this->themeDir . '/Blocks/' . $name;
-        $force    = $input->getOption('force');
+        // --- Resolve paths and namespace ---
+        $relPath   = $group ? "{$group}/{$name}" : $name;
+        $namespace = 'TAW\\Blocks\\' . str_replace('/', '\\', $relPath);
+        $blockDir  = $this->themeDir . '/Blocks/' . $relPath;
+        $force     = $input->getOption('force');
 
         if (is_dir($blockDir) && !$force) {
             $io->error([
                 "Block '{$name}' already exists at:",
-                $blockDir,
+                "Blocks/{$relPath}",
                 'Use --force to overwrite.',
             ]);
             return Command::FAILURE;
@@ -124,17 +142,17 @@ class MakeBlockCommand extends Command
 
         // 1. Class file
         $classContent = $type === 'meta'
-            ? $this->generateMetaBlockClass($name, $id)
-            : $this->generateUiBlockClass($name, $id);
+            ? $this->generateMetaBlockClass($name, $id, $namespace)
+            : $this->generateUiBlockClass($name, $id, $namespace);
         file_put_contents($blockDir . '/' . $name . '.php', $classContent);
-        $createdFiles[] = ['Class', "Blocks/{$name}/{$name}.php"];
+        $createdFiles[] = ['Class', "Blocks/{$relPath}/{$name}.php"];
 
         // 2. Template
         $templateContent = $type === 'meta'
             ? $this->generateMetaTemplate($name, $id)
             : $this->generateUiTemplate($name, $id);
         file_put_contents($blockDir . '/index.php', $templateContent);
-        $createdFiles[] = ['Template', "Blocks/{$name}/index.php"];
+        $createdFiles[] = ['Template', "Blocks/{$relPath}/index.php"];
 
         // 3. Optional style
         if ($withStyle) {
@@ -142,13 +160,13 @@ class MakeBlockCommand extends Command
             /**
              * {$name} Block Styles
              */
-            
+
             .{$id} {
-                
+
             }
             SCSS;
             file_put_contents($blockDir . '/style.scss', $scss);
-            $createdFiles[] = ['Stylesheet', "Blocks/{$name}/style.scss"];
+            $createdFiles[] = ['Stylesheet', "Blocks/{$relPath}/style.scss"];
         }
 
         // 4. Optional script
@@ -157,11 +175,11 @@ class MakeBlockCommand extends Command
             /**
              * {$name} Block Script
              */
-            
+
             console.log('{$name} block initialized.');
             JS;
             file_put_contents($blockDir . '/script.js', $js);
-            $createdFiles[] = ['Script', "Blocks/{$name}/script.js"];
+            $createdFiles[] = ['Script', "Blocks/{$relPath}/script.js"];
         }
 
         // --- Success ---
@@ -179,24 +197,24 @@ class MakeBlockCommand extends Command
         return Command::SUCCESS;
     }
 
-    // --- Template generators (identical to before) ---
+    // --- Template generators ---
 
-    private function generateMetaBlockClass(string $name, string $id): string
+    private function generateMetaBlockClass(string $name, string $id, string $namespace): string
     {
         return <<<PHP
         <?php
-        
+
         declare(strict_types=1);
-        
-        namespace TAW\Blocks\\{$name};
-        
+
+        namespace {$namespace};
+
         use TAW\Core\MetaBlock;
         use TAW\Core\Metabox\Metabox;
-        
+
         class {$name} extends MetaBlock
         {
             protected string \$id = '{$id}';
-        
+
             protected function registerMetaboxes(): void
             {
                 new Metabox([
@@ -212,7 +230,7 @@ class MakeBlockCommand extends Command
                     ],
                 ]);
             }
-        
+
             protected function getData(int \$postId): array
             {
                 return [
@@ -220,25 +238,25 @@ class MakeBlockCommand extends Command
                 ];
             }
         }
-        
+
         PHP;
     }
 
-    private function generateUiBlockClass(string $name, string $id): string
+    private function generateUiBlockClass(string $name, string $id, string $namespace): string
     {
         return <<<PHP
         <?php
-        
+
         declare(strict_types=1);
-        
-        namespace TAW\Blocks\\{$name};
-        
+
+        namespace {$namespace};
+
         use TAW\Core\Block;
-        
+
         class {$name} extends Block
         {
             protected string \$id = '{$id}';
-        
+
             protected function defaults(): array
             {
                 return [
@@ -246,7 +264,7 @@ class MakeBlockCommand extends Command
                 ];
             }
         }
-        
+
         PHP;
     }
 
@@ -259,10 +277,10 @@ class MakeBlockCommand extends Command
          *
          * @var string \$heading
          */
-        
+
         if (empty(\$heading)) return;
         ?>
-        
+
         <section class="{$id}">
             <div class="container mx-auto px-4">
                 <h2 class="text-3xl font-bold">
@@ -270,7 +288,7 @@ class MakeBlockCommand extends Command
                 </h2>
             </div>
         </section>
-        
+
         PHP;
     }
 
@@ -284,11 +302,11 @@ class MakeBlockCommand extends Command
          * @var string \$text
          */
         ?>
-        
+
         <div class="{$id}">
             <?php echo esc_html(\$text); ?>
         </div>
-        
+
         PHP;
     }
 }

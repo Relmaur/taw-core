@@ -31,24 +31,43 @@ class ExportBlockCommand extends Command
         $this
             ->setName('export:block')
             ->setDescription('Export a block as a portable ZIP')
-            ->addArgument('name', InputArgument::REQUIRED, 'Block name to export')
+            ->setHelp(<<<'HELP'
+                Packages a block into a ZIP archive that can be imported into any TAW theme.
+
+                The block name can include its group path:
+
+                  <info>php bin/taw export:block Hero</info>
+                  <info>php bin/taw export:block sections/Hero</info>
+                  <info>php bin/taw export:block ui/cards/Badge -o ./exports</info>
+                HELP)
+            ->addArgument(
+                'name',
+                InputArgument::REQUIRED,
+                'Block name or path to export (e.g. Hero, sections/Hero, ui/cards/Badge)'
+            )
             ->addOption('output', 'o', InputOption::VALUE_REQUIRED, 'Output directory', '.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io   = new SymfonyStyle($input, $output);
-        $name = $input->getArgument('name');
+        $name = trim($input->getArgument('name'), '/');
+
+        // Split "sections/Hero" into group="sections", blockName="Hero"
+        $segments  = explode('/', $name);
+        $blockName = array_pop($segments);
+        $group     = implode('/', $segments);
 
         $blockDir = $this->themeDir . '/Blocks/' . $name;
 
         if (!is_dir($blockDir)) {
-            $io->error("Block '{$name}' not found at {$blockDir}");
+            $io->error("Block not found at Blocks/{$name}");
             return Command::FAILURE;
         }
 
         $outputDir = rtrim($input->getOption('output'), '/');
-        $zipName   = "taw-block-{$name}.zip";
+        $zipSlug   = $group ? strtolower(str_replace('/', '-', $group)) . '-' . $blockName : $blockName;
+        $zipName   = "taw-block-{$zipSlug}.zip";
         $zipPath   = $outputDir . '/' . $zipName;
 
         if (!class_exists(\ZipArchive::class)) {
@@ -70,15 +89,18 @@ class ExportBlockCommand extends Command
             \RecursiveIteratorIterator::LEAVES_ONLY
         );
 
+        // ZIP entries are always stored as {blockName}/file — group is metadata,
+        // not structure, so the archive stays portable across different layouts.
         $fileList = [];
         foreach ($files as $file) {
-            $relativePath = $name . '/' . substr($file->getRealPath(), strlen($blockDir) + 1);
-            $zip->addFile($file->getRealPath(), $relativePath);
-            $fileList[] = substr($file->getRealPath(), strlen($blockDir) + 1);
+            $fileRelative = substr($file->getRealPath(), strlen($blockDir) + 1);
+            $zip->addFile($file->getRealPath(), $blockName . '/' . $fileRelative);
+            $fileList[] = $fileRelative;
         }
 
         $manifest = [
-            'name'        => $name,
+            'name'        => $blockName,
+            'group'       => $group,
             'exported_at' => date('c'),
             'taw_version' => '1.0.0',
             'php_version'  => PHP_VERSION,
@@ -86,7 +108,7 @@ class ExportBlockCommand extends Command
         ];
 
         $zip->addFromString(
-            $name . '/block.json',
+            $blockName . '/block.json',
             json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         );
         $zip->close();
@@ -96,7 +118,7 @@ class ExportBlockCommand extends Command
             ? round($sizeBytes / 1024, 1) . ' KB'
             : $sizeBytes . ' bytes';
 
-        $io->success("Exported '{$name}' → {$zipPath} ({$sizeFormatted})");
+        $io->success("Exported 'Blocks/{$name}' → {$zipPath} ({$sizeFormatted})");
         $io->table(
             ['File', 'Included'],
             array_map(fn($f) => [$f, '✓'], $fileList)

@@ -15,7 +15,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * Import a block from a TAW block ZIP archive.
  *
  * Reads the block.json manifest, validates the package,
- * and extracts into Blocks/.
+ * and extracts into Blocks/ (respecting group paths).
  */
 class ImportBlockCommand extends Command
 {
@@ -36,16 +36,25 @@ class ImportBlockCommand extends Command
                 Extracts a block package (created by <info>export:block</info>)
                 into your theme's Blocks/ directory.
 
-                The ZIP must contain a block.json manifest.
+                The ZIP must contain a block.json manifest. If the manifest
+                includes a group path, the block is placed there automatically.
+                Use <info>--group</info> to override or specify a different location.
 
-                Example:
+                Examples:
                   <info>php bin/taw import:block taw-block-Hero.zip</info>
+                  <info>php bin/taw import:block taw-block-Hero.zip --group=sections</info>
                   <info>php bin/taw import:block taw-block-Hero.zip --force</info>
                 HELP)
             ->addArgument(
                 'path',
                 InputArgument::REQUIRED,
                 'Path to the block ZIP file'
+            )
+            ->addOption(
+                'group',
+                'g',
+                InputOption::VALUE_REQUIRED,
+                'Group subfolder to import into — overrides the manifest group (e.g. sections, ui/cards)'
             )
             ->addOption(
                 'force',
@@ -79,11 +88,10 @@ class ImportBlockCommand extends Command
         }
 
         // --- Read the manifest ---
-        // The first directory in the ZIP is the block name.
+        // ZIP entries are stored as {blockName}/file, so the first segment is always the block name.
         $firstEntry = $zip->getNameIndex(0);
         $name       = explode('/', $firstEntry)[0];
 
-        // Try to read the manifest
         $manifestJson = $zip->getFromName($name . '/block.json');
         $manifest     = $manifestJson ? json_decode($manifestJson, true) : null;
 
@@ -92,51 +100,58 @@ class ImportBlockCommand extends Command
             $io->table(
                 ['Property', 'Value'],
                 [
-                    ['Name', $manifest['name'] ?? $name],
-                    ['Exported', $manifest['exported_at'] ?? 'Unknown'],
-                    ['TAW Version', $manifest['taw_version'] ?? 'Unknown'],
-                    ['Files', count($manifest['files'] ?? [])],
+                    ['Name',         $manifest['name'] ?? $name],
+                    ['Group',        $manifest['group'] ?: '(none)'],
+                    ['Exported',     $manifest['exported_at'] ?? 'Unknown'],
+                    ['TAW Version',  $manifest['taw_version'] ?? 'Unknown'],
+                    ['Files',        count($manifest['files'] ?? [])],
                 ]
             );
         }
 
-        // --- Check for existing block ---
-        $targetDir = $this->themeDir . '/Blocks/' . $name;
+        // --group flag takes precedence over the manifest group
+        $group = $input->getOption('group') ?? ($manifest['group'] ?? '');
+        $group = trim((string) $group, '/');
 
+        // --- Resolve target directory ---
+        $blocksBase = $this->themeDir . '/Blocks';
+        $extractTo  = $group ? $blocksBase . '/' . $group : $blocksBase;
+        $targetDir  = $extractTo . '/' . $name;
+        $displayPath = ($group ? $group . '/' : '') . $name;
+
+        // --- Check for existing block ---
         if (is_dir($targetDir) && !$force) {
-            // Interactive confirmation — ask the user what to do.
-            // This is another Symfony Console superpower.
-            if (!$io->confirm("Block '{$name}' already exists. Overwrite?", false)) {
+            if (!$io->confirm("Block '{$name}' already exists at Blocks/{$displayPath}. Overwrite?", false)) {
                 $io->warning('Import cancelled.');
                 $zip->close();
                 return Command::SUCCESS;
             }
 
-            // User said yes — remove existing block
             $this->removeDirectory($targetDir);
         }
 
-        // --- Extract ---
-        // extractTo() extracts the entire ZIP maintaining folder structure.
-        // Since the ZIP contains {Name}/... and we extract to Blocks/,
-        // the result is Blocks/{Name}/... — exactly right.
-        $blocksDir = $this->themeDir . '/Blocks';
-        $zip->extractTo($blocksDir);
+        // --- Create group directory if needed ---
+        if (!is_dir($extractTo)) {
+            mkdir($extractTo, 0755, true);
+        }
+
+        // Extract — ZIP stores {blockName}/file, extracting to $extractTo gives
+        // $extractTo/{blockName}/file, which is exactly $targetDir.
+        $zip->extractTo($extractTo);
         $zip->close();
 
-        // Remove the block.json manifest from the extracted files
-        // (it's metadata for the CLI tool, not part of the block itself)
+        // Remove the block.json manifest (CLI metadata, not part of the block)
         $manifestFile = $targetDir . '/block.json';
         if (file_exists($manifestFile)) {
             unlink($manifestFile);
         }
 
-        $io->success("Block '{$name}' imported!");
+        $io->success("Block '{$name}' imported to Blocks/{$displayPath}!");
 
         $io->section('Next Steps');
         $io->listing([
             'Run <info>composer dump-autoload</info> to register the class',
-            'Review the block at <info>Blocks/' . $name . '/</info>',
+            'Review the block at <info>Blocks/' . $displayPath . '/</info>',
             'Check for any dependencies specific to the source project',
         ]);
 
@@ -145,9 +160,6 @@ class ImportBlockCommand extends Command
 
     /**
      * Recursively remove a directory.
-     *
-     * PHP doesn't have a built-in rmdir-recursive, so we
-     * iterate depth-first and delete files before directories.
      */
     private function removeDirectory(string $dir): void
     {
