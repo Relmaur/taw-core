@@ -29,26 +29,67 @@ if (!defined('ABSPATH')) {
 
 class Metabox
 {
+    /** @var string Unique metabox identifier. Used as the HTML id and meta key base. */
     private string $id;
+
+    /** @var string Human-readable title displayed in the WordPress editor. */
     private string $title;
+
+    /** @var string Post type slug this metabox is registered on (e.g. 'page', 'post'). */
     private string $screen;
+
+    /** @var string Metabox position context: 'normal', 'side', or 'advanced'. */
     private string $context;
+
+    /** @var string Metabox render priority: 'high', 'default', or 'low'. */
     private string $priority;
+
+    /** @var string Prefix prepended to every meta key (e.g. '_taw_'). */
     private string $prefix;
-    private array  $fields;
+
+    /** @var array<int, array<string, mixed>> Array of field definition arrays. */
+    private array $fields;
+
+    /** @var array<int, array<string, mixed>> Optional tab definitions grouping fields into tabs. */
     private array $tabs;
+
+    /** @var string Base64-encoded SVG data URI used as the metabox icon, or empty string. */
     private string $icon;
+
+    /** @var bool Guards against enqueuing the WP Color Picker init script more than once. */
     private static bool $color_script_enqueued = false;
+
+    /** @var bool Guards against enqueuing the post selector script more than once. */
     private static bool $post_selector_script_enqueued = false;
+
+    /** @var bool Guards against enqueuing the repeater script more than once. */
     private static bool $repeater_script_enqueued = false;
+
+    /**
+     * Global registry of field configurations, keyed by field ID.
+     * Populated during metabox construction.
+     * 
+     * Structure: [
+     *   'hero_heading' => [
+     *     'id' => 'hero_heading',
+     *     'type' => 'text',
+     *     'editor' => true,
+     *     'metabox_id' => 'taw_hero',
+     *     // ... all other field config
+     *   ],
+     * ]
+     */
+    /** @var array stores field configurations */
+    private static array $fieldRegistry = [];
 
 
     /** @var callable|null Callback to conditionally show the metabox. Receives WP_Post. */
     private $show_on;
 
-    /** Tracks whether the image uploader JS has already been enqueued. */
+    /** @var bool Guards against enqueuing the media-uploader image script more than once. */
     private static bool $image_script_enqueued = false;
 
+    /** @var bool Guards against enqueuing general admin assets (CSS/JS) more than once. */
     private static bool $assets_enqueued = false;
 
     /**
@@ -83,10 +124,16 @@ class Metabox
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
     }
 
-    /* -------------------------------------------------------------------------
-     * Registration
-     * ---------------------------------------------------------------------- */
 
+
+    /**
+     * Register the metabox with WordPress via `add_meta_box()`.
+     *
+     * Hooked to `add_meta_boxes`. Skips registration if the optional
+     * `show_on` callback returns false for the current post.
+     *
+     * @return void
+     */
     public function register(): void
     {
 
@@ -113,6 +160,17 @@ class Metabox
      * MARK: Assets
      */
 
+    /**
+     * Enqueue all admin scripts and styles required by this metabox's fields.
+     *
+     * Hooked to `admin_enqueue_scripts`. Only runs on post edit screens.
+     * Conditionally enqueues Alpine.js, the TAW admin stylesheet, and any
+     * field-type-specific assets (image uploader, color picker, post selector,
+     * repeater) — including sub-field assets inside repeater definitions.
+     *
+     * @param string $hook The current admin page hook (e.g. 'post.php').
+     * @return void
+     */
     public function enqueue_admin_assets(string $hook): void
     {
         if (!in_array($hook, ['post.php', 'post-new.php'], true)) {
@@ -252,6 +310,14 @@ class Metabox
         });
     }
 
+    /**
+     * Outputs the WP Color Picker init script exactly once via `admin_footer`.
+     *
+     * Exposes `window.tawInitColorPickers(container)` globally so repeater
+     * rows can initialize color pickers for dynamically-added fields.
+     *
+     * @return void
+     */
     private function enqueue_color_script(): void
     {
         if (self::$color_script_enqueued) {
@@ -297,6 +363,15 @@ class Metabox
         });
     }
 
+    /**
+     * Outputs the post selector AJAX + UI script exactly once via `admin_footer`.
+     *
+     * Localizes `window.tawRest` with the REST API URL and a nonce, then
+     * exposes `window.tawInitPostSelectors(container)` so repeater rows can
+     * re-initialize selectors for dynamically-added fields.
+     *
+     * @return void
+     */
     private function enqueue_post_selector_script(): void
     {
         if (self::$post_selector_script_enqueued) {
@@ -557,6 +632,15 @@ class Metabox
         });
     }
 
+    /**
+     * Outputs the repeater UI script exactly once via `admin_footer`.
+     *
+     * Enqueues jQuery UI Sortable for drag-and-drop row reordering, then
+     * injects the repeater JS which handles add/remove rows, collapse/expand,
+     * drag-and-drop, and JSON serialization into the hidden input.
+     *
+     * @return void
+     */
     private function enqueue_repeater_script(): void
     {
         if (self::$repeater_script_enqueued) {
@@ -771,6 +855,14 @@ class Metabox
         });
     }
 
+    /**
+     * Enqueue shared metabox assets (CSS/JS) exactly once.
+     *
+     * Reserved for global admin styles or scripts that should only be
+     * loaded a single time regardless of how many Metabox instances exist.
+     *
+     * @return void
+     */
     public function enqueue_assets(): void
     {
         if (self::$assets_enqueued) {
@@ -789,6 +881,16 @@ class Metabox
      * MARK: Render 
      */
 
+    /**
+     * Render the metabox HTML inside the WordPress editor.
+     *
+     * Outputs a nonce field for security, initialises an Alpine.js reactive
+     * data object pre-populated with saved meta values, then loops over all
+     * registered fields — applying conditional visibility and optional widths.
+     *
+     * @param \WP_Post $post The post currently being edited.
+     * @return void
+     */
     public function render(\WP_Post $post): void
     {
         if (is_callable($this->show_on) && !call_user_func($this->show_on, $post)) {
@@ -852,8 +954,20 @@ class Metabox
 
     /**
      * MARK: Renderers
-     * 
-     * Render a single field by type.
+     */
+
+    /**
+     * Render a single field's HTML by its type.
+     *
+     * Delegates to the appropriate inline renderer (or sub-method) based on
+     * `$field['type']`. Supported types: text, url, number, textarea, wysiwyg,
+     * select, checkbox, color, range, image, group, post_select, repeater.
+     *
+     * @param array<string, mixed> $field    Field definition array.
+     * @param string               $field_id Full meta key including prefix (e.g. '_taw_heading').
+     * @param mixed                $value    Current saved value for this field.
+     * @param int|null             $post_id  ID of the post being edited, or null inside templates.
+     * @return void
      */
     private function render_field(array $field, string $field_id, mixed $value, ?int $post_id = null): void
     {
@@ -1145,6 +1259,17 @@ class Metabox
         }
     }
 
+    /**
+     * Render all sub-fields that belong to a group field.
+     *
+     * Each sub-field's meta key is built as `{$field_id_prefix}_{sub_field_id}`.
+     * Values are read directly from post meta when a post ID is available.
+     *
+     * @param array<int, array<string, mixed>> $group_fields Sub-field definitions.
+     * @param string                           $field_id_prefix Prefix including the group field's own key.
+     * @param int|null                         $post_id Post ID for reading saved values, or null.
+     * @return void
+     */
     private function render_group(array $group_fields, string $field_id_prefix, ?int $post_id = null): void
     {
         foreach ($group_fields as $field) {
@@ -1164,6 +1289,18 @@ class Metabox
         <?php }
     }
 
+    /**
+     * Render an Alpine.js-powered tabbed interface grouping metabox fields.
+     *
+     * Each tab definition may include an `id`, `label`, `icon`, and a `fields`
+     * array of field IDs that should be displayed under that tab. Fields are
+     * matched against `$this->fields` and rendered in their declared order.
+     *
+     * @param array<int, array<string, mixed>> $tabs            Tab definition arrays.
+     * @param string                           $field_id_prefix Prefix applied to field meta keys.
+     * @param \WP_Post                         $post            The post currently being edited.
+     * @return void
+     */
     private function render_tabs(array $tabs, string $field_id_prefix, \WP_Post $post): void
     {
 
@@ -1451,8 +1588,18 @@ class Metabox
 
     /**
      * MARK: Sanitization
-     * 
-     * Sanitize a field value based on its type and optional 'sanitize' override.
+     */
+
+    /**
+     * Sanitize a raw submitted value according to its field type.
+     *
+     * Fields with `'sanitize' => 'code'` bypass standard sanitization and
+     * preserve raw content for users with the `unfiltered_html` capability
+     * (falling back to `wp_kses_post()` for everyone else).
+     *
+     * @param array<string, mixed> $field Field definition array.
+     * @param mixed                $value Raw value from `$_POST`.
+     * @return mixed Sanitized value ready to be stored via `update_post_meta()`.
      */
     private function sanitize_field(array $field, mixed $value): mixed
     {
@@ -1600,6 +1747,7 @@ class Metabox
      * @param int    $post_id  The post/page ID.
      * @param string $field_id Field ID (without prefix).
      * @param string $prefix   Meta key prefix. Default '_taw_'.
+     * @return mixed The raw meta value, or empty string if not set.
      */
     public static function get(int $post_id, string $field_id, string $prefix = '_taw_'): mixed
     {
@@ -1609,15 +1757,17 @@ class Metabox
     /**
      * Retrieve a checkbox/toggle meta value as a boolean.
      *
-     * * Usage: 
-     * 
+     * Usage:
+     * ```php
      * if (Metabox::get_bool($post->ID, 'hero_show_cta')) {
-     *  // render the CTA
+     *     // render the CTA
      * }
+     * ```
      *
      * @param int    $post_id  The post/page ID.
      * @param string $field_id Field ID (without prefix).
      * @param string $prefix   Meta key prefix. Default '_taw_'.
+     * @return bool True if the stored value is '1', false otherwise.
      */
     public static function get_bool(int $post_id, string $field_id, string $prefix = '_taw_'): bool
     {
@@ -1626,11 +1776,13 @@ class Metabox
 
 
     /**
-     * Retrieve a meta value and return an image URL.
-     * 
+     * Retrieve an image URL from a saved attachment ID meta value.
+     *
      * @param int    $post_id  The post/page ID.
      * @param string $field_id Field ID (without prefix).
      * @param string $size     WordPress image size. Default 'full'.
+     * @param string $prefix   Meta key prefix. Default '_taw_'.
+     * @return string Image URL, or empty string if none is set.
      */
     public static function get_image_url(int $post_id, string $field_id, string $size = 'full', string $prefix = '_taw_'): string
     {
