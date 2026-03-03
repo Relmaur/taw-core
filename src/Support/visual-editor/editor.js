@@ -315,8 +315,6 @@ document.addEventListener('alpine:init', () => {
                     displayValue: attachment.url,
                     originalValue: this.changes[fieldId]?.originalValue ?? el.src ?? '',
                 };
-
-                this.updateSaveBar();
             });
 
             frame.open();
@@ -374,24 +372,6 @@ document.addEventListener('alpine:init', () => {
             } else {
                 this.changes[fieldId].value = newValue;
             }
-
-            this.updateSaveBar();
-        },
-
-        /**
-         * Update the save bar status message.
-         */
-        updateSaveBar() {
-            const bar = document.getElementById('taw-editor-savebar');
-            if (!bar) return;
-
-            if (this.hasChanges) {
-                bar.classList.add('has-changes');
-                const count = this.changeCount;
-                this.statusMessage = `${count} unsaved ${count === 1 ? 'change' : 'changes'}`;
-            } else {
-                bar.classList.remove('has-changes');
-            }
         },
 
         // ── Save & Discard ─────────────────────────────────────
@@ -428,12 +408,10 @@ document.addEventListener('alpine:init', () => {
                 // Clear changes on success
                 this.changes = {};
                 this.statusMessage = 'Saved!';
-                this.updateSaveBar();
 
                 // Brief success feedback, then hide the bar
                 setTimeout(() => {
-                    const bar = document.getElementById('taw-editor-savebar');
-                    if (bar) bar.classList.remove('has-changes');
+                    this.statusMessage = '';
                 }, 1500);
 
             } catch (error) {
@@ -468,7 +446,6 @@ document.addEventListener('alpine:init', () => {
 
             this.changes = {};
             this.deselect();
-            this.updateSaveBar();
         },
 
         // ── Utilities ──────────────────────────────────────────
