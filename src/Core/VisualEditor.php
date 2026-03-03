@@ -35,6 +35,7 @@ class VisualEditor
         // When in edit mode on the frontend, enqueue editor assets
         if (self::isActive()) {
             add_action('wp_enqueue_scripts', [self::class, 'enqueueEditorAssets']);
+            add_action('wp_footer', [self::class, 'renderEditorShell'], 99);
         }
     }
 
@@ -129,7 +130,38 @@ class VisualEditor
     /**
      * Enqueue visual editor assets on the frontend.
      */
-    public static function enqueueEditorAssets(): void {}
+    public static function enqueueEditorAssets(): void
+    {
+        // WordPress media picker (needed for image fields)
+        wp_enqueue_media();
+
+        $editorDir = Framework::path() . '/src/Support/visual-editor/';
+        $editorUrl = Framework::url() . '/src/Support/visual-editor';
+
+        wp_enqueue_style(
+            'taw-visual-editor',
+            $editorUrl . '/editor.css',
+            [],
+            filemtime($editorDir . '/editor.css')
+        );
+
+        // Editor script - depends on Alpine (already loaded by the theme)
+        wp_enqueue_script(
+            'taw-visual-editor',
+            $editorUrl . '/editor.js',
+            [],
+            filemtime($editorDir . '/editor.js'),
+            true
+        );
+
+        // Pass data to the editor script
+        wp_localize_script('taw-visual-editor', 'tawEditor', [
+            'postId' => get_queried_object_id(),
+            'restUrl' => rest_url('taw/v1/visual-editor/'),
+            'nonce' => wp_create_nonce('wp_rest'),
+            'exitUrl' => get_permalink(get_queried_object_id())
+        ]);
+    }
 
     /**
      * Resolve the current post ID from context.
@@ -157,5 +189,32 @@ class VisualEditor
         }
 
         return null;
+    }
+
+    /**
+     * Inject the editor wrapper and save bar HTML into the page footer.
+     */
+    public static function renderEditorShell(): void
+    {
+?>
+        <div id="taw-editor-savebar" class="taw-editor-savebar"
+            x-data
+            x-show="$store.tawEditor?.hasChanges">
+            <div class="taw-editor-savebar__status">
+                <strong x-text="$store.tawEditor?.statusMessage ?? ''"></strong>
+            </div>
+            <div class="taw-editor-savebar__actions">
+                <button class="taw-editor-savebar__btn taw-editor-savebar__btn--discard"
+                    @click="$store.tawEditor?.discard()">
+                    Discard
+                </button>
+                <button class="taw-editor-savebar__btn taw-editor-savebar__btn--save"
+                    @click="$store.tawEditor?.save()"
+                    :disabled="$store.tawEditor?.saving">
+                    Save Changes
+                </button>
+            </div>
+        </div>
+<?php
     }
 }
