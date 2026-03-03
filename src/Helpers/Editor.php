@@ -116,19 +116,3 @@ class Editor
         return $attrs;
     }
 }
-
-/**
- * Template helper - shorthand for Editor::field();
- */
-function taw_editable(mixed $value, string $blockId, string $fieldId, string $tag = 'span'): string
-{
-    return \TAW\Helpers\Editor::field($value, $blockId, $fieldId, $tag);
-}
-
-/**
- * Template helper - shorthand for Editor::attrs().
- */
-function taw_editor_attrs(string $blockId, string $fieldId): string
-{
-    return \TAW\Helpers\Editor::attrs($blockId, $fieldId);
-}
