@@ -135,8 +135,8 @@ class VisualEditor
         // WordPress media picker (needed for image fields)
         wp_enqueue_media();
 
-        $editorDir = Framework::path() . '/src/Support/visual-editor/';
-        $editorUrl = Framework::url() . '/src/Support/visual-editor/';
+        $editorDir = Framework::path() . '/src/Support/visual-editor';
+        $editorUrl = Framework::url() . '/src/Support/visual-editor';
 
         wp_enqueue_style(
             'taw-visual-editor',
@@ -197,23 +197,26 @@ class VisualEditor
     public static function renderEditorShell(): void
     {
 ?>
-        <div id="taw-editor-savebar" class="taw-editor-savebar"
-            x-data
-            x-show="$store.tawEditor?.hasChanges">
-            <div class="taw-editor-savebar__status">
-                <strong x-text="$store.tawEditor?.statusMessage ?? ''"></strong>
+        <div x-data="tawVisualEditor" id="taw-visual-editor-root">
+
+            <div id="taw-editor-savebar" class="taw-editor-savebar"
+                :class="{ 'has-changes': hasChanges }">
+                <div class="taw-editor-savebar__status">
+                    <strong x-text="statusMessage"></strong>
+                </div>
+                <div class="taw-editor-savebar__actions">
+                    <button class="taw-editor-savebar__btn taw-editor-savebar__btn--discard"
+                        @click="discard()">
+                        Discard
+                    </button>
+                    <button class="taw-editor-savebar__btn taw-editor-savebar__btn--save"
+                        @click="save()"
+                        :disabled="saving">
+                        Save Changes
+                    </button>
+                </div>
             </div>
-            <div class="taw-editor-savebar__actions">
-                <button class="taw-editor-savebar__btn taw-editor-savebar__btn--discard"
-                    @click="$store.tawEditor?.discard()">
-                    Discard
-                </button>
-                <button class="taw-editor-savebar__btn taw-editor-savebar__btn--save"
-                    @click="$store.tawEditor?.save()"
-                    :disabled="$store.tawEditor?.saving">
-                    Save Changes
-                </button>
-            </div>
+
         </div>
 <?php
     }
