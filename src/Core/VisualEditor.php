@@ -136,7 +136,7 @@ class VisualEditor
         wp_enqueue_media();
 
         $editorDir = Framework::path() . '/src/Support/visual-editor/';
-        $editorUrl = Framework::url() . '/src/Support/visual-editor';
+        $editorUrl = Framework::url() . '/src/Support/visual-editor/';
 
         wp_enqueue_style(
             'taw-visual-editor',
