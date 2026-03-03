@@ -115,4 +115,48 @@ class Editor
 
         return $attrs;
     }
+
+    /**
+     * Return the editor data attributes as a key-value array.
+     * 
+     * Designed for integration with helpers that build HTML
+     * from attribute arrays (like Image::render()).
+     *
+     * Usage with Image::render():
+     *   echo Image::render($id, 'full', 'Alt text', [
+     *       'above_fold' => true,
+     *       'attr'       => Editor::attrsArray('hero', 'hero_image'),
+     *   ]);
+     *
+     * @return array<string, string> Empty array when editor is inactive.
+     */
+    public static function attrsArray(string $blockId, string $fieldId): array
+    {
+        if (! VisualEditor::isActive()) {
+            return [];
+        }
+
+        $editorConfig = Metabox::get_editor_config($fieldId);
+
+        if ($editorConfig === null) {
+            return [];
+        }
+
+        $fieldConfig = Metabox::get_field_config($fieldId);
+        $fieldType   = $fieldConfig['type'] ?? 'text';
+        $fieldLabel  = $fieldConfig['label'] ?? $fieldId;
+
+        $attrs = [
+            'data-taw-block' => $blockId,
+            'data-taw-field' => $fieldId,
+            'data-taw-type'  => $fieldType,
+            'data-taw-label' => $fieldLabel,
+        ];
+
+        if (is_array($editorConfig)) {
+            $attrs['data-taw-editor'] = wp_json_encode($editorConfig);
+        }
+
+        return $attrs;
+    }
 }

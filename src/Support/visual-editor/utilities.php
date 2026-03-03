@@ -26,3 +26,13 @@ if (! function_exists('taw_editor_attrs')) {
         return \TAW\Helpers\Editor::attrs($blockId, $fieldId);
     }
 }
+
+if (! function_exists('taw_editor_attrs_array')) {
+    /**
+     * Template helper — shorthand for Editor::attrsArray().
+     */
+    function taw_editor_attrs_array(string $blockId, string $fieldId): array
+    {
+        return \TAW\Helpers\Editor::attrsArray($blockId, $fieldId);
+    }
+}

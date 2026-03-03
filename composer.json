@@ -20,7 +20,7 @@
         "files": [
             "src/Support/vite-loader.php",
             "src/Support/performance.php",
-            "src/Support/visual-editor/helpers.php"
+            "src/Support/visual-editor/utilities.php"
         ]
     },
     "minimum-stability": "stable",
