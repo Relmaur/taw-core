@@ -1,8 +1,8 @@
 /**
  * TAW Visual Editor — Alpine.js Frontend Component
  *
- * Scans the page for [data-taw-field] elements and provides
- * inline editing capabilities based on field type.
+ * Provides inline editing and a right-side panel for
+ * content editing on the frontend.
  */
 document.addEventListener('alpine:init', () => {
 
@@ -10,17 +10,30 @@ document.addEventListener('alpine:init', () => {
 
         // ── State ──────────────────────────────────────────────
 
-        /** Currently selected element (DOM node) */
+        /** Currently selected DOM element */
         activeEl: null,
 
-        /** Tracks all pending changes: { fieldId: { blockId, type, value, originalValue } } */
+        /** Current panel mode: 'idle' | 'field' | 'section' */
+        panelMode: 'idle',
+
+        /** The block ID of the currently selected section */
+        activeBlockId: null,
+
+        /** The field ID of the currently selected field */
+        activeFieldId: null,
+
+        /** Tracks all pending changes */
         changes: {},
 
-        /** Whether a save request is in flight */
+        /** Whether a save is in flight */
         saving: false,
 
-        /** Status message for the save bar */
-        statusMessage: '',
+        /** Toast notifications */
+        toasts: [],
+        _toastId: 0,
+
+        /** Map of blockId → array of field info (built on init) */
+        blockFields: {},
 
         // ── Computed ───────────────────────────────────────────
 
@@ -32,205 +45,297 @@ document.addEventListener('alpine:init', () => {
             return Object.keys(this.changes).length;
         },
 
+        /** Get the fields to display in the panel for the active block */
+        get activeSectionFields() {
+            if (!this.activeBlockId) return [];
+            return this.blockFields[this.activeBlockId] || [];
+        },
+
+        /** Get the single active field's info for field mode */
+        get activeFieldInfo() {
+            if (!this.activeFieldId || !this.activeBlockId) return null;
+            const fields = this.blockFields[this.activeBlockId] || [];
+            return fields.find(f => f.fieldId === this.activeFieldId) || null;
+        },
+
+        /** List of blocks found on the page (for idle panel state) */
+        get availableBlocks() {
+            return Object.entries(this.blockFields).map(([blockId, fields]) => ({
+                blockId,
+                fieldCount: fields.length,
+            }));
+        },
+
         // ── Lifecycle ──────────────────────────────────────────
 
         init() {
-            // Delegated click handler for editable elements
-            document.addEventListener('click', (e) => {
-                const editableEl = e.target.closest('[data-taw-field]');
+            // Build the block → fields map by scanning the DOM
+            this.scanEditableFields();
 
-                if (editableEl) {
-                    this.select(e);
-                } else if (!e.target.closest('.taw-editor-toolbar') && !e.target.closest('.taw-editor-savebar')) {
+            // Delegated click handler
+            document.addEventListener('click', (e) => {
+                const fieldEl = e.target.closest('[data-taw-field]');
+                const sectionEl = e.target.closest('[data-taw-block-section]');
+                const panelEl = e.target.closest('.taw-editor-panel');
+                const toolbarEl = e.target.closest('.taw-editor-toolbar');
+
+                if (fieldEl) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.selectField(fieldEl);
+                } else if (sectionEl && !panelEl) {
+                    e.preventDefault();
+                    this.selectSection(sectionEl.dataset.tawBlockSection);
+                } else if (!panelEl && !toolbarEl) {
                     this.deselect();
                 }
             });
 
             // Keyboard shortcuts
             document.addEventListener('keydown', (e) => {
-                // Escape: deselect current element
-                if (e.key === 'Escape') {
-                    this.deselect();
-                }
-                // Ctrl/Cmd + S: save changes
+                if (e.key === 'Escape') this.deselect();
                 if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                     e.preventDefault();
-                    if (this.hasChanges) {
-                        this.save();
-                    }
+                    if (this.hasChanges) this.save();
                 }
             });
 
-            console.log('[TAW Editor] Visual editor initialized',
-                document.querySelectorAll('[data-taw-field]').length, 'editable fields found');
+            // Unsaved changes protection
+            window.addEventListener('beforeunload', (e) => {
+                if (this.hasChanges) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
+            });
+
+            console.log('[TAW Editor] Initialized.',
+                Object.keys(this.blockFields).length, 'blocks,',
+                document.querySelectorAll('[data-taw-field]').length, 'fields');
+        },
+
+        /**
+         * Scan the DOM for all [data-taw-field] elements and
+         * build a map of blockId → fields.
+         */
+        scanEditableFields() {
+            this.blockFields = {};
+
+            document.querySelectorAll('[data-taw-field]').forEach(el => {
+                const blockId = el.dataset.tawBlock;
+                const fieldId = el.dataset.tawField;
+                const type = el.dataset.tawType;
+                const label = el.dataset.tawLabel || fieldId;
+                const editor = el.dataset.tawEditor
+                    ? JSON.parse(el.dataset.tawEditor) : {};
+
+                if (!this.blockFields[blockId]) {
+                    this.blockFields[blockId] = [];
+                }
+
+                // Avoid duplicates (same field rendered twice)
+                if (!this.blockFields[blockId].find(f => f.fieldId === fieldId)) {
+                    this.blockFields[blockId].push({
+                        fieldId,
+                        type,
+                        label,
+                        editor,
+                        el, // Reference to the DOM element
+                    });
+                }
+            });
         },
 
         // ── Selection ──────────────────────────────────────────
 
         /**
-         * Handle click on an editable element.
-         * Called via @click on [data-taw-field] elements.
+         * Select a single field — opens field mode in the panel.
          */
-        select(event) {
-            const el = event.target.closest('[data-taw-field]');
-            if (!el) return;
-
-            event.preventDefault();
-            event.stopPropagation();
-
-            // If clicking the already-active element, do nothing
-            // (let the editing interaction handle it)
+        selectField(el) {
             if (this.activeEl === el) return;
+            this.clearActiveState();
 
-            // Deselect previous
-            this.deselect();
-
-            // Select new
             this.activeEl = el;
-            el.classList.add('taw-editor-active');
+            this.activeBlockId = el.dataset.tawBlock;
+            this.activeFieldId = el.dataset.tawField;
+            this.panelMode = 'field';
 
-            // Position and show the toolbar
+            el.classList.add('taw-editor-active');
             this.showToolbar(el);
         },
 
         /**
-         * Deselect the current element.
+         * Select a block section — opens section mode in the panel
+         * showing all editable fields for that block.
          */
-        deselect() {
-            if (this.activeEl) {
-                this.activeEl.classList.remove('taw-editor-active', 'taw-editor-editing');
-                this.activeEl.removeAttribute('contenteditable');
-                this.activeEl = null;
-            }
-            this.hideToolbar();
-        },
+        selectSection(blockId) {
+            this.clearActiveState();
 
-        // ── Toolbar ────────────────────────────────────────────
+            this.activeBlockId = blockId;
+            this.activeFieldId = null;
+            this.panelMode = 'section';
 
-        /**
-         * Show the floating toolbar above the given element.
-         */
-        showToolbar(el) {
-            // Remove existing toolbar if any
-            this.hideToolbar();
-
-            const fieldId = el.dataset.tawField;
-            const fieldType = el.dataset.tawType;
-            const label = el.dataset.tawLabel || fieldId;
-
-            // Build the toolbar HTML
-            const toolbar = document.createElement('div');
-            toolbar.className = 'taw-editor-toolbar';
-            toolbar.id = 'taw-editor-toolbar';
-
-            toolbar.innerHTML = `
-                <span class="taw-editor-toolbar__label">${this.escHtml(label)}</span>
-                <span class="taw-editor-toolbar__type">${this.escHtml(fieldType)}</span>
-                ${this.getToolbarActions(fieldType)}
-            `;
-
-            document.body.appendChild(toolbar);
-
-            // Bind action buttons
-            this.bindToolbarActions(toolbar, el, fieldType);
-
-            // Position above the element
-            this.positionToolbar(toolbar, el);
-        },
-
-        /**
-         * Get the action buttons HTML based on field type.
-         */
-        getToolbarActions(fieldType) {
-            switch (fieldType) {
-                case 'text':
-                case 'textarea':
-                case 'url':
-                case 'number':
-                    return '<button class="taw-editor-toolbar__btn" data-action="edit">Edit</button>';
-
-                case 'wysiwyg':
-                    return '<button class="taw-editor-toolbar__btn" data-action="edit-wysiwyg">Edit Content</button>';
-
-                case 'image':
-                    return `
-                        <button class="taw-editor-toolbar__btn" data-action="change-image">Change</button>
-                    `;
-
-                default:
-                    return '<button class="taw-editor-toolbar__btn" data-action="edit">Edit</button>';
-            }
-        },
-
-        /**
-         * Bind click handlers to toolbar action buttons.
-         */
-        bindToolbarActions(toolbar, el, fieldType) {
-            toolbar.querySelectorAll('[data-action]').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const action = btn.dataset.action;
-
-                    switch (action) {
-                        case 'edit':
-                            this.startInlineEdit(el);
-                            break;
-                        case 'edit-wysiwyg':
-                            this.startWysiwygEdit(el);
-                            break;
-                        case 'change-image':
-                            this.openMediaPicker(el);
-                            break;
-                    }
-                });
+            // Highlight all fields in this section
+            document.querySelectorAll(`[data-taw-block="${blockId}"]`).forEach(el => {
+                el.classList.add('taw-editor-active');
             });
         },
 
         /**
-         * Position toolbar above the target element.
+         * Switch from field mode to section mode for the same block.
          */
+        expandToSection() {
+            if (this.activeBlockId) {
+                this.selectSection(this.activeBlockId);
+            }
+        },
+
+        /**
+         * From the panel, focus a specific field (scrolls to it and selects it).
+         */
+        focusField(fieldId) {
+            const el = document.querySelector(`[data-taw-field="${fieldId}"]`);
+            if (!el) return;
+
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            this.selectField(el);
+        },
+
+        deselect() {
+            this.clearActiveState();
+            this.panelMode = 'idle';
+            this.activeBlockId = null;
+            this.activeFieldId = null;
+            this.hideToolbar();
+        },
+
+        clearActiveState() {
+            document.querySelectorAll('.taw-editor-active, .taw-editor-editing').forEach(el => {
+                el.classList.remove('taw-editor-active', 'taw-editor-editing');
+                el.removeAttribute('contenteditable');
+            });
+            this.hideToolbar();
+        },
+
+        // ── Toolbar (stays as a lightweight indicator) ─────────
+
+        showToolbar(el) {
+            this.hideToolbar();
+
+            const label = el.dataset.tawLabel || el.dataset.tawField;
+            const fieldType = el.dataset.tawType;
+
+            const toolbar = document.createElement('div');
+            toolbar.className = 'taw-editor-toolbar';
+            toolbar.id = 'taw-editor-toolbar';
+            toolbar.innerHTML = `
+                <span class="taw-editor-toolbar__label">${this.escHtml(label)}</span>
+                <span class="taw-editor-toolbar__type">${this.escHtml(fieldType)}</span>
+            `;
+
+            document.body.appendChild(toolbar);
+            this.positionToolbar(toolbar, el);
+        },
+
         positionToolbar(toolbar, el) {
             const rect = el.getBoundingClientRect();
             const scrollY = window.scrollY;
             const scrollX = window.scrollX;
+            // Account for the panel width (320px) on the right
+            const panelWidth = 320;
 
-            // Place above the element with 10px gap
             let top = rect.top + scrollY - toolbar.offsetHeight - 10;
             let left = rect.left + scrollX;
 
-            // If toolbar would go off-screen top, place below instead
-            if (top < scrollY + 50) { // 50px buffer for admin bar
+            if (top < scrollY + 50) {
                 top = rect.bottom + scrollY + 10;
-                // Flip the arrow
-                toolbar.classList.add('taw-editor-toolbar--below');
             }
 
-            // Keep within horizontal viewport
-            const maxLeft = window.innerWidth - toolbar.offsetWidth - 10;
+            const maxLeft = window.innerWidth - panelWidth - toolbar.offsetWidth - 10;
             left = Math.max(10, Math.min(left, maxLeft + scrollX));
 
             toolbar.style.top = `${top}px`;
             toolbar.style.left = `${left}px`;
         },
 
-        /**
-         * Remove the toolbar from the DOM.
-         */
         hideToolbar() {
             const existing = document.getElementById('taw-editor-toolbar');
             if (existing) existing.remove();
         },
 
-        // ── Inline Editing (text, textarea, url, number) ──────
+        // ── Panel Field Editing ────────────────────────────────
+        // These are called from the panel's input elements.
 
         /**
-         * Make the element contenteditable for inline text editing.
+         * Handle panel input change for a field.
+         * Updates both the DOM preview and the changes tracker.
          */
+        panelFieldUpdate(fieldId, newValue) {
+            const fieldInfo = this.findFieldInfo(fieldId);
+            if (!fieldInfo) return;
+
+            const el = fieldInfo.el;
+
+            // Store original if first edit
+            if (!this.changes[fieldId]) {
+                this._storeOriginal(el);
+            }
+
+            // Update the live DOM preview
+            if (fieldInfo.type === 'image') {
+                // For image, newValue from panel is an attachment ID
+                // We'll handle this via the media picker
+                return;
+            }
+
+            // Update DOM element
+            el.textContent = newValue;
+
+            // Track the change
+            if (newValue === this.changes[fieldId]?.originalValue) {
+                delete this.changes[fieldId];
+            } else {
+                this.changes[fieldId].value = newValue;
+            }
+        },
+
+        /**
+         * Open the media picker from the panel for an image field.
+         */
+        panelImagePicker(fieldId) {
+            const fieldInfo = this.findFieldInfo(fieldId);
+            if (!fieldInfo) return;
+            this.openMediaPicker(fieldInfo.el);
+        },
+
+        /**
+         * Get the current display value for a field (for panel inputs).
+         */
+        getFieldValue(fieldId) {
+            const el = document.querySelector(`[data-taw-field="${fieldId}"]`);
+            if (!el) return '';
+
+            if (el.dataset.tawType === 'image') {
+                return el.tagName === 'IMG' ? el.src : '';
+            }
+            return el.textContent;
+        },
+
+        /**
+         * Find a field's info object from any block.
+         */
+        findFieldInfo(fieldId) {
+            for (const fields of Object.values(this.blockFields)) {
+                const found = fields.find(f => f.fieldId === fieldId);
+                if (found) return found;
+            }
+            return null;
+        },
+
+        // ── Inline Editing ─────────────────────────────────────
+
         startInlineEdit(el) {
-            const fieldType = el.dataset.tawType;
             const fieldId = el.dataset.tawField;
 
-            // Store original value before editing starts
             if (!this.changes[fieldId]) {
                 this._storeOriginal(el);
             }
@@ -239,31 +344,21 @@ document.addEventListener('alpine:init', () => {
             el.setAttribute('contenteditable', 'true');
             el.focus();
 
-            // For single-line fields (text, url, number), prevent Enter from creating new lines
-            if (fieldType !== 'textarea') {
+            if (el.dataset.tawType !== 'textarea') {
                 el.addEventListener('keydown', this._singleLineKeyHandler);
             }
 
-            // Track changes on input
-            el.addEventListener('input', () => this._trackChange(el), { once: false });
-
-            // When the user clicks away, finalize the edit
+            el.addEventListener('input', () => this._trackChange(el));
             el.addEventListener('blur', () => this._finalizeInlineEdit(el), { once: true });
         },
 
-        /**
-         * Prevent Enter key in single-line fields.
-         */
         _singleLineKeyHandler(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                e.target.blur(); // Finalize the edit
+                e.target.blur();
             }
         },
 
-        /**
-         * Finalize inline editing — remove contenteditable, record change.
-         */
         _finalizeInlineEdit(el) {
             el.classList.remove('taw-editor-editing');
             el.removeAttribute('contenteditable');
@@ -273,14 +368,10 @@ document.addEventListener('alpine:init', () => {
 
         // ── Image Editing ──────────────────────────────────────
 
-        /**
-         * Open the WordPress media picker for an image field.
-         */
         openMediaPicker(el) {
             const fieldId = el.dataset.tawField;
             const blockId = el.dataset.tawBlock;
 
-            // Store original before first change
             if (!this.changes[fieldId]) {
                 this._storeOriginal(el);
             }
@@ -295,23 +386,18 @@ document.addEventListener('alpine:init', () => {
             frame.on('select', () => {
                 const attachment = frame.state().get('selection').first().toJSON();
 
-                // Update the DOM — handle both <img> and background-image
                 if (el.tagName === 'IMG') {
                     el.src = attachment.url;
-                    // Also update srcset if present
-                    if (el.srcset) {
-                        el.removeAttribute('srcset');
-                    }
+                    if (el.srcset) el.removeAttribute('srcset');
                 } else {
                     el.style.backgroundImage = `url(${attachment.url})`;
                 }
 
-                // Track the change — for images, we store the attachment ID
                 this.changes[fieldId] = {
-                    blockId: blockId,
-                    fieldId: fieldId,
+                    blockId,
+                    fieldId,
                     type: 'image',
-                    value: attachment.id, // WP attachment ID
+                    value: attachment.id,
                     displayValue: attachment.url,
                     originalValue: this.changes[fieldId]?.originalValue ?? el.src ?? '',
                 };
@@ -320,19 +406,12 @@ document.addEventListener('alpine:init', () => {
             frame.open();
         },
 
-        // ── WYSIWYG Editing (placeholder for Step 3d+) ────────
-
         startWysiwygEdit(el) {
-            // For MVP, fall back to inline editing
-            // In a future iteration, this could open a modal with TinyMCE
             this.startInlineEdit(el);
         },
 
         // ── Change Tracking ────────────────────────────────────
 
-        /**
-         * Store the original value of an element before first edit.
-         */
         _storeOriginal(el) {
             const fieldId = el.dataset.tawField;
             const type = el.dataset.tawType;
@@ -344,50 +423,35 @@ document.addEventListener('alpine:init', () => {
                 originalValue = el.textContent;
             }
 
-            // Initialize the change entry with original value
             this.changes[fieldId] = {
                 blockId: el.dataset.tawBlock,
-                fieldId: fieldId,
-                type: type,
+                fieldId,
+                type,
                 value: originalValue,
-                originalValue: originalValue,
+                originalValue,
             };
         },
 
-        /**
-         * Record a change for the given element.
-         */
         _trackChange(el) {
             const fieldId = el.dataset.tawField;
-            const type = el.dataset.tawType;
             const newValue = el.textContent;
 
             if (!this.changes[fieldId]) {
                 this._storeOriginal(el);
             }
 
-            // If the value is back to original, remove the change
             if (newValue === this.changes[fieldId].originalValue) {
                 delete this.changes[fieldId];
             } else {
                 this.changes[fieldId].value = newValue;
             }
-
-            const count = this.changeCount;
-            this.statusMessage = count > 0 ? `${count} unsaved ${count === 1 ? 'change' : 'changes'}` : '';
         },
 
         // ── Save & Discard ─────────────────────────────────────
 
-        /**
-         * Save all pending changes via the REST API.
-         * (REST endpoint will be built in Step 4)
-         */
         async save() {
             if (!this.hasChanges || this.saving) return;
-
             this.saving = true;
-            this.statusMessage = 'Saving…';
 
             try {
                 const response = await fetch(`${tawEditor.restUrl}save`, {
@@ -402,46 +466,36 @@ document.addEventListener('alpine:init', () => {
                     }),
                 });
 
-                if (!response.ok) {
-                    throw new Error(`Save failed: ${response.status}`);
-                }
-
+                if (!response.ok) throw new Error(`${response.status}`);
                 const result = await response.json();
 
-                // Clear changes on success
-                this.changes = {};
-                this.statusMessage = 'Saved!';
-
-                // Brief success feedback, then hide the bar
-                setTimeout(() => {
-                    this.statusMessage = '';
-                }, 1500);
-
+                if (result.success) {
+                    this.changes = {};
+                    this.toast(result.message, 'success');
+                } else {
+                    this.toast(result.message, 'error', 5000);
+                    if (result.saved) {
+                        result.saved.forEach(id => delete this.changes[id]);
+                    }
+                }
             } catch (error) {
                 console.error('[TAW Editor] Save failed:', error);
-                this.statusMessage = 'Save failed — please try again';
+                this.toast('Save failed — please try again', 'error', 5000);
             } finally {
                 this.saving = false;
             }
         },
 
-        /**
-         * Discard all pending changes and revert DOM to original values.
-         */
         discard() {
             if (!confirm('Discard all unsaved changes?')) return;
 
-            // Revert each changed element to its original value
             for (const [fieldId, change] of Object.entries(this.changes)) {
                 const el = document.querySelector(`[data-taw-field="${fieldId}"]`);
                 if (!el) continue;
 
                 if (change.type === 'image') {
-                    if (el.tagName === 'IMG') {
-                        el.src = change.originalValue;
-                    } else {
-                        el.style.backgroundImage = change.originalValue;
-                    }
+                    if (el.tagName === 'IMG') el.src = change.originalValue;
+                    else el.style.backgroundImage = change.originalValue;
                 } else {
                     el.textContent = change.originalValue;
                 }
@@ -449,13 +503,39 @@ document.addEventListener('alpine:init', () => {
 
             this.changes = {};
             this.deselect();
+            this.toast('Changes discarded', 'info');
+        },
+
+        // ── Toast Notifications ────────────────────────────────
+
+        toasts: [],
+        _toastId: 0,
+
+        toast(message, type = 'info', duration = 3000) {
+            const id = ++this._toastId;
+            this.toasts.push({ id, message, type, visible: false });
+
+            requestAnimationFrame(() => {
+                const t = this.toasts.find(t => t.id === id);
+                if (t) t.visible = true;
+            });
+
+            if (duration > 0) {
+                setTimeout(() => this.dismissToast(id), duration);
+            }
+        },
+
+        dismissToast(id) {
+            const t = this.toasts.find(t => t.id === id);
+            if (!t) return;
+            t.visible = false;
+            setTimeout(() => {
+                this.toasts = this.toasts.filter(t => t.id !== id);
+            }, 300);
         },
 
         // ── Utilities ──────────────────────────────────────────
 
-        /**
-         * Simple HTML escaping for toolbar content.
-         */
         escHtml(str) {
             const div = document.createElement('div');
             div.textContent = str;

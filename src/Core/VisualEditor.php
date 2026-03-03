@@ -161,6 +161,12 @@ class VisualEditor
             'nonce' => wp_create_nonce('wp_rest'),
             'exitUrl' => get_permalink(get_queried_object_id())
         ]);
+
+        // Add body class for layout shift
+        add_filter('body_class', function (array $classes): array {
+            $classes[] = 'taw-visual-editor-active';
+            return $classes;
+        });
     }
 
     /**
@@ -199,22 +205,164 @@ class VisualEditor
 ?>
         <div x-data="tawVisualEditor" id="taw-visual-editor-root">
 
-            <div id="taw-editor-savebar" class="taw-editor-savebar"
-                :class="{ 'has-changes': hasChanges }">
-                <div class="taw-editor-savebar__status">
-                    <strong x-text="statusMessage"></strong>
+            <!-- ── Right-Side Panel ─────────────────────────── -->
+            <div class="taw-editor-panel">
+
+                <!-- Panel Header -->
+                <div class="taw-editor-panel__header">
+                    <h2 class="taw-editor-panel__title">Visual Editor</h2>
+                    <a :href="tawEditor.exitUrl" class="taw-editor-panel__close" title="Exit editor">✕</a>
                 </div>
-                <div class="taw-editor-savebar__actions">
-                    <button class="taw-editor-savebar__btn taw-editor-savebar__btn--discard"
-                        @click="discard()">
-                        Discard
-                    </button>
-                    <button class="taw-editor-savebar__btn taw-editor-savebar__btn--save"
-                        @click="save()"
-                        :disabled="saving">
-                        Save Changes
-                    </button>
+
+                <!-- Idle State: list available blocks -->
+                <div x-show="panelMode === 'idle'" class="taw-editor-panel__body">
+                    <p class="taw-editor-panel__hint">
+                        Click any editable element on the page, or select a section below.
+                    </p>
+                    <div class="taw-editor-panel__blocks">
+                        <template x-for="block in availableBlocks" :key="block.blockId">
+                            <button class="taw-editor-panel__block-btn"
+                                @click="selectSection(block.blockId)">
+                                <span class="taw-editor-panel__block-name" x-text="block.blockId"></span>
+                                <span class="taw-editor-panel__block-count"
+                                    x-text="block.fieldCount + ' field' + (block.fieldCount !== 1 ? 's' : '')"></span>
+                            </button>
+                        </template>
+                    </div>
                 </div>
+
+                <!-- Field Mode: single field editor -->
+                <div x-show="panelMode === 'field'" class="taw-editor-panel__body">
+                    <button class="taw-editor-panel__back" @click="expandToSection()">
+                        ← All <span x-text="activeBlockId"></span> fields
+                    </button>
+
+                    <template x-if="activeFieldInfo">
+                        <div class="taw-editor-panel__field">
+                            <label class="taw-editor-panel__field-label" x-text="activeFieldInfo.label"></label>
+                            <span class="taw-editor-panel__field-type" x-text="activeFieldInfo.type"></span>
+
+                            <!-- Text / URL / Number input -->
+                            <template x-if="['text', 'url', 'number'].includes(activeFieldInfo.type)">
+                                <input class="taw-editor-panel__input"
+                                    :type="activeFieldInfo.type === 'number' ? 'number' : 'text'"
+                                    :value="getFieldValue(activeFieldInfo.fieldId)"
+                                    @input="panelFieldUpdate(activeFieldInfo.fieldId, $event.target.value)">
+                            </template>
+
+                            <!-- Textarea -->
+                            <template x-if="activeFieldInfo.type === 'textarea'">
+                                <textarea class="taw-editor-panel__textarea"
+                                    rows="4"
+                                    :value="getFieldValue(activeFieldInfo.fieldId)"
+                                    @input="panelFieldUpdate(activeFieldInfo.fieldId, $event.target.value)"></textarea>
+                            </template>
+
+                            <!-- WYSIWYG (simplified textarea for MVP) -->
+                            <template x-if="activeFieldInfo.type === 'wysiwyg'">
+                                <textarea class="taw-editor-panel__textarea"
+                                    rows="6"
+                                    :value="getFieldValue(activeFieldInfo.fieldId)"
+                                    @input="panelFieldUpdate(activeFieldInfo.fieldId, $event.target.value)"></textarea>
+                            </template>
+
+                            <!-- Image -->
+                            <template x-if="activeFieldInfo.type === 'image'">
+                                <div class="taw-editor-panel__image-field">
+                                    <img :src="getFieldValue(activeFieldInfo.fieldId)"
+                                        class="taw-editor-panel__image-preview"
+                                        x-show="getFieldValue(activeFieldInfo.fieldId)">
+                                    <button class="taw-editor-panel__btn"
+                                        @click="panelImagePicker(activeFieldInfo.fieldId)">
+                                        Change Image
+                                    </button>
+                                </div>
+                            </template>
+
+                            <!-- Inline edit shortcut for text types -->
+                            <template x-if="['text', 'textarea', 'wysiwyg'].includes(activeFieldInfo.type)">
+                                <button class="taw-editor-panel__btn taw-editor-panel__btn--secondary"
+                                    @click="startInlineEdit(activeFieldInfo.el)">
+                                    Edit inline on page
+                                </button>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Section Mode: all fields for a block -->
+                <div x-show="panelMode === 'section'" class="taw-editor-panel__body">
+                    <button class="taw-editor-panel__back" @click="deselect()">
+                        ← Back to overview
+                    </button>
+                    <h3 class="taw-editor-panel__section-title" x-text="activeBlockId"></h3>
+
+                    <template x-for="field in activeSectionFields" :key="field.fieldId">
+                        <div class="taw-editor-panel__field"
+                            @click.stop="focusField(field.fieldId)">
+                            <label class="taw-editor-panel__field-label" x-text="field.label"></label>
+                            <span class="taw-editor-panel__field-type" x-text="field.type"></span>
+
+                            <template x-if="['text', 'url', 'number'].includes(field.type)">
+                                <input class="taw-editor-panel__input"
+                                    :type="field.type === 'number' ? 'number' : 'text'"
+                                    :value="getFieldValue(field.fieldId)"
+                                    @input="panelFieldUpdate(field.fieldId, $event.target.value)"
+                                    @click.stop>
+                            </template>
+
+                            <template x-if="field.type === 'textarea' || field.type === 'wysiwyg'">
+                                <textarea class="taw-editor-panel__textarea"
+                                    rows="3"
+                                    :value="getFieldValue(field.fieldId)"
+                                    @input="panelFieldUpdate(field.fieldId, $event.target.value)"
+                                    @click.stop></textarea>
+                            </template>
+
+                            <template x-if="field.type === 'image'">
+                                <div class="taw-editor-panel__image-field" @click.stop>
+                                    <img :src="getFieldValue(field.fieldId)"
+                                        class="taw-editor-panel__image-preview"
+                                        x-show="getFieldValue(field.fieldId)">
+                                    <button class="taw-editor-panel__btn"
+                                        @click="panelImagePicker(field.fieldId)">
+                                        Change
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Save Bar (always at bottom of panel) -->
+                <div class="taw-editor-panel__footer" :class="{ 'has-changes': hasChanges }">
+                    <div class="taw-editor-panel__changes" x-show="hasChanges">
+                        <span x-text="changeCount + ' unsaved ' + (changeCount === 1 ? 'change' : 'changes')"></span>
+                    </div>
+                    <div class="taw-editor-panel__actions">
+                        <button class="taw-editor-panel__btn taw-editor-panel__btn--secondary"
+                            @click="discard()"
+                            x-show="hasChanges">
+                            Discard
+                        </button>
+                        <button class="taw-editor-panel__btn taw-editor-panel__btn--primary"
+                            @click="save()"
+                            :disabled="!hasChanges || saving"
+                            x-text="saving ? 'Saving…' : 'Save'">
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Toast Container ──────────────────────────── -->
+            <div class="taw-editor-toasts">
+                <template x-for="toast in toasts" :key="toast.id">
+                    <div class="taw-editor-toast"
+                        :class="['taw-editor-toast--' + toast.type, { 'visible': toast.visible }]"
+                        @click="dismissToast(toast.id)">
+                        <span x-text="toast.message"></span>
+                    </div>
+                </template>
             </div>
 
         </div>

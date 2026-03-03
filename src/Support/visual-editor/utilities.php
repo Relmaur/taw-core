@@ -36,3 +36,10 @@ if (! function_exists('taw_editor_attrs_array')) {
         return \TAW\Helpers\Editor::attrsArray($blockId, $fieldId);
     }
 }
+
+if (! function_exists('taw_editor_section')) {
+    function taw_editor_section(string $blockId): string
+    {
+        return \TAW\Helpers\Editor::section($blockId);
+    }
+}
