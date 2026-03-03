@@ -19,7 +19,8 @@
         },
         "files": [
             "src/Support/vite-loader.php",
-            "src/Support/performance.php"
+            "src/Support/performance.php",
+            "src/Helpers/Editor.php"
         ]
     },
     "minimum-stability": "stable",

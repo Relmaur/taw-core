@@ -122,9 +122,13 @@ class Metabox
         add_action('add_meta_boxes', [$this, 'register']);
         add_action('save_post', [$this, 'save'], 10, 2);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
+
+        foreach ($this->fields as $field) {
+            self::$fieldRegistry[$field['id']] = array_merge($field, [
+                'metabox_id' => $this->id,
+            ]);
+        }
     }
-
-
 
     /**
      * Register the metabox with WordPress via `add_meta_box()`.
@@ -1876,5 +1880,38 @@ class Metabox
 
         $rows = json_decode($raw, true);
         return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * Retrieve the config for a registered field.
+     * Returns null if the field isn't registered or isn't editor-enabled
+     */
+    public static function get_field_config(string $fieldId): ?array
+    {
+        return self::$fieldRegistry[$fieldId] ?? null;
+    }
+
+    /**
+     * Retrieve the editor config for a field
+     * Returns null if the field doesn't exists or has editor disabled.
+     * Returns true for simple 'editor' => true declarations.
+     * Returns the settings array for 'editor' => [...] declarations.
+     */
+    public static function get_editor_config(string $fieldId): mixed
+    {
+        $field = self::$fieldRegistry[$fieldId] ?? null;
+
+        if (! $field) {
+            return null;
+        }
+
+        $editor = $field['editor'] ?? false;
+
+        // Not editor-enabled
+        if ($editor === false || $editor === null) {
+            return null;
+        }
+
+        return $editor;
     }
 }
