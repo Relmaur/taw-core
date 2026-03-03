@@ -81,7 +81,7 @@
   pointer-events: auto;
 }
 
-.taw-editor-toolbar::after {
+/* .taw-editor-toolbar::after {
   content: "";
   position: absolute;
   bottom: -6px;
@@ -92,7 +92,7 @@
   border-right: 1px solid var(--taw-editor-primary-border);
   border-bottom: 1px solid var(--taw-editor-primary-border);
   transform: rotate(45deg);
-}
+} */
 
 .taw-editor-toolbar__label {
   color: var(--taw-editor-text-muted);
