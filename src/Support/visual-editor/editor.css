@@ -1,210 +1,353 @@
-/*
- * TAW Visual Editor — Frontend Overlay Styles
- *
- * These styles are ONLY loaded when ?taw_visual_edit=1 is active.
- * They handle: editable element outlines, selection state,
- * the floating toolbar, and the save bar.
- */
-
 /* =========================================================
-   CSS Custom Properties — easy to theme later
+   Design Tokens
    ========================================================= */
 
 :root {
-  --taw-editor-primary: #3b82f6;
-  --taw-editor-primary-hover: #2563eb;
-  --taw-editor-primary-light: rgba(59, 130, 246, 0.08);
-  --taw-editor-primary-border: rgba(59, 130, 246, 0.3);
-  --taw-editor-danger: #ef4444;
-  --taw-editor-bg: #ffffff;
-  --taw-editor-text: #1f2937;
-  --taw-editor-text-muted: #6b7280;
-  --taw-editor-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  --taw-editor-radius: 6px;
-  --taw-editor-font:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --taw-editor-bg:             #ffffff;
+  --taw-editor-font:           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --taw-editor-text:           #111827;
+  --taw-editor-text-muted:     #6b7280;
+  --taw-editor-primary:        #2563eb;
+  --taw-editor-primary-hover:  #1d4ed8;
+  --taw-editor-primary-light:  #eff6ff;
+  --taw-editor-primary-border: #bfdbfe;
+  --taw-editor-danger:         #dc2626;
+  --taw-editor-radius:         6px;
+  --taw-editor-shadow:         0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 /* =========================================================
-   Editable Elements — hover and selection outlines
+   Page Layout — shift content to make room for the panel
    ========================================================= */
 
-/* All editable elements get a subtle dashed outline on hover */
-[data-taw-field] {
-  cursor: pointer;
-  transition:
-    outline-color 0.15s ease,
-    background-color 0.15s ease;
-  outline: 2px dashed transparent;
-  outline-offset: 4px;
-  border-radius: 2px;
-}
-
-[data-taw-field]:hover {
-  outline-color: var(--taw-editor-primary-border);
-  background-color: var(--taw-editor-primary-light);
-}
-
-/* Selected state — solid outline */
-[data-taw-field].taw-editor-active {
-  outline: 2px solid var(--taw-editor-primary);
-  outline-offset: 4px;
-  background-color: var(--taw-editor-primary-light);
-}
-
-/* When a text/textarea field is being edited inline */
-[data-taw-field].taw-editor-editing {
-  outline: 2px solid var(--taw-editor-primary);
-  outline-offset: 4px;
-  min-height: 1em;
+body.taw-visual-editor-active {
+  margin-right: 320px;
+  transition: margin-right 0.25s ease;
 }
 
 /* =========================================================
-   Floating Toolbar — appears above the selected element
+   Right-Side Panel
    ========================================================= */
 
-.taw-editor-toolbar {
-  position: absolute;
-  z-index: 100000;
+.taw-editor-panel {
+  position: fixed;
+  top: 32px; /* Below WP admin bar */
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  z-index: 99999;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  flex-direction: column;
   background: var(--taw-editor-bg);
-  border: 1px solid var(--taw-editor-primary-border);
-  border-radius: var(--taw-editor-radius);
-  box-shadow: var(--taw-editor-shadow);
+  border-left: 1px solid #e5e7eb;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.06);
   font-family: var(--taw-editor-font);
   font-size: 13px;
-  line-height: 1;
-  white-space: nowrap;
-  pointer-events: auto;
+  color: var(--taw-editor-text);
+  overflow: hidden;
 }
 
-/* .taw-editor-toolbar::after {
-  content: "";
-  position: absolute;
-  bottom: -6px;
-  left: 20px;
-  width: 10px;
-  height: 10px;
-  background: var(--taw-editor-bg);
-  border-right: 1px solid var(--taw-editor-primary-border);
-  border-bottom: 1px solid var(--taw-editor-primary-border);
-  transform: rotate(45deg);
-} */
-
-.taw-editor-toolbar__label {
-  color: var(--taw-editor-text-muted);
-  font-weight: 500;
-  padding-right: 8px;
-  border-right: 1px solid #e5e7eb;
-}
-
-.taw-editor-toolbar__type {
-  display: inline-block;
-  padding: 2px 6px;
-  background: var(--taw-editor-primary-light);
-  color: var(--taw-editor-primary);
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.taw-editor-toolbar__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  background: var(--taw-editor-primary);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  font-family: var(--taw-editor-font);
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.taw-editor-toolbar__btn:hover {
-  background: var(--taw-editor-primary-hover);
-}
-
-/* =========================================================
-   Save Bar — fixed bottom bar with save/discard actions
-   ========================================================= */
-
-.taw-editor-savebar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 100001;
+.taw-editor-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 24px;
-  background: var(--taw-editor-bg);
-  border-top: 1px solid #e5e7eb;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
-  font-family: var(--taw-editor-font);
-  transform: translateY(100%);
-  transition: transform 0.25s ease;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
 }
 
-.taw-editor-savebar.has-changes {
-  transform: translateY(0);
+.taw-editor-panel__title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
 }
 
-.taw-editor-savebar__status {
-  font-size: 13px;
-  color: var(--taw-editor-text-muted);
-}
-
-.taw-editor-savebar__status strong {
-  color: var(--taw-editor-text);
-}
-
-.taw-editor-savebar__actions {
+.taw-editor-panel__close {
+  width: 28px;
+  height: 28px;
   display: flex;
-  gap: 8px;
-}
-
-.taw-editor-savebar__btn {
-  padding: 8px 20px;
-  border-radius: var(--taw-editor-radius);
-  font-size: 13px;
-  font-weight: 500;
-  font-family: var(--taw-editor-font);
-  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--taw-editor-text-muted);
+  text-decoration: none;
   transition: all 0.15s ease;
 }
 
-.taw-editor-savebar__btn--discard {
-  background: transparent;
-  border: 1px solid #d1d5db;
+.taw-editor-panel__close:hover {
+  background: #e5e7eb;
   color: var(--taw-editor-text);
 }
 
-.taw-editor-savebar__btn--discard:hover {
+.taw-editor-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.taw-editor-panel__hint {
+  color: var(--taw-editor-text-muted);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+/* ── Block List (idle state) ──────────────────────────── */
+
+.taw-editor-panel__blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.taw-editor-panel__block-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--taw-editor-radius);
+  cursor: pointer;
+  font-family: var(--taw-editor-font);
+  font-size: 13px;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.taw-editor-panel__block-btn:hover {
+  background: var(--taw-editor-primary-light);
+  border-color: var(--taw-editor-primary-border);
+}
+
+.taw-editor-panel__block-name {
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.taw-editor-panel__block-count {
+  color: var(--taw-editor-text-muted);
+  font-size: 12px;
+}
+
+/* ── Back Button ──────────────────────────────────────── */
+
+.taw-editor-panel__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  margin-bottom: 16px;
+  background: none;
+  border: none;
+  color: var(--taw-editor-primary);
+  font-family: var(--taw-editor-font);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.taw-editor-panel__back:hover {
+  text-decoration: underline;
+}
+
+/* ── Section Title ────────────────────────────────────── */
+
+.taw-editor-panel__section-title {
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: capitalize;
+  margin: 0 0 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* ── Field Editors ────────────────────────────────────── */
+
+.taw-editor-panel__field {
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--taw-editor-radius);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.taw-editor-panel__field:hover {
+  border-color: var(--taw-editor-primary-border);
+}
+
+.taw-editor-panel__field-label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.taw-editor-panel__field-type {
+  display: inline-block;
+  padding: 1px 5px;
+  background: var(--taw-editor-primary-light);
+  color: var(--taw-editor-primary);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 8px;
+}
+
+.taw-editor-panel__input,
+.taw-editor-panel__textarea {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-family: var(--taw-editor-font);
+  font-size: 13px;
+  line-height: 1.5;
+  background: #fff;
+  color: var(--taw-editor-text);
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.taw-editor-panel__input:focus,
+.taw-editor-panel__textarea:focus {
+  outline: none;
+  border-color: var(--taw-editor-primary);
+  box-shadow: 0 0 0 2px var(--taw-editor-primary-light);
+}
+
+/* ── Image Field in Panel ─────────────────────────────── */
+
+.taw-editor-panel__image-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.taw-editor-panel__image-preview {
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+}
+
+/* ── Panel Buttons ────────────────────────────────────── */
+
+.taw-editor-panel__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 14px;
+  border-radius: 4px;
+  font-family: var(--taw-editor-font);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.taw-editor-panel__btn--primary {
+  background: var(--taw-editor-primary);
+  color: #fff;
+}
+
+.taw-editor-panel__btn--primary:hover {
+  background: var(--taw-editor-primary-hover);
+}
+
+.taw-editor-panel__btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.taw-editor-panel__btn--secondary {
+  background: #fff;
+  border-color: #d1d5db;
+  color: var(--taw-editor-text);
+}
+
+.taw-editor-panel__btn--secondary:hover {
   background: #f9fafb;
   border-color: #9ca3af;
 }
 
-.taw-editor-savebar__btn--save {
-  background: var(--taw-editor-primary);
-  border: 1px solid var(--taw-editor-primary);
+/* ── Panel Footer (save bar) ──────────────────────────── */
+
+.taw-editor-panel__footer {
+  padding: 12px 16px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.taw-editor-panel__changes {
+  font-size: 12px;
+  color: var(--taw-editor-primary);
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.taw-editor-panel__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.taw-editor-panel__actions .taw-editor-panel__btn {
+  flex: 1;
+}
+
+/* =========================================================
+   Toast Notifications
+   ========================================================= */
+
+.taw-editor-toasts {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(calc(-50% - 160px)); /* Offset for panel */
+  z-index: 100002;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.taw-editor-toast {
+  padding: 10px 20px;
+  border-radius: var(--taw-editor-radius);
+  font-family: var(--taw-editor-font);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--taw-editor-shadow);
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s ease;
+}
+
+.taw-editor-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.taw-editor-toast--success {
+  background: #059669;
   color: #fff;
 }
 
-.taw-editor-savebar__btn--save:hover {
-  background: var(--taw-editor-primary-hover);
+.taw-editor-toast--error {
+  background: var(--taw-editor-danger);
+  color: #fff;
 }
 
-.taw-editor-savebar__btn--save:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.taw-editor-toast--info {
+  background: var(--taw-editor-text);
+  color: #fff;
 }

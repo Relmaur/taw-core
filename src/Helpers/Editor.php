@@ -159,4 +159,22 @@ class Editor
 
         return $attrs;
     }
+
+    /**
+     * Return a data attribute marking this element as a block section.
+     * 
+     * Place on the outermost element of a MetaBlock template so the
+     * visual editor can detect section-level clicks.
+     *
+     * Usage:
+     *   <section class="hero" <?php echo taw_editor_section('hero'); ?>>
+     */
+    public static function section(string $blockId): string
+    {
+        if (! VisualEditor::isActive()) {
+            return '';
+        }
+
+        return sprintf('data-taw-block-section="%s"', esc_attr($blockId));
+    }
 }
