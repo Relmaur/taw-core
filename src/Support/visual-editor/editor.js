@@ -151,7 +151,13 @@ document.addEventListener('alpine:init', () => {
          * Select a single field — opens field mode in the panel.
          */
         selectField(el) {
-            if (this.activeEl === el) return;
+            if (this.activeEl === el) {
+                // Already selected → start inline editing (if text-based)
+                if (el.dataset.tawType !== 'image') {
+                    this.startInlineEdit(el);
+                }
+                return;
+            }
             this.clearActiveState();
 
             this.activeEl = el;
@@ -160,7 +166,7 @@ document.addEventListener('alpine:init', () => {
             this.panelMode = 'field';
 
             el.classList.add('taw-editor-active');
-            this.showToolbar(el);
+            // this.showToolbar(el);
         },
 
         /**
@@ -218,23 +224,23 @@ document.addEventListener('alpine:init', () => {
 
         // ── Toolbar (stays as a lightweight indicator) ─────────
 
-        showToolbar(el) {
-            this.hideToolbar();
+        // showToolbar(el) {
+        //     this.hideToolbar();
 
-            const label = el.dataset.tawLabel || el.dataset.tawField;
-            const fieldType = el.dataset.tawType;
+        //     const label = el.dataset.tawLabel || el.dataset.tawField;
+        //     const fieldType = el.dataset.tawType;
 
-            const toolbar = document.createElement('div');
-            toolbar.className = 'taw-editor-toolbar';
-            toolbar.id = 'taw-editor-toolbar';
-            toolbar.innerHTML = `
-                <span class="taw-editor-toolbar__label">${this.escHtml(label)}</span>
-                <span class="taw-editor-toolbar__type">${this.escHtml(fieldType)}</span>
-            `;
+        //     const toolbar = document.createElement('div');
+        //     toolbar.className = 'taw-editor-toolbar';
+        //     toolbar.id = 'taw-editor-toolbar';
+        //     toolbar.innerHTML = `
+        //         <span class="taw-editor-toolbar__label">${this.escHtml(label)}</span>
+        //         <span class="taw-editor-toolbar__type">${this.escHtml(fieldType)}</span>
+        //     `;
 
-            document.body.appendChild(toolbar);
-            this.positionToolbar(toolbar, el);
-        },
+        //     document.body.appendChild(toolbar);
+        //     this.positionToolbar(toolbar, el);
+        // },
 
         positionToolbar(toolbar, el) {
             const rect = el.getBoundingClientRect();
@@ -515,9 +521,14 @@ document.addEventListener('alpine:init', () => {
             const id = ++this._toastId;
             this.toasts.push({ id, message, type, visible: false });
 
-            requestAnimationFrame(() => {
-                const t = this.toasts.find(t => t.id === id);
-                if (t) t.visible = true;
+            // $nextTick lets Alpine wire up the x-for reactive effects for the
+            // new item first; the inner rAF then gives the browser a chance to
+            // compute the initial opacity:0 style so the CSS transition fires.
+            this.$nextTick(() => {
+                requestAnimationFrame(() => {
+                    const t = this.toasts.find(t => t.id === id);
+                    if (t) t.visible = true;
+                });
             });
 
             if (duration > 0) {

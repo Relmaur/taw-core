@@ -3,17 +3,19 @@
    ========================================================= */
 
 :root {
-  --taw-editor-bg:             #ffffff;
-  --taw-editor-font:           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --taw-editor-text:           #111827;
-  --taw-editor-text-muted:     #6b7280;
-  --taw-editor-primary:        #2563eb;
-  --taw-editor-primary-hover:  #1d4ed8;
-  --taw-editor-primary-light:  #eff6ff;
+  --taw-editor-bg: #ffffff;
+  --taw-editor-font:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --taw-editor-text: #111827;
+  --taw-editor-text-muted: #6b7280;
+  --taw-editor-primary: #2563eb;
+  --taw-editor-primary-hover: #1d4ed8;
+  --taw-editor-primary-light: #eff6ff;
   --taw-editor-primary-border: #bfdbfe;
-  --taw-editor-danger:         #dc2626;
-  --taw-editor-radius:         6px;
-  --taw-editor-shadow:         0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --taw-editor-danger: #dc2626;
+  --taw-editor-radius: 6px;
+  --taw-editor-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 /* =========================================================
@@ -211,6 +213,7 @@ body.taw-visual-editor-active {
   color: var(--taw-editor-text);
   transition: border-color 0.15s ease;
   box-sizing: border-box;
+  margin: 0 0 0.5rem 0;
 }
 
 .taw-editor-panel__input:focus,
