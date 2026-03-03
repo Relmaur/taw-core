@@ -372,6 +372,9 @@ document.addEventListener('alpine:init', () => {
             } else {
                 this.changes[fieldId].value = newValue;
             }
+
+            const count = this.changeCount;
+            this.statusMessage = count > 0 ? `${count} unsaved ${count === 1 ? 'change' : 'changes'}` : '';
         },
 
         // ── Save & Discard ─────────────────────────────────────
