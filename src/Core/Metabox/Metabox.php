@@ -123,10 +123,35 @@ class Metabox
         add_action('save_post', [$this, 'save'], 10, 2);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
 
+        // Register fields in the static registry for the visual editor
         foreach ($this->fields as $field) {
             self::$fieldRegistry[$field['id']] = array_merge($field, [
                 'metabox_id' => $this->id,
+                'prefix'     => $this->prefix,
             ]);
+
+            // Group: register sub-fields with compound IDs
+            if (($field['type'] ?? '') === 'group' && !empty($field['fields'])) {
+                $groupEditorSetting = $field['editor'] ?? false;
+
+                foreach ($field['fields'] as $subField) {
+                    $compoundId = $field['id'] . '_' . $subField['id'];
+
+                    if (!array_key_exists('editor', $subField)) {
+                        $subField['editor'] = $groupEditorSetting;
+                    }
+
+                    self::$fieldRegistry[$compoundId] = array_merge($subField, [
+                        'metabox_id'   => $this->id,
+                        'prefix'       => $this->prefix,
+                        'parent_group' => $field['id'],
+                    ]);
+                }
+            }
+
+            // Repeater TODO: sub-fields intentionally excluded from visual editor.
+            // Repeater data is a single JSON blob requiring row-index-aware
+            // editing — planned for a future iteration.
         }
     }
 
@@ -1710,6 +1735,39 @@ class Metabox
         }
 
         return wp_json_encode($clean_rows);
+    }
+
+    /**
+     * Sanitize a value based on a field config from the registry.
+     * 
+     * Used by the visual editor REST endpoint to sanitize incoming
+     * values using the same rules as the metabox save handler.
+     *
+     * @param array $fieldConfig The field config array from getFieldConfig().
+     * @param mixed $value       The raw value to sanitize.
+     * @return mixed The sanitized value.
+     */
+    public static function sanitizeValue(array $fieldConfig, mixed $value): mixed
+    {
+        // Fields with 'sanitize' => 'code' preserve raw content for trusted users
+        if (($fieldConfig['sanitize'] ?? '') === 'code') {
+            return current_user_can('unfiltered_html') ? $value : wp_kses_post($value);
+        }
+
+        $type = $fieldConfig['type'] ?? 'text';
+
+        return match ($type) {
+            'text', 'select' => sanitize_text_field($value),
+            'textarea'       => sanitize_textarea_field($value),
+            'url'            => esc_url_raw($value),
+            'number'         => floatval($value),
+            'image'          => absint($value),
+            'wysiwyg'        => wp_kses_post($value),
+            'checkbox'       => in_array($value, ['1', 1, true], true) ? '1' : '0',
+            'range'          => floatval($value),
+            'color'          => sanitize_hex_color($value) ?: '',
+            default          => sanitize_text_field($value),
+        };
     }
 
     /**
