@@ -355,15 +355,20 @@ class VisualEditor
             </div>
 
             <!-- ── Toast Container ──────────────────────────── -->
-            <div class="taw-editor-toasts">
-                <template x-for="toast in toasts" :key="toast.id">
-                    <div class="taw-editor-toast"
-                        :class="['taw-editor-toast--' + toast.type, { 'visible': toast.visible }]"
-                        @click="dismissToast(toast.id)">
-                        <span x-text="toast.message"></span>
-                    </div>
-                </template>
-            </div>
+            <!-- x-teleport moves this to <body> so it lives in the root
+                 stacking context, clear of any intermediate z-index/overflow
+                 created by the panel or WordPress wrapper elements. -->
+            <template x-teleport="body">
+                <div class="taw-editor-toasts">
+                    <template x-for="toast in toasts" :key="toast.id">
+                        <div class="taw-editor-toast"
+                            :class="['taw-editor-toast--' + toast.type, { 'visible': toast.visible }]"
+                            @click="dismissToast(toast.id)">
+                            <span x-text="toast.message"></span>
+                        </div>
+                    </template>
+                </div>
+            </template>
 
         </div>
 <?php
