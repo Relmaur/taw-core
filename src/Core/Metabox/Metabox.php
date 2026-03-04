@@ -65,6 +65,9 @@ class Metabox
     /** @var bool Guards against enqueuing the repeater script more than once. */
     private static bool $repeater_script_enqueued = false;
 
+    /** @var bool Guards against registering admin notices more than once. */
+    private static bool $notices_registered = false;
+
     /**
      * Global registry of field configurations, keyed by field ID.
      * Populated during metabox construction.
@@ -122,6 +125,11 @@ class Metabox
         add_action('add_meta_boxes', [$this, 'register']);
         add_action('save_post', [$this, 'save'], 10, 2);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
+
+        if (!self::$notices_registered) {
+            add_action('admin_notices', [self::class, 'displayValidationErrors']);
+            self::$notices_registered = true;
+        }
 
         // Register fields in the static registry for the visual editor
         foreach ($this->fields as $field) {
@@ -1971,5 +1979,30 @@ class Metabox
         }
 
         return $editor;
+    }
+
+    /**
+     * Display validation errors stored in a transient as admin notices.
+     * 
+     * This method is hooked to 'admin_notices' and checks for a transient named
+     * 'taw_validation_errors_{post_id}'. If found, it displays each error as
+     * an admin notice and then deletes the transient.
+     */
+    public static function displayValidationErrors(): void
+    {
+        global $post;
+        if (!$post) return;
+
+        $errors = get_transient('taw_validation_errors_' . $post->ID);
+        if (!$errors) return;
+
+        delete_transient('taw_validation_errors_' . $post->ID);
+
+        foreach ($errors as $error) {
+            printf(
+                '<div class="notice notice-error is-dismissible"><p>%s</p></div>',
+                esc_html($error)
+            );
+        }
     }
 }
