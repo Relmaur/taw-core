@@ -7,6 +7,7 @@ namespace TAW\Core;
 use TAW\Core\Rest\VisualEditorEndpoint;
 use TAW\Core\Rest\SearchEndpoints;
 use TAW\Support\Performance;
+use TAW\Support\ViteLoader;
 
 /**
  * Theme — the single entry point for wiring TAW Core into a WordPress theme.
@@ -54,11 +55,10 @@ class Theme
         // directory. Runs on after_setup_theme so get_template_directory() is set.
         add_action('after_setup_theme', [BlockLoader::class, 'loadAll']);
 
-        // ── 2. Theme assets ────────────────────────────────────────────────────
-        // Enqueue the theme's main JS/CSS bundle.
-        // Dev: served live from the Vite dev server with HMR.
-        // Prod: resolved from /public/build/manifest.json with cache-busted hashes.
-        add_action('wp_enqueue_scripts', 'vite_enqueue_theme_assets');
+        // ── 2. Vite asset pipeline ─────────────────────────────────────────────
+        // Wire up modulepreload and type="module" injection.
+        // The theme enqueues its own entry points via ViteLoader::enqueueAsset().
+        ViteLoader::init();
 
         // ── 3. Block assets ────────────────────────────────────────────────────
         // Enqueue per-block CSS/JS for every block that was queued via
