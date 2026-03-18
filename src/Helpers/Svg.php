@@ -41,6 +41,7 @@ class Svg
         add_filter('upload_mimes', [self::class, 'allowMimeType']);
         add_filter('wp_check_filetype_and_ext', [self::class, 'fixFileTypeDetection'], 10, 5);
         add_filter('wp_handle_upload', [self::class, 'sanitizeOnUpload']);
+        add_filter('plupload_init', [self::class, 'allowPluploadMimeType']);
         add_filter('file_is_displayable_image', [self::class, 'isNotDisplayableImage'], 10, 2);
         add_filter('intermediate_image_sizes_advanced', [self::class, 'skipSubSizes'], 10, 3);
         add_filter('wp_generate_attachment_metadata', [self::class, 'generateMetadata'], 10, 2);
@@ -109,6 +110,26 @@ class Svg
         }
 
         return $upload;
+    }
+
+    /**
+     * Add SVG to Plupload's client-side allowed file type list.
+     *
+     * Plupload validates file extensions before uploading. SVG is not in
+     * WordPress's default whitelist, so the file is rejected in the browser
+     * and never reaches the server. This filter adds it so the upload
+     * can proceed to the server-side checks.
+     *
+     * @internal Used by register().
+     */
+    public static function allowPluploadMimeType(array $params): array
+    {
+        $params['filters']['mime_types'][] = [
+            'title'      => __('SVG Images'),
+            'extensions' => 'svg,svgz',
+        ];
+
+        return $params;
     }
 
     /**
