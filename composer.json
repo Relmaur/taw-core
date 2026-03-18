@@ -19,7 +19,7 @@
         },
         "files": [
             "src/Support/performance.php",
-            "src/Support/visual-editor/utilities.php"
+            "src/Support/utilities.php"
         ]
     },
     "minimum-stability": "stable",

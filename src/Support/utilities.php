@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * Global template helpers for the TAW Visual Editor.
  *
@@ -42,4 +44,21 @@ if (! function_exists('taw_editor_section')) {
     {
         return \TAW\Helpers\Editor::section($blockId);
     }
+}
+
+/**
+ * Global helper for the Dump
+ */
+\TAW\Helpers\Dump::skipFile(__FILE__);
+
+/**
+ * Dump helper functions
+ */
+function dump(mixed $value, string $label = ''): void
+{
+    \TAW\Helpers\Dump::dump($value, $label);
+}
+function dd(mixed $value, string $label = ''): void
+{
+    \TAW\Helpers\Dump::dd($value, $label);
 }
