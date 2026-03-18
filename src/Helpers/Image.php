@@ -184,8 +184,39 @@ class Image
     }
 
     /**
+     * Get the natural width and height of an image at a given size.
+     *
+     * @param int    $attachment_id WordPress attachment ID.
+     * @param string $size          WordPress image size (thumbnail, medium, large, full).
+     * @return array{width: int, height: int}|null Associative array with 'width' and 'height',
+     *                                              or null if attachment is invalid.
+     *
+     * Usage:
+     *  $dim = Image::getDimension($id, 'large');
+     *  $dim['width'];   // e.g. 1024
+     *  $dim['height'];  // e.g. 768
+     */
+    public static function getDimension(int $attachment_id, string $size = 'full'): ?array
+    {
+        if (!$attachment_id || !wp_attachment_is_image($attachment_id)) {
+            return null;
+        }
+
+        $image = wp_get_attachment_image_src($attachment_id, $size);
+
+        if (!$image) {
+            return null;
+        }
+
+        return [
+            'width'  => (int) $image[1],
+            'height' => (int) $image[2],
+        ];
+    }
+
+    /**
      * Get the image URL for a given attachment ID and size.
-     * 
+     *
      * @param int $attachment_id Wordpress attachment ID.
      * @param string $size       Wordpress image size
      * @return string Image URL, or empty string if attachment is invalid.
