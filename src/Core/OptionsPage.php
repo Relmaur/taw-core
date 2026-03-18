@@ -379,6 +379,26 @@ class OptionsPage
     }
 
     /**
+     * Validate a field value before saving.
+     *
+     * Returns true on success, or a string error message on failure.
+     */
+    private function validate_field(array $field, mixed $value): true|string
+    {
+        if (!empty($field['required']) && ($value === '' || $value === null)) {
+            $label = $field['label'] ?? $field['id'];
+            return sprintf(__('%s is required.', 'taw-core'), $label);
+        }
+
+        if (($field['type'] ?? '') === 'url' && $value !== '' && !filter_var($value, FILTER_VALIDATE_URL)) {
+            $label = $field['label'] ?? $field['id'];
+            return sprintf(__('%s must be a valid URL.', 'taw-core'), $label);
+        }
+
+        return true;
+    }
+
+    /**
      * Sanitize a field value — mirrors Metabox::sanitize_field().
      */
     private function sanitize_field(array $field, mixed $value): mixed
