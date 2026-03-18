@@ -213,41 +213,56 @@ class Svg
     /**
      * Sanitize raw SVG content.
      *
-     * Strips: <script>, <foreignObject>, <iframe>, <object>, <embed>, <base>,
-     * all event-handler attributes (on*), javascript:/vbscript: hrefs,
-     * data:text/html URIs, style attributes containing expressions, and PHP tags.
+     * Delegates to enshrined/svg-sanitize, a battle-tested library that handles
+     * the full SVG XSS surface: script elements, on* attributes, javascript:/
+     * vbscript: hrefs, CSS expressions, data URIs, xlink:href payloads, and more.
+     * When not available, falls back to a custom sanitizer that covers the most common attack vectors, 
+     * but may not be as comprehensive or up-to-date with the latest SVG/XSS techniques
      *
      * @param string $svg Raw SVG markup.
      * @return string     Sanitized SVG markup, or empty string on failure.
      */
     public static function sanitize(string $svg): string
     {
-        // Strip PHP processing instructions before the XML parser sees them
-        $svg = preg_replace('/<\?php.*?\?>/si', '', $svg) ?? '';
-        $svg = preg_replace('/<\?=.*?\?>/si', '', $svg) ?? '';
 
-        $dom = new \DOMDocument();
-        $dom->formatOutput = false;
+        // Check whether the enshrined/svg-sanitize library is available. If so, use it for robust sanitization; if not, fall back to a simpler custom sanitizer.
+        if (!class_exists(\enshrined\svgSanitize\Sanitizer::class)) {
 
-        libxml_use_internal_errors(true);
-        $loaded = $dom->loadXML($svg, LIBXML_NONET);
-        libxml_clear_errors();
-        libxml_use_internal_errors(false);
+            error_log('Warning: enshrined/svg-sanitize library not found. SVG sanitization will be less robust. Consider installing it via Composer for better security.');
 
-        if (!$loaded) {
-            return '';
+            // Without enshrine/svg:
+            // Strip PHP processing instructions before the XML parser sees them
+            $svg = preg_replace('/<\?php.*?\?>/si', '', $svg) ?? '';
+            $svg = preg_replace('/<\?=.*?\?>/si', '', $svg) ?? '';
+
+            $dom = new \DOMDocument();
+            $dom->formatOutput = false;
+
+            libxml_use_internal_errors(true);
+            $loaded = $dom->loadXML($svg, LIBXML_NONET);
+            libxml_clear_errors();
+            libxml_use_internal_errors(false);
+
+            if (!$loaded) {
+                return '';
+            }
+
+            $root = $dom->documentElement;
+
+            // Reject anything that is not an SVG document
+            if (!$root || strtolower($root->localName) !== 'svg') {
+                return '';
+            }
+
+            self::cleanNode($root);
+
+            return $dom->saveXML($root) ?: '';
         }
 
-        $root = $dom->documentElement;
+        $sanitizer = new \enshrined\svgSanitize\Sanitizer();
+        $sanitizer->minify(false);
 
-        // Reject anything that is not an SVG document
-        if (!$root || strtolower($root->localName) !== 'svg') {
-            return '';
-        }
-
-        self::cleanNode($root);
-
-        return $dom->saveXML($root) ?: '';
+        return $sanitizer->sanitize($svg) ?: '';
     }
 
     // -------------------------------------------------------------------------
@@ -474,11 +489,18 @@ class Svg
 
     /**
      * Recursively remove dangerous elements and attributes from a DOM node.
+     * 
+     * (Used by the sanitize() method if enshrine/svg is not available, but left in place as a fallback or for future extension if needed.)
      */
     private static function cleanNode(\DOMNode $node): void
     {
         static $blockedElements = [
-            'script', 'foreignobject', 'iframe', 'object', 'embed', 'base',
+            'script',
+            'foreignobject',
+            'iframe',
+            'object',
+            'embed',
+            'base',
         ];
 
         $toRemove = [];
@@ -510,6 +532,8 @@ class Svg
 
     /**
      * Strip dangerous attributes from a single DOM element.
+     * 
+     * (Used by the sanitize() method if enshrine/svg is not available, but left in place as a fallback or for future extension if needed.)
      */
     private static function cleanAttributes(\DOMElement $element): void
     {
@@ -526,12 +550,14 @@ class Svg
             }
 
             // javascript:, vbscript:, and data:text/html in link-like attributes
-            if (in_array($name, ['href', 'src', 'action', 'formaction'], true)
+            if (
+                in_array($name, ['href', 'src', 'action', 'formaction'], true)
                 || $attr->nodeName === 'xlink:href'
             ) {
                 $normalized = strtolower(trim($value));
 
-                if (str_starts_with($normalized, 'javascript:')
+                if (
+                    str_starts_with($normalized, 'javascript:')
                     || str_starts_with($normalized, 'vbscript:')
                     || str_starts_with($normalized, 'data:text/html')
                 ) {
@@ -544,7 +570,8 @@ class Svg
             if ($name === 'style') {
                 $normalized = strtolower(preg_replace('/\s+/', '', $value) ?? '');
 
-                if (str_contains($normalized, 'expression(')
+                if (
+                    str_contains($normalized, 'expression(')
                     || str_contains($normalized, 'javascript:')
                 ) {
                     $toRemove[] = $attr->nodeName;
