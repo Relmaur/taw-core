@@ -124,7 +124,7 @@ class Performance
      * @param int    $attachment_id WordPress attachment ID.
      * @param string $size          WordPress image size. Default 'full'.
      */
-    public static function preload_image(int $attachment_id, string $size = 'full'): void
+    public static function preloadImage(int $attachment_id, string $size = 'full'): void
     {
         if (!self::$head_fired) {
             self::$config['preload_images'][] = [$attachment_id, $size];
