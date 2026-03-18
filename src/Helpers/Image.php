@@ -217,27 +217,23 @@ class Image
     /**
      * Generate a CSS background-image value for use in inline styles.
      *
-     * If above_fold is true, a <link rel="preload"> tag is automatically
-     * registered via wp_head so the browser fetches the image early —
-     * just like preload_tag() does for <img> elements.
-     *
      * Usage:
      *  // Below the fold (default)
      *  <div style="<?= Image::background($id, 'full') ?>">
      *
-     *  // Above the fold — CSS value + auto-queued preload link in <head>
-     *  <div style="<?= Image::background($id, 'full', ['above_fold' => true]) ?>">
-     *
      *  // Combine with other CSS properties
      *  <div style="height:400px; <?= Image::background($id, 'full') ?>">
+     *
+     * To preload a background image, use Performance::configure():
+     *  Performance::configure(['preload_images' => [[$id, 'full']]]);
      *
      * @param int    $attachment_id WordPress attachment ID.
      * @param string $size          WordPress image size. Defaults to 'full'.
      * @param array  $options {
-     *     @type bool   $above_fold  Queue a <link rel="preload"> in wp_head. Default false.
-     *     @type string $position    CSS background-position value. Default 'center'.
-     *     @type string $size_css    CSS background-size value. Default 'cover'.
-     *     @type bool   $no_repeat   Whether to add background-repeat: no-repeat. Default true.
+     *     @type string $position  CSS background-position value. Default 'center'.
+     *     @type string $size_css  CSS background-size value. Default 'cover'.
+     *     @type bool   $no_repeat Whether to add background-repeat: no-repeat. Default true.
+     *     @type bool   $url_only  Return just the URL instead of the full CSS string. Default false.
      * }
      * @return string Inline CSS string (no style="" wrapper), or empty string if invalid.
      */
@@ -257,15 +253,6 @@ class Image
         }
 
         $url = esc_url($image[0]);
-
-        // Register preload in wp_head for above-fold background images
-        if (isset($options['above_fold']) && $options['above_fold']) {
-            $preload_tag = self::preload_tag($attachment_id, $size);
-
-            add_action('wp_head', static function () use ($preload_tag) {
-                echo $preload_tag; // phpcs:ignore WordPress.Security.EscapeOutput
-            }, 1);
-        }
 
         $position  = $options['position'] ?? 'center';
         $size_css  = $options['size_css'] ?? 'cover';

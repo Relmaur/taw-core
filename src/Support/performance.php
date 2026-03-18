@@ -13,17 +13,17 @@ namespace TAW\Support;
  *   TAW\Support\Performance::configure([
  *       'preconnect_origins' => ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'],
  *       'preload_fonts'      => ['resources/fonts/MyFont-Regular.woff2'],
+ *       'preload_images'     => [[$hero_id, 'full']],
  *       'remove_emoji'       => false,
  *   ]);
- *
- * Image preloading is intentionally NOT handled here — it is the theme developer's
- * responsibility. Use Image::background() with 'above_fold' => true, or call
- * Image::preload_tag() explicitly in your template or a wp_head hook.
  *
  * Only the keys you supply are changed — unspecified keys keep their defaults.
  */
 class Performance
 {
+    /** Tracks whether wp_head has already fired. */
+    private static bool $head_fired = false;
+
     private static array $config = [
         /**
          * Strip Gutenberg block library CSS, classic-theme-styles, and global-styles
@@ -68,6 +68,14 @@ class Performance
          */
         'preload_fonts' => [],
 
+        /**
+         * WordPress attachment images to preload, as [$attachment_id, $size] tuples.
+         * Limit to 1-2 above-the-fold images (hero, banner) — over-preloading is counterproductive.
+         *
+         * Example: [[$hero_id, 'full'], [$banner_id, 'large']]
+         */
+        'preload_images' => [],
+
     ];
 
     /**
@@ -101,6 +109,34 @@ class Performance
         add_action('init', [self::class, 'removeEmoji']);
         add_action('after_setup_theme', [self::class, 'removeMeta']);
         add_action('wp_head', [self::class, 'renderFontPreloads'], 1);
+        add_action('wp_head', [self::class, 'renderImagePreloads'], 1);
+        add_action('wp_head', static function () { self::$head_fired = true; }, PHP_INT_MAX);
+    }
+
+    /**
+     * Preload a WordPress attachment image.
+     *
+     * Safe to call from anywhere — including block render callbacks:
+     *  - Before wp_head fires: queued and output in <head>.
+     *  - After wp_head fires (block templates): output inline in the body,
+     *    which is valid HTML5 and still triggers an early browser fetch.
+     *
+     * @param int    $attachment_id WordPress attachment ID.
+     * @param string $size          WordPress image size. Default 'full'.
+     */
+    public static function preload_image(int $attachment_id, string $size = 'full'): void
+    {
+        if (!self::$head_fired) {
+            self::$config['preload_images'][] = [$attachment_id, $size];
+            return;
+        }
+
+        // wp_head already fired — output inline (valid HTML5, browser fetches immediately)
+        $tag = \TAW\Helpers\Image::preload_tag($attachment_id, $size);
+
+        if ($tag) {
+            echo $tag; // phpcs:ignore WordPress.Security.EscapeOutput
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -157,6 +193,14 @@ class Performance
         if (self::$config['remove_oembed']) {
             remove_action('wp_head', 'wp_oembed_add_discovery_links');
             remove_action('wp_head', 'wp_oembed_add_host_js');
+        }
+    }
+
+    /** @internal */
+    public static function renderImagePreloads(): void
+    {
+        foreach (self::$config['preload_images'] as [$id, $size]) {
+            echo \TAW\Helpers\Image::preload_tag((int) $id, $size); // phpcs:ignore WordPress.Security.EscapeOutput
         }
     }
 
