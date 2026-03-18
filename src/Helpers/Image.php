@@ -172,7 +172,7 @@ class Image
         // Responsive preloading - browser picks the right size to preload
         if ($srcset && $sizes) {
             $tag .= sprintf(
-                ' imagesrcset="%s" imagesize="%s"',
+                ' imagesrcset="%s" imagesizes="%s"',
                 esc_attr($srcset),
                 esc_attr($sizes)
             );

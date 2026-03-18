@@ -132,7 +132,7 @@ class Dump
         <div id="<?= $id ?>">
             <div class="taw-head">
                 <span class="taw-title">
-                    ⚡ ML Dump
+                    ⚡ TAW Dump
                     <span class="taw-count"><?= count(self::$queue) ?></span>
                 </span>
                 <button class="taw-close" onclick="document.getElementById('<?= $id ?>').remove()" title="Close">✕</button>

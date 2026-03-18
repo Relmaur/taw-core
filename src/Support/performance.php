@@ -16,6 +16,10 @@ namespace TAW\Support;
  *       'remove_emoji'       => false,
  *   ]);
  *
+ * Image preloading is intentionally NOT handled here — it is the theme developer's
+ * responsibility. Use Image::background() with 'above_fold' => true, or call
+ * Image::preload_tag() explicitly in your template or a wp_head hook.
+ *
  * Only the keys you supply are changed — unspecified keys keep their defaults.
  */
 class Performance
@@ -64,11 +68,6 @@ class Performance
          */
         'preload_fonts' => [],
 
-        /**
-         * Preload the hero image on the front page using the hero_image_url meta field.
-         * Set to false if your theme manages hero image preloading itself.
-         */
-        'preload_hero_image' => true,
     ];
 
     /**
@@ -102,7 +101,6 @@ class Performance
         add_action('init', [self::class, 'removeEmoji']);
         add_action('after_setup_theme', [self::class, 'removeMeta']);
         add_action('wp_head', [self::class, 'renderFontPreloads'], 1);
-        add_action('wp_head', [self::class, 'renderHeroPreload'], 2);
     }
 
     // -------------------------------------------------------------------------
@@ -173,19 +171,6 @@ class Performance
         }
     }
 
-    /** @internal */
-    public static function renderHeroPreload(): void
-    {
-        if (!self::$config['preload_hero_image'] || !is_front_page()) {
-            return;
-        }
-
-        $hero_id = (int) \TAW\Core\Metabox\Metabox::get(get_the_ID(), 'hero_image_url', '_taw_');
-
-        if ($hero_id) {
-            echo \TAW\Helpers\Image::preload_tag($hero_id, 'full');
-        }
-    }
 }
 
 // Bootstrap — runs once when Composer loads this file via the `files` autoload entry.
