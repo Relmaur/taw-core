@@ -259,7 +259,7 @@ class Image
         $url = esc_url($image[0]);
 
         // Register preload in wp_head for above-fold background images
-        if (!empty($options['above_fold'])) {
+        if (isset($options['above_fold']) && $options['above_fold']) {
             $preload_tag = self::preload_tag($attachment_id, $size);
 
             add_action('wp_head', static function () use ($preload_tag) {
