@@ -279,6 +279,10 @@ class Image
             $css .= ' background-repeat: no-repeat;';
         }
 
+        if (isset($options['url_only']) && $options['url_only']) {
+            return $url;
+        }
+
         return $css;
     }
 
