@@ -74,8 +74,6 @@ class ViteLoader
         }
         $initialized = true;
 
-        // Critical CSS inlined first, before any preload or regular head output
-        add_action('wp_head', [self::class, 'inlineCriticalCss'], 1);
         add_action('wp_head', [self::class, 'preloadAssets'], 2);
         add_filter('script_loader_tag', [self::class, 'addModuleType'], 10, 3);
 
@@ -116,6 +114,12 @@ class ViteLoader
 
         $dist = self::distDir();
         $key  = ltrim($entry_point, '/');
+
+        // ── Critical CSS ────────────────────────────────────────────────────────
+        // Called inline here (not via a separate wp_head hook) so it is
+        // guaranteed to run in the same context as the rest of the enqueue,
+        // mirroring how vite_inline_critical_css() worked in the old loader.
+        self::inlineCriticalCss();
 
         // ── Async CSS (non-render-blocking) ────────────────────────────────────
         // Collect CSS from the JS entry bundle and any standalone SCSS companion.
@@ -478,10 +482,6 @@ class ViteLoader
      */
     public static function inlineCriticalCss(string $entry_key = 'resources/scss/critical.scss'): void
     {
-        if (self::isDevServerRunning()) {
-            return;
-        }
-
         $manifest = self::getManifest();
 
         if (!isset($manifest[$entry_key]['file'])) {
