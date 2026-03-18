@@ -56,7 +56,7 @@ class Performance
         'preconnect_origins' => [],
 
         /**
-         * Self-hosted font files to preload (resolved via vite_asset_url()).
+         * Self-hosted font files to preload (resolved via ViteLoader::assetUrl()).
          * crossorigin is required for font preloads, even for same-origin files.
          * Only preload fonts used above the fold — over-preloading wastes bandwidth.
          *
@@ -168,7 +168,7 @@ class Performance
         foreach (self::$config['preload_fonts'] as $font_path) {
             printf(
                 '<link rel="preload" href="%s" as="font" type="font/woff2" crossorigin>' . "\n",
-                esc_url(vite_asset_url($font_path))
+                esc_url(ViteLoader::assetUrl($font_path))
             );
         }
     }

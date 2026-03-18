@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Core;
 
+use TAW\Support\ViteLoader;
+
 abstract class BaseBlock
 {
     protected string $id;
@@ -40,7 +42,7 @@ abstract class BaseBlock
 
         $relative_dir = str_replace(get_template_directory() . '/', '', $this->dir);
 
-        if (function_exists('vite_is_dev') && vite_is_dev()) {
+        if (ViteLoader::isDevServerRunning()) {
             $this->enqueueDevAssets($relative_dir);
         } else {
             $this->enqueueProdAssets($relative_dir);
@@ -56,7 +58,7 @@ abstract class BaseBlock
         $head_done = did_action('wp_head') > 0;
 
         if ($style_ext) {
-            $url = VITE_SERVER . '/' . $relative_dir . '/' . $style_ext;
+            $url = ViteLoader::DEV_SERVER . '/' . $relative_dir . '/' . $style_ext;
 
             if ($head_done) {
                 // Fallback: wp_head already fired, print inline
@@ -69,7 +71,7 @@ abstract class BaseBlock
         if (file_exists($this->dir . '/script.js')) {
             wp_enqueue_script(
                 'taw-block-' . $this->id,
-                VITE_SERVER . '/' . $relative_dir . '/script.js',
+                ViteLoader::DEV_SERVER . '/' . $relative_dir . '/script.js',
                 ['vite-client'],
                 null,
                 true  // footer — scripts DO have a footer fallback
@@ -82,14 +84,7 @@ abstract class BaseBlock
      */
     private function enqueueProdAssets(string $relative_dir): void
     {
-        static $manifest = null;
-        if ($manifest === null) {
-            $manifest_path = get_template_directory() . '/public/build/manifest.json';
-            $manifest = file_exists($manifest_path)
-                ? json_decode(file_get_contents($manifest_path), true)
-                : [];
-        }
-
+        $manifest  = ViteLoader::getManifest();
         $scss_key  = $relative_dir . '/style.scss';
         $css_key   = $relative_dir . '/style.css';
         $js_key    = $relative_dir . '/script.js';
@@ -98,7 +93,7 @@ abstract class BaseBlock
         $head_done = did_action('wp_head') > 0;
 
         if ($style_key) {
-            $url = get_theme_file_uri('/public/build/' . $manifest[$style_key]['file']);
+            $url = ViteLoader::distUrl($manifest[$style_key]['file']);
 
             if ($head_done) {
                 printf('<link rel="stylesheet" href="%s">' . "\n", esc_url($url));
@@ -110,7 +105,7 @@ abstract class BaseBlock
         if (isset($manifest[$js_key])) {
             wp_enqueue_script(
                 'taw-block-' . $this->id,
-                get_theme_file_uri('/public/build/' . $manifest[$js_key]['file']),
+                ViteLoader::distUrl($manifest[$js_key]['file']),
                 [],
                 null,
                 true

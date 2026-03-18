@@ -12,14 +12,22 @@ use TAW\Core\Framework;
  * Handles dev-server detection, manifest parsing with object-cache,
  * script/style enqueuing, modulepreload, and critical CSS inlining.
  *
- * Boot once in Theme::boot() via ViteLoader::init(), then enqueue
- * individual entry points from the theme:
+ * The main theme bundle is enqueued automatically — Theme::boot() is all you need:
  *
- *   add_action('wp_enqueue_scripts', function () {
- *       ViteLoader::enqueueAsset('theme-app', 'resources/js/app.js');
- *   });
+ *   Theme::boot(); // boots ViteLoader::init('resources/js/app.js') internally
  *
- * Or resolve an arbitrary asset URL (e.g., for a font src attribute):
+ * Custom entry point (call before boot):
+ *
+ *   ViteLoader::init('src/main.ts');
+ *   Theme::boot();
+ *
+ * Additional entry points (e.g. a block script):
+ *
+ *   add_action('wp_enqueue_scripts', fn() =>
+ *       ViteLoader::enqueueAsset('my-block', 'resources/js/my-block.js')
+ *   );
+ *
+ * Resolve any asset URL (fonts, images, etc.):
  *
  *   ViteLoader::assetUrl('resources/fonts/Inter-Regular.woff2');
  */
@@ -66,12 +74,86 @@ class ViteLoader
         }
         $initialized = true;
 
+        // Critical CSS inlined first, before any preload or regular head output
+        add_action('wp_head', [self::class, 'inlineCriticalCss'], 1);
         add_action('wp_head', [self::class, 'preloadAssets'], 2);
         add_filter('script_loader_tag', [self::class, 'addModuleType'], 10, 3);
 
         add_action('wp_enqueue_scripts', function () use ($entry_point): void {
-            self::enqueueAsset('theme-app', $entry_point);
+            self::enqueueThemeAssets($entry_point);
         });
+    }
+
+    /**
+     * Full theme asset enqueue — mirrors the old vite_enqueue_theme_assets().
+     *
+     * Dev:  serves everything live from the Vite HMR server.
+     * Prod: inlines critical CSS, loads full CSS asynchronously (non-render-blocking
+     *       via media="print" + onload swap), and enqueues the JS bundle.
+     *
+     * Also picks up a standalone SCSS companion entry automatically:
+     *   resources/js/app.js  →  resources/scss/app.scss (if present in manifest)
+     */
+    private static function enqueueThemeAssets(string $entry_point): void
+    {
+        if (self::isDevServerRunning()) {
+            if (!wp_script_is('vite-client', 'registered')) {
+                wp_register_script('vite-client', self::DEV_SERVER . '/@vite/client', [], null, false);
+                self::$moduleHandles[] = 'vite-client';
+            }
+            wp_enqueue_script('vite-client');
+
+            self::$moduleHandles[] = 'theme-app';
+            wp_enqueue_script('theme-app', self::DEV_SERVER . '/' . ltrim($entry_point, '/'), ['vite-client'], null, false);
+
+            return;
+        }
+
+        $manifest = self::getManifest();
+        if (empty($manifest)) {
+            return;
+        }
+
+        $dist = self::distDir();
+        $key  = ltrim($entry_point, '/');
+
+        // ── Async CSS (non-render-blocking) ────────────────────────────────────
+        // Collect CSS from the JS entry bundle and any standalone SCSS companion.
+        $async_css_urls = [];
+
+        foreach ($manifest[$key]['css'] ?? [] as $css_file) {
+            $async_css_urls[] = Framework::themeUrl($dist . '/' . $css_file);
+        }
+
+        // Convention: resources/js/app.js pairs with resources/scss/app.scss
+        $scss_key = preg_replace('#^resources/js/(.+)\.js$#', 'resources/scss/$1.scss', $key);
+        if ($scss_key !== $key && isset($manifest[$scss_key]['file'])) {
+            $async_css_urls[] = Framework::themeUrl($dist . '/' . $manifest[$scss_key]['file']);
+        }
+
+        $async_css_urls = array_unique($async_css_urls);
+
+        if (!empty($async_css_urls)) {
+            add_action('wp_head', function () use ($async_css_urls): void {
+                foreach ($async_css_urls as $url) {
+                    // media="print" loads without blocking render; onload swaps to "all"
+                    printf(
+                        '<link rel="stylesheet" href="%s" media="print" onload="this.media=\'all\'">' . "\n",
+                        esc_url($url)
+                    );
+                    printf(
+                        '<noscript><link rel="stylesheet" href="%s"></noscript>' . "\n",
+                        esc_url($url)
+                    );
+                }
+            }, 50);
+        }
+
+        // ── JS bundle ──────────────────────────────────────────────────────────
+        if (isset($manifest[$key]['file'])) {
+            self::$moduleHandles[] = 'theme-app';
+            wp_enqueue_script('theme-app', Framework::themeUrl($dist . '/' . $manifest[$key]['file']), [], null, true);
+        }
     }
 
     // ── Dev-server detection ───────────────────────────────────────────────
@@ -138,6 +220,20 @@ class ViteLoader
         wp_cache_set(self::MANIFEST_CACHE_KEY, $manifest, self::MANIFEST_CACHE_GROUP, HOUR_IN_SECONDS * 24);
 
         return $manifest;
+    }
+
+    /**
+     * Build a full URL to a file inside the Vite dist directory.
+     *
+     * Use this when you already have a resolved filename from the manifest
+     * (e.g. $manifest[$key]['file']) and need a browser-ready URL.
+     *
+     * @param string $file  Manifest-resolved filename, e.g. 'assets/app-Bx7kZ3.js'
+     * @return string       Full URL to the file inside the dist directory.
+     */
+    public static function distUrl(string $file): string
+    {
+        return Framework::themeUrl(self::distDir() . '/' . $file);
     }
 
     /**
