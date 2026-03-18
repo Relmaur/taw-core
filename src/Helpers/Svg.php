@@ -41,6 +41,8 @@ class Svg
         add_filter('upload_mimes', [self::class, 'allowMimeType']);
         add_filter('wp_check_filetype_and_ext', [self::class, 'fixFileTypeDetection'], 10, 5);
         add_filter('wp_handle_upload', [self::class, 'sanitizeOnUpload']);
+        add_filter('file_is_displayable_image', [self::class, 'isNotDisplayableImage'], 10, 2);
+        add_filter('intermediate_image_sizes_advanced', [self::class, 'skipSubSizes'], 10, 3);
         add_filter('wp_generate_attachment_metadata', [self::class, 'generateMetadata'], 10, 2);
     }
 
@@ -107,6 +109,52 @@ class Svg
         }
 
         return $upload;
+    }
+
+    /**
+     * Tell WordPress that SVG files are not "displayable images".
+     *
+     * WordPress passes every file whose mime type starts with `image/` through
+     * `file_is_displayable_image()`. On servers where Imagick is installed,
+     * that function can return true for SVGs because Imagick is able to
+     * rasterize them. When that happens WordPress enters its full image-
+     * processing pipeline (thumbnail generation, Imagick resize…), which
+     * consumes excessive resources and surfaces as the misleading "server
+     * cannot process the image" error.
+     *
+     * Returning false here makes WordPress skip that block entirely.
+     * Our `generateMetadata` filter then fills in the correct metadata
+     * using the SVG's own viewBox / width / height attributes.
+     *
+     * @internal Used by register().
+     */
+    public static function isNotDisplayableImage(bool $result, string $path): bool
+    {
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        if (in_array($ext, ['svg', 'svgz'], true)) {
+            return false;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Prevent WordPress from generating any sub-sizes (thumbnail, medium…) for SVGs.
+     *
+     * Belt-and-suspenders guard for the case where `file_is_displayable_image`
+     * still returns true (e.g. a third-party plugin re-filters it). SVGs are
+     * resolution-independent — sub-sizes serve no purpose.
+     *
+     * @internal Used by register().
+     */
+    public static function skipSubSizes(array $sizes, array $_imagedata, int $attachment_id): array
+    {
+        if (self::isSvg($attachment_id)) {
+            return [];
+        }
+
+        return $sizes;
     }
 
     /**
