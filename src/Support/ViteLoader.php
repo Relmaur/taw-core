@@ -45,11 +45,20 @@ class ViteLoader
     // ── Boot ───────────────────────────────────────────────────────────────
 
     /**
-     * Wire up the WordPress hooks needed by the asset pipeline.
+     * Wire up the WordPress hooks needed by the asset pipeline and enqueue
+     * the theme's main entry point — mirroring the old vite_enqueue_theme_assets().
      *
-     * Call once from Theme::boot() — subsequent calls are no-ops.
+     * Called automatically from Theme::boot() with the default entry point.
+     * Override before boot() if your theme uses a different entry:
+     *
+     *   ViteLoader::init('src/main.ts'); // must come before Theme::boot()
+     *   Theme::boot();
+     *
+     * Subsequent calls are no-ops, so Theme::boot()'s internal call is safe.
+     *
+     * @param string $entry_point Theme-relative Vite entry, e.g. 'resources/js/app.js'.
      */
-    public static function init(): void
+    public static function init(string $entry_point = 'resources/js/app.js'): void
     {
         static $initialized = false;
         if ($initialized) {
@@ -59,6 +68,10 @@ class ViteLoader
 
         add_action('wp_head', [self::class, 'preloadAssets'], 2);
         add_filter('script_loader_tag', [self::class, 'addModuleType'], 10, 3);
+
+        add_action('wp_enqueue_scripts', function () use ($entry_point): void {
+            self::enqueueAsset('theme-app', $entry_point);
+        });
     }
 
     // ── Dev-server detection ───────────────────────────────────────────────
