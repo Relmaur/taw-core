@@ -73,7 +73,7 @@ class Svg
         array $data,
         string $file,
         string $filename,
-        array $mimes,
+        ?array $_mimes,
         string|false $real_mime
     ): array {
         $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
