@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace TAW\Core;
 
-use TAW\Core\Rest\VisualEditorEndpoint;
 use TAW\Core\Rest\SearchEndpoints;
+use TAW\Core\Rest\VisualEditorEndpoint;
+use TAW\Helpers\Svg;
 use TAW\Support\Performance;
 use TAW\Support\ViteLoader;
 
@@ -76,6 +77,10 @@ class Theme
         // Each class registers its routes via rest_api_init in its constructor.
         new VisualEditorEndpoint();
         new SearchEndpoints();
+
+        // ── 6. SVG support ─────────────────────────────────────────────────────
+        // Allow and sanitize SVG uploads, and provide a helper for inline SVG rendering.
+        Svg::register();
     }
 
     /**
