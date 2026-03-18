@@ -41,6 +41,7 @@ class Svg
         add_filter('upload_mimes', [self::class, 'allowMimeType']);
         add_filter('wp_check_filetype_and_ext', [self::class, 'fixFileTypeDetection'], 10, 5);
         add_filter('wp_handle_upload', [self::class, 'sanitizeOnUpload']);
+        add_filter('wp_generate_attachment_metadata', [self::class, 'generateMetadata'], 10, 2);
     }
 
     /**
@@ -106,6 +107,34 @@ class Svg
         }
 
         return $upload;
+    }
+
+    /**
+     * Bypass the image editor for SVG uploads and return metadata directly.
+     *
+     * WordPress passes every uploaded "image" through GD or Imagick to read
+     * dimensions and generate sub-sizes. Neither library understands SVG, so
+     * the attempt throws the "server cannot process the image" error. This
+     * filter short-circuits that path for SVGs and returns the metadata we
+     * already know how to read ourselves.
+     *
+     * @internal Used by register().
+     */
+    public static function generateMetadata(array $metadata, int $attachment_id): array
+    {
+        if (!self::isSvg($attachment_id)) {
+            return $metadata;
+        }
+
+        [$width, $height] = self::dimensions($attachment_id);
+
+        return [
+            'width'      => $width  ?? 0,
+            'height'     => $height ?? 0,
+            'file'       => get_post_meta($attachment_id, '_wp_attached_file', true),
+            'sizes'      => [],
+            'image_meta' => [],
+        ];
     }
 
     // -------------------------------------------------------------------------
