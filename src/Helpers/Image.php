@@ -39,7 +39,8 @@ namespace TAW\Helpers;
  * 
  * @paackage TAW
  */
-class Image {
+class Image
+{
     /**
      * Render a performance-optimized <img> tag.
      * 
@@ -69,7 +70,7 @@ class Image {
         // Get the image soruce for the requested size
         $image = wp_get_attachment_image_src($attachment_id, $size);
 
-        if(!$image) {
+        if (!$image) {
             return '';
         }
 
@@ -84,7 +85,7 @@ class Image {
         ];
 
         // Performance attributes based on fold position
-        if($above_fold) {
+        if ($above_fold) {
             $attrs['loading']       = 'eager';
             $attrs['fetchpriority'] = 'high';
             $attrs['decoding']      = 'high';
@@ -97,16 +98,16 @@ class Image {
         // srcset - WordPress generates this from stored image metadata
         $srcset = wp_get_attachment_image_srcset($attachment_id, $size);
 
-        if($srcset) {
+        if ($srcset) {
             $attrs['srcset'] = $srcset;
         }
 
         // Sizes - use custom value if provided, otherwise let WordPress calculate
-        if(isset($options['sizes'])) {
+        if (isset($options['sizes'])) {
             $attrs['sizes'] = $options['sizes'];
         } elseif ($srcset) {
             $sizes = wp_get_attachment_image_sizes($attachment_id, $size);
-            if($sizes) {
+            if ($sizes) {
                 $attrs['sizes'] = $sizes;
             }
         }
@@ -145,14 +146,15 @@ class Image {
      * @param string $size       Wordpress image size
      * @param string HTML <link> preload tag, or empty string
      */
-    public static function preload_tag(int $attachment_id, string $size = 'large'): string {
-        if(!$attachment_id || !wp_attachment_is_image($attachment_id)) {
+    public static function preload_tag(int $attachment_id, string $size = 'large'): string
+    {
+        if (!$attachment_id || !wp_attachment_is_image($attachment_id)) {
             return '';
         }
 
         $image = wp_get_attachment_image_src($attachment_id, $size);
 
-        if(!$image) {
+        if (!$image) {
             return '';
         }
 
@@ -168,7 +170,7 @@ class Image {
         );
 
         // Responsive preloading - browser picks the right size to preload
-        if($srcset && $sizes) {
+        if ($srcset && $sizes) {
             $tag .= sprintf(
                 ' imagesrcset="%s" imagesize="%s"',
                 esc_attr($srcset),
@@ -179,5 +181,27 @@ class Image {
         $tag .= ">\n";
 
         return $tag;
+    }
+
+    /**
+     * Get the image URL for a given attachment ID and size.
+     * 
+     * @param int $attachment_id Wordpress attachment ID.
+     * @param string $size       Wordpress image size
+     * @return string Image URL, or empty string if attachment is invalid.
+     */
+    public static function url(int $attachment_id, string $size = 'large'): string
+    {
+        if (!$attachment_id || !wp_attachment_is_image($attachment_id)) {
+            return '';
+        }
+
+        $image = wp_get_attachment_image_src($attachment_id, $size);
+
+        if (!$image) {
+            return '';
+        }
+
+        return $image[0];
     }
 }
