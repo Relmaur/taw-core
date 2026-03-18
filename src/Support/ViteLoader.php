@@ -496,6 +496,18 @@ class ViteLoader
 
         $css = file_get_contents($css_path);
         if ($css) {
+            // Vite's base: './' writes relative url(./...) references in compiled CSS.
+            // These resolve correctly from a linked stylesheet but break when the CSS
+            // is inlined into <head> — the browser resolves them against the page URL
+            // instead of the CSS file's location in public/build/assets/.
+            // Replace with absolute Theme URLs before inlining.
+            $assets_url = Framework::themeUrl(self::distDir() . '/assets');
+            $css = str_replace(
+                ["url('./", 'url("./','url(./'],
+                ["url('" . $assets_url . '/', 'url("' . $assets_url . '/','url(' . $assets_url . '/'],
+                $css
+            );
+
             echo '<style id="critical-css">' . $css . '</style>' . "\n";
         }
     }
