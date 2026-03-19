@@ -19,7 +19,8 @@ class Dump
     {
         if (!defined('WP_DEBUG') || !WP_DEBUG) return;
 
-        if (!is_admin()) return;
+        // Return if the user is on any admin screen
+        if (is_admin()) return;
 
         self::$queue[] = [
             'value' => $value,
