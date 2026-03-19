@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace TAW\Core;
+namespace TAW\Core\OptionsPage;
 
 /**
  * Configuration-driven Options Page.

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Support;
 
-use TAW\Core\Framework;
+use TAW\Helpers\Framework;
 
 /**
  * ViteLoader — OOP asset pipeline for Vite-powered WordPress themes.

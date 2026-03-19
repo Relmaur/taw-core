@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-namespace TAW\Core;
+namespace TAW\Core\Theme;
+
 
 /**
  * Github-based Theme Updater.

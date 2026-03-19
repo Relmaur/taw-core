@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace TAW\Core;
+namespace TAW\Core\Block;
 
-use TAW\Core\BlockRegistry;
+use TAW\Core\Block\BlockRegistry;
 
 class BlockLoader
 {

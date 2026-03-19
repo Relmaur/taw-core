@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
-namespace TAW\Core;
+namespace TAW\Core\Theme;
 
+use TAW\Core\Block\BlockLoader;
+use TAW\Core\Block\BlockRegistry;
+use TAW\Core\Editor\VisualEditor;
 use TAW\Core\Rest\SearchEndpoints;
 use TAW\Core\Rest\VisualEditorEndpoint;
 use TAW\Helpers\Svg;
@@ -16,11 +19,11 @@ use TAW\Support\ViteLoader;
  * Drop one line in your functions.php (after requiring the Composer autoloader)
  * and the entire framework boots itself:
  *
- *   TAW\Core\Theme::boot();
+ *   TAW\Core\Theme\Theme::boot();
  *
  * Optionally tune performance settings before or after boot():
  *
- *   TAW\Core\Theme::performance([
+ *   TAW\Core\Theme\Theme::performance([
  *       'preconnect_origins' => ['https://fonts.googleapis.com'],
  *       'preload_fonts'      => ['resources/fonts/MyFont-Regular.woff2'],
  *       'remove_emoji'       => false,

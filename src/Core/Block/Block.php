@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace TAW\Core;
+namespace TAW\Core\Block;
 
-use TAW\Core\BaseBlock;
+use TAW\Core\Block\BaseBlock;
 
 abstract class Block extends BaseBlock
 {

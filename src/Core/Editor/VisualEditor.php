@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace TAW\Core;
+namespace TAW\Core\Editor;
+
+use TAW\Helpers\Framework;
 
 class VisualEditor
 {
@@ -135,8 +137,8 @@ class VisualEditor
         // WordPress media picker (needed for image fields)
         wp_enqueue_media();
 
-        $editorDir = Framework::path() . '/src/Support/visual-editor';
-        $editorUrl = Framework::url() . '/src/Support/visual-editor';
+        $editorDir = Framework::path() . '/src/Core/Editor/';
+        $editorUrl = Framework::url() . '/src/Core/Editor/';
 
         wp_enqueue_style(
             'taw-visual-editor',

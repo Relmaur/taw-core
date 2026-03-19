@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace TAW\Core;
+namespace TAW\Core\Block;
 
-use TAW\Core\MetaBlock;
+use TAW\Core\Block\MetaBlock;
 
 class BlockRegistry
 {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace TAW\Core;
+namespace TAW\Helpers;
 
 /**
  * Taw Framework — the path resolver for the taw/core package.

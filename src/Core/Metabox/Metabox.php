@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core\Metabox;
 
-use TAW\Core\Framework;
+use TAW\Helpers\Framework;
 
 /**
  * Native WordPress Metabox Framework

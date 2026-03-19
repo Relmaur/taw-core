@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Helpers;
 
-use TAW\Core\VisualEditor;
+use TAW\Core\Editor\VisualEditor;
 use TAW\Core\Metabox\Metabox;
 
 class Editor
