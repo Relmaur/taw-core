@@ -90,14 +90,14 @@ class Dump
                 border: 1px solid #30363d;
             }
 
-            #<?= $id ?>* {
+            #<?= $id ?> * {
                 box-sizing: border-box;
                 margin: 0;
                 padding: 0;
                 font-size: 10px;
             }
 
-            #<?= $id ?>.taw-head {
+            #<?= $id ?> .taw-head {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
@@ -108,7 +108,7 @@ class Dump
                 user-select: none;
             }
 
-            #<?= $id ?>.taw-title {
+            #<?= $id ?> .taw-title {
                 font-weight: 700;
                 font-size: 11px;
                 letter-spacing: .06em;
@@ -116,7 +116,7 @@ class Dump
                 text-transform: uppercase;
             }
 
-            #<?= $id ?>.taw-count {
+            #<?= $id ?> .taw-count {
                 background: #30363d;
                 color: #8b949e;
                 border-radius: 20px;
@@ -125,7 +125,7 @@ class Dump
                 margin-left: 8px;
             }
 
-            #<?= $id ?>.taw-close {
+            #<?= $id ?> .taw-close {
                 cursor: pointer;
                 color: #8b949e;
                 background: none;
@@ -136,26 +136,26 @@ class Dump
                 border-radius: 4px;
             }
 
-            #<?= $id ?>.taw-close:hover {
+            #<?= $id ?> .taw-close:hover {
                 color: #f85149;
                 background: #21262d;
             }
 
-            #<?= $id ?>.taw-body {
+            #<?= $id ?> .taw-body {
                 overflow-y: auto;
                 flex: 1;
             }
 
-            #<?= $id ?>.taw-entry {
+            #<?= $id ?> .taw-entry {
                 padding: 10px 14px;
                 border-bottom: 1px solid #21262d;
             }
 
-            #<?= $id ?>.taw-entry:last-child {
+            #<?= $id ?> .taw-entry:last-child {
                 border-bottom: none;
             }
 
-            #<?= $id ?>.taw-entry-head {
+            #<?= $id ?> .taw-entry-head {
                 display: flex;
                 flex-direction: column;
                 align-items: baseline;
@@ -163,58 +163,58 @@ class Dump
                 margin-bottom: 5px;
             }
 
-            #<?= $id ?>.taw-lbl {
+            #<?= $id ?> .taw-lbl {
                 color: #f0883e;
                 font-weight: 700;
                 font-size: 11px;
             }
 
-            #<?= $id ?>.taw-loc {
+            #<?= $id ?> .taw-loc {
                 color: #484f58;
                 font-size: 10px;
             }
 
-            #<?= $id ?>.taw-val {
+            #<?= $id ?> .taw-val {
                 padding-left: 2px;
             }
 
             /* ── value types ── */
-            #<?= $id ?>.v-s {
+            #<?= $id ?> .v-s {
                 color: #a5d6ff;
             }
 
-            #<?= $id ?>.v-n {
+            #<?= $id ?> .v-n {
                 color: #79c0ff;
             }
 
-            #<?= $id ?>.v-b {
+            #<?= $id ?> .v-b {
                 color: #ff7b72;
             }
 
-            #<?= $id ?>.v-nl {
+            #<?= $id ?> .v-nl {
                 color: #ff7b72;
                 font-style: italic;
             }
 
-            #<?= $id ?>.v-t {
+            #<?= $id ?> .v-t {
                 color: #8b949e;
                 font-size: 10px;
             }
 
-            #<?= $id ?>.v-k {
+            #<?= $id ?> .v-k {
                 color: #7ee787;
             }
 
-            #<?= $id ?>.v-c {
+            #<?= $id ?> .v-c {
                 color: #d2a8ff;
             }
 
-            #<?= $id ?>.v-ar {
+            #<?= $id ?> .v-ar {
                 color: #8b949e;
             }
 
             /* ── collapsible nodes ── */
-            #<?= $id ?>summary {
+            #<?= $id ?> summary {
                 cursor: pointer;
                 list-style: none;
                 display: flex;
@@ -222,11 +222,11 @@ class Dump
                 gap: 5px;
             }
 
-            #<?= $id ?>summary::-webkit-details-marker {
+            #<?= $id ?> summary::-webkit-details-marker {
                 display: none;
             }
 
-            #<?= $id ?>.taw-arrow {
+            #<?= $id ?> .taw-arrow {
                 font-size: 9px;
                 color: #484f58;
                 display: inline-block;
@@ -234,17 +234,17 @@ class Dump
                 transition: transform .15s;
             }
 
-            #<?= $id ?>details[open] .taw-arrow {
+            #<?= $id ?> details[open] .taw-arrow {
                 transform: rotate(90deg);
             }
 
-            #<?= $id ?>.taw-kids {
+            #<?= $id ?> .taw-kids {
                 padding-left: 18px;
                 border-left: 1px solid #21262d;
                 margin-top: 3px;
             }
 
-            #<?= $id ?>.taw-row {
+            #<?= $id ?> .taw-row {
                 display: flex;
                 align-items: baseline;
                 gap: 6px;
