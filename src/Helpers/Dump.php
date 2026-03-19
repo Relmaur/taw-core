@@ -18,6 +18,7 @@ class Dump
     public static function dump(mixed $value, string $label = ''): void
     {
         if (!defined('WP_DEBUG') || !WP_DEBUG) return;
+        if (!in_array(wp_get_environment_type(), ['local', 'development'], true)) return;
 
         // Return if the user is on any admin screen
         if (is_admin()) return;
@@ -41,6 +42,7 @@ class Dump
     public static function dd(mixed $value, string $label = ''): void
     {
         if (!defined('WP_DEBUG') || !WP_DEBUG) return;
+        if (!in_array(wp_get_environment_type(), ['local', 'development'], true)) return;
 
         self::$queue[] = [
             'value' => $value,
