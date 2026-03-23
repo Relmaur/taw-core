@@ -208,7 +208,7 @@ class MakeBlockCommand extends Command
 
         namespace {$namespace};
 
-        use TAW\Core\MetaBlock;
+        use TAW\Core\Block\MetaBlock;
         use TAW\Core\Metabox\Metabox;
 
         class {$name} extends MetaBlock
@@ -251,7 +251,7 @@ class MakeBlockCommand extends Command
 
         namespace {$namespace};
 
-        use TAW\Core\Block;
+        use TAW\Core\Block\Block;
 
         class {$name} extends Block
         {
