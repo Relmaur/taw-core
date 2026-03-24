@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Core\OptionsPage;
 
+use TAW\Helpers\Framework;
+
 /**
  * Configuration-driven Options Page.
  *
