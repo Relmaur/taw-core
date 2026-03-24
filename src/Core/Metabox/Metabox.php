@@ -96,6 +96,16 @@ class Metabox
     private static bool $assets_enqueued = false;
 
     /**
+     * Screen type that determines which WordPress hooks are used.
+     *
+     * - 'post_type' (default): Standard post/page/CPT metabox via add_meta_boxes / save_post.
+     * - 'nav_menu':            Menu item fields via wp_nav_menu_item_custom_fields / wp_update_nav_menu_item.
+     *
+     * @var string
+     */
+    private string $type;
+
+    /**
      * @param array $config {
      *     @type string   $id       Unique metabox ID.
      *     @type string   $title    Metabox title shown in the editor.
@@ -122,8 +132,16 @@ class Metabox
         $this->tabs     = $config['tabs'] ?? [];
         $this->icon     = isset($config['icon']) ? 'data:image/svg+xml;base64,' . base64_encode($config['icon']) : '';
 
-        add_action('add_meta_boxes', [$this, 'register']);
-        add_action('save_post', [$this, 'save'], 10, 2);
+        $this->type = $config['type'] ?? 'post_type';
+
+        if ($this->type === 'nav_menu') {
+            add_action('wp_nav_menu_item_custom_fields', [$this, 'render_for_nav_menu'], 10, 5);
+            add_action('wp_update_nav_menu_item', [$this, 'save_nav_menu'], 10, 3);
+        } else {
+            add_action('add_meta_boxes', [$this, 'register']);
+            add_action('save_post', [$this, 'save'], 10, 2);
+        }
+
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
 
         if (!self::$notices_registered) {
@@ -194,6 +212,186 @@ class Metabox
     }
 
     /**
+     * MARK: Nav Menu
+     */
+
+    /**
+     * Render fields for a single nav menu item.
+     *
+     * Hooked to `wp_nav_menu_item_custom_fields`. Called once per menu item
+     * on the Menus admin page. Field names use array notation keyed by item ID
+     * (e.g. `_taw_field[123]`) so that when the whole menu form is submitted
+     * each item's values remain distinct in `$_POST`.
+     *
+     * @param int      $item_id The menu item ID.
+     * @param \WP_Post $item    The menu item as a WP_Post object.
+     * @param int      $depth   Nesting depth of this item.
+     * @param object   $args    Menu arguments.
+     * @param int      $id      The nav menu ID.
+     * @return void
+     */
+    public function render_for_nav_menu(int $_item_id, \WP_Post $item, int $_depth, object $_args, int $_id): void
+    {
+        wp_nonce_field($this->id . '_nonce_action', $this->id . '_nonce');
+
+        foreach ($this->fields as $field) {
+            $meta_key  = $this->prefix . $field['id'];
+            $name_attr = $meta_key . '[' . $item->ID . ']';
+            $html_id   = $meta_key . '-' . $item->ID;
+            $value     = get_post_meta($item->ID, $meta_key, true);
+            ?>
+            <p class="field-description description description-thin">
+                <label for="<?php echo esc_attr($html_id); ?>">
+                    <?php echo esc_html($field['label'] ?? ''); ?>
+                    <?php if (!empty($field['required'])): ?>
+                        <span class="taw-required">*</span>
+                    <?php endif; ?>
+                </label>
+                <?php $this->render_nav_menu_field($field, $html_id, $name_attr, $value); ?>
+                <?php if (!empty($field['description'])): ?>
+                    <span class="description"><?php echo esc_html($field['description']); ?></span>
+                <?php endif; ?>
+            </p>
+            <?php
+        }
+    }
+
+    /**
+     * Render a single field for the nav-menu context.
+     *
+     * Uses a separate, simplified renderer (rather than reusing render_field) because:
+     * - The `name` and `id` attributes differ (array-keyed by item ID).
+     * - Complex field types (image, wysiwyg, repeater, color) are intentionally
+     *   unsupported in the nav-menu panel; their assets are not loaded on nav-menus.php.
+     *
+     * Supported types: text, url, number, textarea, select, checkbox.
+     *
+     * @param array<string,mixed> $field     Field definition array.
+     * @param string              $html_id   Unique HTML id attribute value.
+     * @param string              $name_attr Input name attribute (e.g. `_taw_field[123]`).
+     * @param mixed               $value     Current saved value.
+     * @return void
+     */
+    private function render_nav_menu_field(array $field, string $html_id, string $name_attr, mixed $value): void
+    {
+        $type        = $field['type'] ?? 'text';
+        $placeholder = $field['placeholder'] ?? '';
+
+        switch ($type) {
+            case 'text':
+            case 'url':
+                printf(
+                    '<input type="%s" id="%s" name="%s" value="%s" placeholder="%s" class="widefat">',
+                    esc_attr($type),
+                    esc_attr($html_id),
+                    esc_attr($name_attr),
+                    esc_attr($value),
+                    esc_attr($placeholder)
+                );
+                break;
+
+            case 'number':
+                printf(
+                    '<input type="number" id="%s" name="%s" value="%s" class="widefat" min="%s" max="%s" step="%s">',
+                    esc_attr($html_id),
+                    esc_attr($name_attr),
+                    esc_attr($value),
+                    esc_attr($field['min'] ?? ''),
+                    esc_attr($field['max'] ?? ''),
+                    esc_attr($field['step'] ?? '1')
+                );
+                break;
+
+            case 'textarea':
+                printf(
+                    '<textarea id="%s" name="%s" class="widefat" rows="%d" placeholder="%s">%s</textarea>',
+                    esc_attr($html_id),
+                    esc_attr($name_attr),
+                    intval($field['rows'] ?? 3),
+                    esc_attr($placeholder),
+                    esc_textarea($value)
+                );
+                break;
+
+            case 'select':
+                printf('<select id="%s" name="%s" class="widefat">', esc_attr($html_id), esc_attr($name_attr));
+                foreach ($field['options'] ?? [] as $opt_value => $opt_label) {
+                    printf(
+                        '<option value="%s" %s>%s</option>',
+                        esc_attr($opt_value),
+                        selected($value, $opt_value, false),
+                        esc_html($opt_label)
+                    );
+                }
+                echo '</select>';
+                break;
+
+            case 'checkbox':
+                printf(
+                    '<input type="checkbox" id="%s" name="%s" value="1" %s>',
+                    esc_attr($html_id),
+                    esc_attr($name_attr),
+                    checked('1', $value, false)
+                );
+                break;
+
+            default:
+                printf(
+                    '<input type="text" id="%s" name="%s" value="%s" placeholder="%s" class="widefat">',
+                    esc_attr($html_id),
+                    esc_attr($name_attr),
+                    esc_attr($value),
+                    esc_attr($placeholder)
+                );
+        }
+    }
+
+    /**
+     * Save custom fields for a nav menu item.
+     *
+     * Hooked to `wp_update_nav_menu_item`, which fires once per item when the
+     * Menus form is saved. Field values are stored as post meta on the menu
+     * item (which is a `nav_menu_item` post internally).
+     *
+     * Because the same `$_POST` contains data for every item on the page,
+     * each field is an array keyed by item ID (e.g. `$_POST['_taw_field'][123]`).
+     *
+     * @param int   $menu_id          The nav menu ID.
+     * @param int   $menu_item_db_id  The menu item's post ID.
+     * @param array $args             Sanitized item data passed by WordPress.
+     * @return void
+     */
+    public function save_nav_menu(int $_menu_id, int $menu_item_db_id, array $_args): void
+    {
+        if (
+            !isset($_POST[$this->id . '_nonce']) ||
+            !wp_verify_nonce($_POST[$this->id . '_nonce'], $this->id . '_nonce_action')
+        ) {
+            return;
+        }
+
+        if (!current_user_can('edit_theme_options')) {
+            return;
+        }
+
+        foreach ($this->fields as $field) {
+            $meta_key  = $this->prefix . $field['id'];
+            $raw_value = $_POST[$meta_key][$menu_item_db_id] ?? null;
+
+            if ($raw_value === null) {
+                // Unchecked checkboxes are absent from POST — treat as "0".
+                if (($field['type'] ?? '') === 'checkbox') {
+                    update_post_meta($menu_item_db_id, $meta_key, '0');
+                }
+                continue;
+            }
+
+            $value = $this->sanitize_field($field, $raw_value);
+            update_post_meta($menu_item_db_id, $meta_key, $value);
+        }
+    }
+
+    /**
      * MARK: Assets
      */
 
@@ -210,7 +408,22 @@ class Metabox
      */
     public function enqueue_admin_assets(string $hook): void
     {
-        if (!in_array($hook, ['post.php', 'post-new.php'], true)) {
+        $allowed_hooks = $this->type === 'nav_menu'
+            ? ['nav-menus.php']
+            : ['post.php', 'post-new.php'];
+
+        if (!in_array($hook, $allowed_hooks, true)) {
+            return;
+        }
+
+        // Nav-menu context: only enqueue the stylesheet — no Alpine or complex field assets.
+        if ($this->type === 'nav_menu') {
+            wp_enqueue_style(
+                'taw-metaboxes',
+                Framework::url('assets/admin.css'),
+                [],
+                Framework::version()
+            );
             return;
         }
 
