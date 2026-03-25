@@ -230,7 +230,7 @@ class Metabox
      * @param int      $id      The nav menu ID.
      * @return void
      */
-    public function render_for_nav_menu(int $_item_id, \WP_Post $item, int $_depth, object $_args, int $_id): void
+    public function render_for_nav_menu(int|string $_item_id, \WP_Post $item, int $_depth, mixed $_args, int $_id): void
     {
         wp_nonce_field($this->id . '_nonce_action', $this->id . '_nonce');
 
