@@ -253,6 +253,30 @@ class Dump
                 padding: 1px 0;
                 flex-wrap: wrap;
             }
+
+            #<?= $id ?> .taw-copy {
+                cursor: pointer;
+                color: #484f58;
+                background: none;
+                border: 1px solid #30363d;
+                font-size: 10px;
+                line-height: 1;
+                padding: 2px 6px;
+                border-radius: 4px;
+                margin-left: auto;
+                transition: color .1s, border-color .1s;
+                flex-shrink: 0;
+            }
+
+            #<?= $id ?> .taw-copy:hover {
+                color: #58a6ff;
+                border-color: #58a6ff;
+            }
+
+            #<?= $id ?> .taw-copy.copied {
+                color: #3fb950;
+                border-color: #3fb950;
+            }
         </style>
 
         <div id="<?= $id ?>">
@@ -265,17 +289,38 @@ class Dump
             </div>
             <div class="taw-body"><?= $items ?></div>
         </div>
+        <script>
+            (function () {
+                var panel = document.getElementById('<?= $id ?>');
+                panel.addEventListener('click', function (e) {
+                    var btn = e.target.closest('.taw-copy');
+                    if (!btn) return;
+                    var text = btn.closest('.taw-entry').getAttribute('data-copy');
+                    navigator.clipboard.writeText(text).then(function () {
+                        btn.textContent = '✓ copied';
+                        btn.classList.add('copied');
+                        setTimeout(function () {
+                            btn.textContent = '⎘ copy';
+                            btn.classList.remove('copied');
+                        }, 1500);
+                    });
+                });
+            })();
+        </script>
     <?php
         return (string) ob_get_clean();
     }
 
     private static function render_entry(array $entry): string
     {
+        $copy_text = $entry['label'] . ' (' . $entry['trace'] . ')' . "\n" . print_r($entry['value'], true);
+
         ob_start(); ?>
-        <div class="taw-entry">
+        <div class="taw-entry" data-copy="<?= esc_attr($copy_text) ?>">
             <div class="taw-entry-head">
                 <span class="taw-lbl"><?= esc_html($entry['label']) ?></span>
                 <span class="taw-loc"><?= esc_html($entry['trace']) ?></span>
+                <button class="taw-copy" title="Copy to clipboard">⎘ copy</button>
             </div>
             <div class="taw-val"><?= self::format($entry['value']) ?></div>
         </div>
