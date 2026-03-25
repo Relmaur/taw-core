@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core\Block;
 
+use TAW\Core\Block\BaseBlock;
 use TAW\Core\Block\BlockRegistry;
 
 class BlockLoader
@@ -39,8 +40,17 @@ class BlockLoader
                 $relative = ltrim(str_replace($blocks_dir, '', $subdir), '/');
                 $class    = 'TAW\\Blocks\\' . str_replace('/', '\\', $relative) . '\\' . $name;
 
-                if (class_exists($class) && is_subclass_of($class, MetaBlock::class)) {
+                if (!class_exists($class) || !is_subclass_of($class, BaseBlock::class)) {
+                    continue;
+                }
+
+                if (is_subclass_of($class, MetaBlock::class)) {
                     BlockRegistry::register(new $class());
+                } else {
+                    // Plain Block: no registry entry needed, but call boot() so
+                    // any admin-time registrations (Metaboxes, hooks) are set up
+                    // on every request without requiring a template render.
+                    $class::boot();
                 }
             } else {
                 // No matching PHP file — treat as a group folder and recurse

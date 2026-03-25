@@ -14,6 +14,15 @@ abstract class BaseBlock
 
     private static array $enqueuedComponents = [];
 
+    /**
+     * Called once at theme boot for every Block subclass, before any template renders.
+     *
+     * Override in concrete blocks to register anything that must exist on every request
+     * (Metaboxes, admin hooks, etc.). The default implementation is a no-op.
+     * MetaBlock subclasses use registerMetaboxes() via their constructor instead.
+     */
+    public static function boot(): void {}
+
     public function __construct()
     {
         $reflector = new \ReflectionClass(static::class);
