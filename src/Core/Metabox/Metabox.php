@@ -239,8 +239,8 @@ class Metabox
             $name_attr = $meta_key . '[' . $item->ID . ']';
             $html_id   = $meta_key . '-' . $item->ID;
             $value     = get_post_meta($item->ID, $meta_key, true);
-            ?>
-            <p class="field-description description description-thin">
+?>
+            <p class="taw-nav-field description description-thin">
                 <label for="<?php echo esc_attr($html_id); ?>">
                     <?php echo esc_html($field['label'] ?? ''); ?>
                     <?php if (!empty($field['required'])): ?>
@@ -252,7 +252,7 @@ class Metabox
                     <span class="description"><?php echo esc_html($field['description']); ?></span>
                 <?php endif; ?>
             </p>
-            <?php
+        <?php
         }
     }
 
@@ -506,7 +506,7 @@ class Metabox
         self::$image_script_enqueued = true;
 
         add_action('admin_footer', static function () {
-?>
+        ?>
             <script>
                 (function($) {
                     'use strict';
