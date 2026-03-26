@@ -926,7 +926,9 @@ class Metabox
                         var $input   = $repeater.find('> .taw-repeater-input');
                         var $rows    = $repeater.find('> .taw-repeater-rows');
                         var $addBtn  = $repeater.find('> .taw-repeater-add');
-                        var template = $repeater.find('> .taw-repeater-template').html();
+                        // Read innerHTML from the <template> element's content fragment.
+                        var tmplEl   = $repeater.children('.taw-repeater-template')[0];
+                        var template = tmplEl ? tmplEl.innerHTML : '';
                         var max      = parseInt($repeater.data('max'), 10) || 0;
                         var min      = parseInt($repeater.data('min'), 10) || 0;
 
@@ -1500,13 +1502,13 @@ class Metabox
                     </button>
 
                     <?php // Template row — hidden, cloned by JS when adding new rows.
-                    // We use a <script type="text/html"> tag so the browser
-                    // doesn't parse it as real DOM (no accidental form submissions
-                    // or JS initializations on the template).
+                    // <template> keeps content inert (no form submissions, no JS init)
+                    // and — unlike <script type="text/html"> — supports nesting:
+                    // a nested </template> never prematurely closes the outer one.
                     ?>
-                    <script type="text/html" class="taw-repeater-template">
+                    <template class="taw-repeater-template">
                         <?php $this->render_repeater_row($sub_fields, $field_id, $tpl_placeholder, [], $post_id); ?>
-                    </script>
+                    </template>
                 </div>
             <?php
                 break;
