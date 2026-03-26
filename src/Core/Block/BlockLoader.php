@@ -45,7 +45,9 @@ class BlockLoader
                 }
 
                 if (is_subclass_of($class, MetaBlock::class)) {
-                    BlockRegistry::register(new $class());
+                    foreach ($class::variations() as $variation) {
+                        BlockRegistry::register(new $class($variation));
+                    }
                 } else {
                     // Plain Block: no registry entry needed, but call boot() so
                     // any admin-time registrations (Metaboxes, hooks) are set up

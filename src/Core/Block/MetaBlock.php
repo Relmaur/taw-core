@@ -8,10 +8,35 @@ use TAW\Core\Metabox\Metabox;
 
 abstract class MetaBlock extends BaseBlock
 {
-    public function __construct()
+    protected string $variation = '';
+
+    public function __construct(string $variation = '')
     {
         parent::__construct();
+
+        if ($variation !== '') {
+            $this->variation = $variation;
+            $this->id        = $this->id . '--' . $variation;
+        }
+
         $this->registerMetaboxes();
+    }
+
+    public function getVariation(): string
+    {
+        return $this->variation;
+    }
+
+    /**
+     * Declare which variations of this block should be registered.
+     * Override to return multiple variation strings (e.g. ['', 'footer']).
+     * An empty string means the default instance with no suffix.
+     *
+     * @return string[]
+     */
+    public static function variations(): array
+    {
+        return [''];
     }
 
     /**
