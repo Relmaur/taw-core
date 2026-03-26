@@ -908,196 +908,196 @@ class Metabox
                 (function($) {
                     'use strict';
 
-                    $(document).ready(function() {
+                    function debounce(fn, wait) {
+                        var timer;
+                        return function() {
+                            var context = this, args = arguments;
+                            clearTimeout(timer);
+                            timer = setTimeout(function() { fn.apply(context, args); }, wait);
+                        };
+                    }
 
-                        $('.taw-repeater').each(function() {
-                            var $repeater = $(this);
+                    // initRepeater is called for every .taw-repeater on page load,
+                    // and again for any nested repeaters that appear inside newly added rows.
+                    function initRepeater($repeater) {
+                        if ($repeater.data('taw-repeater-init')) return;
+                        $repeater.data('taw-repeater-init', true);
 
-                            // Skip if already initialized
-                            if ($repeater.data('taw-repeater-init')) return;
-                            $repeater.data('taw-repeater-init', true);
+                        var $input   = $repeater.find('> .taw-repeater-input');
+                        var $rows    = $repeater.find('> .taw-repeater-rows');
+                        var $addBtn  = $repeater.find('> .taw-repeater-add');
+                        var template = $repeater.find('> .taw-repeater-template').html();
+                        var max      = parseInt($repeater.data('max'), 10) || 0;
+                        var min      = parseInt($repeater.data('min'), 10) || 0;
 
-                            var $input = $repeater.find('> .taw-repeater-input');
-                            var $rows = $repeater.find('> .taw-repeater-rows');
-                            var $addBtn = $repeater.find('> .taw-repeater-add');
-                            var template = $repeater.find('> .taw-repeater-template').html();
-                            var max = parseInt($repeater.data('max'), 10) || 0;
-                            var min = parseInt($repeater.data('min'), 10) || 0;
+                        // Each repeater has its own placeholder (e.g. __TAWRPT__taw_outer__)
+                        // so nested repeater templates are never corrupted by the outer replace.
+                        var placeholder    = $repeater.data('placeholder');
+                        var placeholderRe  = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
 
-                            // Counter for unique indexes — uses timestamp to avoid
-                            // collisions with existing rows after add/remove cycles
-                            var nextIndex = Date.now();
+                        // Build a regex scoped to this repeater's field ID so serialize()
+                        // never picks up inputs that belong to a nested repeater's rows.
+                        // Matches: taw_repeater[this_field_id][any_index][sub_field_id]
+                        var fieldId        = $repeater.data('field-id');
+                        var escapedFieldId = fieldId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        var nameRe         = new RegExp('^taw_repeater\\[' + escapedFieldId + '\\]\\[[^\\]]+\\]\\[([^\\]]+)\\]$');
 
-                            // --- Add Row ---
+                        // Counter for unique indexes — timestamp avoids collisions
+                        var nextIndex = Date.now();
 
-                            $addBtn.on('click', function() {
-                                if (max > 0 && $rows.children('.taw-repeater-row').length >= max) {
-                                    return;
-                                }
+                        // --- Add Row ---
 
-                                var newIndex = nextIndex++;
-                                var rowHtml = template.replace(/__INDEX__/g, newIndex);
-                                var $row = $(rowHtml);
+                        $addBtn.on('click', function() {
+                            if (max > 0 && $rows.children('.taw-repeater-row').length >= max) {
+                                return;
+                            }
 
-                                $rows.append($row);
+                            var newIndex = nextIndex++;
+                            var rowHtml  = template.replace(placeholderRe, newIndex);
+                            var $row     = $(rowHtml);
 
-                                // Initialize any JS-dependent fields in the new row
-                                initFieldsInRow($row);
+                            $rows.append($row);
 
+                            // Initialize JS-dependent fields, including any nested repeaters
+                            initFieldsInRow($row);
+
+                            updateNumbers();
+                            updateButtonState();
+                            serialize();
+                        });
+
+                        // --- Remove Row ---
+
+                        $rows.on('click', '.taw-repeater-row-remove', function(e) {
+                            e.preventDefault();
+                            var $row  = $(this).closest('.taw-repeater-row');
+                            var count = $rows.children('.taw-repeater-row').length;
+
+                            if (min > 0 && count <= min) return;
+
+                            $row.slideUp(200, function() {
+                                $row.remove();
                                 updateNumbers();
                                 updateButtonState();
                                 serialize();
                             });
-
-                            // --- Remove Row ---
-
-                            $rows.on('click', '.taw-repeater-row-remove', function(e) {
-                                e.preventDefault();
-                                var $row = $(this).closest('.taw-repeater-row');
-                                var count = $rows.children('.taw-repeater-row').length;
-
-                                if (min > 0 && count <= min) return;
-
-                                $row.slideUp(200, function() {
-                                    $row.remove();
-                                    updateNumbers();
-                                    updateButtonState();
-                                    serialize();
-                                });
-                            });
-
-                            // --- Collapse/Expand Row ---
-
-                            $rows.on('click', '.taw-repeater-row-toggle', function(e) {
-                                e.preventDefault();
-                                var $row = $(this).closest('.taw-repeater-row');
-                                var $content = $row.find('> .taw-repeater-row-content');
-                                $content.slideToggle(150);
-                                $(this).text($content.is(':visible') ? '▾' : '▸');
-                            });
-
-                            // --- Sortable ---
-
-                            $rows.sortable({
-                                handle: '.taw-repeater-row-drag',
-                                axis: 'y',
-                                placeholder: 'taw-repeater-row-placeholder',
-                                tolerance: 'pointer',
-                                start: function(e, ui) {
-                                    ui.placeholder.height(ui.item.outerHeight());
-                                },
-                                update: function() {
-                                    updateNumbers();
-                                    serialize();
-                                }
-                            });
-
-                            // --- Initialize JS fields in a row ---
-
-                            function initFieldsInRow($row) {
-                                // Color pickers
-                                if (typeof window.tawInitColorPickers === 'function') {
-                                    window.tawInitColorPickers($row[0]);
-                                }
-
-                                // Post selectors
-                                if (typeof window.tawInitPostSelectors === 'function') {
-                                    window.tawInitPostSelectors($row[0]);
-                                }
-
-                                // Image fields work via event delegation (no init needed)
-                                // Text, textarea, select, number, range, checkbox — plain HTML, no init needed
-                            }
-
-                            // --- Update row numbers ---
-
-                            function updateNumbers() {
-                                $rows.children('.taw-repeater-row').each(function(i) {
-                                    $(this).find('> .taw-repeater-row-header .taw-repeater-row-title').text('#' + (i + 1));
-                                });
-                            }
-
-                            // --- Update add button state ---
-
-                            function updateButtonState() {
-                                var count = $rows.children('.taw-repeater-row').length;
-
-                                if (max > 0 && count >= max) {
-                                    $addBtn.prop('disabled', true);
-                                } else {
-                                    $addBtn.prop('disabled', false);
-                                }
-                            }
-
-                            // --- Serialize all rows into the hidden input ---
-
-                            function serialize() {
-                                var data = [];
-
-                                $rows.children('.taw-repeater-row').each(function() {
-                                    var $row = $(this);
-                                    var rowData = {};
-
-                                    // Find all inputs/selects/textareas within this row
-                                    $row.find('input, select, textarea').each(function() {
-                                        var $el = $(this);
-                                        var name = $el.attr('name');
-                                        if (!name) return;
-
-                                        // Parse the sub-field ID from the name
-                                        // Format: taw_repeater[_taw_something][INDEX][sub_field_id]
-                                        var match = name.match(/\[[^\]]+\]\[([^\]]+)\]$/);
-                                        if (!match) return;
-
-                                        var subKey = match[1];
-
-                                        // Handle checkboxes: hidden + checkbox share the same name.
-                                        // The checkbox overwrites the hidden field's "0" with "1".
-                                        if ($el.attr('type') === 'checkbox') {
-                                            rowData[subKey] = $el.is(':checked') ? '1' : '0';
-                                            return;
-                                        }
-
-                                        // Skip hidden fields that are paired with checkboxes
-                                        if ($el.attr('type') === 'hidden') {
-                                            // Check if there's a checkbox with the same name
-                                            var $checkbox = $row.find('input[type="checkbox"][name="' + name + '"]');
-                                            if ($checkbox.length) return; // Checkbox handler above will handle it
-                                        }
-
-                                        rowData[subKey] = $el.val();
-                                    });
-
-                                    if (Object.keys(rowData).length) {
-                                        data.push(rowData);
-                                    }
-                                });
-
-                                $input.val(JSON.stringify(data));
-                            }
-
-                            // --- Listen for changes to serialize ---
-
-                            $rows.on('change input', 'input, select, textarea', debounce(function() {
-                                serialize();
-                            }, 200));
-
-                            // Initialize button state on load
-                            updateButtonState();
                         });
 
-                        // Reuse the debounce helper (or define it if not already present)
-                        function debounce(fn, wait) {
-                            var timer;
-                            return function() {
-                                var context = this,
-                                    args = arguments;
-                                clearTimeout(timer);
-                                timer = setTimeout(function() {
-                                    fn.apply(context, args);
-                                }, wait);
-                            };
+                        // --- Collapse/Expand Row ---
+
+                        $rows.on('click', '.taw-repeater-row-toggle', function(e) {
+                            e.preventDefault();
+                            var $row     = $(this).closest('.taw-repeater-row');
+                            var $content = $row.find('> .taw-repeater-row-content');
+                            $content.slideToggle(150);
+                            $(this).text($content.is(':visible') ? '▾' : '▸');
+                        });
+
+                        // --- Sortable ---
+
+                        $rows.sortable({
+                            handle: '.taw-repeater-row-drag',
+                            axis: 'y',
+                            placeholder: 'taw-repeater-row-placeholder',
+                            tolerance: 'pointer',
+                            start: function(e, ui) {
+                                ui.placeholder.height(ui.item.outerHeight());
+                            },
+                            update: function() {
+                                updateNumbers();
+                                serialize();
+                            }
+                        });
+
+                        // --- Initialize JS fields in a row (including nested repeaters) ---
+
+                        function initFieldsInRow($row) {
+                            if (typeof window.tawInitColorPickers === 'function') {
+                                window.tawInitColorPickers($row[0]);
+                            }
+                            if (typeof window.tawInitPostSelectors === 'function') {
+                                window.tawInitPostSelectors($row[0]);
+                            }
+                            // Recursively initialize any nested repeaters in the new row
+                            $row.find('.taw-repeater').each(function() {
+                                initRepeater($(this));
+                            });
                         }
+
+                        // --- Update row numbers ---
+
+                        function updateNumbers() {
+                            $rows.children('.taw-repeater-row').each(function(i) {
+                                $(this).find('> .taw-repeater-row-header .taw-repeater-row-title').text('#' + (i + 1));
+                            });
+                        }
+
+                        // --- Update add button state ---
+
+                        function updateButtonState() {
+                            var count = $rows.children('.taw-repeater-row').length;
+                            $addBtn.prop('disabled', max > 0 && count >= max);
+                        }
+
+                        // --- Serialize all rows into the hidden input ---
+                        // Uses nameRe (scoped to this field ID) so inputs from nested
+                        // repeater rows are not mistakenly included in this level's data.
+
+                        function serialize() {
+                            var data = [];
+
+                            $rows.children('.taw-repeater-row').each(function() {
+                                var $row    = $(this);
+                                var rowData = {};
+
+                                $row.find('input, select, textarea').each(function() {
+                                    var $el  = $(this);
+                                    var name = $el.attr('name');
+                                    if (!name) return;
+
+                                    // Only collect fields belonging to this repeater level
+                                    var match = name.match(nameRe);
+                                    if (!match) return;
+
+                                    var subKey = match[1];
+
+                                    // Checkboxes: the checkbox value wins over the paired hidden "0"
+                                    if ($el.attr('type') === 'checkbox') {
+                                        rowData[subKey] = $el.is(':checked') ? '1' : '0';
+                                        return;
+                                    }
+
+                                    // Skip hidden fields paired with a checkbox of the same name
+                                    if ($el.attr('type') === 'hidden') {
+                                        if ($row.find('input[type="checkbox"][name="' + name + '"]').length) return;
+                                    }
+
+                                    rowData[subKey] = $el.val();
+                                });
+
+                                if (Object.keys(rowData).length) {
+                                    data.push(rowData);
+                                }
+                            });
+
+                            $input.val(JSON.stringify(data));
+                        }
+
+                        // --- Listen for changes ---
+
+                        $rows.on('change input', 'input, select, textarea', debounce(function() {
+                            serialize();
+                        }, 200));
+
+                        updateButtonState();
+                    }
+
+                    $(document).ready(function() {
+                        // Initialize all top-level repeaters; nested ones are initialized
+                        // recursively by initFieldsInRow when a new outer row is added.
+                        $('.taw-repeater').each(function() {
+                            initRepeater($(this));
+                        });
                     });
                 })(jQuery);
             </script>
@@ -1467,13 +1467,17 @@ class Metabox
                 // Decode saved rows
                 $rows = $value ? json_decode($value, true) : [];
                 if (!is_array($rows)) $rows = [];
+                // Each repeater uses its own unique placeholder so nested repeaters
+                // don't corrupt each other's templates when JS does the replace.
+                $tpl_placeholder = '__TAWRPT_' . $field_id . '__';
             ?>
                 <div class="taw-repeater"
                     data-field-id="<?php echo esc_attr($field_id); ?>"
+                    data-placeholder="<?php echo esc_attr($tpl_placeholder); ?>"
                     data-max="<?php echo intval($max_rows); ?>"
                     data-min="<?php echo intval($min_rows); ?>">
 
-                    <?php // Hidden input holds the serialized JSON value 
+                    <?php // Hidden input holds the serialized JSON value
                     ?>
                     <input type="hidden"
                         class="taw-repeater-input"
@@ -1481,7 +1485,7 @@ class Metabox
                         name="<?php echo esc_attr($field_id); ?>"
                         value="<?php echo esc_attr($value ?: '[]'); ?>">
 
-                    <?php // Sortable container for rows 
+                    <?php // Sortable container for rows
                     ?>
                     <div class="taw-repeater-rows">
                         <?php foreach ($rows as $row_index => $row_data):
@@ -1489,7 +1493,7 @@ class Metabox
                         endforeach; ?>
                     </div>
 
-                    <?php // "Add Row" button 
+                    <?php // "Add Row" button
                     ?>
                     <button type="button" class="button taw-repeater-add">
                         <?php echo esc_html($button_label); ?>
@@ -1498,10 +1502,10 @@ class Metabox
                     <?php // Template row — hidden, cloned by JS when adding new rows.
                     // We use a <script type="text/html"> tag so the browser
                     // doesn't parse it as real DOM (no accidental form submissions
-                    // or JS initializations on the template). 
+                    // or JS initializations on the template).
                     ?>
                     <script type="text/html" class="taw-repeater-template">
-                        <?php $this->render_repeater_row($sub_fields, $field_id, '__INDEX__', [], $post_id); ?>
+                        <?php $this->render_repeater_row($sub_fields, $field_id, $tpl_placeholder, [], $post_id); ?>
                     </script>
                 </div>
             <?php
