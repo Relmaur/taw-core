@@ -42,26 +42,37 @@ abstract class BaseBlock
      * Supports style.scss, style.css, and script.js.
      * Safe to call multiple times — only enqueues once per block.
      */
+    /**
+     * The ID used for asset deduplication and WP handles.
+     * Overridden by MetaBlock so all variations share one enqueue slot.
+     */
+    protected function getAssetId(): string
+    {
+        return $this->id;
+    }
+
     public function enqueueAssets(): void
     {
-        if (isset(self::$enqueuedComponents[$this->id])) {
+        $assetId = $this->getAssetId();
+
+        if (isset(self::$enqueuedComponents[$assetId])) {
             return;
         }
-        self::$enqueuedComponents[$this->id] = true;
+        self::$enqueuedComponents[$assetId] = true;
 
         $relative_dir = str_replace(get_template_directory() . '/', '', $this->dir);
 
         if (ViteLoader::isDevServerRunning()) {
-            $this->enqueueDevAssets($relative_dir);
+            $this->enqueueDevAssets($relative_dir, $assetId);
         } else {
-            $this->enqueueProdAssets($relative_dir);
+            $this->enqueueProdAssets($relative_dir, $assetId);
         }
     }
 
     /**
      * DEV: serve assets from Vite dev server for HMR.
      */
-    private function enqueueDevAssets(string $relative_dir): void
+    private function enqueueDevAssets(string $relative_dir, string $assetId): void
     {
         $style_ext = $this->resolveStyleExtension();
         $head_done = did_action('wp_head') > 0;
@@ -73,13 +84,13 @@ abstract class BaseBlock
                 // Fallback: wp_head already fired, print inline
                 printf('<link rel="stylesheet" href="%s">' . "\n", esc_url($url));
             } else {
-                wp_enqueue_style('taw-block-' . $this->id, $url, [], null);
+                wp_enqueue_style('taw-block-' . $assetId, $url, [], null);
             }
         }
 
         if (file_exists($this->dir . '/script.js')) {
             wp_enqueue_script(
-                'taw-block-' . $this->id,
+                'taw-block-' . $assetId,
                 ViteLoader::DEV_SERVER . '/' . $relative_dir . '/script.js',
                 ['vite-client'],
                 null,
@@ -91,7 +102,7 @@ abstract class BaseBlock
     /**
      * PROD: resolve hashed filenames from the Vite manifest.
      */
-    private function enqueueProdAssets(string $relative_dir): void
+    private function enqueueProdAssets(string $relative_dir, string $assetId): void
     {
         $manifest  = ViteLoader::getManifest();
         $scss_key  = $relative_dir . '/style.scss';
@@ -107,13 +118,13 @@ abstract class BaseBlock
             if ($head_done) {
                 printf('<link rel="stylesheet" href="%s">' . "\n", esc_url($url));
             } else {
-                wp_enqueue_style('taw-block-' . $this->id, $url, [], null);
+                wp_enqueue_style('taw-block-' . $assetId, $url, [], null);
             }
         }
 
         if (isset($manifest[$js_key])) {
             wp_enqueue_script(
-                'taw-block-' . $this->id,
+                'taw-block-' . $assetId,
                 ViteLoader::distUrl($manifest[$js_key]['file']),
                 [],
                 null,

@@ -9,10 +9,13 @@ use TAW\Core\Metabox\Metabox;
 abstract class MetaBlock extends BaseBlock
 {
     protected string $variation = '';
+    protected string $baseId   = '';
 
     public function __construct(string $variation = '')
     {
         parent::__construct();
+
+        $this->baseId = $this->id;
 
         if ($variation !== '') {
             $this->variation = $variation;
@@ -25,6 +28,15 @@ abstract class MetaBlock extends BaseBlock
     public function getVariation(): string
     {
         return $this->variation;
+    }
+
+    /**
+     * All variations share the same physical assets, so use the base ID
+     * as the WP handle and deduplication key.
+     */
+    protected function getAssetId(): string
+    {
+        return $this->baseId;
     }
 
     /**
