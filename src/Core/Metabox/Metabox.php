@@ -14,10 +14,13 @@ use TAW\Helpers\Framework;
  *
  * Usage:
  *   new Metabox([
- *       'id'     => 'my_metabox',
- *       'title'  => 'My Fields',
- *       'screen' => 'page',
- *       'fields' => [ ... ],
+ *       'id'      => 'my_metabox',
+ *       'title'   => 'My Fields',
+ *       'screens' => ['page', 'post'],          // post type slugs
+ *       // 'screens' => ['about-us', 'contact'], // page/post slugs
+ *       // 'screens' => ['page-about.php'],       // template filenames
+ *       // 'screens' => ['page', 'page-home.php', 'about-us'], // mixed
+ *       'fields'  => [ ... ],
  *   ]);
  *
  * @package TAW
@@ -182,10 +185,11 @@ class Metabox
     }
 
     /**
-     * Returns the post type screens this metabox is registered on.
+     * Returns the raw screens array as configured.
      *
-     * Override in a subclass to declare screens dynamically, or pass
-     * 'screens' (string|string[]) in the constructor config.
+     * Each entry may be a registered post type slug, a page/post slug, or a
+     * template filename (ending in .php). Override in a subclass for dynamic
+     * resolution, or pass 'screens' in the constructor config.
      *
      * @return string[]
      */
@@ -195,22 +199,72 @@ class Metabox
     }
 
     /**
+     * Splits the screens array into three buckets:
+     *   - post types  (registered via post_type_exists())
+     *   - templates   (strings ending in .php)
+     *   - slugs       (everything else — matched against post_name)
+     *
+     * @return array{0: string[], 1: string[], 2: string[]}
+     */
+    private function parseScreens(): array
+    {
+        $postTypes = [];
+        $templates = [];
+        $slugs     = [];
+
+        foreach ($this->screens() as $screen) {
+            if (str_ends_with($screen, '.php')) {
+                $templates[] = $screen;
+            } elseif (post_type_exists($screen)) {
+                $postTypes[] = $screen;
+            } else {
+                $slugs[] = $screen;
+            }
+        }
+
+        return [$postTypes, $templates, $slugs];
+    }
+
+    /**
      * Register the metabox with WordPress via `add_meta_box()`.
      *
-     * Hooked to `add_meta_boxes`. Skips registration if the optional
-     * `show_on` callback returns false for the current post.
+     * Hooked to `add_meta_boxes`. Each entry in screens() is evaluated:
+     *   - Post type slugs   → registered unconditionally for that post type.
+     *   - Template files    → registered when the current post uses that template.
+     *   - Page/post slugs   → registered when the current post's slug matches.
+     *
+     * Skips registration entirely if the optional `show_on` callback returns false.
      *
      * @return void
      */
     public function register(): void
     {
-
         $post = get_post();
-        if (
-            $post &&
-            is_callable($this->show_on) &&
-            !call_user_func($this->show_on, $post)
-        ) {
+
+        if ($post && is_callable($this->show_on) && !call_user_func($this->show_on, $post)) {
+            return;
+        }
+
+        [$postTypes, $templates, $slugs] = $this->parseScreens();
+
+        // Evaluate slug/template conditions against the current post.
+        if (($templates || $slugs) && $post) {
+            $slugMatch = $slugs && in_array($post->post_name, $slugs, true);
+
+            $templateMatch = false;
+            if ($templates) {
+                $current = get_post_meta($post->ID, '_wp_page_template', true) ?: '';
+                $templateMatch = in_array($current, $templates, true);
+            }
+
+            if ($slugMatch || $templateMatch) {
+                $postTypes[] = $post->post_type;
+            }
+        }
+
+        $postTypes = array_unique($postTypes);
+
+        if (empty($postTypes)) {
             return;
         }
 
@@ -218,7 +272,7 @@ class Metabox
             $this->id,
             $this->title,
             [$this, 'render'],
-            $this->screens(),
+            $postTypes,
             $this->context,
             $this->priority
         );
@@ -1734,8 +1788,18 @@ class Metabox
             return;
         }
 
-        // Must match the registered post type
-        if ($post->post_type !== $this->screen) {
+        // Must match a registered screen (post type, slug, or template)
+        [$postTypes, $templates, $slugs] = $this->parseScreens();
+
+        $postTypeMatch  = in_array($post->post_type, $postTypes, true);
+        $slugMatch      = $slugs && in_array($post->post_name, $slugs, true);
+        $templateMatch  = false;
+        if ($templates) {
+            $current       = get_post_meta($post_id, '_wp_page_template', true) ?: '';
+            $templateMatch = in_array($current, $templates, true);
+        }
+
+        if (!$postTypeMatch && !$slugMatch && !$templateMatch) {
             return;
         }
 
