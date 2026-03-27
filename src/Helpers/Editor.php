@@ -33,29 +33,37 @@ class Editor
         string $tag = 'span'
     ): string {
 
-        // Fast path: not in edit mode - zero overhead
+        /**
+         * Always escape, regardless of editor state
+         * 
+         * This method takes over escaping responsibility from the template developer.
+         * Since the return value may include HTML wrapper tags (when the editor is active), the caller
+         * MUST use 'echo' without additional escaping - which means we must handle it here, every time,
+         * no exceptions.
+         */
+        $fieldConfig = Metabox::get_field_config($fieldId);
+        $fieldType = $fieldConfig['type'] ?? 'text';
+
+        $escaped = self::escapeValue($value, $fieldType);
+
+        // Fast path: not in edit mode - return esacped value, zero markup overhead
         if (! VisualEditor::isActive()) {
-            return (string) $value;
+            return $escaped;
         }
 
         $editorConfig = Metabox::get_editor_config($fieldId);
 
         if ($editorConfig === null) {
-            return (string) $value;
+            return $escaped;
         }
 
-        // Resolve field type from registry
-        $fieldConfig = Metabox::get_field_config($fieldId);
-        $fieldType = $fieldConfig['type'] ?? 'text';
         $fieldLabel = $fieldConfig['label'] ?? $fieldId;
 
         // Build data attributes
         $attrs = self::buildDataAttributes($blockId, $fieldId, $fieldType, $fieldLabel, $editorConfig);
 
-        // Wrap the value
-        return <<<HTML
-            <{$tag} {$attrs}>{$value}</{$tag}>
-        HTML;
+        // Wrap the escaped value
+        return "<{$tag} {$attrs}>{$escaped}</{$tag}>";
     }
 
     /**
@@ -81,10 +89,47 @@ class Editor
         }
 
         $fieldConfig = Metabox::get_field_config($fieldId);
+
+        if ($fieldConfig === null && defined('WP_DEBUG') && WP_DEBUG) {
+            // Help developers catch typos during development
+            trigger_error(
+                sprintf('taw_editable(): field "%s" is not registered in any Metabox.', $fieldId),
+                E_USER_NOTICE
+            );
+        }
+
         $fieldType   = $fieldConfig['type'] ?? 'text';
+
         $fieldLabel  = $fieldConfig['label'] ?? $fieldId;
 
         return self::buildDataAttributes($blockId, $fieldId, $fieldType, $fieldLabel, $editorConfig);
+    }
+
+    /**
+     * Escape a field value using the appropriate function for its type.
+     *
+     * This is the single source of truth for "how do I safely output
+     * this field type?" The mapping follows WordPress VIP conventions:
+     *
+     *  - text/textarea/select/etc. → esc_html()   (plain text into HTML body)
+     *  - wysiwyg                   → wp_kses_post() (trusted HTML, strip dangerous tags)
+     *  - url                       → esc_url()     (sanitize for href/src contexts)
+     *  - image                     → esc_url()     (attachment URLs)
+     *
+     * @param mixed  $value The raw field value.
+     * @param string $type  The field type from the registry.
+     * @return string The escaped value, safe for its intended output context.
+     */
+    private static function escapeValue(mixed $value, string $type): string
+    {
+        $value = (string) $value;
+
+        return match ($type) {
+            'wysiwyg'  => wp_kses_post($value),
+            'url'      => esc_url($value),
+            'image'    => esc_url($value),
+            default    => esc_html($value),
+        };
     }
 
     /**
