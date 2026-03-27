@@ -121,36 +121,26 @@ class ViteLoader
         // mirroring how vite_inline_critical_css() worked in the old loader.
         self::inlineCriticalCss();
 
-        // ── Async CSS (non-render-blocking) ────────────────────────────────────
+        // ── Theme CSS (render-blocking, prevents FOUC with utility-first CSS) ────
         // Collect CSS from the JS entry bundle and any standalone SCSS companion.
-        $async_css_urls = [];
+        $css_urls = [];
 
         foreach ($manifest[$key]['css'] ?? [] as $css_file) {
-            $async_css_urls[] = Framework::themeUrl($dist . '/' . $css_file);
+            $css_urls[] = Framework::themeUrl($dist . '/' . $css_file);
         }
 
         // Convention: resources/js/app.js pairs with resources/scss/app.scss
         $scss_key = preg_replace('#^resources/js/(.+)\.js$#', 'resources/scss/$1.scss', $key);
         if ($scss_key !== $key && isset($manifest[$scss_key]['file'])) {
-            $async_css_urls[] = Framework::themeUrl($dist . '/' . $manifest[$scss_key]['file']);
+            $css_urls[] = Framework::themeUrl($dist . '/' . $manifest[$scss_key]['file']);
         }
 
-        $async_css_urls = array_unique($async_css_urls);
+        $css_urls = array_unique($css_urls);
 
-        if (!empty($async_css_urls)) {
-            add_action('wp_head', function () use ($async_css_urls): void {
-                foreach ($async_css_urls as $url) {
-                    // media="print" loads without blocking render; onload swaps to "all"
-                    printf(
-                        '<link rel="stylesheet" href="%s" media="print" onload="this.media=\'all\'">' . "\n",
-                        esc_url($url)
-                    );
-                    printf(
-                        '<noscript><link rel="stylesheet" href="%s"></noscript>' . "\n",
-                        esc_url($url)
-                    );
-                }
-            }, 50);
+        foreach ($css_urls as $i => $url) {
+            $handle = $i === 0 ? 'theme-app-style' : 'theme-app-style-' . $i;
+            wp_register_style($handle, $url, [], null);
+            wp_enqueue_style($handle);
         }
 
         // ── JS bundle ──────────────────────────────────────────────────────────
