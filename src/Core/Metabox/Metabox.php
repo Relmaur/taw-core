@@ -1010,9 +1010,12 @@ class Metabox
                     function debounce(fn, wait) {
                         var timer;
                         return function() {
-                            var context = this, args = arguments;
+                            var context = this,
+                                args = arguments;
                             clearTimeout(timer);
-                            timer = setTimeout(function() { fn.apply(context, args); }, wait);
+                            timer = setTimeout(function() {
+                                fn.apply(context, args);
+                            }, wait);
                         };
                     }
 
@@ -1022,26 +1025,26 @@ class Metabox
                         if ($repeater.data('taw-repeater-init')) return;
                         $repeater.data('taw-repeater-init', true);
 
-                        var $input   = $repeater.find('> .taw-repeater-input');
-                        var $rows    = $repeater.find('> .taw-repeater-rows');
-                        var $addBtn  = $repeater.find('> .taw-repeater-add');
+                        var $input = $repeater.find('> .taw-repeater-input');
+                        var $rows = $repeater.find('> .taw-repeater-rows');
+                        var $addBtn = $repeater.find('> .taw-repeater-add');
                         // Read innerHTML from the <template> element's content fragment.
-                        var tmplEl   = $repeater.children('.taw-repeater-template')[0];
+                        var tmplEl = $repeater.children('.taw-repeater-template')[0];
                         var template = tmplEl ? tmplEl.innerHTML : '';
-                        var max      = parseInt($repeater.data('max'), 10) || 0;
-                        var min      = parseInt($repeater.data('min'), 10) || 0;
+                        var max = parseInt($repeater.data('max'), 10) || 0;
+                        var min = parseInt($repeater.data('min'), 10) || 0;
 
                         // Each repeater has its own placeholder (e.g. __TAWRPT__taw_outer__)
                         // so nested repeater templates are never corrupted by the outer replace.
-                        var placeholder    = $repeater.data('placeholder');
-                        var placeholderRe  = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+                        var placeholder = $repeater.data('placeholder');
+                        var placeholderRe = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
 
                         // Build a regex scoped to this repeater's field ID so serialize()
                         // never picks up inputs that belong to a nested repeater's rows.
                         // Matches: taw_repeater[this_field_id][any_index][sub_field_id]
-                        var fieldId        = $repeater.data('field-id');
+                        var fieldId = $repeater.data('field-id');
                         var escapedFieldId = fieldId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        var nameRe         = new RegExp('^taw_repeater\\[' + escapedFieldId + '\\]\\[[^\\]]+\\]\\[([^\\]]+)\\]$');
+                        var nameRe = new RegExp('^taw_repeater\\[' + escapedFieldId + '\\]\\[[^\\]]+\\]\\[([^\\]]+)\\]$');
 
                         // Counter for unique indexes — timestamp avoids collisions
                         var nextIndex = Date.now();
@@ -1054,8 +1057,8 @@ class Metabox
                             }
 
                             var newIndex = nextIndex++;
-                            var rowHtml  = template.replace(placeholderRe, newIndex);
-                            var $row     = $(rowHtml);
+                            var rowHtml = template.replace(placeholderRe, newIndex);
+                            var $row = $(rowHtml);
 
                             $rows.append($row);
 
@@ -1071,7 +1074,7 @@ class Metabox
 
                         $rows.on('click', '.taw-repeater-row-remove', function(e) {
                             e.preventDefault();
-                            var $row  = $(this).closest('.taw-repeater-row');
+                            var $row = $(this).closest('.taw-repeater-row');
                             var count = $rows.children('.taw-repeater-row').length;
 
                             if (min > 0 && count <= min) return;
@@ -1088,7 +1091,7 @@ class Metabox
 
                         $rows.on('click', '.taw-repeater-row-toggle', function(e) {
                             e.preventDefault();
-                            var $row     = $(this).closest('.taw-repeater-row');
+                            var $row = $(this).closest('.taw-repeater-row');
                             var $content = $row.find('> .taw-repeater-row-content');
                             $content.slideToggle(150);
                             $(this).text($content.is(':visible') ? '▾' : '▸');
@@ -1148,11 +1151,11 @@ class Metabox
                             var data = [];
 
                             $rows.children('.taw-repeater-row').each(function() {
-                                var $row    = $(this);
+                                var $row = $(this);
                                 var rowData = {};
 
                                 $row.find('input, select, textarea').each(function() {
-                                    var $el  = $(this);
+                                    var $el = $(this);
                                     var name = $el.attr('name');
                                     if (!name) return;
 
@@ -1778,7 +1781,9 @@ class Metabox
             $field_name = $this->prefix . $condition['field'];
             $expected   = $condition['value'];
             $operator   = $condition['operator'] ?? '==';
-            $actual     = $_POST[$field_name] ?? '';
+
+            // Read from $_POST via helper (applies wp_unslash)
+            $actual = $this->getPostValue($field_name);
 
             $met = match ($operator) {
                 '=='       => $actual == $expected,
@@ -1804,7 +1809,10 @@ class Metabox
         // Nonce check
         if (
             !isset($_POST[$this->id . '_nonce']) ||
-            !wp_verify_nonce($_POST[$this->id . '_nonce'], $this->id . '_nonce_action')
+            !wp_verify_nonce(
+                sanitize_text_field(wp_unslash($_POST[$this->id . '_nonce'])),
+                $this->id . '_nonce_action'
+            )
         ) {
             return;
         }
@@ -1835,15 +1843,26 @@ class Metabox
 
         foreach ($this->fields as $field) {
 
+            // ── Assign $field_id FIRST ──────────────────────────
+            //
+            // BUG FIX: Previously, $field_id was assigned AFTER the
+            // conditions check, which meant the conditions block used
+            // a stale value from the previous iteration (or was
+            // undefined on the first).
+
+            $field_id = $this->prefix . $field['id'];
+
+            // ── Conditional fields ──────────────────────────
+
             if (!empty($field['conditions']) && !$this->evaluate_conditions($field['conditions'])) {
                 // Conditions not met — clean up any stale value
                 delete_post_meta($post_id, $field_id);
                 continue;
             }
 
-            $field_id = $this->prefix . $field['id'];
 
-            // Handle Group Fields
+            // ── Conditional fields ──────────────────────────
+
             if (($field['type'] ?? '') === 'group') {
                 $group_fields = $field['fields'] ?? [];
                 foreach ($group_fields as $group_field) {
@@ -1861,15 +1880,18 @@ class Metabox
                         delete_post_meta($post_id, $group_field_id);
                         continue;
                     }
-
-                    $value = $this->sanitize_field($group_field, $_POST[$group_field_id]);
+                    // Sanitize the unslashed value — NOT the raw $_POST value
+                    $value = $this->sanitize_field($group_field, $this->getPostValue($group_field_id));
                     update_post_meta($post_id, $group_field_id, $value);
                 }
 
                 continue;
             }
 
-            $raw_value = $_POST[$field_id] ?? '';
+            // ── Handle Regular Fields ───────────────────────────
+
+            // Read from $_POST via helper (applies wp_unslash)
+            $raw_value = $this->getPostValue($field_id);
 
             // Validate 
             $validation = $this->validate_field($field, $raw_value);
@@ -1879,7 +1901,7 @@ class Metabox
                 // but show the error. This is a UX decision — some frameworks
                 // refuse to save entirely, but losing user input is worse.
                 if (isset($_POST[$field_id])) {
-                    $value = $this->sanitize_field($field, $_POST[$field_id]);
+                    $value = $this->sanitize_field($field, $this->getPostValue($field_id));
                     update_post_meta($post_id, $field_id, $value);
                 }
                 continue;
@@ -1890,7 +1912,8 @@ class Metabox
                 continue;
             }
 
-            $value = $this->sanitize_field($field, $_POST[$field_id]);
+            // Sanitize the unslashed value — NOT the raw $_POST value
+            $value = $this->sanitize_field($field, $this->getPostValue($field_id));
             update_post_meta($post_id, $field_id, $value);
         }
 
@@ -1943,6 +1966,31 @@ class Metabox
         }
 
         return implode(' && ', $parts);
+    }
+
+    /**
+     * Safely read a value from $_POST with WordPress unslashing.
+     *
+     * WordPress adds slashes to all $_POST data during boot (legacy
+     * from magic_quotes). wp_unslash() reverses that so values like
+     * "Marco's Theme" don't get saved as "Marco\'s Theme".
+     *
+     * This method deliberately does NOT sanitize — that's the caller's
+     * job via sanitize_field(), because the correct sanitizer depends
+     * on the field type (text vs textarea vs URL vs wysiwyg, etc.)
+     *
+     * @param string $key The $_POST key to read.
+     * @return string The unslashed value, or empty string if not set.
+     */
+    private function getPostValue(string $key): string
+    {
+        if (!isset($_POST[$key])) {
+            return '';
+        }
+
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce verified in save() before any getPostValue() calls
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- caller handles type-specific sanitization via sanitize_field()
+        return wp_unslash($_POST[$key]);
     }
 
     /**
