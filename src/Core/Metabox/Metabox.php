@@ -226,11 +226,48 @@ class Metabox
     }
 
     /**
+     * Checks whether a post matches any of the configured template screens.
+     *
+     * Two sources are checked for each template entry:
+     *
+     *   1. Explicit assignment — the `_wp_page_template` post meta set when the
+     *      user selects a template from the Page Attributes dropdown.
+     *
+     *   2. Template hierarchy — WordPress automatically applies `page-{slug}.php`
+     *      to the page whose slug is `{slug}` without writing any meta. We detect
+     *      this pattern and compare against the post slug directly.
+     *
+     * @param \WP_Post $post      The post being evaluated.
+     * @param string[] $templates Template filenames from parseScreens().
+     * @return bool
+     */
+    private function postMatchesTemplate(\WP_Post $post, array $templates): bool
+    {
+        $assigned = get_post_meta($post->ID, '_wp_page_template', true) ?: '';
+
+        foreach ($templates as $template) {
+            // Explicit template assignment via Page Attributes
+            if ($template === $assigned) {
+                return true;
+            }
+
+            // Template hierarchy: page-{slug}.php auto-applies to the page
+            // with that slug — no meta is ever written in this case.
+            if (preg_match('/^page-(.+)\.php$/', $template, $m) && $post->post_name === $m[1]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Register the metabox with WordPress via `add_meta_box()`.
      *
      * Hooked to `add_meta_boxes`. Each entry in screens() is evaluated:
      *   - Post type slugs   → registered unconditionally for that post type.
-     *   - Template files    → registered when the current post uses that template.
+     *   - Template files    → registered when the current post uses that template
+     *                         (explicit assignment OR template hierarchy naming).
      *   - Page/post slugs   → registered when the current post's slug matches.
      *
      * Skips registration entirely if the optional `show_on` callback returns false.
@@ -249,13 +286,8 @@ class Metabox
 
         // Evaluate slug/template conditions against the current post.
         if (($templates || $slugs) && $post) {
-            $slugMatch = $slugs && in_array($post->post_name, $slugs, true);
-
-            $templateMatch = false;
-            if ($templates) {
-                $current = get_post_meta($post->ID, '_wp_page_template', true) ?: '';
-                $templateMatch = in_array($current, $templates, true);
-            }
+            $slugMatch     = $slugs && in_array($post->post_name, $slugs, true);
+            $templateMatch = $templates && $this->postMatchesTemplate($post, $templates);
 
             if ($slugMatch || $templateMatch) {
                 $postTypes[] = $post->post_type;
@@ -1791,13 +1823,9 @@ class Metabox
         // Must match a registered screen (post type, slug, or template)
         [$postTypes, $templates, $slugs] = $this->parseScreens();
 
-        $postTypeMatch  = in_array($post->post_type, $postTypes, true);
-        $slugMatch      = $slugs && in_array($post->post_name, $slugs, true);
-        $templateMatch  = false;
-        if ($templates) {
-            $current       = get_post_meta($post_id, '_wp_page_template', true) ?: '';
-            $templateMatch = in_array($current, $templates, true);
-        }
+        $postTypeMatch = in_array($post->post_type, $postTypes, true);
+        $slugMatch     = $slugs && in_array($post->post_name, $slugs, true);
+        $templateMatch = $templates && $this->postMatchesTemplate($post, $templates);
 
         if (!$postTypeMatch && !$slugMatch && !$templateMatch) {
             return;
