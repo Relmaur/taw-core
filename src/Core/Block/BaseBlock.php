@@ -111,10 +111,12 @@ abstract class BaseBlock
      * PROD: resolve hashed filenames from the Vite manifest.
      *
      * CSS loading strategy:
-     *  - $critical = true, head not yet done → inline as <style> in <head> (zero render-blocking, zero CLS)
-     *  - $critical = true, head already done → sync <link> fallback (called too late to inline)
-     *  - $critical = false, head not yet done → async <link> via late wp_head hook (non-render-blocking)
-     *  - $critical = false, head already done → async <link> inline (below-fold, CLS trade-off accepted)
+     *  - $critical = true  → <style> inlined into <head> via wp_head hook (priority 11).
+     *                        Never echoed directly so it cannot land before <!DOCTYPE html>
+     *                        regardless of when enqueueAssets() is called.
+     *                        Falls back to a sync <link> if wp_head has already completed.
+     *  - $critical = false → async <link media="print" onload> via wp_head hook (priority 50)
+     *                        when called before/during wp_head, or inline when called after.
      */
     private function enqueueProdAssets(string $relative_dir, string $assetId): void
     {
@@ -130,12 +132,19 @@ abstract class BaseBlock
             $url      = ViteLoader::distUrl($manifest[$style_key]['file']);
             $css_path = Framework::themePath(ViteLoader::distDir() . '/' . $manifest[$style_key]['file']);
 
-            if ($this->critical && !$head_done) {
-                // Inline directly into <head> — eliminates render blocking and CLS
-                ViteLoader::inlineCssFile($css_path, 'block-' . $assetId);
-            } elseif ($this->critical) {
-                // Critical but called after head — sync link is the best we can do
-                printf('<link rel="stylesheet" href="%s">' . "\n", esc_url($url));
+            if ($this->critical) {
+                if ($head_done) {
+                    // wp_head already fired — best-effort sync <link> in body
+                    printf('<link rel="stylesheet" href="%s">' . "\n", esc_url($url));
+                } else {
+                    // Always schedule via wp_head hook so the <style> is guaranteed
+                    // to land inside <head> no matter when enqueueAssets() was called.
+                    // Priority 11 runs right after wp_enqueue_scripts (10), before the
+                    // async <link> tags (50), and well before </head>.
+                    add_action('wp_head', static function () use ($css_path, $assetId): void {
+                        ViteLoader::inlineCssFile($css_path, 'block-' . $assetId);
+                    }, 11);
+                }
             } elseif ($head_done) {
                 // Non-critical, after head (below-fold render) — async, no noscript needed
                 printf(
