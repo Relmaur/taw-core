@@ -35,8 +35,8 @@ class Metabox
     /** @var string Human-readable title displayed in the WordPress editor. */
     private string $title;
 
-    /** @var string Post type slug this metabox is registered on (e.g. 'page', 'post'). */
-    private string $screen;
+    /** @var array<int, string> Post type slugs this metabox is registered on (e.g. ['page', 'post']). */
+    private array $screens;
 
     /** @var string Metabox position context: 'normal', 'side', or 'advanced'. */
     private string $context;
@@ -109,8 +109,8 @@ class Metabox
      * @param array $config {
      *     @type string   $id       Unique metabox ID.
      *     @type string   $title    Metabox title shown in the editor.
-     *     @type string   $screen   Post type to attach to. Default 'page'.
-     *     @type string   $context  'normal', 'side', or 'advanced'. Default 'normal'.
+     *     @type string|string[] $screens  Post type(s) to attach to. Also accepts legacy 'screen'. Default 'page'.
+     *     @type string          $context  'normal', 'side', or 'advanced'. Default 'normal'.
      *     @type string   $priority 'high', 'default', or 'low'. Default 'high'.
      *     @type string   $prefix   Meta key prefix. Default '_taw_'.
      *     @type callable $show_on  Optional callback(WP_Post): bool — return false to hide the metabox.
@@ -123,7 +123,7 @@ class Metabox
     {
         $this->id       = $config['id'];
         $this->title    = $config['title'];
-        $this->screen   = $config['screen']   ?? 'page';
+        $this->screens  = (array)($config['screens'] ?? $config['screen'] ?? 'page');
         $this->context  = $config['context']  ?? 'normal';
         $this->priority = $config['priority'] ?? 'high';
         $this->prefix   = $config['prefix']   ?? '_taw_';
@@ -182,6 +182,19 @@ class Metabox
     }
 
     /**
+     * Returns the post type screens this metabox is registered on.
+     *
+     * Override in a subclass to declare screens dynamically, or pass
+     * 'screens' (string|string[]) in the constructor config.
+     *
+     * @return string[]
+     */
+    public function screens(): array
+    {
+        return $this->screens;
+    }
+
+    /**
      * Register the metabox with WordPress via `add_meta_box()`.
      *
      * Hooked to `add_meta_boxes`. Skips registration if the optional
@@ -205,7 +218,7 @@ class Metabox
             $this->id,
             $this->title,
             [$this, 'render'],
-            $this->screen,
+            $this->screens(),
             $this->context,
             $this->priority
         );
@@ -1372,14 +1385,12 @@ class Metabox
                         name="<?php echo esc_attr($field_id); ?>"
                         value="<?php echo esc_attr($value); ?>">
 
-                    <?php if ($image_url): ?>
-                        <div class="taw-image-preview" style="margin-bottom: 10px;">
-                            <?php if ($image_url): ?>
-                                <img src="<?php echo esc_url($image_url); ?>"
-                                    style="max-width:300px;height:auto;display:block;border:1px solid #ddd;padding:4px;border-radius:4px;">
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
+                    <div class="taw-image-preview" style="margin-bottom: 10px;">
+                        <?php if ($image_url): ?>
+                            <img src="<?php echo esc_url($image_url); ?>"
+                                style="max-width:300px;height:auto;display:block;border:1px solid #ddd;padding:4px;border-radius:4px;">
+                        <?php endif; ?>
+                    </div>
 
                     <button type="button" class="button taw-upload-image">
                         <?php esc_html_e('Select Image', 'taw-theme'); ?>
