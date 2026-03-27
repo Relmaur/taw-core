@@ -88,7 +88,7 @@ class Image
         if ($above_fold) {
             $attrs['loading']       = 'eager';
             $attrs['fetchpriority'] = 'high';
-            $attrs['decoding']      = 'high';
+            $attrs['decoding']      = 'auto';
         } else {
             $attrs['loading']       = 'lazy';
             $attrs['fetchpriority'] = 'low';
@@ -133,20 +133,26 @@ class Image
     }
 
     /**
-     * Generate a <link rel="preload" tag for an above-the-fold image.
-     * 
+     * Generate a <link rel="preload"> tag for an above-the-fold image.
+     *
      * Call this in your template BEFORE wp_head(), or hook into wp_head
      * at priority 1-2. Preloading tells the browser to fetch the image
      * immediately, before it discovers the <img> tag in the HTML.
-     * 
+     *
      * Only preload your single most important image (usually the hero).
      * Preloading multiple images defeats the purpose.
-     * 
-     * @param int $attachment_id Wordpress attachment ID.
-     * @param string $size       Wordpress image size
-     * @param string HTML <link> preload tag, or empty string
+     *
+     * The $sizes argument should match whatever you pass as 'sizes' to
+     * Image::render() so the browser preloads the same candidate the
+     * <img> will ultimately use.
+     *
+     * @param int         $attachment_id WordPress attachment ID.
+     * @param string      $size          WordPress image size.
+     * @param string|null $sizes         Custom sizes attribute (e.g. '100vw'). Falls back
+     *                                   to the WordPress-generated value when omitted.
+     * @return string HTML <link> preload tag, or empty string.
      */
-    public static function preload_tag(int $attachment_id, string $size = 'large'): string
+    public static function preload_tag(int $attachment_id, string $size = 'large', ?string $sizes = null): string
     {
         if (!$attachment_id || !wp_attachment_is_image($attachment_id)) {
             return '';
@@ -160,21 +166,20 @@ class Image
 
         [$src] = $image;
 
-        //Build preload with srcset for responsive preloading
-        $srcset = wp_get_attachment_image_srcset($attachment_id, $size);
-        $sizes = wp_get_attachment_image_sizes($attachment_id, $size);
+        $srcset         = wp_get_attachment_image_srcset($attachment_id, $size);
+        $resolved_sizes = $sizes ?? wp_get_attachment_image_sizes($attachment_id, $size);
 
         $tag = sprintf(
-            '<link rel="preload" href="%s" as="image"',
+            '<link rel="preload" href="%s" as="image" fetchpriority="high"',
             esc_url($src)
         );
 
-        // Responsive preloading - browser picks the right size to preload
-        if ($srcset && $sizes) {
+        // Responsive preloading — browser picks the right candidate to preload
+        if ($srcset && $resolved_sizes) {
             $tag .= sprintf(
                 ' imagesrcset="%s" imagesizes="%s"',
                 esc_attr($srcset),
-                esc_attr($sizes)
+                esc_attr($resolved_sizes)
             );
         }
 
