@@ -245,7 +245,7 @@ class ViteLoader
      *
      * @return string  Theme-relative path, e.g. 'dist' or 'public/build'
      */
-    private static function distDir(): string
+    public static function distDir(): string
     {
         static $dir = null;
 
@@ -489,26 +489,39 @@ class ViteLoader
         }
 
         $css_path = Framework::themePath(self::distDir() . '/' . $manifest[$entry_key]['file']);
+        self::inlineCssFile($css_path, 'critical-css');
+    }
 
+    /**
+     * Read a compiled CSS file, rewrite Vite's relative asset URLs to absolute
+     * theme URLs, then echo a <style> block inline.
+     *
+     * Vite's `base: './'` produces `url('./assets/...')` in compiled CSS, which
+     * resolves correctly from a linked stylesheet but breaks when CSS is inlined
+     * into <head> (browser resolves against the page URL, not the CSS file location).
+     *
+     * @param string $css_path  Absolute filesystem path to the compiled CSS file.
+     * @param string $id        Optional HTML id attribute for the <style> tag.
+     */
+    public static function inlineCssFile(string $css_path, string $id = ''): void
+    {
         if (!file_exists($css_path)) {
             return;
         }
 
         $css = file_get_contents($css_path);
-        if ($css) {
-            // Vite's base: './' writes relative url(./...) references in compiled CSS.
-            // These resolve correctly from a linked stylesheet but break when the CSS
-            // is inlined into <head> — the browser resolves them against the page URL
-            // instead of the CSS file's location in public/build/assets/.
-            // Replace with absolute Theme URLs before inlining.
-            $assets_url = Framework::themeUrl(self::distDir() . '/assets');
-            $css = str_replace(
-                ["url('./", 'url("./','url(./'],
-                ["url('" . $assets_url . '/', 'url("' . $assets_url . '/','url(' . $assets_url . '/'],
-                $css
-            );
-
-            echo '<style id="critical-css">' . $css . '</style>' . "\n";
+        if (!$css) {
+            return;
         }
+
+        $assets_url = Framework::themeUrl(self::distDir() . '/assets');
+        $css = str_replace(
+            ["url('./", 'url("./','url(./'],
+            ["url('" . $assets_url . '/', 'url("' . $assets_url . '/','url(' . $assets_url . '/'],
+            $css
+        );
+
+        $id_attr = $id ? ' id="' . esc_attr($id) . '"' : '';
+        echo '<style' . $id_attr . '>' . $css . '</style>' . "\n";
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core\Block;
 
+use TAW\Helpers\Framework;
 use TAW\Support\ViteLoader;
 
 abstract class BaseBlock
@@ -11,6 +12,13 @@ abstract class BaseBlock
     protected string $id;
     protected string $dir;
     protected string $uri;
+
+    /**
+     * Set to true for above-fold blocks whose CSS must be inlined into <head>
+     * to prevent layout shift. All other blocks load their CSS asynchronously
+     * (non-render-blocking) to reduce network dependency depth.
+     */
+    protected bool $critical = false;
 
     private static array $enqueuedComponents = [];
 
@@ -101,6 +109,12 @@ abstract class BaseBlock
 
     /**
      * PROD: resolve hashed filenames from the Vite manifest.
+     *
+     * CSS loading strategy:
+     *  - $critical = true, head not yet done → inline as <style> in <head> (zero render-blocking, zero CLS)
+     *  - $critical = true, head already done → sync <link> fallback (called too late to inline)
+     *  - $critical = false, head not yet done → async <link> via late wp_head hook (non-render-blocking)
+     *  - $critical = false, head already done → async <link> inline (below-fold, CLS trade-off accepted)
      */
     private function enqueueProdAssets(string $relative_dir, string $assetId): void
     {
@@ -113,12 +127,33 @@ abstract class BaseBlock
         $head_done = did_action('wp_head') > 0;
 
         if ($style_key) {
-            $url = ViteLoader::distUrl($manifest[$style_key]['file']);
+            $url      = ViteLoader::distUrl($manifest[$style_key]['file']);
+            $css_path = Framework::themePath(ViteLoader::distDir() . '/' . $manifest[$style_key]['file']);
 
-            if ($head_done) {
+            if ($this->critical && !$head_done) {
+                // Inline directly into <head> — eliminates render blocking and CLS
+                ViteLoader::inlineCssFile($css_path, 'block-' . $assetId);
+            } elseif ($this->critical) {
+                // Critical but called after head — sync link is the best we can do
                 printf('<link rel="stylesheet" href="%s">' . "\n", esc_url($url));
+            } elseif ($head_done) {
+                // Non-critical, after head (below-fold render) — async, no noscript needed
+                printf(
+                    '<link rel="stylesheet" href="%s" media="print" onload="this.media=\'all\'">' . "\n",
+                    esc_url($url)
+                );
             } else {
-                wp_enqueue_style('taw-block-' . $assetId, $url, [], null);
+                // Non-critical, inside head — schedule async output via late wp_head hook
+                add_action('wp_head', static function () use ($url): void {
+                    printf(
+                        '<link rel="stylesheet" href="%s" media="print" onload="this.media=\'all\'">' . "\n",
+                        esc_url($url)
+                    );
+                    printf(
+                        '<noscript><link rel="stylesheet" href="%s"></noscript>' . "\n",
+                        esc_url($url)
+                    );
+                }, 50);
             }
         }
 
