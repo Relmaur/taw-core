@@ -22,10 +22,45 @@ class VisualEditorEndpoint
     public function register_routes(): void
     {
         register_rest_route(self::NAMESPACE, '/visual-editor/save', [
-            'methods'             => \WP_REST_Server::CREATABLE, // = 'POST'
+            'methods'             => \WP_REST_Server::CREATABLE,
             'callback'            => [$this, 'save_fields'],
             'permission_callback' => [$this, 'check_permission'],
+            'args'                => $this->get_save_args(),
         ]);
+    }
+
+    /**
+     * Define accepted parameters for the save endpoint.
+     *
+     * WordPress processes these BEFORE save_fields() runs:
+     * - 'required' → auto-rejects requests missing the param (400)
+     * - 'validate_callback' → auto-rejects invalid values (400)
+     * - 'sanitize_callback' → cleans values before your callback
+     *
+     * By the time save_fields() executes, $request->get_param()
+     * returns validated, sanitized data.
+     */
+    private function get_save_args(): array
+    {
+        return [
+            'post_id' => [
+                'required'          => true,
+                'sanitize_callback' => 'absint',
+                'validate_callback' => function ($value) {
+                    return absint($value) > 0;
+                },
+                'description'       => 'The post ID to save field changes to.',
+            ],
+            'fields' => [
+                'required'          => true,
+                'validate_callback' => function ($value) {
+                    // Must be a non-empty associative array
+                    // Each key is a field ID, each value is a change object
+                    return is_array($value) && !empty($value);
+                },
+                'description'       => 'Object of field changes keyed by field ID.',
+            ],
+        ];
     }
 
     /**
@@ -65,30 +100,36 @@ class VisualEditorEndpoint
      *     }
      * }
      */
+    /**
+     * Save handler — receives batched field changes from the visual editor.
+     *
+     * By the time this runs, WordPress has already verified:
+     * - post_id is present and is a positive integer (args validation)
+     * - fields is present and is a non-empty array (args validation)
+     * - The user can edit posts in general (permission_callback)
+     *
+     * We still need to verify:
+     * - The user can edit THIS specific post (resource-level auth)
+     * - The post exists
+     * - Each field is registered and editor-enabled (business logic)
+     */
     public function save_fields(\WP_REST_Request $request): \WP_REST_Response
     {
-        $body = $request->get_json_params();
+        // ── Read from $request (pre-validated by args) ──────────
+        //
+        // NOTE: We use get_param() instead of get_json_params().
+        // get_param() returns data that has been through the args
+        // sanitize/validate pipeline. get_json_params() returns
+        // the raw parsed JSON — bypassing the args processing.
 
-        // ── Validate payload structure ──────────────────────────
+        $postId = $request->get_param('post_id');
+        $fields = $request->get_param('fields');
 
-        $postId = absint($body['post_id'] ?? 0);
-        $fields = $body['fields'] ?? [];
-
-        if (!$postId) {
-            return new \WP_REST_Response([
-                'success' => false,
-                'message' => 'Missing or invalid post_id.',
-            ], 400);
-        }
-
-        if (empty($fields) || !is_array($fields)) {
-            return new \WP_REST_Response([
-                'success' => false,
-                'message' => 'No fields provided.',
-            ], 400);
-        }
-
-        // ── Verify the user can edit THIS specific post ─────────
+        // ── Resource-level authorization ────────────────────────
+        //
+        // The permission_callback checks "can edit posts in general".
+        // Here we check "can edit THIS specific post" — the double
+        // check pattern VIP expects.
 
         if (!current_user_can('edit_post', $postId)) {
             return new \WP_REST_Response([
@@ -97,7 +138,6 @@ class VisualEditorEndpoint
             ], 403);
         }
 
-        // Verify the post exists
         $post = get_post($postId);
         if (!$post) {
             return new \WP_REST_Response([
@@ -108,8 +148,8 @@ class VisualEditorEndpoint
 
         // ── Process each field change ───────────────────────────
 
-        $saved   = [];
-        $errors  = [];
+        $saved  = [];
+        $errors = [];
 
         foreach ($fields as $fieldId => $change) {
             $result = $this->save_single_field($postId, $fieldId, $change);
@@ -132,7 +172,7 @@ class VisualEditorEndpoint
             'message' => $allSucceeded
                 ? sprintf('%d field(s) saved.', count($saved))
                 : sprintf('%d saved, %d failed.', count($saved), count($errors)),
-        ], $allSucceeded ? 200 : 207); // 207 = Multi-Status (partial success)
+        ], $allSucceeded ? 200 : 207);
     }
 
     /**

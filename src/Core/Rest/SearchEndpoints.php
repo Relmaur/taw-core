@@ -60,13 +60,28 @@ class SearchEndpoints
                 'default'           => 'post',
                 'sanitize_callback' => 'sanitize_text_field',
                 'validate_callback' => function ($value) {
-                    // Accept comma-separated types: "post,page"
                     $types = array_map('trim', explode(',', $value));
                     foreach ($types as $type) {
-                        if (!post_type_exists($type)) {
+                        $type_obj = get_post_type_object($type);
+
+                        // Must exist
+                        if (!$type_obj) {
                             return new \WP_Error(
                                 'invalid_post_type',
                                 sprintf('Post type "%s" does not exist.', $type),
+                                ['status' => 400]
+                            );
+                        }
+
+                        // Must be publicly queryable — blocks internal types
+                        // like 'revision', 'nav_menu_item', 'customize_changeset'
+                        if (!$type_obj->publicly_queryable && $type !== 'page') {
+                            // Special case: 'page' has publicly_queryable = false
+                            // but show_in_rest = true. It's a core WordPress quirk.
+                            // Pages are public content that should be searchable.
+                            return new \WP_Error(
+                                'restricted_post_type',
+                                sprintf('Post type "%s" is not publicly queryable.', $type),
                                 ['status' => 400]
                             );
                         }
@@ -93,6 +108,29 @@ class SearchEndpoints
             ],
         ];
     }
+
+    // NOTE ABOUT THE 'page' SPECIAL CASE:
+    //
+    // This is a genuine WordPress quirk worth understanding:
+    //
+    //   $page_type = get_post_type_object('page');
+    //   $page_type->publicly_queryable;  // → false (!)
+    //   $page_type->public;              // → true
+    //   $page_type->show_in_rest;        // → true
+    //
+    // WordPress set publicly_queryable to false for pages because
+    // pages use their own permalink structure (hierarchical slugs)
+    // rather than the standard ?post_type=page query. But pages
+    // are obviously public content.
+    //
+    // The explicit '$type !== page' exception handles this. If you
+    // prefer a more general approach, you could check:
+    //
+    //   if (!$type_obj->publicly_queryable && !$type_obj->public) {
+    //
+    // But that's slightly broader — it would allow any post type
+    // with 'public' => true, which includes some types that might
+    // not be intended for search. The explicit exception is safer.
 
     /**
      * The actual search handler.
