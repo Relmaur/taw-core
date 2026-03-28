@@ -51,14 +51,17 @@ class VisualEditor
      */
     public static function isActive(): bool
     {
-        // Return cached result if we're already checked
         if (self::$active !== null) {
             return self::$active;
         }
 
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- this is a read-only frontend check, not a form submission
+        $edit_param = isset($_GET[self::QUERY_PARAM])
+            ? sanitize_text_field(wp_unslash($_GET[self::QUERY_PARAM]))
+            : '';
+
         self::$active = ! is_admin()
-            && isset($_GET[self::QUERY_PARAM])
-            && $_GET[self::QUERY_PARAM] === '1'
+            && $edit_param === '1'
             && current_user_can(self::CAPABILITY);
 
         return self::$active;
@@ -178,7 +181,7 @@ class VisualEditor
      */
     private static function resolvePostId(): ?int
     {
-        // Froentend: use the current queried object
+        // Frontend: use the current queried object
         if (!is_admin()) {
             $queried = get_queried_object();
 
@@ -192,7 +195,17 @@ class VisualEditor
         $screen = function_exists('get_current_screen') ? get_current_screen() : null;
 
         if ($screen && $screen->base === 'post') {
-            $postId = absint($_GET['post'] ?? $_POST['post_ID'] ?? 0);
+            // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- reading post ID for admin bar button context, not processing a form
+            $raw_post_id = isset($_GET['post'])
+                ? sanitize_text_field(wp_unslash($_GET['post']))
+                : '';
+
+            // phpcs:ignore WordPress.Security.NonceVerification.Missing -- fallback for edit screen context
+            if ($raw_post_id === '' && isset($_POST['post_ID'])) {
+                $raw_post_id = sanitize_text_field(wp_unslash($_POST['post_ID']));
+            }
+
+            $postId = absint($raw_post_id);
             return $postId ?: null;
         }
 
