@@ -95,6 +95,9 @@ class Metabox
     /** @var bool Guards against enqueuing the media-uploader image script more than once. */
     private static bool $image_script_enqueued = false;
 
+    /** @var bool Guards against enqueuing the multi-file picker script more than once. */
+    private static bool $files_script_enqueued = false;
+
     /** @var bool Guards against enqueuing general admin assets (CSS/JS) more than once. */
     private static bool $assets_enqueued = false;
 
@@ -562,33 +565,39 @@ class Metabox
             $this->enqueue_post_selector_script();
         }
 
+        $has_files = array_filter($this->fields, fn($f) => ($f['type'] ?? '') === 'files');
+
+        if ($has_files) {
+            wp_enqueue_media();
+            $this->enqueue_files_script();
+        }
+
         $has_repeater = array_filter($this->fields, fn($f) => ($f['type'] ?? '') === 'repeater');
 
         if ($has_repeater) {
             $this->enqueue_repeater_script();
 
-            // Repeater sub-fields might need their own assets
-            foreach ($this->fields as $field) {
-                if (($field['type'] ?? '') !== 'repeater') continue;
-                $sub_fields = $field['fields'] ?? [];
+            // Collect all field types used at any depth inside repeaters
+            $nested_types = $this->collect_field_types($this->fields);
 
-                $sub_has_image = array_filter($sub_fields, fn($f) => ($f['type'] ?? '') === 'image');
-                if ($sub_has_image) {
-                    wp_enqueue_media();
-                    $this->enqueue_image_script();
-                }
+            if (in_array('image', $nested_types, true)) {
+                wp_enqueue_media();
+                $this->enqueue_image_script();
+            }
 
-                $sub_has_color = array_filter($sub_fields, fn($f) => ($f['type'] ?? '') === 'color');
-                if ($sub_has_color) {
-                    wp_enqueue_style('wp-color-picker');
-                    wp_enqueue_script('wp-color-picker');
-                    $this->enqueue_color_script();
-                }
+            if (in_array('color', $nested_types, true)) {
+                wp_enqueue_style('wp-color-picker');
+                wp_enqueue_script('wp-color-picker');
+                $this->enqueue_color_script();
+            }
 
-                $sub_has_post_select = array_filter($sub_fields, fn($f) => ($f['type'] ?? '') === 'post_select');
-                if ($sub_has_post_select) {
-                    $this->enqueue_post_selector_script();
-                }
+            if (in_array('post_select', $nested_types, true)) {
+                $this->enqueue_post_selector_script();
+            }
+
+            if (in_array('files', $nested_types, true)) {
+                wp_enqueue_media();
+                $this->enqueue_files_script();
             }
         }
     }
@@ -652,6 +661,160 @@ class Metabox
                         $wrapper.find('.taw-image-input').val('').trigger('change');
                         $wrapper.find('.taw-image-preview').html('');
                         $(this).hide();
+                    });
+                })(jQuery);
+            </script>
+        <?php
+        });
+    }
+
+    /**
+     * Recursively collects all field 'type' values from a field definitions array,
+     * descending into 'fields' sub-arrays at any nesting depth.
+     *
+     * Used by enqueue_admin_assets() to determine which asset scripts to load
+     * without having to hard-code a maximum nesting level.
+     *
+     * @param array $fields Field definitions (may contain nested 'fields' arrays).
+     * @return string[]     Flat list of all type strings found at any depth.
+     */
+    private function collect_field_types(array $fields): array
+    {
+        $types = [];
+        foreach ($fields as $field) {
+            $types[] = $field['type'] ?? 'text';
+            if (!empty($field['fields'])) {
+                $types = array_merge($types, $this->collect_field_types($field['fields']));
+            }
+        }
+        return $types;
+    }
+
+    /**
+     * Outputs the multi-file picker JS exactly once via `admin_footer`.
+     *
+     * Exposes `window.tawInitFilesPickers(container)` so repeater rows can
+     * initialize file pickers for dynamically-added fields.
+     */
+    private function enqueue_files_script(): void
+    {
+        if (self::$files_script_enqueued) {
+            return;
+        }
+
+        self::$files_script_enqueued = true;
+
+        add_action('admin_footer', static function () {
+        ?>
+            <script>
+                (function($) {
+                    'use strict';
+
+                    /**
+                     * Initialize all .taw-files-field elements within a container.
+                     * Exposed globally so repeater rows can call it for new rows.
+                     */
+                    window.tawInitFilesPickers = function(container) {
+                        $(container).find('.taw-files-field').each(function() {
+                            var $wrap = $(this);
+                            if ($wrap.data('taw-files-init')) return;
+                            $wrap.data('taw-files-init', true);
+
+                            var $input   = $wrap.find('> .taw-files-input');
+                            var $preview = $wrap.find('> .taw-files-preview');
+                            var $addBtn  = $wrap.find('> .taw-files-add');
+                            var limit     = parseInt($wrap.data('limit'), 10) || 0;
+                            var fileTypes = $wrap.data('file-types') || '';
+
+                            function getIds() {
+                                try { return JSON.parse($input.val() || '[]'); }
+                                catch(e) { return []; }
+                            }
+
+                            function saveIds(ids) {
+                                $input.val(JSON.stringify(ids)).trigger('change');
+                            }
+
+                            function updateButton() {
+                                var count = getIds().length;
+                                $addBtn.prop('disabled', limit > 0 && count >= limit);
+                            }
+
+                            function addItem(attachment) {
+                                var ids = getIds();
+                                if (ids.indexOf(attachment.id) !== -1) return;
+                                if (limit > 0 && ids.length >= limit) return;
+
+                                ids.push(attachment.id);
+                                saveIds(ids);
+
+                                var isImage = attachment.type === 'image';
+                                var thumbUrl = isImage && attachment.sizes && attachment.sizes.thumbnail
+                                    ? attachment.sizes.thumbnail.url
+                                    : (isImage ? attachment.url : '');
+
+                                var $item = $('<div class="taw-files-item"></div>').attr('data-id', attachment.id);
+
+                                if (isImage && thumbUrl) {
+                                    $item.append('<img src="' + thumbUrl + '" alt="">');
+                                } else {
+                                    $item.append('<span class="taw-files-icon dashicons dashicons-media-default"></span>');
+                                    $item.append('<span class="taw-files-name">' + $('<span>').text(attachment.filename || attachment.title || '').html() + '</span>');
+                                }
+                                $item.append('<button type="button" class="taw-files-remove" title="<?php echo esc_js(__('Remove', 'taw-theme')); ?>">&times;</button>');
+                                $preview.append($item);
+                                updateButton();
+                            }
+
+                            // Remove a file
+                            $preview.on('click', '.taw-files-remove', function() {
+                                var $item   = $(this).closest('.taw-files-item');
+                                var removed = parseInt($item.data('id'), 10);
+                                saveIds(getIds().filter(function(id) { return id !== removed; }));
+                                $item.remove();
+                                updateButton();
+                            });
+
+                            // Drag-to-reorder
+                            $preview.sortable({
+                                items: '.taw-files-item',
+                                placeholder: 'taw-files-item-placeholder',
+                                tolerance: 'pointer',
+                                update: function() {
+                                    var ids = [];
+                                    $preview.find('.taw-files-item').each(function() {
+                                        ids.push(parseInt($(this).data('id'), 10));
+                                    });
+                                    saveIds(ids);
+                                }
+                            });
+
+                            // Open WP media picker
+                            $addBtn.on('click', function() {
+                                if (limit > 0 && getIds().length >= limit) return;
+
+                                var cfg = {
+                                    title:    '<?php echo esc_js(__('Select or Upload Files', 'taw-theme')); ?>',
+                                    button:   { text: '<?php echo esc_js(__('Add selected', 'taw-theme')); ?>' },
+                                    multiple: true
+                                };
+                                if (fileTypes) cfg.library = { type: fileTypes };
+
+                                var frame = wp.media(cfg);
+                                frame.on('select', function() {
+                                    frame.state().get('selection').each(function(a) {
+                                        addItem(a.toJSON());
+                                    });
+                                });
+                                frame.open();
+                            });
+
+                            updateButton();
+                        });
+                    };
+
+                    $(document).ready(function() {
+                        window.tawInitFilesPickers(document.body);
                     });
                 })(jQuery);
             </script>
@@ -1122,6 +1285,9 @@ class Metabox
                             if (typeof window.tawInitPostSelectors === 'function') {
                                 window.tawInitPostSelectors($row[0]);
                             }
+                            if (typeof window.tawInitFilesPickers === 'function') {
+                                window.tawInitFilesPickers($row[0]);
+                            }
                             // Recursively initialize any nested repeaters in the new row
                             $row.find('.taw-repeater').each(function() {
                                 initRepeater($(this));
@@ -1185,6 +1351,9 @@ class Metabox
                             });
 
                             $input.val(JSON.stringify(data));
+                            // Notify ancestor repeaters so they can re-serialize
+                            // their own hidden inputs with the updated nested data.
+                            $input.trigger('change');
                         }
 
                         // --- Listen for changes ---
@@ -1487,6 +1656,61 @@ class Metabox
                     <button type="button" class="button taw-remove-image"
                         style="<?php echo $value ? '' : 'display:none;'; ?>">
                         <?php esc_html_e('Remove Image', 'taw-theme'); ?>
+                    </button>
+                </div>
+            <?php break;
+
+            /* ---- MARK: Files (multi-attachment gallery) ---- */
+            case 'files':
+                $ids = $value ? json_decode($value, true) : [];
+                if (!is_array($ids)) $ids = [];
+                $limit      = $field['limit'] ?? 0;      // 0 = unlimited
+                $file_types = $field['file_types'] ?? ''; // e.g. 'image' or '' for all
+
+                // Pre-load attachment data for existing selections
+                $attachments = [];
+                foreach ($ids as $attach_id) {
+                    $attach_id = absint($attach_id);
+                    if (!$attach_id) continue;
+                    $mime     = get_post_mime_type($attach_id);
+                    $is_image = $mime && str_starts_with((string) $mime, 'image/');
+                    $attachments[] = [
+                        'id'       => $attach_id,
+                        'url'      => $is_image
+                            ? wp_get_attachment_image_url($attach_id, 'thumbnail')
+                            : wp_get_attachment_url($attach_id),
+                        'name'     => get_the_title($attach_id)
+                            ?: basename((string) (wp_get_attachment_url($attach_id) ?: '')),
+                        'is_image' => $is_image,
+                    ];
+                }
+            ?>
+                <div class="taw-files-field"
+                    data-limit="<?php echo intval($limit); ?>"
+                    data-file-types="<?php echo esc_attr($file_types); ?>">
+
+                    <input type="hidden"
+                        class="taw-files-input"
+                        id="<?php echo esc_attr($field_id); ?>"
+                        name="<?php echo esc_attr($field_id); ?>"
+                        value="<?php echo esc_attr($value ?: '[]'); ?>">
+
+                    <div class="taw-files-preview">
+                        <?php foreach ($attachments as $att): ?>
+                            <div class="taw-files-item" data-id="<?php echo esc_attr((string) $att['id']); ?>">
+                                <?php if ($att['is_image'] && $att['url']): ?>
+                                    <img src="<?php echo esc_url($att['url']); ?>" alt="">
+                                <?php else: ?>
+                                    <span class="taw-files-icon dashicons dashicons-media-default"></span>
+                                    <span class="taw-files-name"><?php echo esc_html($att['name']); ?></span>
+                                <?php endif; ?>
+                                <button type="button" class="taw-files-remove" title="<?php esc_attr_e('Remove', 'taw-theme'); ?>">&times;</button>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <button type="button" class="button taw-files-add">
+                        <?php echo esc_html($field['button_label'] ?? __('Add Files', 'taw-theme')); ?>
                     </button>
                 </div>
             <?php break;
@@ -2029,6 +2253,7 @@ class Metabox
             'color'          => sanitize_hex_color($value) ?: '',
             'post_select'       => $this->sanitize_post_select($field, $value),
             'repeater'          => $this->sanitize_repeater($field, $value),
+            'files'             => $this->sanitize_files($value),
             default          => sanitize_text_field($value),
         };
     }
@@ -2064,6 +2289,19 @@ class Metabox
         }
 
         return wp_json_encode($clean);
+    }
+
+    /**
+     * Sanitize files field value.
+     * Decodes the JSON array of attachment IDs and sanitizes each as absint.
+     */
+    private function sanitize_files(mixed $value): string
+    {
+        $ids = json_decode((string) $value, true);
+        if (!is_array($ids)) return '[]';
+
+        $clean = array_values(array_filter(array_map('absint', $ids)));
+        return wp_json_encode($clean, JSON_UNESCAPED_UNICODE);
     }
 
     /**
