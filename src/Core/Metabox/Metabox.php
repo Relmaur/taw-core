@@ -1262,7 +1262,7 @@ class Metabox
         ?>
 
         <div class="fields-container"
-            x-data="{ fields: <?php echo esc_attr(wp_json_encode($initial_values)); ?> }"
+            x-data="{ fields: <?php echo esc_attr(wp_json_encode($initial_values, JSON_UNESCAPED_UNICODE)); ?> }"
             x-init="
             // Watch all inputs within this metabox and sync to reactive state
             $el.querySelectorAll('input, select, textarea').forEach(el => {
@@ -2073,7 +2073,7 @@ class Metabox
      */
     private function sanitize_repeater(array $field, mixed $value): string
     {
-        $rows = json_decode(wp_unslash($value), true);
+        $rows = json_decode($value, true);
         if (!is_array($rows)) {
             return '[]';
         }
@@ -2112,7 +2112,7 @@ class Metabox
             }
         }
 
-        return wp_json_encode($clean_rows);
+        return wp_json_encode($clean_rows, JSON_UNESCAPED_UNICODE);
     }
 
     /**
