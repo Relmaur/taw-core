@@ -1365,6 +1365,10 @@ class Metabox
                             }
                         });
 
+                        // Expose serialize via a custom event so the pre-submit flush
+                        // (registered below) can invoke it without breaking the closure.
+                        $repeater.on('taw-flush-serialize', serialize);
+
                         updateButtonState();
                     }
 
@@ -1373,6 +1377,17 @@ class Metabox
                         // recursively by initFieldsInRow when a new outer row is added.
                         $('.taw-repeater').each(function() {
                             initRepeater($(this));
+                        });
+
+                        // Pre-submit flush: serialize all repeaters synchronously before
+                        // the form is sent so that debounce lag never causes stale data.
+                        // Repeaters are triggered in reverse DOM order (innermost first)
+                        // so each child updates its hidden input before its parent reads it.
+                        $('form#post, form#post-new').one('submit.tawRepeater', function() {
+                            var $all = $(this).find('.taw-repeater').get().reverse();
+                            $.each($all, function(_, el) {
+                                $(el).trigger('taw-flush-serialize');
+                            });
                         });
                     });
                 })(jQuery);
