@@ -127,6 +127,9 @@ class Metabox
      */
     public function __construct(array $config)
     {
+        // TEMP DEBUG
+        error_log('[TAW] Metabox::__construct id=' . ($config['id'] ?? '?'));
+
         $this->id       = $config['id'];
         $this->title    = $config['title'];
         $this->screens  = (array)($config['screens'] ?? $config['screen'] ?? 'page');
