@@ -1188,9 +1188,9 @@ class Metabox
                         if ($repeater.data('taw-repeater-init')) return;
                         $repeater.data('taw-repeater-init', true);
 
-                        var $input = $repeater.find('> .taw-repeater-input');
-                        var $rows = $repeater.find('> .taw-repeater-rows');
-                        var $addBtn = $repeater.find('> .taw-repeater-add');
+                        var $input  = $repeater.children('.taw-repeater-input');
+                        var $rows   = $repeater.children('.taw-repeater-rows');
+                        var $addBtn = $repeater.children('.taw-repeater-add');
                         // Read the <template> content via .content DocumentFragment clone.
                         // tmplEl.innerHTML is unreliable for <template> elements — in some
                         // browser/jQuery combinations the element reports no DOM children
@@ -1264,7 +1264,7 @@ class Metabox
                         $rows.on('click', '.taw-repeater-row-toggle', function(e) {
                             e.preventDefault();
                             var $row = $(this).closest('.taw-repeater-row');
-                            var $content = $row.find('> .taw-repeater-row-content');
+                            var $content = $row.children('.taw-repeater-row-content');
                             $content.slideToggle(150);
                             $(this).text($content.is(':visible') ? '▾' : '▸');
                         });
@@ -1307,7 +1307,7 @@ class Metabox
 
                         function updateNumbers() {
                             $rows.children('.taw-repeater-row').each(function(i) {
-                                $(this).find('> .taw-repeater-row-header .taw-repeater-row-title').text('#' + (i + 1));
+                                $(this).children('.taw-repeater-row-header').find('.taw-repeater-row-title').text('#' + (i + 1));
                             });
                         }
 
