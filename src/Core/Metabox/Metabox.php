@@ -1307,7 +1307,15 @@ class Metabox
                         // Uses nameRe (scoped to this field ID) so inputs from nested
                         // repeater rows are not mistakenly included in this level's data.
 
+                        // Guard flag — prevents re-entrant calls that would otherwise loop
+                        // when a nested repeater's $input.trigger('change') bubbles up and
+                        // fires this serialize() again before it has finished.
+                        var _serializing = false;
+
                         function serialize() {
+                            if (_serializing) return;
+                            _serializing = true;
+
                             var data = [];
 
                             $rows.children('.taw-repeater-row').each(function() {
@@ -1331,9 +1339,19 @@ class Metabox
                                         return;
                                     }
 
-                                    // Skip hidden fields paired with a checkbox of the same name
                                     if ($el.attr('type') === 'hidden') {
+                                        // Skip hidden fields paired with a checkbox of the same name
                                         if ($row.find('input[type="checkbox"][name="' + name + '"]').length) return;
+
+                                        // If this hidden input belongs to a nested repeater,
+                                        // flush that repeater NOW before we read its value.
+                                        // This guarantees we capture the user's latest edits
+                                        // even if the debounce hasn't fired yet.
+                                        // The _serializing guard above prevents the change event
+                                        // emitted by the child from re-entering this serialize().
+                                        if ($el.hasClass('taw-repeater-input')) {
+                                            $el.closest('.taw-repeater').trigger('taw-flush-serialize');
+                                        }
                                     }
 
                                     rowData[subKey] = $el.val();
@@ -1347,6 +1365,7 @@ class Metabox
                             $input.val(JSON.stringify(data));
                             // Notify ancestor repeaters so they can re-serialize
                             // their own hidden inputs with the updated nested data.
+                            _serializing = false;
                             $input.trigger('change');
                         }
 
