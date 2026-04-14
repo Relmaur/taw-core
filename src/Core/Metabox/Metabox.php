@@ -490,7 +490,7 @@ class Metabox
             }
 
             $value = $this->sanitize_field($field, $raw_value);
-            update_post_meta($menu_item_db_id, $meta_key, $value);
+            update_post_meta($menu_item_db_id, $meta_key, wp_slash($value));
         }
     }
 
@@ -1827,6 +1827,13 @@ class Metabox
                 $min_rows    = $field['min'] ?? 0;
                 $button_label = $field['button_label'] ?? __('Add Row', 'taw-theme');
 
+                // $value may arrive as a PHP array when this is a nested repeater
+                // (the parent sanitize_repeater stores nested rows as decoded arrays
+                // to avoid double-JSON-encoding, which breaks update_post_meta).
+                if (is_array($value)) {
+                    $value = wp_json_encode($value) ?: '[]';
+                }
+
                 // Decode saved rows
                 $rows = $value ? json_decode($value, true) : [];
                 if (!is_array($rows)) $rows = [];
@@ -2143,7 +2150,7 @@ class Metabox
                     }
                     // Sanitize the unslashed value — NOT the raw $_POST value
                     $value = $this->sanitize_field($group_field, $this->getPostValue($group_field_id));
-                    update_post_meta($post_id, $group_field_id, $value);
+                    update_post_meta($post_id, $group_field_id, wp_slash($value));
                 }
 
                 continue;
@@ -2163,7 +2170,7 @@ class Metabox
                 // refuse to save entirely, but losing user input is worse.
                 if (isset($_POST[$field_id])) {
                     $value = $this->sanitize_field($field, $this->getPostValue($field_id));
-                    update_post_meta($post_id, $field_id, $value);
+                    update_post_meta($post_id, $field_id, wp_slash($value));
                 }
                 continue;
             }
@@ -2175,7 +2182,7 @@ class Metabox
 
             // Sanitize the unslashed value — NOT the raw $_POST value
             $value = $this->sanitize_field($field, $this->getPostValue($field_id));
-            update_post_meta($post_id, $field_id, $value);
+            update_post_meta($post_id, $field_id, wp_slash($value));
         }
 
         // Display validation errors as admin notices
@@ -2376,12 +2383,23 @@ class Metabox
                 // Only allow known sub-field keys
                 if (!isset($field_map[$key])) continue;
 
-                // Reuse existing sanitize_field() for each sub-field
-                $clean_row[$key] = $this->sanitize_field($field_map[$key], $val);
+                $cleaned = $this->sanitize_field($field_map[$key], $val);
+
+                // Nested repeaters: store as a decoded PHP array rather than a JSON
+                // string so that the parent wp_json_encode() produces clean nested JSON
+                // (e.g. {"child":[{...}]}) with no backslash-escaped inner quotes.
+                // update_post_meta() internally calls wp_unslash(), which would strip
+                // those escapes and corrupt the outer JSON if we stored it as a string.
+                if (($field_map[$key]['type'] ?? '') === 'repeater') {
+                    $clean_row[$key] = json_decode($cleaned, true) ?: [];
+                } else {
+                    $clean_row[$key] = $cleaned;
+                }
             }
 
-            // Only keep rows that have at least one non-empty value
-            $has_content = array_filter($clean_row, fn($v) => $v !== '' && $v !== '0' && $v !== '[]');
+            // Only keep rows that have at least one non-empty value.
+            // Nested repeaters are stored as PHP arrays, so also filter out [].
+            $has_content = array_filter($clean_row, fn($v) => $v !== '' && $v !== '0' && $v !== '[]' && $v !== []);
             if (!empty($has_content)) {
                 $clean_rows[] = $clean_row;
             }
