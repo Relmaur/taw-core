@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core\OptionsPage;
 
+use TAW\Core\Metabox\Metabox;
 use TAW\Helpers\Framework;
 
 /**
@@ -75,6 +76,8 @@ class OptionsPage
             [],
             Framework::version()  // Bonus: auto cache-bust with package version
         );
+
+        Metabox::enqueue_field_scripts($this->fields);
     }
 
     /**

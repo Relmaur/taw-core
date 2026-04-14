@@ -544,60 +544,13 @@ class Metabox
             Framework::version()  // Bonus: auto cache-bust with package version
         );
 
-        // Walk the full field tree once so types inside tabs/groups are detected.
-        $all_types = $this->collect_field_types($this->fields);
-
-        if (in_array('image', $all_types, true)) {
-            wp_enqueue_media();
-            $this->enqueue_image_script();
-        }
-
-        if (in_array('color', $all_types, true)) {
-            wp_enqueue_style('wp-color-picker');
-            wp_enqueue_script('wp-color-picker');
-            $this->enqueue_color_script();
-        }
-
-        if (in_array('post_select', $all_types, true)) {
-            $this->enqueue_post_selector_script();
-        }
-
-        if (in_array('files', $all_types, true)) {
-            wp_enqueue_media();
-            $this->enqueue_files_script();
-        }
-
-        if (in_array('repeater', $all_types, true)) {
-            $this->enqueue_repeater_script();
-
-            $nested_types = $all_types;
-
-            if (in_array('image', $nested_types, true)) {
-                wp_enqueue_media();
-                $this->enqueue_image_script();
-            }
-
-            if (in_array('color', $nested_types, true)) {
-                wp_enqueue_style('wp-color-picker');
-                wp_enqueue_script('wp-color-picker');
-                $this->enqueue_color_script();
-            }
-
-            if (in_array('post_select', $nested_types, true)) {
-                $this->enqueue_post_selector_script();
-            }
-
-            if (in_array('files', $nested_types, true)) {
-                wp_enqueue_media();
-                $this->enqueue_files_script();
-            }
-        }
+        self::enqueue_field_scripts($this->fields);
     }
     /**
      * Outputs the image-upload JS exactly once, using event delegation so it
      * handles any number of image fields across multiple metabox instances.
      */
-    private function enqueue_image_script(): void
+    private static function enqueue_image_script(): void
     {
         if (self::$image_script_enqueued) {
             return;
@@ -670,16 +623,55 @@ class Metabox
      * @param array $fields Field definitions (may contain nested 'fields' arrays).
      * @return string[]     Flat list of all type strings found at any depth.
      */
-    private function collect_field_types(array $fields): array
+    private static function collect_field_types(array $fields): array
     {
         $types = [];
         foreach ($fields as $field) {
             $types[] = $field['type'] ?? 'text';
             if (!empty($field['fields'])) {
-                $types = array_merge($types, $this->collect_field_types($field['fields']));
+                $types = array_merge($types, self::collect_field_types($field['fields']));
             }
         }
         return $types;
+    }
+
+    /**
+     * Enqueue all field-type-specific admin scripts for a given field list.
+     *
+     * Called by both Metabox and OptionsPage so that repeaters, image pickers,
+     * colour pickers, etc. are loaded regardless of which context the fields
+     * appear in.
+     *
+     * @param array $fields Top-level field definitions (nested fields are walked recursively).
+     * @return void
+     */
+    public static function enqueue_field_scripts(array $fields): void
+    {
+        $all_types = self::collect_field_types($fields);
+
+        if (in_array('image', $all_types, true)) {
+            wp_enqueue_media();
+            self::enqueue_image_script();
+        }
+
+        if (in_array('color', $all_types, true)) {
+            wp_enqueue_style('wp-color-picker');
+            wp_enqueue_script('wp-color-picker');
+            self::enqueue_color_script();
+        }
+
+        if (in_array('post_select', $all_types, true)) {
+            self::enqueue_post_selector_script();
+        }
+
+        if (in_array('files', $all_types, true)) {
+            wp_enqueue_media();
+            self::enqueue_files_script();
+        }
+
+        if (in_array('repeater', $all_types, true)) {
+            self::enqueue_repeater_script();
+        }
     }
 
     /**
@@ -688,7 +680,7 @@ class Metabox
      * Exposes `window.tawInitFilesPickers(container)` so repeater rows can
      * initialize file pickers for dynamically-added fields.
      */
-    private function enqueue_files_script(): void
+    private static function enqueue_files_script(): void
     {
         if (self::$files_script_enqueued) {
             return;
@@ -822,7 +814,7 @@ class Metabox
      *
      * @return void
      */
-    private function enqueue_color_script(): void
+    private static function enqueue_color_script(): void
     {
         if (self::$color_script_enqueued) {
             return;
@@ -876,7 +868,7 @@ class Metabox
      *
      * @return void
      */
-    private function enqueue_post_selector_script(): void
+    private static function enqueue_post_selector_script(): void
     {
         if (self::$post_selector_script_enqueued) {
             return;
@@ -1145,7 +1137,7 @@ class Metabox
      *
      * @return void
      */
-    private function enqueue_repeater_script(): void
+    private static function enqueue_repeater_script(): void
     {
         if (self::$repeater_script_enqueued) {
             return;
