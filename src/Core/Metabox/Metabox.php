@@ -544,41 +544,33 @@ class Metabox
             Framework::version()  // Bonus: auto cache-bust with package version
         );
 
-        $has_image = array_filter($this->fields, fn($f) => ($f['type'] ?? '') === 'image');
+        // Walk the full field tree once so types inside tabs/groups are detected.
+        $all_types = $this->collect_field_types($this->fields);
 
-        if ($has_image) {
+        if (in_array('image', $all_types, true)) {
             wp_enqueue_media();
             $this->enqueue_image_script();
         }
 
-        $has_color = array_filter($this->fields, fn($f) => ($f['type'] ?? '') === 'color');
-
-        if ($has_color) {
+        if (in_array('color', $all_types, true)) {
             wp_enqueue_style('wp-color-picker');
             wp_enqueue_script('wp-color-picker');
             $this->enqueue_color_script();
         }
 
-        $has_post_select = array_filter($this->fields, fn($f) => ($f['type'] ?? '') === 'post_select');
-
-        if ($has_post_select) {
+        if (in_array('post_select', $all_types, true)) {
             $this->enqueue_post_selector_script();
         }
 
-        $has_files = array_filter($this->fields, fn($f) => ($f['type'] ?? '') === 'files');
-
-        if ($has_files) {
+        if (in_array('files', $all_types, true)) {
             wp_enqueue_media();
             $this->enqueue_files_script();
         }
 
-        $has_repeater = array_filter($this->fields, fn($f) => ($f['type'] ?? '') === 'repeater');
-
-        if ($has_repeater) {
+        if (in_array('repeater', $all_types, true)) {
             $this->enqueue_repeater_script();
 
-            // Collect all field types used at any depth inside repeaters
-            $nested_types = $this->collect_field_types($this->fields);
+            $nested_types = $all_types;
 
             if (in_array('image', $nested_types, true)) {
                 wp_enqueue_media();
