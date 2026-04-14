@@ -1191,9 +1191,18 @@ class Metabox
                         var $input = $repeater.find('> .taw-repeater-input');
                         var $rows = $repeater.find('> .taw-repeater-rows');
                         var $addBtn = $repeater.find('> .taw-repeater-add');
-                        // Read innerHTML from the <template> element's content fragment.
+                        // Read the <template> content via .content DocumentFragment clone.
+                        // tmplEl.innerHTML is unreliable for <template> elements — in some
+                        // browser/jQuery combinations the element reports no DOM children
+                        // (content lives in .content, a DocumentFragment) and returns ''.
+                        // Cloning .content into a throwaway div gives a correct serialization.
                         var tmplEl = $repeater.children('.taw-repeater-template')[0];
-                        var template = tmplEl ? tmplEl.innerHTML : '';
+                        var template = '';
+                        if (tmplEl) {
+                            var _tmpDiv = document.createElement('div');
+                            _tmpDiv.appendChild(tmplEl.content.cloneNode(true));
+                            template = _tmpDiv.innerHTML;
+                        }
                         var max = parseInt($repeater.data('max'), 10) || 0;
                         var min = parseInt($repeater.data('min'), 10) || 0;
 
