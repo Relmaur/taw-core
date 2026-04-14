@@ -127,8 +127,6 @@ class Metabox
      */
     public function __construct(array $config)
     {
-        // TEMP DEBUG
-        error_log('[TAW] Metabox::__construct id=' . ($config['id'] ?? '?'));
 
         $this->id       = $config['id'];
         $this->title    = $config['title'];
@@ -1354,9 +1352,18 @@ class Metabox
 
                         // --- Listen for changes ---
 
-                        $rows.on('change input', 'input, select, textarea', debounce(function() {
-                            serialize();
-                        }, 200));
+                        var debouncedSerialize = debounce(serialize, 200);
+
+                        $rows.on('change input', 'input, select, textarea', function(e) {
+                            // A hidden input changing means a nested repeater just serialized.
+                            // Skip the debounce so the parent captures the latest nested data
+                            // immediately — otherwise a 200ms gap lets the user save stale data.
+                            if ($(e.target).attr('type') === 'hidden') {
+                                serialize();
+                            } else {
+                                debouncedSerialize();
+                            }
+                        });
 
                         updateButtonState();
                     }
