@@ -38,7 +38,7 @@ class Metabox
     /** @var string Human-readable title displayed in the WordPress editor. */
     private string $title;
 
-    /** @var array<int, string> Post type slugs this metabox is registered on (e.g. ['page', 'post']). */
+    /** @var array<int, string> Post type slugs / template filenames this metabox is registered on (e.g. ['page', 'post']). */
     private array $screens;
 
     /** @var string Metabox position context: 'normal', 'side', or 'advanced'. */
@@ -479,7 +479,9 @@ class Metabox
 
         foreach ($this->fields as $field) {
             $meta_key  = $this->prefix . $field['id'];
-            $raw_value = $_POST[$meta_key][$menu_item_db_id] ?? null;
+            $raw_value = isset($_POST[$meta_key][$menu_item_db_id])
+                ? wp_unslash($_POST[$meta_key][$menu_item_db_id])
+                : null;
 
             if ($raw_value === null) {
                 // Unchecked checkboxes are absent from POST — treat as "0".
