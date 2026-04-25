@@ -25,6 +25,9 @@ abstract class MetaBlock extends BaseBlock
         $this->registerMetaboxes();
     }
 
+    /**
+     * Get the variation string for this block instance.
+     */
     public function getVariation(): string
     {
         return $this->variation;
@@ -84,5 +87,13 @@ abstract class MetaBlock extends BaseBlock
     protected function getImageUrl(int $postId, string $fieldId, string $size = 'full'): string
     {
         return Metabox::get_image_url($postId, $fieldId, $size);
+    }
+
+    /**
+     * Get a repeater field value for a given post.
+     */
+    protected function getRepeater(int $postId, string $fieldId, string $prefix = '_taw_'): array
+    {
+        return Metabox::get_repeater($postId, $fieldId, $prefix);
     }
 }
