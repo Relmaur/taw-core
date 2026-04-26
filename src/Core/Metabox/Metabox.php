@@ -249,9 +249,17 @@ class Metabox
     {
         $assigned = get_post_meta($post->ID, '_wp_page_template', true) ?: '';
 
+        $frontPageId = (int) get_option('page_on_front');
+
         foreach ($templates as $template) {
             // Explicit template assignment via Page Attributes
             if ($template === $assigned) {
+                return true;
+            }
+
+            // front-page.php is applied by WP to the page set as the static
+            // front page — no meta is written, so we match by page_on_front.
+            if ($template === 'front-page.php' && $frontPageId && $post->ID === $frontPageId) {
                 return true;
             }
 
