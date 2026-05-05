@@ -521,6 +521,151 @@ div[class|="postbox"]:not(:has(#side-sortables))
   margin-left: 2px;
 }
 
+/* ---- Repeater: Tabbed layouts ---- */
+
+.taw-repeater[data-layout^="tabbed"] {
+  border: 1px solid #c3c4c7;
+  border-radius: 4px;
+  background: #fff;
+  margin-bottom: 0.5rem;
+}
+
+.taw-repeater[data-layout^="tabbed"] .taw-repeater-rows {
+  margin: 0;
+}
+
+.taw-repeater[data-layout^="tabbed"] .taw-repeater-row {
+  border: none;
+  border-radius: 0;
+  margin: 0;
+}
+
+.taw-repeater[data-layout^="tabbed"] .taw-repeater-row-content .fields-container .field {
+  box-shadow: none;
+  border-bottom: 1px solid #f0f0f1;
+}
+
+.taw-repeater[data-layout^="tabbed"] .taw-repeater-row-content .fields-container .field:last-child {
+  border-bottom: none;
+}
+
+.taw-repeater-tab-nav {
+  display: flex;
+  background: #f6f7f7;
+}
+
+/* Horizontal: tabs run left-to-right along the top */
+.taw-repeater[data-layout="tabbed_horizontal"] .taw-repeater-tab-nav {
+  flex-direction: row;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #c3c4c7;
+  border-radius: 4px 4px 0 0;
+}
+
+/* Vertical: tabs stacked in a left column */
+.taw-repeater[data-layout="tabbed_vertical"] {
+  display: flex;
+  flex-direction: row;
+}
+
+.taw-repeater[data-layout="tabbed_vertical"] .taw-repeater-tab-nav {
+  flex-direction: column;
+  border-right: 1px solid #c3c4c7;
+  border-radius: 4px 0 0 4px;
+  min-width: 140px;
+  flex-shrink: 0;
+}
+
+.taw-repeater[data-layout="tabbed_vertical"] .taw-repeater-rows {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Individual tab button */
+.taw-repeater-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  border: none;
+  border-right: 1px solid #c3c4c7;
+  cursor: pointer;
+  font-size: 0.85em;
+  opacity: 0.6;
+  transition: background 150ms ease, opacity 150ms ease;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.taw-repeater[data-layout="tabbed_vertical"] .taw-repeater-tab {
+  border-right: none;
+  border-bottom: 1px solid #c3c4c7;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.taw-repeater-tab:hover,
+.taw-repeater-tab.active {
+  background: #fff;
+  opacity: 1;
+}
+
+.taw-repeater-tab.active {
+  font-weight: 600;
+}
+
+/* Remove × inside a tab */
+.taw-repeater-tab-remove {
+  margin-left: auto;
+  font-size: 1em;
+  line-height: 1;
+  opacity: 0.4;
+  padding: 0 0.1rem;
+  cursor: pointer;
+  transition: opacity 150ms ease, color 150ms ease;
+}
+
+.taw-repeater-tab-remove:hover {
+  opacity: 1;
+  color: #b32d2e;
+}
+
+/* Add Row button repurposed as a "+" tab in tabbed mode */
+.taw-repeater[data-layout^="tabbed"] .taw-repeater-add.taw-repeater-tab-add {
+  background: none;
+  border: none;
+  border-right: 1px solid #c3c4c7;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 1.2em;
+  font-weight: 400;
+  padding: 0.35rem 0.75rem;
+  opacity: 0.45;
+  cursor: pointer;
+  transition: opacity 150ms ease, background 150ms ease;
+  line-height: 1;
+}
+
+.taw-repeater[data-layout="tabbed_vertical"] .taw-repeater-add.taw-repeater-tab-add {
+  border-right: none;
+  border-top: 1px solid #c3c4c7;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.taw-repeater[data-layout^="tabbed"] .taw-repeater-add.taw-repeater-tab-add:hover {
+  opacity: 1;
+  background: #fff;
+}
+
+.taw-repeater[data-layout^="tabbed"] .taw-repeater-add.taw-repeater-tab-add[disabled] {
+  opacity: 0.2;
+  cursor: not-allowed;
+  background: none;
+}
+
 .taw-options-page {
   .taw-tabbed {
     .tabs {

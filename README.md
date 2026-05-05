@@ -220,6 +220,27 @@ new Metabox([
 ]
 ```
 
+By default repeater rows render as a collapsible accordion. Use the `layout` key to switch to a tabbed UI:
+
+| `layout` value | Description |
+|----------------|-------------|
+| _(omitted)_ | Accordion rows (default) |
+| `tabbed_horizontal` | Tabs along the top, content below |
+| `tabbed_vertical` | Tabs stacked in a left column, content on the right |
+
+```php
+[
+    'id'     => 'slides',
+    'label'  => 'Slides',
+    'type'   => 'repeater',
+    'layout' => 'tabbed_horizontal', // or 'tabbed_vertical'
+    'fields' => [
+        ['id' => 'title', 'label' => 'Title', 'type' => 'text'],
+        ['id' => 'image', 'label' => 'Image', 'type' => 'image'],
+    ],
+]
+```
+
 Repeater data is serialized as clean nested JSON and survives WordPress's `wp_unslash()` in `update_post_meta()`.
 
 ### Reading Values

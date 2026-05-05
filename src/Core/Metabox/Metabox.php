@@ -1216,6 +1216,64 @@ class Metabox
                         // Counter for unique indexes — timestamp avoids collisions
                         var nextIndex = Date.now();
 
+                        // --- Tabbed layout support ---
+                        var layout = $repeater.data('layout') || '';
+                        var isTabbed = layout === 'tabbed_horizontal' || layout === 'tabbed_vertical';
+                        var activeTabIndex = 0;
+                        var $tabNav = null;
+
+                        function rebuildTabs() {
+                            $tabNav.children('.taw-repeater-tab').remove();
+                            $rows.children('.taw-repeater-row').each(function(i) {
+                                var $row = $(this);
+                                var $tab = $('<button type="button" class="taw-repeater-tab">');
+                                $tab.append('<span class="taw-repeater-tab-label">#' + (i + 1) + '</span>');
+                                var $x = $('<span class="taw-repeater-tab-remove" title="Remove">&times;</span>');
+                                $x.on('click', function(e) {
+                                    e.stopPropagation();
+                                    var count = $rows.children('.taw-repeater-row').length;
+                                    if (min > 0 && count <= min) return;
+                                    $row.remove();
+                                    var newCount = $rows.children('.taw-repeater-row').length;
+                                    var newActive = Math.min(activeTabIndex, Math.max(0, newCount - 1));
+                                    rebuildTabs();
+                                    if (newCount > 0) setActiveTab(newActive);
+                                    updateButtonState();
+                                    serialize();
+                                });
+                                $tab.append($x);
+                                $tab.on('click', function() { setActiveTab(i); });
+                                $tab.insertBefore($tabNav.children('.taw-repeater-tab-add'));
+                            });
+                        }
+
+                        function setActiveTab(index) {
+                            activeTabIndex = index;
+                            $rows.children('.taw-repeater-row').each(function(i) {
+                                $(this).children('.taw-repeater-row-content').toggle(i === index);
+                            });
+                            $tabNav.children('.taw-repeater-tab').each(function(i) {
+                                $(this).toggleClass('active', i === index);
+                            });
+                        }
+
+                        function initTabbedUI() {
+                            $tabNav = $('<div class="taw-repeater-tab-nav">');
+                            $tabNav.insertBefore($rows);
+
+                            // Move the Add button into the tab nav and compact its label
+                            $addBtn.addClass('taw-repeater-tab-add').text('+').appendTo($tabNav);
+
+                            // Hide all row headers; hide all row content (setActiveTab reveals one)
+                            $rows.children('.taw-repeater-row').children('.taw-repeater-row-header').hide();
+                            $rows.children('.taw-repeater-row').children('.taw-repeater-row-content').hide();
+
+                            rebuildTabs();
+                            if ($rows.children('.taw-repeater-row').length > 0) {
+                                setActiveTab(0);
+                            }
+                        }
+
                         // --- Add Row ---
 
                         $addBtn.on('click', function() {
@@ -1232,14 +1290,22 @@ class Metabox
                             // Initialize JS-dependent fields, including any nested repeaters
                             initFieldsInRow($row);
 
+                            if (isTabbed) {
+                                $row.children('.taw-repeater-row-header').hide();
+                                $row.children('.taw-repeater-row-content').hide();
+                                rebuildTabs();
+                                setActiveTab($rows.children('.taw-repeater-row').length - 1);
+                            }
+
                             updateNumbers();
                             updateButtonState();
                             serialize();
                         });
 
-                        // --- Remove Row ---
+                        // --- Remove Row (accordion mode only; tabbed uses tab × button) ---
 
                         $rows.on('click', '.taw-repeater-row-remove', function(e) {
+                            if (isTabbed) return;
                             e.preventDefault();
                             var $row = $(this).closest('.taw-repeater-row');
                             var count = $rows.children('.taw-repeater-row').length;
@@ -1254,9 +1320,10 @@ class Metabox
                             });
                         });
 
-                        // --- Collapse/Expand Row ---
+                        // --- Collapse/Expand Row (accordion mode only) ---
 
                         $rows.on('click', '.taw-repeater-row-toggle', function(e) {
+                            if (isTabbed) return;
                             e.preventDefault();
                             var $row = $(this).closest('.taw-repeater-row');
                             var $content = $row.children('.taw-repeater-row-content');
@@ -1264,21 +1331,23 @@ class Metabox
                             $(this).text($content.is(':visible') ? '▾' : '▸');
                         });
 
-                        // --- Sortable ---
+                        // --- Sortable (accordion mode only) ---
 
-                        $rows.sortable({
-                            handle: '.taw-repeater-row-drag',
-                            axis: 'y',
-                            placeholder: 'taw-repeater-row-placeholder',
-                            tolerance: 'pointer',
-                            start: function(e, ui) {
-                                ui.placeholder.height(ui.item.outerHeight());
-                            },
-                            update: function() {
-                                updateNumbers();
-                                serialize();
-                            }
-                        });
+                        if (!isTabbed) {
+                            $rows.sortable({
+                                handle: '.taw-repeater-row-drag',
+                                axis: 'y',
+                                placeholder: 'taw-repeater-row-placeholder',
+                                tolerance: 'pointer',
+                                start: function(e, ui) {
+                                    ui.placeholder.height(ui.item.outerHeight());
+                                },
+                                update: function() {
+                                    updateNumbers();
+                                    serialize();
+                                }
+                            });
+                        }
 
                         // --- Initialize JS fields in a row (including nested repeaters) ---
 
@@ -1301,9 +1370,15 @@ class Metabox
                         // --- Update row numbers ---
 
                         function updateNumbers() {
-                            $rows.children('.taw-repeater-row').each(function(i) {
-                                $(this).children('.taw-repeater-row-header').find('.taw-repeater-row-title').text('#' + (i + 1));
-                            });
+                            if (isTabbed && $tabNav) {
+                                $tabNav.children('.taw-repeater-tab').each(function(i) {
+                                    $(this).children('.taw-repeater-tab-label').text('#' + (i + 1));
+                                });
+                            } else {
+                                $rows.children('.taw-repeater-row').each(function(i) {
+                                    $(this).children('.taw-repeater-row-header').find('.taw-repeater-row-title').text('#' + (i + 1));
+                                });
+                            }
                         }
 
                         // --- Update add button state ---
@@ -1399,6 +1474,10 @@ class Metabox
                         $repeater.on('taw-flush-serialize', serialize);
 
                         updateButtonState();
+
+                        if (isTabbed) {
+                            initTabbedUI();
+                        }
                     }
 
                     $(document).ready(function() {
@@ -1836,6 +1915,7 @@ class Metabox
                 $max_rows    = $field['max'] ?? 0;      // 0 = unlimited
                 $min_rows    = $field['min'] ?? 0;
                 $button_label = $field['button_label'] ?? __('Add Row', 'taw-theme');
+                $layout      = $field['layout'] ?? '';  // '', 'tabbed_horizontal', 'tabbed_vertical'
 
                 // $value may arrive as a PHP array when this is a nested repeater
                 // (the parent sanitize_repeater stores nested rows as decoded arrays
@@ -1855,7 +1935,8 @@ class Metabox
                     data-field-id="<?php echo esc_attr($field_id); ?>"
                     data-placeholder="<?php echo esc_attr($tpl_placeholder); ?>"
                     data-max="<?php echo intval($max_rows); ?>"
-                    data-min="<?php echo intval($min_rows); ?>">
+                    data-min="<?php echo intval($min_rows); ?>"
+                    <?php if ($layout): ?>data-layout="<?php echo esc_attr($layout); ?>"<?php endif; ?>>
 
                     <?php // Hidden input holds the serialized JSON value
                     ?>
