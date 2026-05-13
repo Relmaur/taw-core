@@ -71,6 +71,9 @@ class Metabox
     /** @var bool Guards against registering admin notices more than once. */
     private static bool $notices_registered = false;
 
+    /** @var bool Guards against registering SEO integration hooks more than once. */
+    private static bool $seo_integration_registered = false;
+
     /**
      * Global registry of field configurations, keyed by field ID.
      * Populated during metabox construction.
@@ -154,6 +157,11 @@ class Metabox
         if (!self::$notices_registered) {
             add_action('admin_notices', [self::class, 'displayValidationErrors']);
             self::$notices_registered = true;
+        }
+
+        if (!self::$seo_integration_registered) {
+            self::$seo_integration_registered = true;
+            new SeoContentIntegration();
         }
 
         // Register fields in the static registry for the visual editor
@@ -2709,6 +2717,11 @@ class Metabox
     public static function get_field_config(string $fieldId): ?array
     {
         return self::$fieldRegistry[$fieldId] ?? null;
+    }
+
+    public static function getFieldRegistry(): array
+    {
+        return self::$fieldRegistry;
     }
 
     /**
