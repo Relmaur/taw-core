@@ -76,6 +76,16 @@ class Performance
          */
         'preload_images' => [],
 
+        /**
+         * Inject long-lived cache headers for font files into the root .htaccess
+         * on theme activation via after_switch_theme.
+         *
+         * Vite content-hashes font filenames, so `immutable` is safe. Set to false
+         * on managed hosts (WPMUDEV, WP Engine, Kinsta) that handle caching at the
+         * server/CDN level — the block is harmless there but unnecessary.
+         */
+        'font_cache_htaccess' => true,
+
     ];
 
     /**
@@ -111,6 +121,7 @@ class Performance
         add_action('wp_head', [self::class, 'renderFontPreloads'], 1);
         add_action('wp_head', [self::class, 'renderImagePreloads'], 1);
         add_action('wp_head', static function () { self::$head_fired = true; }, PHP_INT_MAX);
+        add_action('after_switch_theme', [self::class, 'injectFontCacheHtaccess']);
     }
 
     /**
@@ -202,6 +213,36 @@ class Performance
         foreach (self::$config['preload_images'] as [$id, $size]) {
             echo \TAW\Helpers\Image::preload_tag((int) $id, $size); // phpcs:ignore WordPress.Security.EscapeOutput
         }
+    }
+
+    /** @internal */
+    public static function injectFontCacheHtaccess(): void
+    {
+        if (!self::$config['font_cache_htaccess']) {
+            return;
+        }
+
+        $htaccess = ABSPATH . '.htaccess';
+
+        if (!is_writable($htaccess) && !file_exists($htaccess)) {
+            return;
+        }
+
+        $rules = [
+            '<IfModule mod_expires.c>',
+            '    <FilesMatch "\.(woff2|woff|ttf|otf|eot)$">',
+            '        ExpiresActive On',
+            '        ExpiresDefault "access plus 1 year"',
+            '    </FilesMatch>',
+            '</IfModule>',
+            '<IfModule mod_headers.c>',
+            '    <FilesMatch "\.(woff2|woff|ttf|otf|eot)$">',
+            '        Header set Cache-Control "max-age=31536000, public, immutable"',
+            '    </FilesMatch>',
+            '</IfModule>',
+        ];
+
+        insert_with_markers($htaccess, 'TAW Font Cache', $rules);
     }
 
     /** @internal */
