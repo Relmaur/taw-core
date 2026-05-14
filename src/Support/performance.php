@@ -222,6 +222,10 @@ class Performance
             return;
         }
 
+        if (!function_exists('insert_with_markers')) {
+            require_once ABSPATH . 'wp-admin/includes/misc.php';
+        }
+
         $htaccess = ABSPATH . '.htaccess';
 
         if (!is_writable($htaccess) && !file_exists($htaccess)) {
