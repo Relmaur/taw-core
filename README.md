@@ -182,6 +182,7 @@ new Metabox([
 | `group` | Nested fields under a shared prefix |
 | `post_select` | AJAX-powered post picker with thumbnails; single or multi |
 | `repeater` | Dynamic rows of sub-fields; stores as JSON; supports nesting |
+| `datepicker` | jQuery UI date picker; stored as a date string (default `YYYY-MM-DD`); supports `date_format`, `min_date`, `max_date` |
 
 All fields accept: `id`, `label`, `description`, `placeholder`, `default`, `required`, `width` (percentage for column layout).
 

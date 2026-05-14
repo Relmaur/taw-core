@@ -101,6 +101,9 @@ class Metabox
     /** @var bool Guards against enqueuing the multi-file picker script more than once. */
     private static bool $files_script_enqueued = false;
 
+    /** @var bool Guards against enqueuing the datepicker script more than once. */
+    private static bool $datepicker_script_enqueued = false;
+
     /** @var bool Guards against enqueuing general admin assets (CSS/JS) more than once. */
     private static bool $assets_enqueued = false;
 
@@ -730,6 +733,11 @@ class Metabox
         if (in_array('repeater', $all_types, true)) {
             self::enqueue_repeater_script();
         }
+
+        if (in_array('datepicker', $all_types, true)) {
+            wp_enqueue_script('jquery-ui-datepicker');
+            self::enqueue_datepicker_script();
+        }
     }
 
     /**
@@ -910,6 +918,62 @@ class Metabox
                     // Initialize on page load
                     $(document).ready(function() {
                         tawInitColorPickers(document.body);
+                    });
+                })(jQuery);
+            </script>
+        <?php
+        });
+    }
+
+    /**
+     * Outputs the jQuery UI Datepicker init script exactly once via `admin_footer`.
+     *
+     * Exposes `window.tawInitDatepickers(container)` so repeater rows can
+     * initialize datepickers for dynamically-added fields.
+     */
+    private static function enqueue_datepicker_script(): void
+    {
+        if (self::$datepicker_script_enqueued) {
+            return;
+        }
+
+        self::$datepicker_script_enqueued = true;
+
+        add_action('admin_footer', static function () {
+        ?>
+            <style>
+                .taw-datepicker-wrap { position: relative; display: inline-block; }
+                .taw-datepicker-wrap .taw-datepicker-icon {
+                    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+                    pointer-events: none; color: #757575;
+                }
+                .ui-datepicker { z-index: 100500 !important; }
+            </style>
+            <script>
+                (function($) {
+                    'use strict';
+
+                    window.tawInitDatepickers = function(container) {
+                        $(container).find('.taw-datepicker-input').each(function() {
+                            if ($(this).hasClass('hasDatepicker')) {
+                                return;
+                            }
+                            var $input = $(this);
+                            $input.datepicker({
+                                dateFormat:  $input.data('date-format')  || 'yy-mm-dd',
+                                minDate:     $input.data('min-date')     || null,
+                                maxDate:     $input.data('max-date')     || null,
+                                changeMonth: true,
+                                changeYear:  true,
+                                onSelect: function(dateText) {
+                                    $(this).val(dateText).trigger('change');
+                                }
+                            });
+                        });
+                    };
+
+                    $(document).ready(function() {
+                        tawInitDatepickers(document.body);
                     });
                 })(jQuery);
             </script>
@@ -1773,6 +1837,20 @@ class Metabox
                 );
                 break;
 
+            /* ---- MARK: Datepicker ---- */
+            case 'datepicker':
+                printf(
+                    '<div class="taw-datepicker-wrap"><input type="text" id="%s" name="%s" value="%s" placeholder="%s" class="regular-text taw-datepicker-input" data-date-format="%s" data-min-date="%s" data-max-date="%s" autocomplete="off"><span class="taw-datepicker-icon dashicons dashicons-calendar-alt"></span></div>',
+                    esc_attr($field_id),
+                    esc_attr($field_id),
+                    esc_attr($value),
+                    esc_attr($placeholder ?: ($field['date_format'] ?? 'YYYY-MM-DD')),
+                    esc_attr($field['date_format'] ?? 'yy-mm-dd'),
+                    esc_attr($field['min_date'] ?? ''),
+                    esc_attr($field['max_date'] ?? '')
+                );
+                break;
+
             /* ---- MARK: Range ---- */
             case 'range':
                 $min  = $field['min']  ?? 0;
@@ -2433,6 +2511,7 @@ class Metabox
             'checkbox'       => in_array($value, ['1', 1, true], true) ? '1' : '0',
             'range'          => floatval($value),
             'color'          => sanitize_hex_color($value) ?: '',
+            'datepicker'     => sanitize_text_field($value),
             'post_select'       => $this->sanitize_post_select($field, $value),
             'repeater'          => $this->sanitize_repeater($field, $value),
             'files'             => $this->sanitize_files($value),
@@ -2575,6 +2654,7 @@ class Metabox
             'checkbox'       => in_array($value, ['1', 1, true], true) ? '1' : '0',
             'range'          => floatval($value),
             'color'          => sanitize_hex_color($value) ?: '',
+            'datepicker'     => sanitize_text_field($value),
             default          => sanitize_text_field($value),
         };
     }
