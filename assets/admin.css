@@ -4,6 +4,10 @@ div[class|="postbox"]:not(:has(#side-sortables))
   padding: 0 !important;
 }
 
+div[id*="taw_"] .postbox-header h2.hndle:has(img) {
+  justify-content: flex-start;
+}
+
 .taw-tabbed {
   .tabs {
     display: flex;
@@ -540,12 +544,18 @@ div[class|="postbox"]:not(:has(#side-sortables))
   margin: 0;
 }
 
-.taw-repeater[data-layout^="tabbed"] .taw-repeater-row-content .fields-container .field {
+.taw-repeater[data-layout^="tabbed"]
+  .taw-repeater-row-content
+  .fields-container
+  .field {
   box-shadow: none;
   border-bottom: 1px solid #f0f0f1;
 }
 
-.taw-repeater[data-layout^="tabbed"] .taw-repeater-row-content .fields-container .field:last-child {
+.taw-repeater[data-layout^="tabbed"]
+  .taw-repeater-row-content
+  .fields-container
+  .field:last-child {
   border-bottom: none;
 }
 
@@ -593,7 +603,9 @@ div[class|="postbox"]:not(:has(#side-sortables))
   cursor: pointer;
   font-size: 0.85em;
   opacity: 0.6;
-  transition: background 150ms ease, opacity 150ms ease;
+  transition:
+    background 150ms ease,
+    opacity 150ms ease;
   text-align: left;
   white-space: nowrap;
 }
@@ -623,7 +635,9 @@ div[class|="postbox"]:not(:has(#side-sortables))
   opacity: 0.4;
   padding: 0 0.1rem;
   cursor: pointer;
-  transition: opacity 150ms ease, color 150ms ease;
+  transition:
+    opacity 150ms ease,
+    color 150ms ease;
 }
 
 .taw-repeater-tab-remove:hover {
@@ -643,11 +657,14 @@ div[class|="postbox"]:not(:has(#side-sortables))
   padding: 0.35rem 0.75rem;
   opacity: 0.45;
   cursor: pointer;
-  transition: opacity 150ms ease, background 150ms ease;
+  transition:
+    opacity 150ms ease,
+    background 150ms ease;
   line-height: 1;
 }
 
-.taw-repeater[data-layout="tabbed_vertical"] .taw-repeater-add.taw-repeater-tab-add {
+.taw-repeater[data-layout="tabbed_vertical"]
+  .taw-repeater-add.taw-repeater-tab-add {
   border-right: none;
   border-top: 1px solid #c3c4c7;
   text-align: center;
@@ -655,12 +672,14 @@ div[class|="postbox"]:not(:has(#side-sortables))
   box-sizing: border-box;
 }
 
-.taw-repeater[data-layout^="tabbed"] .taw-repeater-add.taw-repeater-tab-add:hover {
+.taw-repeater[data-layout^="tabbed"]
+  .taw-repeater-add.taw-repeater-tab-add:hover {
   opacity: 1;
   background: #fff;
 }
 
-.taw-repeater[data-layout^="tabbed"] .taw-repeater-add.taw-repeater-tab-add[disabled] {
+.taw-repeater[data-layout^="tabbed"]
+  .taw-repeater-add.taw-repeater-tab-add[disabled] {
   opacity: 0.2;
   cursor: not-allowed;
   background: none;
