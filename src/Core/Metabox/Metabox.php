@@ -56,7 +56,7 @@ class Metabox
     /** @var array<int, array<string, mixed>> Optional tab definitions grouping fields into tabs. */
     private array $tabs;
 
-    /** @var string Base64-encoded SVG data URI used as the metabox icon, or empty string. */
+    /** @var string Raw icon value: a dashicons class (e.g. 'dashicons-admin-settings'), an SVG string, or empty. */
     private string $icon;
 
     /** @var bool Guards against enqueuing the WP Color Picker init script more than once. */
@@ -125,7 +125,9 @@ class Metabox
      *     @type callable $show_on  Optional callback(WP_Post): bool — return false to hide the metabox.
      *     @type array    $fields   Array of field definitions.
      *     @type array    $tabs     Optional array of tab definitions.
-     *     @type string   $icon     Optional icon uri for the metabox.
+     *     @type string   $icon     Optional icon shown in the metabox handle before the title.
+     *                              Accepts a dashicons class (e.g. 'dashicons-admin-settings'),
+     *                              a raw SVG string, or a URL to an image file.
      * }
      */
     public function __construct(array $config)
@@ -140,7 +142,7 @@ class Metabox
         $this->fields   = $config['fields']   ?? [];
         $this->show_on  = $config['show_on']  ?? null;
         $this->tabs     = $config['tabs'] ?? [];
-        $this->icon     = isset($config['icon']) ? 'data:image/svg+xml;base64,' . base64_encode($config['icon']) : '';
+        $this->icon     = $config['icon'] ?? '';
 
         $this->type = $config['type'] ?? 'post_type';
 
@@ -322,12 +324,49 @@ class Metabox
 
         add_meta_box(
             $this->id,
-            $this->title,
+            $this->buildTitleWithIcon(),
             [$this, 'render'],
             $postTypes,
             $this->context,
             $this->priority
         );
+    }
+
+    /**
+     * Build the metabox handle title, optionally prepending an icon.
+     *
+     * Supports:
+     *  - Dashicons class  e.g. 'dashicons-admin-settings'
+     *  - Raw SVG string   e.g. '<svg xmlns="...">...</svg>'
+     *  - Image URL        e.g. 'https://example.com/icon.png'
+     */
+    private function buildTitleWithIcon(): string
+    {
+        $title = esc_html($this->title);
+
+        if (empty($this->icon)) {
+            return $title;
+        }
+
+        if (str_starts_with($this->icon, 'dashicons-')) {
+            $icon_html = sprintf(
+                '<span class="dashicons %s" style="vertical-align:text-bottom;margin-right:5px;"></span>',
+                esc_attr($this->icon)
+            );
+        } elseif (str_starts_with(ltrim($this->icon), '<svg')) {
+            $src       = 'data:image/svg+xml;base64,' . base64_encode($this->icon);
+            $icon_html = sprintf(
+                '<img src="%s" style="width:16px;height:16px;vertical-align:text-bottom;margin-right:5px;" alt="">',
+                esc_attr($src)
+            );
+        } else {
+            $icon_html = sprintf(
+                '<img src="%s" style="width:16px;height:16px;vertical-align:text-bottom;margin-right:5px;" alt="">',
+                esc_url($this->icon)
+            );
+        }
+
+        return $icon_html . $title;
     }
 
     /**
