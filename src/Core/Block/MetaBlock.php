@@ -79,21 +79,24 @@ abstract class MetaBlock extends BaseBlock
     /**
      * Helpers
      */
-    protected function getMeta(int $postId, string $fieldId, string $prefix = '_taw_'): mixed
+    protected function getMeta(int|false $postId, string $fieldId, string $prefix = '_taw_'): mixed
     {
+        if (!$postId) return null;
         return Metabox::get($postId, $fieldId, $prefix);
     }
 
-    protected function getImageUrl(int $postId, string $fieldId, string $size = 'full'): string
+    protected function getImageUrl(int|false $postId, string $fieldId, string $size = 'full'): string
     {
+        if (!$postId) return '';
         return Metabox::get_image_url($postId, $fieldId, $size);
     }
 
     /**
      * Get a repeater field value for a given post.
      */
-    protected function getRepeater(int $postId, string $fieldId, string $prefix = '_taw_'): array
+    protected function getRepeater(int|false $postId, string $fieldId, string $prefix = '_taw_'): array
     {
+        if (!$postId) return [];
         return Metabox::get_repeater($postId, $fieldId, $prefix);
     }
 }
