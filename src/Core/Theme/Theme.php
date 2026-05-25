@@ -7,6 +7,7 @@ namespace TAW\Core\Theme;
 use TAW\Core\Block\BlockLoader;
 use TAW\Core\Block\BlockRegistry;
 use TAW\Core\Editor\VisualEditor;
+use TAW\Core\Form\SubmissionsHandler;
 use TAW\Core\Rest\SearchEndpoints;
 use TAW\Core\Rest\VisualEditorEndpoint;
 use TAW\Helpers\Svg;
@@ -45,6 +46,8 @@ class Theme
      *   3. Queued block asset enqueuing (for FAUC-free above-the-fold blocks)
      *   4. Visual Editor (admin bar button + frontend editing shell)
      *   5. REST API endpoints (visual editor save, post search)
+     *   6. SVG support (upload allowlist + inline helper)
+     *   7. Form submissions (taw_submission CPT + webhook settings page)
      */
     public static function boot(): void
     {
@@ -84,6 +87,11 @@ class Theme
         // ── 6. SVG support ─────────────────────────────────────────────────────
         // Allow and sanitize SVG uploads, and provide a helper for inline SVG rendering.
         Svg::register();
+
+        // ── 7. Form submissions ────────────────────────────────────────────────
+        // Registers the taw_submission CPT so Form::process() can persist
+        // every submission, and adds the Settings → Form Webhook admin page.
+        new SubmissionsHandler();
     }
 
     /**
