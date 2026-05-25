@@ -22,7 +22,12 @@ abstract class MetaBlock extends BaseBlock
             $this->id        = $this->id . '--' . $variation;
         }
 
-        add_action('init', [$this, 'registerMetaboxes']);
+        add_action('init', [$this, 'initMetaboxes']);
+    }
+
+    public function initMetaboxes(): void
+    {
+        $this->registerMetaboxes();
     }
 
     /**
@@ -57,7 +62,7 @@ abstract class MetaBlock extends BaseBlock
     /**
      * Define and register metaboxes for this block.
      */
-    abstract public function registerMetaboxes(): void;
+    abstract protected function registerMetaboxes(): void;
 
     /**
      * Gather template data from post meta.
