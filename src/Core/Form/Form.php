@@ -330,11 +330,13 @@ class Form
         echo '<label>Leave this empty <input type="text" name="taw_hp_check" value="" tabindex="-1" autocomplete="off"></label>';
         echo '</div>';
 
+        $this->renderStyles();
+
         // General error banner (shown by JS on non-field errors)
         echo '<div class="hidden p-4 w-full text-red-800 bg-red-100 border border-red-200 rounded-lg"'
             . ' data-taw-general-error role="alert"></div>';
 
-        echo '<div class="grid grid-cols-12 gap-4">';
+        echo '<div class="taw-form-grid">';
         foreach ($this->config['fields'] as $field) {
             $this->renderField($field);
         }
@@ -361,6 +363,25 @@ class Form
         $this->renderScript($btnLabel, $loadingLabel);
     }
 
+    private function renderStyles(): void
+    {
+        $formId = esc_attr($this->id);
+        ?>
+        <style>
+        [data-taw-form="<?php echo $formId; ?>"] .taw-form-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 1rem;
+        }
+        @media (max-width: 639px) {
+            [data-taw-form="<?php echo $formId; ?>"] .taw-form-field {
+                grid-column: 1 / -1 !important;
+            }
+        }
+        </style>
+        <?php
+    }
+
     private function renderField(array $field): void
     {
         $id          = $field['id'];
@@ -371,18 +392,12 @@ class Form
         $conditions  = $field['conditions'] ?? [];
         $baseClasses = 'w-full p-2 border border-stone-400 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all';
 
-        // Width → 12-column grid span (mobile always full-width)
-        $width   = (int) ($field['width'] ?? 100);
-        $colSpan = match (true) {
-            $width <= 25 => 'col-span-12 sm:col-span-3',
-            $width <= 33 => 'col-span-12 sm:col-span-4',
-            $width <= 50 => 'col-span-12 sm:col-span-6',
-            $width <= 67 => 'col-span-12 sm:col-span-8',
-            $width <= 75 => 'col-span-12 sm:col-span-9',
-            default      => 'col-span-12',
-        };
+        // Width → grid-column span (1–12). Responsive collapse handled by renderStyles().
+        $width = max(1, min(100, (int) ($field['width'] ?? 100)));
+        $span  = max(1, min(12, (int) round($width / 100 * 12)));
 
-        $wrapAttrs = 'class="' . $colSpan . ' flex flex-col gap-1"'
+        $wrapAttrs = 'class="taw-form-field flex flex-col gap-1"'
+            . ' style="grid-column: span ' . $span . ' / span ' . $span . ';"'
             . ' data-taw-field-wrap="' . esc_attr($id) . '"';
 
         if (!empty($conditions)) {
