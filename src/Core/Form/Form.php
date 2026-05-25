@@ -413,7 +413,7 @@ class Form
                 clearErrors();
                 setLoading(true);
 
-                fetch(form.action, {
+                fetch(form.getAttribute('action'), {
                     method: 'POST',
                     credentials: 'same-origin',
                     body: new FormData(form),
