@@ -49,7 +49,13 @@ class Form
         $this->id     = $config['id'];
         $this->config = $config;
 
-        add_action('init', [$this, 'process']);
+        // Process immediately if init already fired (e.g. form instantiated inside a template).
+        // Otherwise schedule for init — process() is a no-op on GET requests.
+        if (did_action('init')) {
+            $this->process();
+        } else {
+            add_action('init', [$this, 'process']);
+        }
     }
 
     /* -------------------------------------------------------------------------
@@ -86,7 +92,7 @@ class Form
 
         foreach ($this->config['fields'] as $field) {
             $fieldId = $field['id'];
-            $value   = $_POST[$fieldId] ?? '';
+            $value   = isset($_POST[$fieldId]) ? wp_unslash($_POST[$fieldId]) : '';
             $label   = $field['label'] ?? $fieldId;
 
             if (!empty($field['required']) && empty($value)) {
@@ -115,7 +121,11 @@ class Form
             SubmissionsHandler::saveSubmission($this->id, $this->config['fields'], $data);
 
             set_transient('taw_form_success_' . $this->id, true, 60);
-            wp_redirect(add_query_arg('taw_form_sent', '1', $_SERVER['REQUEST_URI']));
+            // PRG: redirect to the same page without POST data.
+            // We do NOT append a query var — unregistered vars cause WP to 404.
+            // The success state is communicated entirely via the transient.
+            $redirect = esc_url_raw(home_url(wp_unslash($_SERVER['REQUEST_URI'])));
+            wp_safe_redirect($redirect);
             exit;
         }
 
@@ -184,32 +194,37 @@ class Form
             'site_url' => get_site_url(),
         ]);
 
-        // Email to site admin
-        (new Mailer())
-            ->to(get_option('admin_email'))
-            ->subject($emailConfig['to_self']['subject'] ?? 'New Form Submission')
-            ->template($emailConfig['to_self']['template'])
-            ->setVariables($shared)
-            ->send();
-
-        // Confirmation email to the submitter (if an email field was filled)
-        $clientEmail = null;
-        foreach ($this->config['fields'] as $field) {
-            if (($field['type'] ?? '') === 'email' && !empty($formData[$field['id']])) {
-                $clientEmail = $formData[$field['id']];
-                break;
-            }
-        }
-
-        if ($clientEmail) {
-            $shared['client_name'] = $formData['name'] ?? '';
-
+        try {
+            // Email to site admin
             (new Mailer())
-                ->to($clientEmail)
-                ->subject($emailConfig['to_client']['subject'] ?? "Got your message — I'll be in touch soon")
-                ->template($emailConfig['to_client']['template'])
+                ->to(get_option('admin_email'))
+                ->subject($emailConfig['to_self']['subject'] ?? 'New Form Submission')
+                ->template($emailConfig['to_self']['template'])
                 ->setVariables($shared)
                 ->send();
+
+            // Confirmation email to the submitter (if an email field was filled)
+            $clientEmail = null;
+            foreach ($this->config['fields'] as $field) {
+                if (($field['type'] ?? '') === 'email' && !empty($formData[$field['id']])) {
+                    $clientEmail = $formData[$field['id']];
+                    break;
+                }
+            }
+
+            if ($clientEmail) {
+                $shared['client_name'] = $formData['name'] ?? '';
+
+                (new Mailer())
+                    ->to($clientEmail)
+                    ->subject($emailConfig['to_client']['subject'] ?? "Got your message — I'll be in touch soon")
+                    ->template($emailConfig['to_client']['template'])
+                    ->setVariables($shared)
+                    ->send();
+            }
+        } catch (\Throwable $e) {
+            error_log('[TAW Form] sendWithTemplate failed for form "' . $this->id . '": ' . $e->getMessage());
+            return false;
         }
 
         return true;
