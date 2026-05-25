@@ -11,15 +11,17 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Form — configuration-driven frontend form with processing, validation, and email delivery.
+ * Form — configuration-driven frontend form with AJAX processing, validation, and email delivery.
  *
  * Features:
  *  - CSRF protection (WordPress nonces)
  *  - Honeypot spam protection
  *  - Field sanitization & validation
- *  - Transient-based success flash message
- *  - PRG pattern (redirect after POST) to prevent double-submission
+ *  - AJAX submission via admin-ajax.php — bypasses WP routing, no 404 risk
+ *  - Inline field-level and general error display
  *  - Optional email delivery via Mailer + MJML templates
+ *  - Submission persistence via SubmissionsHandler (CPT)
+ *  - Webhook delivery (configured in Settings → Form Webhook)
  *
  * Usage:
  *   $form = new Form([
@@ -29,7 +31,7 @@ if (!defined('ABSPATH')) {
  *           'to_self'   => ['subject' => 'New contact', 'template' => 'contact-self'],
  *           'to_client' => ['subject' => 'Got your message', 'template' => 'contact-client'],
  *       ],
- *       'messages' => ['success' => 'Thanks! We'll be in touch.'],
+ *       'messages' => ['success' => 'Thanks! We\'ll be in touch.'],
  *       'fields' => [
  *           ['id' => 'name',    'label' => 'Name',    'type' => 'text',     'required' => true],
  *           ['id' => 'email',   'label' => 'Email',   'type' => 'email',    'required' => true],
@@ -42,95 +44,75 @@ class Form
 {
     private string $id;
     private array $config;
-    private array $errors = [];
 
     public function __construct(array $config)
     {
         $this->id     = $config['id'];
         $this->config = $config;
 
-        // Process immediately if init already fired (e.g. form instantiated inside a template).
-        // Otherwise schedule for init — process() is a no-op on GET requests.
-        if (did_action('init')) {
-            $this->process();
-        } else {
-            add_action('init', [$this, 'process']);
-        }
+        // Route through admin-ajax.php — works for both logged-in and logged-out users,
+        // and is completely independent of WP's page/rewrite routing.
+        add_action('wp_ajax_nopriv_taw_form_' . $this->id, [$this, 'process']);
+        add_action('wp_ajax_taw_form_' . $this->id, [$this, 'process']);
     }
 
     /* -------------------------------------------------------------------------
-     * Processing
+     * Processing (AJAX handler)
      * ---------------------------------------------------------------------- */
 
     public function process(): void
     {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            return;
-        }
+        // Nonce verification via check_ajax_referer exits automatically on failure.
+        check_ajax_referer($this->id . '_action', $this->id . '_nonce');
 
-        if (!isset($_POST['taw_form_id']) || $_POST['taw_form_id'] !== $this->id) {
-            return;
-        }
-
-        // Honeypot
+        // Honeypot — silently succeed so bots think they submitted correctly.
         if (!empty($_POST['taw_hp_check'])) {
-            return;
+            wp_send_json_success();
         }
 
-        // Nonce
-        if (
-            !isset($_POST[$this->id . '_nonce']) ||
-            !wp_verify_nonce($_POST[$this->id . '_nonce'], $this->id . '_action')
-        ) {
-            $this->errors['general'] = 'Security check failed. Please refresh and try again.';
-            return;
-        }
-
-        // Validate & sanitize
-        $data     = [];
-        $hasError = false;
+        $data   = [];
+        $errors = [];
 
         foreach ($this->config['fields'] as $field) {
             $fieldId = $field['id'];
             $value   = isset($_POST[$fieldId]) ? wp_unslash($_POST[$fieldId]) : '';
             $label   = $field['label'] ?? $fieldId;
 
-            if (!empty($field['required']) && empty($value)) {
-                $this->errors[$fieldId] = sprintf(__('%s is required.', 'taw'), $label);
-                $hasError = true;
+            if (!empty($field['required']) && '' === trim((string) $value)) {
+                /* translators: %s: field label */
+                $errors[$fieldId] = sprintf(__('%s is required.', 'taw'), $label);
                 continue;
             }
 
             $sanitized = $this->sanitize($value, $field['type'] ?? 'text');
 
             if (($field['type'] ?? '') === 'email' && !empty($sanitized) && !is_email($sanitized)) {
-                $this->errors[$fieldId] = __('Invalid email address.', 'taw');
-                $hasError = true;
+                $errors[$fieldId] = __('Invalid email address.', 'taw');
             }
 
             $data[$fieldId] = $sanitized;
         }
 
-        if ($hasError) {
-            return;
+        if (!empty($errors)) {
+            wp_send_json_error(['errors' => $errors]);
         }
 
         $sent = $this->sendEmail($data);
 
-        if ($sent) {
-            SubmissionsHandler::saveSubmission($this->id, $this->config['fields'], $data);
-
-            set_transient('taw_form_success_' . $this->id, true, 60);
-            // PRG: redirect to the same page without POST data.
-            // We do NOT append a query var — unregistered vars cause WP to 404.
-            // The success state is communicated entirely via the transient.
-            $redirect = esc_url_raw(home_url(wp_unslash($_SERVER['REQUEST_URI'])));
-            wp_safe_redirect($redirect);
-            exit;
+        if (!$sent) {
+            wp_send_json_error(['general' => __('There was a problem sending your message. Please try again later.', 'taw')]);
         }
 
-        $this->errors['general'] = __('There was a problem sending your message. Please try again later.', 'taw');
+        SubmissionsHandler::saveSubmission($this->id, $this->config['fields'], $data);
+
+        wp_send_json_success([
+            'message' => $this->config['messages']['success'] ?? __('Thank you! Your message has been sent.', 'taw'),
+        ]);
     }
+
+    /* -------------------------------------------------------------------------
+     * Email
+     * ---------------------------------------------------------------------- */
 
     private function sanitize(mixed $value, string $type): string
     {
@@ -236,38 +218,42 @@ class Form
 
     public function render(): void
     {
-        $successMsg = null;
-        if (get_transient('taw_form_success_' . $this->id)) {
-            delete_transient('taw_form_success_' . $this->id);
-            $successMsg = $this->config['messages']['success'] ?? 'Thank you! Your message has been sent.';
-        }
+        $formId       = esc_attr($this->id);
+        $btnLabel     = $this->config['submit_label'] ?? __('Send Message', 'taw');
+        $loadingLabel = $this->config['submit_loading_label'] ?? __('Sending...', 'taw');
+        $ajaxUrl      = esc_url(admin_url('admin-ajax.php'));
 
-        if (isset($this->errors['general'])) {
-            echo '<div class="p-4 mb-6 text-red-800 bg-red-100 border border-red-200 rounded-lg">'
-                . esc_html($this->errors['general']) . '</div>';
-        }
-
-        echo '<form method="post" action="" class="flex flex-col gap-4 items-end" data-taw-form novalidate>';
+        echo '<form method="post"'
+            . ' action="' . $ajaxUrl . '"'
+            . ' class="flex flex-col gap-4 items-end"'
+            . ' data-taw-form="' . $formId . '"'
+            . ' novalidate>';
 
         wp_nonce_field($this->id . '_action', $this->id . '_nonce');
-        echo '<input type="hidden" name="taw_form_id" value="' . esc_attr($this->id) . '">';
-        echo '<div style="display:none;"><label>Leave this empty <input type="text" name="taw_hp_check" value=""></label></div>';
+        echo '<input type="hidden" name="action" value="taw_form_' . $formId . '">';
+        echo '<input type="hidden" name="taw_form_id" value="' . $formId . '">';
+
+        // Honeypot field — hidden from real users, filled by bots
+        echo '<div style="display:none;" aria-hidden="true">';
+        echo '<label>Leave this empty <input type="text" name="taw_hp_check" value="" tabindex="-1" autocomplete="off"></label>';
+        echo '</div>';
+
+        // General error banner (shown by JS on non-field errors)
+        echo '<div class="hidden p-4 w-full text-red-800 bg-red-100 border border-red-200 rounded-lg"'
+            . ' data-taw-general-error role="alert"></div>';
 
         foreach ($this->config['fields'] as $field) {
             $this->renderField($field);
         }
 
-        if ($successMsg) {
-            echo '<div class="p-4 w-full text-green-800 bg-green-100 border border-green-200 rounded-lg">'
-                . esc_html($successMsg) . '</div>';
-        }
-
-        $btnLabel     = $this->config['submit_label'] ?? 'Send Message';
-        $loadingLabel = $this->config['submit_loading_label'] ?? 'Sending...';
+        // Success message (shown by JS after successful submission)
+        echo '<div class="hidden p-4 w-full text-green-800 bg-green-100 border border-green-200 rounded-lg"'
+            . ' data-taw-success role="status"></div>';
 
         echo '<div class="mt-2 w-full sm:w-fit">';
-        echo '<button type="submit" data-taw-submit data-loading-label="' . esc_attr($loadingLabel)
-            . '" class="p-3 w-full bg-stone-800 text-stone-300 rounded-md hover:bg-stone-700 transition-colors border border-stone-800 cursor-pointer ml-auto inline-flex items-center justify-center gap-2">';
+        echo '<button type="submit" data-taw-submit'
+            . ' data-loading-label="' . esc_attr($loadingLabel) . '"'
+            . ' class="p-3 w-full bg-stone-800 text-stone-300 rounded-md hover:bg-stone-700 transition-colors border border-stone-800 cursor-pointer ml-auto inline-flex items-center justify-center gap-2">';
         echo '<svg class="hidden animate-spin size-4" data-taw-spinner xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">'
             . '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>'
             . '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>'
@@ -277,6 +263,8 @@ class Form
         echo '</div>';
 
         echo '</form>';
+
+        $this->renderScript($btnLabel, $loadingLabel);
     }
 
     private function renderField(array $field): void
@@ -286,57 +274,144 @@ class Form
         $label       = $field['label'] ?? '';
         $placeholder = $field['placeholder'] ?? '';
         $required    = !empty($field['required']);
-        $value       = isset($_POST[$id]) ? wp_unslash($_POST[$id]) : '';
-        $hasError    = isset($this->errors[$id]);
-        $borderClass = $hasError ? 'border-red-500 ' : 'border-stone-400 ';
-        $baseClasses = 'w-full p-2 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all flex-1 ' . $borderClass;
+        $baseClasses = 'w-full p-2 border border-stone-400 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all flex-1';
 
         echo '<div class="flex flex-col gap-1 w-full">';
 
         if ($label) {
             echo '<label for="' . esc_attr($id) . '" class="font-semibold text-stone-700">';
-            echo esc_html($label) . ($required ? ' <span class="text-red-500">*</span>' : '');
+            echo esc_html($label) . ($required ? ' <span class="text-red-500" aria-hidden="true">*</span>' : '');
             echo '</label>';
         }
 
         switch ($type) {
             case 'textarea':
                 printf(
-                    '<textarea id="%1$s" name="%1$s" rows="%2$s" class="%3$s" placeholder="%4$s">%5$s</textarea>',
+                    '<textarea id="%1$s" name="%1$s" rows="%2$s" class="%3$s" placeholder="%4$s"></textarea>',
                     esc_attr($id),
                     intval($field['rows'] ?? 4),
                     $baseClasses,
-                    esc_attr($placeholder),
-                    esc_textarea($value)
+                    esc_attr($placeholder)
                 );
                 break;
 
             case 'select':
                 echo '<select id="' . esc_attr($id) . '" name="' . esc_attr($id) . '" class="' . $baseClasses . '">';
-                echo '<option value="" disabled ' . selected($value, '', false) . '>Select an option...</option>';
+                echo '<option value="" disabled selected>' . esc_html__('Select an option...', 'taw') . '</option>';
                 foreach (($field['options'] ?? []) as $optVal => $optLabel) {
-                    echo '<option value="' . esc_attr($optVal) . '" ' . selected($value, $optVal, false) . '>'
-                        . esc_html($optLabel) . '</option>';
+                    echo '<option value="' . esc_attr($optVal) . '">' . esc_html($optLabel) . '</option>';
                 }
                 echo '</select>';
                 break;
 
             default:
                 printf(
-                    '<input type="%1$s" id="%2$s" name="%2$s" value="%3$s" class="%4$s" placeholder="%5$s">',
+                    '<input type="%1$s" id="%2$s" name="%2$s" class="%3$s" placeholder="%4$s">',
                     esc_attr($type),
                     esc_attr($id),
-                    esc_attr($value),
                     $baseClasses,
                     esc_attr($placeholder)
                 );
                 break;
         }
 
-        if ($hasError) {
-            echo '<span class="text-sm text-red-600">' . esc_html($this->errors[$id]) . '</span>';
-        }
+        // Error placeholder — shown/populated by JS on validation failure
+        echo '<span class="hidden text-sm text-red-600" data-taw-field-error="' . esc_attr($id) . '" role="alert"></span>';
 
         echo '</div>';
+    }
+
+    private function renderScript(string $btnLabel, string $loadingLabel): void
+    {
+        $formId         = esc_js($this->id);
+        $btnLabelJs     = esc_js($btnLabel);
+        $loadingLabelJs = esc_js($loadingLabel);
+        $networkErrorJs = esc_js(__('A network error occurred. Please try again.', 'taw'));
+        ?>
+        <script>
+        (function () {
+            'use strict';
+
+            var form = document.querySelector('[data-taw-form="<?php echo $formId; ?>"]');
+            if (!form) return;
+
+            var submitBtn = form.querySelector('[data-taw-submit]');
+            var spinner   = form.querySelector('[data-taw-spinner]');
+            var btnLabel  = form.querySelector('[data-taw-submit-label]');
+            var successEl = form.querySelector('[data-taw-success]');
+            var generalEl = form.querySelector('[data-taw-general-error]');
+
+            function setLoading(on) {
+                submitBtn.disabled = on;
+                if (spinner)  spinner.classList.toggle('hidden', !on);
+                if (btnLabel) btnLabel.textContent = on ? '<?php echo $loadingLabelJs; ?>' : '<?php echo $btnLabelJs; ?>';
+            }
+
+            function clearErrors() {
+                form.querySelectorAll('[data-taw-field-error]').forEach(function (el) {
+                    el.textContent = '';
+                    el.classList.add('hidden');
+                });
+                if (generalEl) { generalEl.textContent = ''; generalEl.classList.add('hidden'); }
+                if (successEl) { successEl.textContent = ''; successEl.classList.add('hidden'); }
+            }
+
+            function showFieldError(fieldId, message) {
+                var el = form.querySelector('[data-taw-field-error="' + fieldId + '"]');
+                if (!el) return;
+                el.textContent = message;
+                el.classList.remove('hidden');
+            }
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                clearErrors();
+                setLoading(true);
+
+                fetch(form.action, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    body: new FormData(form),
+                })
+                .then(function (res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    return res.json();
+                })
+                .then(function (json) {
+                    setLoading(false);
+
+                    if (json.success) {
+                        form.reset();
+                        if (successEl) {
+                            successEl.textContent = (json.data && json.data.message) ? json.data.message : '';
+                            successEl.classList.remove('hidden');
+                        }
+                        return;
+                    }
+
+                    var data = json.data || {};
+
+                    if (data.general && generalEl) {
+                        generalEl.textContent = data.general;
+                        generalEl.classList.remove('hidden');
+                    }
+
+                    if (data.errors) {
+                        Object.keys(data.errors).forEach(function (fieldId) {
+                            showFieldError(fieldId, data.errors[fieldId]);
+                        });
+                    }
+                })
+                .catch(function () {
+                    setLoading(false);
+                    if (generalEl) {
+                        generalEl.textContent = '<?php echo $networkErrorJs; ?>';
+                        generalEl.classList.remove('hidden');
+                    }
+                });
+            });
+        })();
+        </script>
+        <?php
     }
 }
