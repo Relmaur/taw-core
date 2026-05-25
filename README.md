@@ -104,15 +104,23 @@ class Hero extends Block {
 
 ### Block with Post Meta (MetaBlock)
 
+`MetaBlock` adds metabox registration and post-meta reading on top of `BaseBlock`. Two abstract methods must be implemented:
+
+- `registerMetaboxes()` — called at `init` (translations are safe here)
+- `getData(int|false $postId)` — returns template variables for the block
+
 ```php
-namespace Blocks\Hero;
+namespace TAW\Blocks\Sections\Hero;
 
 use TAW\Core\Block\MetaBlock;
+use TAW\Core\Metabox\Metabox;
 
 class Hero extends MetaBlock {
+    protected string $id = 'hero';
+
     protected function registerMetaboxes(): void {
-        new \TAW\Core\Metabox\Metabox([
-            'id'      => 'hero',
+        new Metabox([
+            'id'      => 'taw_hero',
             'title'   => 'Hero Fields',
             'screens' => ['page'],
             'fields'  => [
@@ -121,7 +129,35 @@ class Hero extends MetaBlock {
             ],
         ]);
     }
+
+    protected function getData(int|false $postId): array {
+        return [
+            'headline' => $this->getMeta($postId, 'headline') ?: 'Default Headline',
+            'image'    => $this->getImageUrl($postId, 'image'),
+        ];
+    }
 }
+```
+
+`registerMetaboxes()` is deferred internally to the `init` action, so calling `__()` for labels is always safe regardless of when the block class is instantiated.
+
+`getData()` accepts `int|false` — on 404 pages `get_the_ID()` returns `false`, and the meta helpers (`getMeta`, `getImageUrl`, `getRepeater`) all return safe empty values in that case.
+
+### boot() — early setup and form registration
+
+Override `boot()` for anything that must hook in early on every request — including registering forms that the block renders. Unlike `registerMetaboxes()`, `boot()` is called during block discovery (at `after_setup_theme`), so wrap translation calls in `add_action('init', ...)`:
+
+```php
+public static function boot(): void
+{
+    add_action('init', static function () {
+        Form::register([
+            'id'     => 'hero_cta',
+            'fields' => [/* ... */],
+        ]);
+    });
+}
+```
 ```
 
 ### Block Variations
@@ -324,31 +360,88 @@ ViteLoader::preloadAssets(['resources/js/chunks/vendor.js']);
 
 ## Forms
 
-Self-contained frontend form processing with CSRF protection, spam filtering, validation, and optional email delivery.
+Configuration-driven AJAX forms with CSRF protection, honeypot spam filtering, per-field validation, optional email delivery, and automatic submission persistence.
+
+### Registration and rendering
+
+Forms **must** be registered before templates load — `admin-ajax.php` never runs theme templates, so AJAX handlers registered inside a template simply don't exist when the form is submitted. The correct place is inside the block's `boot()` method, wrapped in `add_action('init', ...)` so translation functions are safe.
+
+```php
+// In your MetaBlock::boot()
+public static function boot(): void
+{
+    add_action('init', static function () {
+        Form::register([
+            'id'           => 'contact',
+            'submit_label' => __('Send Message', 'taw-theme'),
+            'messages'     => [
+                'success' => __('Thanks! We\'ll be in touch.', 'taw-theme'),
+            ],
+            'fields' => [
+                ['id' => 'name',    'label' => 'Name',    'type' => 'text',     'required' => true],
+                ['id' => 'email',   'label' => 'Email',   'type' => 'email',    'required' => true],
+                ['id' => 'message', 'label' => 'Message', 'type' => 'textarea', 'required' => false],
+            ],
+        ]);
+    });
+}
+```
+
+Then render it anywhere in a template:
 
 ```php
 use TAW\Core\Form\Form;
 
-$form = new Form([
-    'id'     => 'contact',
-    'fields' => [
-        ['id' => 'name',    'type' => 'text',  'required' => true],
-        ['id' => 'email',   'type' => 'email', 'required' => true],
-        ['id' => 'message', 'type' => 'textarea'],
-    ],
-    'mail' => [
-        'to'      => get_option('admin_email'),
-        'subject' => 'New contact form submission',
-    ],
-]);
+Form::display('contact');
 ```
 
-Features:
-- Nonce-based CSRF protection
-- Honeypot spam field
-- PRG redirect on success with transient flash message
-- Per-field sanitization and validation
-- Optional persistence via `SubmissionsHandler`
+### How it works
+
+Submissions go to `admin-ajax.php` via `fetch()`. This bypasses WordPress's page/rewrite routing entirely — no 404 risk, no full page reload. The response is JSON handled inline:
+
+- **Success** — form resets, success message appears
+- **Field errors** — per-field error spans are populated
+- **General error** — an error banner is shown
+
+### Email configuration
+
+```php
+'email' => [
+    // Email to the site admin
+    'to_self' => [
+        'subject'  => 'New contact form submission',
+        'template' => 'contact-self',   // MJML template name (optional)
+    ],
+    // Confirmation email to the submitter (requires an `email` field)
+    'to_client' => [
+        'subject'  => 'Got your message!',
+        'template' => 'contact-client', // MJML template name (optional)
+    ],
+],
+```
+
+If no templates are configured, a plain-text fallback email is sent via `wp_mail()`.
+
+### Field options
+
+All field types supported by the Metabox system are available: `text`, `email`, `tel`, `url`, `textarea`, `select`. Each field accepts `id`, `label`, `type`, `required`, `placeholder`, and `width`.
+
+### Submission persistence
+
+`SubmissionsHandler` is wired up automatically by `Theme::boot()`. Every successful submission is saved as a `taw_submission` CPT entry viewable in **WP Admin → Submissions**, including all field data, the source form ID, and the submitter's IP.
+
+A webhook can be configured at **Settings → Form Webhook** to forward every submission as a signed JSON POST to n8n, Zapier, Make, or any automation platform.
+
+### Features at a glance
+
+- AJAX via `admin-ajax.php` — no page reload, no routing conflicts
+- Nonce-based CSRF protection (`wp_nonce_field` + `check_ajax_referer`)
+- Honeypot spam field (silently succeeds for bots)
+- Per-field sanitization (matched to field type) and validation
+- Inline field-level and general error display
+- Optional MJML email templates for admin + submitter
+- Automatic submission persistence via `taw_submission` CPT
+- Optional webhook delivery with HMAC-SHA256 signing
 
 ---
 
