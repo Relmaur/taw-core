@@ -44,15 +44,14 @@ class BlockLoader
                     continue;
                 }
 
+                // Always call boot() — MetaBlocks use it for Form registration,
+                // admin hooks, and other per-request setup alongside metaboxes.
+                $class::boot();
+
                 if (is_subclass_of($class, MetaBlock::class)) {
                     foreach ($class::variations() as $variation) {
                         BlockRegistry::register(new $class($variation));
                     }
-                } else {
-                    // Plain Block: no registry entry needed, but call boot() so
-                    // any admin-time registrations (Metaboxes, hooks) are set up
-                    // on every request without requiring a template render.
-                    $class::boot();
                 }
             } else {
                 // No matching PHP file — treat as a group folder and recurse
