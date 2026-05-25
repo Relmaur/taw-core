@@ -23,32 +23,77 @@ if (!defined('ABSPATH')) {
  *  - Submission persistence via SubmissionsHandler (CPT)
  *  - Webhook delivery (configured in Settings → Form Webhook)
  *
- * Usage:
- *   $form = new Form([
+ * ⚠️  REGISTRATION MUST HAPPEN BEFORE TEMPLATES LOAD
+ *
+ * admin-ajax.php never loads theme templates, so AJAX hooks must be registered
+ * on every request. Register forms in functions.php or Theme::boot(), then call
+ * render() anywhere in a template:
+ *
+ *   // functions.php (or Theme::boot())
+ *   Form::register([
  *       'id'           => 'contact',
  *       'submit_label' => 'Send Message',
- *       'email' => [
- *           'to_self'   => ['subject' => 'New contact', 'template' => 'contact-self'],
- *           'to_client' => ['subject' => 'Got your message', 'template' => 'contact-client'],
- *       ],
- *       'messages' => ['success' => 'Thanks! We\'ll be in touch.'],
- *       'fields' => [
+ *       'email'        => ['subject' => 'New contact', 'to' => get_option('admin_email')],
+ *       'messages'     => ['success' => 'Thanks! We\'ll be in touch.'],
+ *       'fields'       => [
  *           ['id' => 'name',    'label' => 'Name',    'type' => 'text',     'required' => true],
  *           ['id' => 'email',   'label' => 'Email',   'type' => 'email',    'required' => true],
  *           ['id' => 'message', 'label' => 'Message', 'type' => 'textarea', 'required' => true],
  *       ],
  *   ]);
- *   $form->render();
+ *
+ *   // Any template / block
+ *   Form::render('contact');
  */
 class Form
 {
+    /** @var self[] All registered forms, keyed by form ID. */
+    private static array $registry = [];
+
     private string $id;
     private array $config;
+
+    /**
+     * Register a form globally so its AJAX handlers are always available.
+     *
+     * Must be called before templates load (functions.php or theme boot).
+     * Returns the Form instance so you can store a reference if needed.
+     */
+    public static function register(array $config): self
+    {
+        $instance = new self($config);
+        return $instance;
+    }
+
+    /**
+     * Render a previously registered form by ID.
+     * Call this from any template or block after Form::register() has run.
+     */
+    public static function display(string $id): void
+    {
+        $form = self::$registry[$id] ?? null;
+
+        if (!$form) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_trigger_error
+                trigger_error(
+                    '[TAW Form] Form "' . esc_html($id) . '" was not registered. '
+                    . 'Call Form::register() in the block boot() method before using Form::display().',
+                    E_USER_WARNING
+                );
+            }
+            return;
+        }
+
+        $form->render();
+    }
 
     public function __construct(array $config)
     {
         $this->id     = $config['id'];
         $this->config = $config;
+
+        self::$registry[$this->id] = $this;
 
         // Route through admin-ajax.php — works for both logged-in and logged-out users,
         // and is completely independent of WP's page/rewrite routing.
