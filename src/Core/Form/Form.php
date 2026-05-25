@@ -115,13 +115,25 @@ class Form
             wp_send_json_success();
         }
 
+        // First pass: collect all raw values so conditions can be evaluated server-side.
+        $raw = [];
+        foreach ($this->config['fields'] as $field) {
+            $raw[$field['id']] = isset($_POST[$field['id']]) ? wp_unslash($_POST[$field['id']]) : '';
+        }
+
         $data   = [];
         $errors = [];
 
         foreach ($this->config['fields'] as $field) {
             $fieldId = $field['id'];
-            $value   = isset($_POST[$fieldId]) ? wp_unslash($_POST[$fieldId]) : '';
-            $label   = $field['label'] ?? $fieldId;
+
+            // Skip fields whose conditions aren't met — they were hidden (and disabled) in the UI.
+            if (!$this->conditionsMet($field['conditions'] ?? [], $raw)) {
+                continue;
+            }
+
+            $value = $raw[$fieldId];
+            $label = $field['label'] ?? $fieldId;
 
             if (!empty($field['required']) && '' === trim((string) $value)) {
                 /* translators: %s: field label */
@@ -165,8 +177,43 @@ class Form
             'email'    => sanitize_email($value),
             'textarea' => sanitize_textarea_field($value),
             'url'      => esc_url_raw($value),
+            'date'     => sanitize_text_field($value),
+            'checkbox' => ($value === '1') ? '1' : '0',
             default    => sanitize_text_field($value),
         };
+    }
+
+    /**
+     * Returns true when every condition in the array is satisfied by $values.
+     * An empty conditions array is always satisfied.
+     *
+     * @param array<int, array{field: string, operator: string, value: scalar}> $conditions
+     * @param array<string, mixed> $values  Raw field_id → value map for the current submission.
+     */
+    private function conditionsMet(array $conditions, array $values): bool
+    {
+        foreach ($conditions as $condition) {
+            $field    = $condition['field']    ?? '';
+            $operator = $condition['operator'] ?? '==';
+            $expected = (string) ($condition['value'] ?? '');
+            $actual   = (string) ($values[$field] ?? '');
+
+            $passes = match ($operator) {
+                '!='       => $actual !== $expected,
+                '>'        => (float) $actual >  (float) $expected,
+                '<'        => (float) $actual <  (float) $expected,
+                '>='       => (float) $actual >= (float) $expected,
+                '<='       => (float) $actual <= (float) $expected,
+                'contains' => str_contains($actual, $expected),
+                default    => $actual === $expected,
+            };
+
+            if (!$passes) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function sendEmail(array $data): bool
@@ -287,15 +334,17 @@ class Form
         echo '<div class="hidden p-4 w-full text-red-800 bg-red-100 border border-red-200 rounded-lg"'
             . ' data-taw-general-error role="alert"></div>';
 
+        echo '<div class="grid grid-cols-12 gap-4">';
         foreach ($this->config['fields'] as $field) {
             $this->renderField($field);
         }
+        echo '</div>';
 
         // Success message (shown by JS after successful submission)
         echo '<div class="hidden p-4 w-full text-green-800 bg-green-100 border border-green-200 rounded-lg"'
             . ' data-taw-success role="status"></div>';
 
-        echo '<div class="mt-2 w-full sm:w-fit">';
+        echo '<div class="mt-2 w-full sm:w-fit self-end">';
         echo '<button type="submit" data-taw-submit'
             . ' data-loading-label="' . esc_attr($loadingLabel) . '"'
             . ' class="p-3 w-full bg-stone-800 text-stone-300 rounded-md hover:bg-stone-700 transition-colors border border-stone-800 cursor-pointer ml-auto inline-flex items-center justify-center gap-2">';
@@ -319,11 +368,32 @@ class Form
         $label       = $field['label'] ?? '';
         $placeholder = $field['placeholder'] ?? '';
         $required    = !empty($field['required']);
-        $baseClasses = 'w-full p-2 border border-stone-400 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all flex-1';
+        $conditions  = $field['conditions'] ?? [];
+        $baseClasses = 'w-full p-2 border border-stone-400 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all';
 
-        echo '<div class="flex flex-col gap-1 w-full">';
+        // Width → 12-column grid span (mobile always full-width)
+        $width   = (int) ($field['width'] ?? 100);
+        $colSpan = match (true) {
+            $width <= 25 => 'col-span-12 sm:col-span-3',
+            $width <= 33 => 'col-span-12 sm:col-span-4',
+            $width <= 50 => 'col-span-12 sm:col-span-6',
+            $width <= 67 => 'col-span-12 sm:col-span-8',
+            $width <= 75 => 'col-span-12 sm:col-span-9',
+            default      => 'col-span-12',
+        };
 
-        if ($label) {
+        $wrapAttrs = 'class="' . $colSpan . ' flex flex-col gap-1"'
+            . ' data-taw-field-wrap="' . esc_attr($id) . '"';
+
+        if (!empty($conditions)) {
+            // Hidden by default; JS evaluates and reveals when conditions are met.
+            $wrapAttrs .= ' data-taw-conditions="' . esc_attr(wp_json_encode($conditions)) . '" hidden';
+        }
+
+        echo '<div ' . $wrapAttrs . '>';
+
+        // Label — rendered inline for checkboxes, above for everything else.
+        if ($label && $type !== 'checkbox') {
             echo '<label for="' . esc_attr($id) . '" class="font-semibold text-stone-700">';
             echo esc_html($label) . ($required ? ' <span class="text-red-500" aria-hidden="true">*</span>' : '');
             echo '</label>';
@@ -349,6 +419,30 @@ class Form
                 echo '</select>';
                 break;
 
+            case 'date':
+                $min = !empty($field['min_date']) ? ' min="' . esc_attr($field['min_date']) . '"' : '';
+                $max = !empty($field['max_date']) ? ' max="' . esc_attr($field['max_date']) . '"' : '';
+                printf(
+                    '<input type="date" id="%1$s" name="%1$s" class="%2$s"%3$s%4$s>',
+                    esc_attr($id),
+                    $baseClasses,
+                    $min,
+                    $max
+                );
+                break;
+
+            case 'checkbox':
+                echo '<label class="flex items-center gap-2 cursor-pointer select-none">';
+                printf(
+                    '<input type="checkbox" id="%1$s" name="%1$s" value="1" class="rounded border-stone-400 cursor-pointer">',
+                    esc_attr($id)
+                );
+                if ($label) {
+                    echo '<span class="text-stone-700">' . esc_html($label) . '</span>';
+                }
+                echo '</label>';
+                break;
+
             default:
                 printf(
                     '<input type="%1$s" id="%2$s" name="%2$s" class="%3$s" placeholder="%4$s">',
@@ -360,9 +454,7 @@ class Form
                 break;
         }
 
-        // Error placeholder — shown/populated by JS on validation failure
         echo '<span class="hidden text-sm text-red-600" data-taw-field-error="' . esc_attr($id) . '" role="alert"></span>';
-
         echo '</div>';
     }
 
@@ -385,6 +477,45 @@ class Form
             var btnLabel  = form.querySelector('[data-taw-submit-label]');
             var successEl = form.querySelector('[data-taw-success]');
             var generalEl = form.querySelector('[data-taw-general-error]');
+
+            function getFieldValue(name) {
+                var el = form.querySelector('[name="' + name + '"]');
+                if (!el) return '';
+                if (el.type === 'checkbox') return el.checked ? '1' : '0';
+                return el.value;
+            }
+
+            function evaluateConditions() {
+                form.querySelectorAll('[data-taw-conditions]').forEach(function (wrap) {
+                    var conditions;
+                    try { conditions = JSON.parse(wrap.getAttribute('data-taw-conditions')); } catch (e) { return; }
+
+                    var met = conditions.every(function (cond) {
+                        var actual   = getFieldValue(cond.field);
+                        var expected = String(cond.value);
+                        switch (cond.operator) {
+                            case '!=':       return actual !== expected;
+                            case '>':        return parseFloat(actual) >  parseFloat(expected);
+                            case '<':        return parseFloat(actual) <  parseFloat(expected);
+                            case '>=':       return parseFloat(actual) >= parseFloat(expected);
+                            case '<=':       return parseFloat(actual) <= parseFloat(expected);
+                            case 'contains': return actual.indexOf(expected) !== -1;
+                            default:         return actual === expected;
+                        }
+                    });
+
+                    wrap.hidden = !met;
+                    // Disable inputs inside hidden wrappers so they are excluded from FormData.
+                    wrap.querySelectorAll('input, select, textarea').forEach(function (el) {
+                        el.disabled = !met;
+                    });
+                });
+            }
+
+            // Evaluate once on load, then on every change/input event.
+            evaluateConditions();
+            form.addEventListener('change', evaluateConditions);
+            form.addEventListener('input',  evaluateConditions);
 
             function setLoading(on) {
                 submitBtn.disabled = on;

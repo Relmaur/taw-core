@@ -422,9 +422,74 @@ Submissions go to `admin-ajax.php` via `fetch()`. This bypasses WordPress's page
 
 If no templates are configured, a plain-text fallback email is sent via `wp_mail()`.
 
-### Field options
+### Field types
 
-All field types supported by the Metabox system are available: `text`, `email`, `tel`, `url`, `textarea`, `select`. Each field accepts `id`, `label`, `type`, `required`, `placeholder`, and `width`.
+| Type | Description |
+|------|-------------|
+| `text` | Single-line text |
+| `email` | Email address — validated with `is_email()` |
+| `tel` | Phone number |
+| `url` | URL |
+| `textarea` | Multi-line text; accepts `rows` (default `4`) |
+| `select` | Dropdown; pass `options` as `['value' => 'Label']` |
+| `checkbox` | Boolean toggle — label rendered inline; value is `'1'` when checked |
+| `date` | Native date picker; accepts `min_date` and `max_date` (ISO format `YYYY-MM-DD`) |
+
+All fields accept: `id`, `label`, `type`, `required`, `placeholder`, `width`, and `conditions`.
+
+### Multi-column layout
+
+Fields live inside a 12-column CSS grid. Use the `width` key (as a percentage) to control how many columns a field spans. On mobile all fields collapse to full width.
+
+```php
+'fields' => [
+    ['id' => 'name',    'type' => 'text',  'label' => 'Name',    'width' => 50],
+    ['id' => 'company', 'type' => 'text',  'label' => 'Company', 'width' => 50],
+    ['id' => 'phone',   'type' => 'tel',   'label' => 'Phone',   'width' => 33],
+    ['id' => 'email',   'type' => 'email', 'label' => 'Email',   'width' => 67],
+    ['id' => 'message', 'type' => 'textarea', 'label' => 'Message', 'width' => 100],
+],
+```
+
+| `width` value | Grid span |
+|---------------|-----------|
+| `≤ 25` | 3 / 12 columns |
+| `≤ 33` | 4 / 12 columns |
+| `≤ 50` | 6 / 12 columns |
+| `≤ 67` | 8 / 12 columns |
+| `≤ 75` | 9 / 12 columns |
+| `> 75` or omitted | 12 / 12 columns (full width) |
+
+### Conditional fields
+
+Any field can declare a `conditions` array. The field is hidden (and excluded from validation and submission data) until every condition is satisfied. Conditions are evaluated both in the browser and on the server — a hidden field can never sneak through even if JS is disabled or tampered with.
+
+```php
+['id' => 'is_company', 'type' => 'checkbox', 'label' => 'I represent a company'],
+[
+    'id'         => 'company_name',
+    'type'       => 'text',
+    'label'      => 'Company name',
+    'required'   => true,
+    'conditions' => [
+        ['field' => 'is_company', 'operator' => '==', 'value' => '1'],
+    ],
+],
+```
+
+Multiple conditions in the array are combined with **AND** (all must be true). Supported operators:
+
+| Operator | Meaning |
+|----------|---------|
+| `==` | Equals (default) |
+| `!=` | Not equals |
+| `>` | Greater than (numeric) |
+| `<` | Less than (numeric) |
+| `>=` | Greater than or equal (numeric) |
+| `<=` | Less than or equal (numeric) |
+| `contains` | String contains |
+
+In the browser the form listens for `change` and `input` events on any field; when a controlling field changes, all dependent fields are re-evaluated immediately. Inputs inside a hidden wrapper are `disabled` so they are excluded from `FormData` without needing to clear their values — if the field is revealed again, the previously entered value is preserved.
 
 ### Submission persistence
 
@@ -439,6 +504,9 @@ A webhook can be configured at **Settings → Form Webhook** to forward every su
 - Honeypot spam field (silently succeeds for bots)
 - Per-field sanitization (matched to field type) and validation
 - Inline field-level and general error display
+- Multi-column layout via a 12-column grid and per-field `width`
+- Conditional fields — show/hide fields based on other field values; enforced in JS and on the server
+- Field types: `text`, `email`, `tel`, `url`, `textarea`, `select`, `checkbox`, `date`
 - Optional MJML email templates for admin + submitter
 - Automatic submission persistence via `taw_submission` CPT
 - Optional webhook delivery with HMAC-SHA256 signing
