@@ -2289,6 +2289,15 @@ class Metabox
      */
     private function render_repeater_row(array $sub_fields, string $field_id, int|string $index, array $row_data, ?int $post_id): void
     {
+        // IDs of sub-fields local to this row — used by build_conditions_expression to route
+        // sibling references to rowFields[id] vs. outer-scope references to fields[prefixed_id].
+        $local_field_ids = array_column($sub_fields, 'id');
+
+        // Seed rowFields with current row values so Alpine initialises in the right state.
+        $initial_row_values = [];
+        foreach ($sub_fields as $sf) {
+            $initial_row_values[$sf['id']] = $row_data[$sf['id']] ?? '';
+        }
     ?>
         <div class="taw-repeater-row" data-index="<?php echo esc_attr((string) $index); ?>">
             <div class="taw-repeater-row-header">
@@ -2300,18 +2309,33 @@ class Metabox
                 <button type="button" class="taw-repeater-row-remove" title="<?php esc_attr_e('Remove row', 'taw-theme'); ?>">&times;</button>
             </div>
             <div class="taw-repeater-row-content">
-                <div class="fields-container">
+                <div class="fields-container"
+                    x-data="{ rowFields: <?php echo esc_attr(wp_json_encode($initial_row_values, JSON_UNESCAPED_UNICODE)); ?> }"
+                    x-init="
+                        $el.querySelectorAll('input, select, textarea').forEach(function(el) {
+                            var m = el.name && el.name.match(/\[([^\]]+)\]$/);
+                            if (m && rowFields.hasOwnProperty(m[1])) {
+                                el.addEventListener('input',  function() { rowFields[m[1]] = el.value; });
+                                el.addEventListener('change', function() { rowFields[m[1]] = el.value; });
+                            }
+                        });
+                    ">
                     <?php foreach ($sub_fields as $sub_field):
-                        $sub_id   = $sub_field['id'];
-                        $sub_value = $row_data[$sub_id] ?? '';
-                        $width    = ($sub_field['width'] ?? '100') . '%';
+                        $sub_id        = $sub_field['id'];
+                        $sub_value     = $row_data[$sub_id] ?? '';
+                        $width         = ($sub_field['width'] ?? '100') . '%';
+                        $has_sub_cond  = !empty($sub_field['conditions']);
 
                         // Build a unique name for serialization.
                         // Format: taw_repeater[field_id][INDEX][sub_field_id]
                         // JS reads these to build the JSON before submit.
                         $input_name = 'taw_repeater[' . $field_id . '][' . $index . '][' . $sub_id . ']';
                     ?>
-                        <div class="field" style="--width: <?php echo esc_attr($width); ?>;">
+                        <div class="field" style="--width: <?php echo esc_attr($width); ?>;"
+                            <?php if ($has_sub_cond): ?>
+                            x-show="<?php echo esc_attr($this->build_conditions_expression($sub_field['conditions'], $local_field_ids)); ?>"
+                            x-cloak
+                            <?php endif; ?>>
                             <div class="field-and-label">
                                 <label class="field-label">
                                     <?php echo esc_html($sub_field['label'] ?? ''); ?>
@@ -2340,7 +2364,7 @@ class Metabox
     private function evaluate_conditions(array $conditions): bool
     {
         foreach ($conditions as $condition) {
-            $field_name = $this->prefix . $condition['field'];
+            $field_name = $this->prefix . ($condition['id'] ?? $condition['field'] ?? '');
             $expected   = $condition['value'];
             $operator   = $condition['operator'] ?? '==';
 
@@ -2504,17 +2528,30 @@ class Metabox
      *
      * We attach an x-data listener at the metabox level that tracks all field values.
      */
-    private function build_conditions_expression(array $conditions): string
+    /**
+     * @param array  $conditions     Field condition definitions.
+     * @param array  $local_field_ids Sub-field IDs local to the current repeater row.
+     *                                When a condition references one of these, the expression
+     *                                reads from `rowFields[id]` (row-level reactive state)
+     *                                instead of falling back to the outer `fields[prefixed_id]`.
+     */
+    private function build_conditions_expression(array $conditions, array $local_field_ids = []): string
     {
         $parts = [];
 
         foreach ($conditions as $condition) {
-            $field_name = $this->prefix . $condition['field'];
-            $operator   = $condition['operator'] ?? '==';
-            $value      = $condition['value'];
+            $raw_id   = $condition['id'] ?? $condition['field'] ?? '';
+            $operator = $condition['operator'] ?? '==';
+            $value    = $condition['value'];
 
-            // Reference the reactive data object
-            $field_ref = "fields['{$field_name}']";
+            // Sibling within the same repeater row → rowFields scope; otherwise outer fields scope.
+            if ($raw_id !== '' && in_array($raw_id, $local_field_ids, true)) {
+                $field_ref = "rowFields['{$raw_id}']";
+            } else {
+                $field_name = $this->prefix . $raw_id;
+                $field_ref  = "fields['{$field_name}']";
+            }
+
             $safe_val  = is_numeric($value) ? $value : "'" . esc_js($value) . "'";
 
             $parts[] = match ($operator) {
