@@ -2,6 +2,7 @@ div[class|="postbox"]:not(:has(#side-sortables))
   .inside:has(.fields-container) {
   margin-top: 0 !important;
   padding: 0.5rem !important;
+  background: #ebebeb;
 }
 
 div[id*="taw_"] {
@@ -15,6 +16,7 @@ div[id*="taw_"]:has(.closed) {
 
 div[id*="taw_"] .postbox-header h2.hndle:has(img) {
   justify-content: flex-start;
+  padding: 12px !important;
 }
 
 .taw-tabbed {
@@ -72,6 +74,7 @@ div[id*="taw_"] .postbox-header h2.hndle:has(img) {
     --gap: 1rem;
   }
 }
+
 .fields-container {
   display: flex;
   flex-wrap: wrap;
@@ -88,6 +91,7 @@ div[id*="taw_"] .postbox-header h2.hndle:has(img) {
   display: flex;
   flex-direction: column;
   border-radius: 0.25rem;
+  background: #fff;
 }
 
 .fields-container .field .field-and-label {
