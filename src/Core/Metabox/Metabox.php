@@ -1764,7 +1764,7 @@ class Metabox
             ?>
 
                 <div class="field"
-                    style="--width: <?php echo esc_attr(($field['width'] ?? '100') . '%'); ?>;"
+                    style="--span: <?php echo esc_attr($field['width'] ?? '100'); ?>;"
                     <?php if ($has_conditions): ?>
                     x-show="<?php echo esc_attr($this->build_conditions_expression($field['conditions'])); ?>"
                     x-cloak
@@ -2192,7 +2192,7 @@ class Metabox
     {
         foreach ($group_fields as $field) {
             $field_id = $field_id_prefix . '_' . $field['id']; ?>
-            <div class="field" style="--width: 100%;">
+            <div class="field" style="--span: 100;">
                 <div class="field-and-label">
                     <label for="<?php echo esc_attr($field_id); ?>" class="field-label"><?php echo esc_html($field['label'] ?? ''); ?></label>
                     <?php
@@ -2256,15 +2256,15 @@ class Metabox
                             $value    = get_post_meta($post->ID, $field_id, true);
                             $label    = $field['label'] ?? '';
                             $desc     = $field['description'] ?? '';
-                            $width    = ($field['width'] ?? '100') . '%';
+                            $width    = (int) ($field['width'] ?? 100);
                             $border   = '';
                             // If it's the last field and its width is less than 100%, add a right border
-                            if ($field_index === array_key_last($matches) && $width !== '100%') {
+                            if ($field_index === array_key_last($matches) && $width < 100) {
                                 $border = 'border-right: 0.5px solid rgb(195, 196, 199);';
                             }
                             ?>
 
-                            <div class="tab-field field" style="--width: <?php echo esc_attr($width) ?>; <?php echo esc_attr($border); ?>">
+                            <div class="tab-field field" style="--span: <?php echo esc_attr((string) $width) ?>; <?php echo esc_attr($border); ?>">
 
                                 <div class="field-and-label">
                                     <label for="<?php echo esc_attr($field_id); ?>" class="tab-field-label"><?php echo esc_html($label); ?></label>
@@ -2323,7 +2323,7 @@ class Metabox
                     <?php foreach ($sub_fields as $sub_field):
                         $sub_id        = $sub_field['id'];
                         $sub_value     = $row_data[$sub_id] ?? '';
-                        $width         = ($sub_field['width'] ?? '100') . '%';
+                        $width         = (int) ($sub_field['width'] ?? 100);
                         $has_sub_cond  = !empty($sub_field['conditions']);
 
                         // Build a unique name for serialization.
@@ -2331,7 +2331,7 @@ class Metabox
                         // JS reads these to build the JSON before submit.
                         $input_name = 'taw_repeater[' . $field_id . '][' . $index . '][' . $sub_id . ']';
                     ?>
-                        <div class="field" style="--width: <?php echo esc_attr($width); ?>;"
+                        <div class="field" style="--span: <?php echo esc_attr((string) $width); ?>;"
                             <?php if ($has_sub_cond): ?>
                             x-show="<?php echo esc_attr($this->build_conditions_expression($sub_field['conditions'], $local_field_ids)); ?>"
                             x-cloak

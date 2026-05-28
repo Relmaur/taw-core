@@ -1,3 +1,7 @@
+:root {
+  --fields-container-gap: 0.5rem;
+}
+
 div[class|="postbox"]:not(:has(#side-sortables))
   .inside:has(.fields-container) {
   margin-top: 0 !important;
@@ -76,15 +80,15 @@ div[id*="taw_"] .postbox-header h2.hndle:has(img) {
 }
 
 .fields-container {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(100, 1fr);
   width: 100%;
-  gap: 0.5rem;
+  gap: var(--fields-container-gap);
 }
 
 .fields-container .field {
   padding: 1rem;
-  width: var(--width, 100%);
+  grid-column: span var(--span, 100);
   box-sizing: border-box;
   box-shadow: 0 0 0 0.5px rgb(195, 196, 199);
   border-bottom: 0.5px solid rgb(195, 196, 199);
