@@ -2190,6 +2190,7 @@ class Metabox
      */
     private function render_group(array $group_fields, string $field_id_prefix, ?int $post_id = null): void
     {
+        ?><div class="fields-container"><?php
         foreach ($group_fields as $field) {
             $field_id = $field_id_prefix . '_' . $field['id']; ?>
             <div class="field" style="--span: <?php echo esc_attr($field['width'] ?? '100'); ?>;">
@@ -2205,6 +2206,7 @@ class Metabox
                 <?php endif; ?>
             </div>
         <?php }
+        ?></div><?php
     }
 
     /**
