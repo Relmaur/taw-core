@@ -2192,7 +2192,7 @@ class Metabox
     {
         foreach ($group_fields as $field) {
             $field_id = $field_id_prefix . '_' . $field['id']; ?>
-            <div class="field" style="--span: 100;">
+            <div class="field" style="--span: <?php echo esc_attr($field['width'] ?? '100'); ?>;">
                 <div class="field-and-label">
                     <label for="<?php echo esc_attr($field_id); ?>" class="field-label"><?php echo esc_html($field['label'] ?? ''); ?></label>
                     <?php
