@@ -563,19 +563,9 @@ div[id*="taw_"] .postbox-header h2.hndle:has(img) {
   margin: 0;
 }
 
-.taw-repeater[data-layout^="tabbed"]
-  .taw-repeater-row-content
-  .fields-container
-  .field {
-  box-shadow: none;
-  border-bottom: 1px solid #f0f0f1;
-}
-
-.taw-repeater[data-layout^="tabbed"]
-  .taw-repeater-row-content
-  .fields-container
-  .field:last-child {
-  border-bottom: none;
+.taw-repeater[data-layout^="tabbed"] .taw-repeater-row-content {
+  padding: 0.5rem;
+  background: #ebebeb;
 }
 
 .taw-repeater-tab-nav {
