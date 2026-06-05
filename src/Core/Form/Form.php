@@ -520,8 +520,18 @@ class Form
         $prevLabel    = $this->config['prev_label'] ?? __('Back', 'taw');
         $nextLabel    = $this->config['next_label'] ?? __('Next', 'taw');
 
-        // ── Step indicator ────────────────────────────────────────
-        echo '<div class="taw-step-indicator" data-taw-step-indicator>';
+        // ── Compact progress (mobile) ─────────────────────────────
+        $firstTitle = $steps[0]['title'] ?? '';
+        echo '<div class="taw-step-progress" data-taw-step-progress aria-hidden="true">';
+        echo '<div class="taw-step-progress-meta">';
+        echo '<span class="taw-step-progress-count" data-taw-step-progress-count>1 / ' . $count . '</span>';
+        echo '<span class="taw-step-progress-title" data-taw-step-progress-title>' . esc_html($firstTitle) . '</span>';
+        echo '</div>';
+        echo '<div class="taw-step-progress-track"><div class="taw-step-progress-fill" data-taw-step-progress-fill></div></div>';
+        echo '</div>';
+
+        // ── Step indicator (desktop) ──────────────────────────────
+        echo '<div class="taw-step-indicator" data-taw-step-indicator aria-label="Form progress">';
         foreach ($steps as $i => $step) {
             echo '<div class="taw-step-dot' . ($i === 0 ? ' is-active' : '') . '" data-taw-step-dot="' . $i . '">';
             echo '<span class="taw-step-dot-number">' . ($i + 1) . '</span>';
@@ -785,12 +795,54 @@ class Form
             }
         }
 
-        /* ── Step indicator ─────────────────────────────── */
+        /* ── Step progress bar (mobile, < 640px) ───────────── */
+        [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress {
+            display: none;
+            margin-bottom: 1.5rem;
+        }
+        [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 0.5rem;
+            gap: 0.5rem;
+        }
+        [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress-count {
+            font-size: 0.75rem;
+            color: #78716c;
+            font-weight: 500;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1c1917;
+            text-align: right;
+        }
+        [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress-track {
+            height: 4px;
+            background: #e7e5e4;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress-fill {
+            height: 100%;
+            background: #1c1917;
+            border-radius: 2px;
+            width: 0%;
+            transition: width .3s ease;
+        }
+        @media (max-width: 639px) {
+            [data-taw-form="<?php echo $fid; ?>"] .taw-step-indicator { display: none; }
+            [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress  { display: block; }
+        }
+
+        /* ── Step indicator (desktop, ≥ 640px) ─────────────── */
         [data-taw-form="<?php echo $fid; ?>"] .taw-step-indicator {
             display: flex;
             align-items: flex-start;
             margin-bottom: 2rem;
-            overflow-x: auto;
         }
         [data-taw-form="<?php echo $fid; ?>"] .taw-step-dot {
             display: flex;
@@ -836,7 +888,7 @@ class Form
             height: 2px;
             background: #e7e5e4;
             margin-top: 1rem;
-            min-width: 1.5rem;
+            min-width: 1rem;
             transition: background .2s;
         }
         [data-taw-form="<?php echo $fid; ?>"] .taw-step-connector.is-done {
@@ -939,6 +991,12 @@ class Form
 
         $stepRequired = wp_json_encode($this->buildStepRequiredMap());
         $fieldToStep  = wp_json_encode($this->buildFieldToStepMap());
+
+        $stepTitles = wp_json_encode(
+            $isMultiStep
+                ? array_values(array_map(fn($s) => $s['title'] ?? '', $this->config['steps']))
+                : []
+        );
         ?>
         <script>
         (function () {
@@ -958,6 +1016,7 @@ class Form
             var currentStep       = 0;
             var stepRequiredMap   = <?php echo $stepRequired; ?>;
             var fieldToStepMap    = <?php echo $fieldToStep; ?>;
+            var stepTitles        = <?php echo $stepTitles; ?>;
 
             // ── Conditions ──────────────────────────────────────────
 
@@ -1030,12 +1089,15 @@ class Form
             var updateStepUI = function() {}; // no-op for single-step forms
 
             if (isMultiStep) {
-                var prevBtn    = form.querySelector('[data-taw-prev]');
-                var nextBtn    = form.querySelector('[data-taw-next]');
-                var submitWrap = form.querySelector('[data-taw-submit-wrap]');
-                var panels     = form.querySelectorAll('[data-taw-step-panel]');
-                var dots       = form.querySelectorAll('[data-taw-step-dot]');
-                var connectors = form.querySelectorAll('[data-taw-step-connector]');
+                var prevBtn       = form.querySelector('[data-taw-prev]');
+                var nextBtn       = form.querySelector('[data-taw-next]');
+                var submitWrap    = form.querySelector('[data-taw-submit-wrap]');
+                var panels        = form.querySelectorAll('[data-taw-step-panel]');
+                var dots          = form.querySelectorAll('[data-taw-step-dot]');
+                var connectors    = form.querySelectorAll('[data-taw-step-connector]');
+                var progressCount = form.querySelector('[data-taw-step-progress-count]');
+                var progressTitle = form.querySelector('[data-taw-step-progress-title]');
+                var progressFill  = form.querySelector('[data-taw-step-progress-fill]');
 
                 updateStepUI = function () {
                     panels.forEach(function (p, i) { p.hidden = i !== currentStep; });
@@ -1052,6 +1114,11 @@ class Form
                     if (prevBtn)    prevBtn.hidden    = currentStep === 0;
                     if (nextBtn)    nextBtn.hidden    = currentStep === stepCount - 1;
                     if (submitWrap) submitWrap.hidden = currentStep !== stepCount - 1;
+
+                    // Compact mobile progress
+                    if (progressCount) progressCount.textContent = (currentStep + 1) + ' / ' + stepCount;
+                    if (progressTitle) progressTitle.textContent = stepTitles[currentStep] || '';
+                    if (progressFill)  progressFill.style.width  = ((currentStep + 1) / stepCount * 100) + '%';
                 };
 
                 function validateStep(index) {
@@ -1147,7 +1214,7 @@ class Form
                         evaluateConditions();
 
                         if (isMultiStep) {
-                            form.querySelectorAll('[data-taw-step-panel], .taw-step-indicator, [data-taw-form-actions]')
+                            form.querySelectorAll('[data-taw-step-panel], .taw-step-indicator, .taw-step-progress, [data-taw-form-actions]')
                                 .forEach(function (el) { el.hidden = true; });
                         }
 
