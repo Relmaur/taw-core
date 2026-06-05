@@ -276,6 +276,15 @@ class Metabox
                 return true;
             }
 
+            // home.php is applied by WP to the page set as the Posts page — no
+            // meta is written, so we match by page_for_posts.
+            if ($template === 'home.php') {
+                $postsPageId = (int) get_option('page_for_posts');
+                if ($postsPageId && $post->ID === $postsPageId) {
+                    return true;
+                }
+            }
+
             // Template hierarchy: page-{slug}.php auto-applies to the page
             // with that slug — no meta is ever written in this case.
             if (preg_match('/^page-(.+)\.php$/', $template, $m) && $post->post_name === $m[1]) {
