@@ -424,18 +424,40 @@ If no templates are configured, a plain-text fallback email is sent via `wp_mail
 
 ### Field types
 
+**Input fields**
+
 | Type | Description |
 |------|-------------|
 | `text` | Single-line text |
 | `email` | Email address — validated with `is_email()` |
 | `tel` | Phone number |
 | `url` | URL |
+| `number` | Numeric input |
 | `textarea` | Multi-line text; accepts `rows` (default `4`) |
 | `select` | Dropdown; pass `options` as `['value' => 'Label']` |
+| `radio` | Radio group; pass `options`; accepts `layout` (`'horizontal'` default / `'vertical'`) |
 | `checkbox` | Boolean toggle — label rendered inline; value is `'1'` when checked |
+| `checkbox_group` | Multiple checkboxes; pass `options`; accepts `layout`; stored as comma-separated string |
 | `date` | Native date picker; accepts `min_date` and `max_date` (ISO format `YYYY-MM-DD`) |
 
-All fields accept: `id`, `label`, `type`, `required`, `placeholder`, `width`, and `conditions`.
+Any other value (e.g. `password`, `hidden`) is passed straight through as the HTML `type` attribute.
+
+**Structural fields** — cosmetic only; no `id`, no validation, no submission data
+
+| Type | Description |
+|------|-------------|
+| `heading` | Dark section header with `label` and optional `subtitle`; mirrors the PDF-style section banners |
+| `divider` | Horizontal rule (`<hr>`) |
+| `html` | Raw HTML via `content` key — rendered with `wp_kses_post` |
+
+```php
+['type' => 'heading', 'label' => '1. Personal Data', 'subtitle' => 'General identification'],
+['type' => 'divider'],
+['type' => 'html', 'content' => '<p class="text-sm text-gray-500">All fields marked * are required.</p>'],
+```
+
+All input fields accept: `id`, `label`, `type`, `required`, `placeholder`, `width`, and `conditions`.
+All fields (including structural) accept `width` (percentage) for column placement.
 
 ### Multi-column layout
 
@@ -477,7 +499,25 @@ Any field can declare a `conditions` array. The field is hidden (and excluded fr
 ],
 ```
 
-Multiple conditions in the array are combined with **AND** (all must be true). Supported operators:
+By default all conditions in the array are combined with **AND**. Add `'relation' => 'any'` to switch to **OR** (at least one must be true):
+
+```php
+// Show 'spouse_name' when marital status is married OR cohabiting
+[
+    'id'         => 'spouse_name',
+    'type'       => 'text',
+    'label'      => 'Spouse / Partner name',
+    'conditions' => [
+        'relation' => 'any',
+        'rules'    => [
+            ['field' => 'estado_civil', 'operator' => '==', 'value' => 'married'],
+            ['field' => 'estado_civil', 'operator' => '==', 'value' => 'cohabiting'],
+        ],
+    ],
+],
+```
+
+The old flat array format (no `relation` key) is still fully supported and defaults to AND. Supported operators:
 
 | Operator | Meaning |
 |----------|---------|
@@ -490,6 +530,67 @@ Multiple conditions in the array are combined with **AND** (all must be true). S
 | `contains` | String contains |
 
 In the browser the form listens for `change` and `input` events on any field; when a controlling field changes, all dependent fields are re-evaluated immediately. Inputs inside a hidden wrapper are `disabled` so they are excluded from `FormData` without needing to clear their values — if the field is revealed again, the previously entered value is preserved.
+
+### Multi-step forms
+
+Replace the top-level `fields` key with `steps`. Each step has a `title` (shown in the step indicator) and its own `fields` array. The same field types, widths, and conditions work identically inside steps.
+
+```php
+Form::register([
+    'id'           => 'fideicomitente',
+    'submit_label' => 'Submit',
+    'next_label'   => 'Continue',   // optional; default "Next"
+    'prev_label'   => 'Back',       // optional; default "Back"
+    'messages'     => ['success' => 'Your form has been received.'],
+    'steps' => [
+        [
+            'title'  => 'Personal Info',
+            'fields' => [
+                ['type' => 'heading', 'label' => '1. General Data', 'subtitle' => 'Identification'],
+                ['id' => 'nombre',    'label' => 'Given Name(s)',  'type' => 'text',  'width' => 33, 'required' => true],
+                ['id' => 'apellido1', 'label' => 'Last Name',      'type' => 'text',  'width' => 33, 'required' => true],
+                ['id' => 'apellido2', 'label' => '2nd Last Name',  'type' => 'text',  'width' => 33],
+                ['id' => 'dob',       'label' => 'Date of Birth',  'type' => 'date',  'width' => 50],
+                ['id' => 'pais',      'label' => 'Country',        'type' => 'text',  'width' => 50],
+            ],
+        ],
+        [
+            'title'  => 'Marital Status',
+            'fields' => [
+                ['type' => 'heading', 'label' => '2. Marital Status & Property Regime'],
+                ['id' => 'estado_civil', 'label' => 'Marital Status', 'type' => 'radio',
+                 'options' => ['single' => 'Single', 'married' => 'Married', 'cohabiting' => 'Cohabitation'],
+                 'layout'  => 'horizontal'],
+                ['id' => 'conyuge', 'label' => 'Spouse / Partner Name', 'type' => 'text',
+                 'conditions' => [
+                     'relation' => 'any',
+                     'rules'    => [
+                         ['field' => 'estado_civil', 'operator' => '==', 'value' => 'married'],
+                         ['field' => 'estado_civil', 'operator' => '==', 'value' => 'cohabiting'],
+                     ],
+                 ]],
+            ],
+        ],
+        [
+            'title'  => 'Declaration',
+            'fields' => [
+                ['type' => 'html', 'content' => '<p>I declare that all information provided is true.</p>'],
+                ['id' => 'confirm', 'label' => 'I confirm the above declaration', 'type' => 'checkbox', 'required' => true],
+            ],
+        ],
+    ],
+]);
+```
+
+**How multi-step works:**
+
+- A numbered step indicator with labels is rendered above the form.
+- **Next** validates required fields in the current step (client-side) before advancing. Hidden/conditioned-out fields are skipped.
+- **Back** navigates without validation.
+- **Submit** only appears on the last step.
+- All fields from all steps are submitted together in a single AJAX request. The server validates every step's fields regardless of client-side step state.
+- If the server returns validation errors, the form automatically navigates back to the step containing the first failing field.
+- On success, all step panels are hidden and the success message is shown.
 
 ### Submission persistence
 
@@ -505,8 +606,10 @@ A webhook can be configured at **Settings → Form Webhook** to forward every su
 - Per-field sanitization (matched to field type) and validation
 - Inline field-level and general error display
 - Multi-column layout via a 12-column grid and per-field `width`
-- Conditional fields — show/hide fields based on other field values; enforced in JS and on the server
-- Field types: `text`, `email`, `tel`, `url`, `textarea`, `select`, `checkbox`, `date`
+- **Multi-step wizard** — `steps` key; numbered indicator; Prev/Next navigation; per-step client-side validation; auto-navigate to failing step on server error
+- **Conditional fields** — AND (default) or OR (`relation: 'any'`) logic; enforced in JS and on the server
+- **Input field types:** `text`, `email`, `tel`, `url`, `number`, `textarea`, `select`, `radio`, `checkbox`, `checkbox_group`, `date`, any HTML input type
+- **Structural field types:** `heading`, `divider`, `html` — layout and copy inside a form with no submission data
 - Optional MJML email templates for admin + submitter
 - Automatic submission persistence via `taw_submission` CPT
 - Optional webhook delivery with HMAC-SHA256 signing
