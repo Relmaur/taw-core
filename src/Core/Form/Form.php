@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\Form;
 
 use TAW\Core\Mail\Mailer;
+use TAW\Helpers\Framework;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -122,6 +123,10 @@ class Form
 
         add_action('wp_ajax_nopriv_taw_form_' . $this->id, [$this, 'process']);
         add_action('wp_ajax_taw_form_' . $this->id, [$this, 'process']);
+
+        add_action('wp_enqueue_scripts', static function () {
+            wp_enqueue_style('taw-form', Framework::url('assets/form.css'), [], Framework::version());
+        });
     }
 
     /* -------------------------------------------------------------------------
@@ -483,9 +488,7 @@ class Form
         echo '<label>Leave this empty <input type="text" name="taw_hp_check" value="" tabindex="-1" autocomplete="off"></label>';
         echo '</div>';
 
-        $this->renderStyles();
-
-        echo '<div class="hidden taw-general-error" data-taw-general-error role="alert"></div>';
+        echo '<div class="taw-hidden taw-general-error" data-taw-general-error role="alert"></div>';
 
         if ($isMultiStep) {
             $this->renderMultiStepBody();
@@ -499,7 +502,7 @@ class Form
             }
             echo '</div>';
 
-            echo '<div class="hidden taw-success" data-taw-success role="status"></div>';
+            echo '<div class="taw-hidden taw-success" data-taw-success role="status"></div>';
 
             echo '<div class="taw-form-actions">';
             $this->renderSubmitButton($submitLabel, $loadingLabel);
@@ -557,7 +560,7 @@ class Form
             echo '</div>';
         }
 
-        echo '<div class="hidden taw-success" data-taw-success role="status"></div>';
+        echo '<div class="taw-hidden taw-success" data-taw-success role="status"></div>';
 
         // ── Navigation buttons ────────────────────────────────────
         echo '<div class="taw-form-actions" data-taw-form-actions>';
@@ -582,10 +585,10 @@ class Form
         echo '<button type="submit" data-taw-submit'
             . ' data-loading-label="' . esc_attr($loadingLabel) . '"'
             . ' class="taw-btn taw-btn-primary">';
-        echo '<svg class="hidden animate-spin taw-btn-spinner" data-taw-spinner'
+        echo '<svg class="taw-hidden taw-btn-spinner" data-taw-spinner'
             . ' xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">'
-            . '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>'
-            . '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>'
+            . '<circle class="taw-spinner-track" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>'
+            . '<path class="taw-spinner-fill" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>'
             . '</svg>';
         echo '<span data-taw-submit-label>' . esc_html($label) . '</span>';
         echo '</button>';
@@ -631,13 +634,12 @@ class Form
         $placeholder = $field['placeholder'] ?? '';
         $required    = !empty($field['required']);
         $conditions  = $field['conditions'] ?? [];
-        $inputClass  = 'w-full p-2 border border-stone-400 rounded-md bg-white'
-                     . ' focus:outline-none focus:ring-2 focus:ring-stone-500 focus:border-transparent transition-all';
+        $inputClass  = 'taw-input';
 
         $width = max(1, min(100, (int) ($field['width'] ?? 100)));
         $span  = max(1, min(12, (int) round($width / 100 * 12)));
 
-        $wrapAttrs = 'class="taw-form-field flex flex-col gap-1"'
+        $wrapAttrs = 'class="taw-form-field"'
             . ' style="grid-column: span ' . $span . ' / span ' . $span . ';"'
             . ' data-taw-field-wrap="' . esc_attr($id) . '"';
 
@@ -650,10 +652,10 @@ class Form
         $labellessTypes = ['checkbox', 'radio', 'checkbox_group'];
 
         if ($label && !in_array($type, $labellessTypes, true)) {
-            echo '<label for="' . esc_attr($id) . '" class="font-semibold text-stone-700">';
+            echo '<label for="' . esc_attr($id) . '" class="taw-field-label">';
             echo esc_html($label);
             if ($required) {
-                echo ' <span class="text-red-500" aria-hidden="true">*</span>';
+                echo ' <span class="taw-required" aria-hidden="true">*</span>';
             }
             echo '</label>';
         }
@@ -681,22 +683,22 @@ class Form
 
             case 'radio':
                 if ($label) {
-                    echo '<span class="font-semibold text-stone-700">' . esc_html($label);
+                    echo '<span class="taw-field-label">' . esc_html($label);
                     if ($required) {
-                        echo ' <span class="text-red-500" aria-hidden="true">*</span>';
+                        echo ' <span class="taw-required" aria-hidden="true">*</span>';
                     }
                     echo '</span>';
                 }
-                $layout = $field['layout'] ?? 'horizontal'; // 'horizontal' | 'vertical'
+                $layout = $field['layout'] ?? 'horizontal';
                 $groupClass = $layout === 'vertical'
-                    ? 'flex flex-col gap-2'
-                    : 'flex flex-wrap gap-x-4 gap-y-2';
+                    ? 'taw-option-group taw-option-group--vertical'
+                    : 'taw-option-group';
                 echo '<div class="' . $groupClass . '" role="radiogroup">';
                 foreach (($field['options'] ?? []) as $optVal => $optLabel) {
                     $optId = esc_attr($id . '_' . $optVal);
-                    echo '<label class="flex items-center gap-2 cursor-pointer">';
+                    echo '<label class="taw-option-label">';
                     printf(
-                        '<input type="radio" id="%s" name="%s" value="%s">',
+                        '<input type="radio" id="%s" name="%s" value="%s" class="taw-check">',
                         $optId,
                         esc_attr($id),
                         esc_attr($optVal)
@@ -709,22 +711,22 @@ class Form
 
             case 'checkbox_group':
                 if ($label) {
-                    echo '<span class="font-semibold text-stone-700">' . esc_html($label);
+                    echo '<span class="taw-field-label">' . esc_html($label);
                     if ($required) {
-                        echo ' <span class="text-red-500" aria-hidden="true">*</span>';
+                        echo ' <span class="taw-required" aria-hidden="true">*</span>';
                     }
                     echo '</span>';
                 }
                 $layout = $field['layout'] ?? 'horizontal';
                 $groupClass = $layout === 'vertical'
-                    ? 'flex flex-col gap-2'
-                    : 'flex flex-wrap gap-x-4 gap-y-2';
+                    ? 'taw-option-group taw-option-group--vertical'
+                    : 'taw-option-group';
                 echo '<div class="' . $groupClass . '">';
                 foreach (($field['options'] ?? []) as $optVal => $optLabel) {
                     $optId = esc_attr($id . '_' . $optVal);
-                    echo '<label class="flex items-center gap-2 cursor-pointer">';
+                    echo '<label class="taw-option-label">';
                     printf(
-                        '<input type="checkbox" id="%s" name="%s[]" value="%s" class="rounded border-stone-400">',
+                        '<input type="checkbox" id="%s" name="%s[]" value="%s" class="taw-check">',
                         $optId,
                         esc_attr($id),
                         esc_attr($optVal)
@@ -736,13 +738,13 @@ class Form
                 break;
 
             case 'checkbox':
-                echo '<label class="flex items-center gap-2 cursor-pointer select-none">';
+                echo '<label class="taw-option-label">';
                 printf(
-                    '<input type="checkbox" id="%1$s" name="%1$s" value="1" class="rounded border-stone-400 cursor-pointer">',
+                    '<input type="checkbox" id="%1$s" name="%1$s" value="1" class="taw-check">',
                     esc_attr($id)
                 );
                 if ($label) {
-                    echo '<span class="text-stone-700">' . esc_html($label) . '</span>';
+                    echo '<span>' . esc_html($label) . '</span>';
                 }
                 echo '</label>';
                 break;
@@ -771,208 +773,8 @@ class Form
                 break;
         }
 
-        echo '<span class="hidden text-sm text-red-600" data-taw-field-error="' . esc_attr($id) . '" role="alert"></span>';
+        echo '<span class="taw-hidden taw-field-error" data-taw-field-error="' . esc_attr($id) . '" role="alert"></span>';
         echo '</div>';
-    }
-
-    /* -------------------------------------------------------------------------
-     * Styles
-     * ---------------------------------------------------------------------- */
-
-    private function renderStyles(): void
-    {
-        $fid = esc_attr($this->id);
-        ?>
-        <style>
-        [data-taw-form="<?php echo $fid; ?>"] .taw-form-grid {
-            display: grid;
-            grid-template-columns: repeat(12, minmax(0, 1fr));
-            gap: 1rem;
-        }
-        @media (max-width: 639px) {
-            [data-taw-form="<?php echo $fid; ?>"] .taw-form-field {
-                grid-column: 1 / -1 !important;
-            }
-        }
-
-        /* ── Step progress bar (mobile, < 640px) ───────────── */
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress {
-            display: none;
-            margin-bottom: 1.5rem;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress-meta {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            margin-bottom: 0.5rem;
-            gap: 0.5rem;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress-count {
-            font-size: 0.75rem;
-            color: #78716c;
-            font-weight: 500;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress-title {
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: #1c1917;
-            text-align: right;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress-track {
-            height: 4px;
-            background: #e7e5e4;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress-fill {
-            height: 100%;
-            background: #1c1917;
-            border-radius: 2px;
-            width: 0%;
-            transition: width .3s ease;
-        }
-        @media (max-width: 639px) {
-            [data-taw-form="<?php echo $fid; ?>"] .taw-step-indicator { display: none; }
-            [data-taw-form="<?php echo $fid; ?>"] .taw-step-progress  { display: block; }
-        }
-
-        /* ── Step indicator (desktop, ≥ 640px) ─────────────── */
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-indicator {
-            display: flex;
-            align-items: flex-start;
-            margin-bottom: 2rem;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-dot {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.4rem;
-            flex-shrink: 0;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-dot-number {
-            width: 2rem;
-            height: 2rem;
-            border-radius: 50%;
-            background: #e7e5e4;
-            color: #78716c;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.875rem;
-            font-weight: 600;
-            transition: background .2s, color .2s;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-dot.is-active .taw-step-dot-number {
-            background: #1c1917;
-            color: #fff;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-dot.is-done .taw-step-dot-number {
-            background: #57534e;
-            color: #fff;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-dot-label {
-            font-size: 0.7rem;
-            color: #78716c;
-            text-align: center;
-            max-width: 80px;
-            line-height: 1.3;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-dot.is-active .taw-step-dot-label {
-            color: #1c1917;
-            font-weight: 600;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-connector {
-            flex: 1;
-            height: 2px;
-            background: #e7e5e4;
-            margin-top: 1rem;
-            min-width: 1rem;
-            transition: background .2s;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-step-connector.is-done {
-            background: #57534e;
-        }
-
-        /* ── Structural field types ─────────────────────── */
-        [data-taw-form="<?php echo $fid; ?>"] .taw-field-heading {
-            padding: 0.625rem 0.875rem;
-            background: #1c1917;
-            color: #fff;
-            border-radius: 0.375rem;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-heading-label {
-            font-size: 0.9375rem;
-            font-weight: 700;
-            margin: 0;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-heading-subtitle {
-            font-size: 0.8rem;
-            opacity: 0.65;
-            font-style: italic;
-            margin: 0.2rem 0 0;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-divider {
-            border: none;
-            border-top: 1px solid #e7e5e4;
-            margin: 0;
-        }
-
-        /* ── Feedback banners ───────────────────────────── */
-        [data-taw-form="<?php echo $fid; ?>"] .taw-general-error {
-            padding: 0.75rem 1rem;
-            color: #991b1b;
-            background: #fee2e2;
-            border: 1px solid #fecaca;
-            border-radius: 0.5rem;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-success {
-            padding: 0.75rem 1rem;
-            color: #166534;
-            background: #dcfce7;
-            border: 1px solid #bbf7d0;
-            border-radius: 0.5rem;
-        }
-
-        /* ── Buttons ────────────────────────────────────── */
-        [data-taw-form="<?php echo $fid; ?>"] .taw-form-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 0.75rem;
-            margin-top: 1.5rem;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-btn {
-            padding: 0.5rem 1.25rem;
-            border-radius: 0.375rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background .15s, color .15s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            border: 1px solid transparent;
-            font-size: 0.9375rem;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-btn-primary {
-            background: #1c1917;
-            color: #d6d3d1;
-            border-color: #1c1917;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-btn-primary:hover:not(:disabled) { background: #44403c; }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-btn-secondary {
-            background: transparent;
-            color: #44403c;
-            border-color: #a8a29e;
-        }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-btn-secondary:hover { background: #f5f5f4; }
-        [data-taw-form="<?php echo $fid; ?>"] .taw-btn-spinner {
-            width: 1rem;
-            height: 1rem;
-        }
-        </style>
-        <?php
     }
 
     /* -------------------------------------------------------------------------
@@ -1168,7 +970,7 @@ class Form
 
             function setLoading(on) {
                 if (submitBtn) submitBtn.disabled = on;
-                if (spinner)   spinner.classList.toggle('hidden', !on);
+                if (spinner)   spinner.classList.toggle('taw-hidden', !on);
                 if (submitLbl) submitLbl.textContent = on ? '<?php echo $loadingLabel; ?>' : '<?php echo $submitLabel; ?>';
             }
 
@@ -1177,17 +979,17 @@ class Form
             function clearErrors() {
                 form.querySelectorAll('[data-taw-field-error]').forEach(function (el) {
                     el.textContent = '';
-                    el.classList.add('hidden');
+                    el.classList.add('taw-hidden');
                 });
-                if (generalEl) { generalEl.textContent = ''; generalEl.classList.add('hidden'); }
-                if (successEl) { successEl.textContent = ''; successEl.classList.add('hidden'); }
+                if (generalEl) { generalEl.textContent = ''; generalEl.classList.add('taw-hidden'); }
+                if (successEl) { successEl.textContent = ''; successEl.classList.add('taw-hidden'); }
             }
 
             function showFieldError(fieldId, message) {
                 var el = form.querySelector('[data-taw-field-error="' + fieldId + '"]');
                 if (!el) return;
                 el.textContent = message;
-                el.classList.remove('hidden');
+                el.classList.remove('taw-hidden');
             }
 
             // ── Submission ──────────────────────────────────────────
@@ -1220,7 +1022,7 @@ class Form
 
                         if (successEl) {
                             successEl.textContent = json.data && json.data.message ? json.data.message : '';
-                            successEl.classList.remove('hidden');
+                            successEl.classList.remove('taw-hidden');
                         }
                         return;
                     }
@@ -1229,7 +1031,7 @@ class Form
 
                     if (payload.general && generalEl) {
                         generalEl.textContent = payload.general;
-                        generalEl.classList.remove('hidden');
+                        generalEl.classList.remove('taw-hidden');
                     }
 
                     if (payload.errors) {
@@ -1257,7 +1059,7 @@ class Form
                     setLoading(false);
                     if (generalEl) {
                         generalEl.textContent = '<?php echo $networkError; ?>';
-                        generalEl.classList.remove('hidden');
+                        generalEl.classList.remove('taw-hidden');
                     }
                 });
             });
