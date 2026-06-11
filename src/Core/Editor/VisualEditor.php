@@ -348,6 +348,95 @@ class VisualEditor
                     </template>
                 </div>
 
+                <!-- Repeater Mode: row-level editing for a single repeater field -->
+                <div x-show="panelMode === 'repeater'" class="taw-editor-panel__body">
+                    <button class="taw-editor-panel__back" @click="expandToSection()">
+                        ← All <span x-text="activeBlockTitle || activeBlockId"></span> fields
+                    </button>
+                    <h3 class="taw-editor-panel__section-title"
+                        x-text="activeRepeaterField?.label || activeRepeaterId"></h3>
+
+                    <template x-for="(row, rowIndex) in activeRepeaterRows" :key="rowIndex">
+                        <div class="taw-editor-panel__repeater-row">
+                            <div class="taw-editor-panel__repeater-row-header"
+                                @click="toggleRepeaterRow(rowIndex)">
+                                <span class="taw-editor-panel__repeater-toggle"
+                                    x-text="openRepeaterRows.includes(rowIndex) ? '▾' : '▸'"></span>
+                                <span x-text="'Row ' + (rowIndex + 1)"></span>
+                                <button class="taw-editor-panel__repeater-remove"
+                                    @click.stop="removeRepeaterRow(rowIndex)"
+                                    title="Remove row">✕</button>
+                            </div>
+
+                            <div x-show="openRepeaterRows.includes(rowIndex)"
+                                class="taw-editor-panel__repeater-row-body">
+
+                                <template x-for="subField in activeRepeaterSubFields" :key="subField.id">
+                                    <div class="taw-editor-panel__field">
+                                        <label class="taw-editor-panel__field-label"
+                                            x-text="subField.label"></label>
+                                        <span class="taw-editor-panel__field-type"
+                                            x-text="subField.type"></span>
+
+                                        <template x-if="['text','url','number'].includes(subField.type)">
+                                            <input class="taw-editor-panel__input"
+                                                :type="subField.type === 'number' ? 'number' : 'text'"
+                                                :value="row[subField.id] ?? ''"
+                                                @input="repeaterRowFieldUpdate(rowIndex, subField.id, $event.target.value)"
+                                                @click.stop>
+                                        </template>
+
+                                        <template x-if="subField.type === 'textarea' || subField.type === 'wysiwyg'">
+                                            <textarea class="taw-editor-panel__textarea" rows="3"
+                                                :value="row[subField.id] ?? ''"
+                                                @input="repeaterRowFieldUpdate(rowIndex, subField.id, $event.target.value)"
+                                                @click.stop></textarea>
+                                        </template>
+
+                                        <template x-if="subField.type === 'select' && subField.options">
+                                            <select class="taw-editor-panel__input"
+                                                @change="repeaterRowFieldUpdate(rowIndex, subField.id, $event.target.value)"
+                                                @click.stop>
+                                                <template x-for="[optVal, optLabel] in Object.entries(subField.options)" :key="optVal">
+                                                    <option :value="optVal"
+                                                        :selected="(row[subField.id] ?? '') === optVal"
+                                                        x-text="optLabel"></option>
+                                                </template>
+                                            </select>
+                                        </template>
+
+                                        <template x-if="subField.type === 'checkbox'">
+                                            <label class="taw-editor-panel__checkbox-label" @click.stop>
+                                                <input type="checkbox"
+                                                    :checked="(row[subField.id] ?? '') === '1'"
+                                                    @change="repeaterRowFieldUpdate(rowIndex, subField.id, $event.target.checked ? '1' : '0')">
+                                                <span x-text="subField.label"></span>
+                                            </label>
+                                        </template>
+
+                                        <template x-if="subField.type === 'image'">
+                                            <div class="taw-editor-panel__image-field" @click.stop>
+                                                <img :src="getRepeaterRowImageUrl(row, subField.id)"
+                                                    class="taw-editor-panel__image-preview"
+                                                    x-show="getRepeaterRowImageUrl(row, subField.id)">
+                                                <button class="taw-editor-panel__btn"
+                                                    @click="repeaterRowImagePicker(rowIndex, subField.id)">
+                                                    Change Image
+                                                </button>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+
+                    <button class="taw-editor-panel__btn taw-editor-panel__btn--secondary taw-editor-panel__add-row"
+                        @click="addRepeaterRow()">
+                        + Add Row
+                    </button>
+                </div>
+
                 <!-- Section Mode: all fields for a metabox -->
                 <div x-show="panelMode === 'section'" class="taw-editor-panel__body">
                     <button class="taw-editor-panel__back" @click="deselect()">
@@ -357,9 +446,18 @@ class VisualEditor
 
                     <template x-for="field in activeSectionFields" :key="field.fieldId">
                         <div class="taw-editor-panel__field"
-                            @click.stop="focusField(field.fieldId)">
+                            @click.stop="field.type === 'repeater' ? selectRepeater(field.fieldId) : focusField(field.fieldId)">
                             <label class="taw-editor-panel__field-label" x-text="field.label"></label>
                             <span class="taw-editor-panel__field-type" x-text="field.type"></span>
+
+                            <!-- Repeater: show row count + drill-down button -->
+                            <template x-if="field.type === 'repeater'">
+                                <button class="taw-editor-panel__btn taw-editor-panel__btn--secondary"
+                                    @click.stop="selectRepeater(field.fieldId)">
+                                    <span x-text="(changes[field.fieldId]?.value ?? field.rows ?? []).length + ' rows'"></span>
+                                    &nbsp;→ Edit
+                                </button>
+                            </template>
 
                             <template x-if="['text', 'url', 'number'].includes(field.type)">
                                 <input class="taw-editor-panel__input"

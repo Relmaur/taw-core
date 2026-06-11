@@ -2961,6 +2961,51 @@ class Metabox
     }
 
     /**
+     * Sanitize a repeater value (array of rows) from the visual editor.
+     * Each row's sub-fields are sanitized individually using sanitizeValue().
+     * Returns a JSON string ready for update_post_meta().
+     *
+     * @param array $fieldConfig The repeater's full config (must include 'fields' sub-array).
+     * @param mixed $value       Array of row objects or a JSON string.
+     */
+    public static function sanitizeRepeaterRows(array $fieldConfig, mixed $value): string
+    {
+        $subFields = $fieldConfig['fields'] ?? [];
+        $rows      = is_array($value)
+            ? $value
+            : (json_decode(wp_unslash((string) $value), true) ?? []);
+
+        // Build a fast lookup of sub-field configs keyed by sub-field ID
+        $sfMap = [];
+        foreach ($subFields as $sf) {
+            if (!empty($sf['id'])) {
+                $sfMap[$sf['id']] = $sf;
+            }
+        }
+
+        $sanitized = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $sanitizedRow = [];
+            foreach ($row as $key => $val) {
+                // Skip internal display-URL keys added for image preview
+                if (str_starts_with((string) $key, '_')) {
+                    continue;
+                }
+                $sf = $sfMap[$key] ?? ['type' => 'text', 'id' => $key];
+                $sanitizedRow[$key] = self::sanitizeValue($sf, $val);
+            }
+            if (!empty($sanitizedRow)) {
+                $sanitized[] = $sanitizedRow;
+            }
+        }
+
+        return (string) wp_json_encode($sanitized);
+    }
+
+    /**
      * Retrieve the config for a registered field.
      * Returns null if the field isn't registered or isn't editor-enabled
      */

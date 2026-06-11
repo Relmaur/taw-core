@@ -133,17 +133,11 @@ class VisualEditorEndpoint
                 continue;
             }
 
-            // Repeater sub-fields have no independent meta key — skip for now
-            if (($config['type'] ?? 'text') === 'repeater') {
-                continue;
-            }
-
             // Group by block_id so JS keys match data-taw-block-section DOM attributes.
             // Fall back to metabox_id for metaboxes registered outside a MetaBlock.
             $groupId      = $config['block_id']      ?? ($config['metabox_id'] ?? 'unknown');
             $metaboxTitle = $config['metabox_title'] ?? $groupId;
             $prefix       = $config['prefix']        ?? '_taw_';
-            $value        = get_post_meta($postId, $prefix . $fieldId, true);
 
             if (!isset($groups[$groupId])) {
                 $groups[$groupId] = [
@@ -152,6 +146,49 @@ class VisualEditorEndpoint
                 ];
             }
 
+            // ── Repeater ──────────────────────────────────────────
+            if (($config['type'] ?? '') === 'repeater') {
+                $rawJson = get_post_meta($postId, $prefix . $fieldId, true);
+                $rows    = is_string($rawJson) && $rawJson !== ''
+                    ? (json_decode($rawJson, true) ?? [])
+                    : [];
+
+                // Build sub-field descriptor list for the editor UI
+                $subFields = [];
+                foreach ($config['fields'] ?? [] as $sf) {
+                    $sfDef = [
+                        'id'    => $sf['id'],
+                        'type'  => $sf['type']  ?? 'text',
+                        'label' => $sf['label'] ?? $sf['id'],
+                    ];
+                    if (!empty($sf['options'])) {
+                        $sfDef['options'] = $sf['options'];
+                    }
+                    // Resolve image attachment IDs to URLs for the preview
+                    if (($sf['type'] ?? '') === 'image') {
+                        foreach ($rows as &$row) {
+                            $attachId = absint($row[$sf['id']] ?? 0);
+                            $row['_' . $sf['id'] . '_url'] = $attachId
+                                ? (wp_get_attachment_image_url($attachId, 'medium') ?: '')
+                                : '';
+                        }
+                        unset($row);
+                    }
+                    $subFields[] = $sfDef;
+                }
+
+                $groups[$groupId]['fields'][] = [
+                    'fieldId'   => $fieldId,
+                    'type'      => 'repeater',
+                    'label'     => $config['label'] ?? $fieldId,
+                    'subFields' => $subFields,
+                    'rows'      => $rows,
+                ];
+                continue;
+            }
+
+            // ── All other field types ──────────────────────────────
+            $value = get_post_meta($postId, $prefix . $fieldId, true);
             $field = [
                 'fieldId' => $fieldId,
                 'type'    => $config['type']  ?? 'text',
@@ -313,7 +350,9 @@ class VisualEditorEndpoint
         // ── 3. Sanitize the value ───────────────────────────────
 
         $rawValue       = $change['value'] ?? '';
-        $sanitizedValue = Metabox::sanitizeValue($fieldConfig, $rawValue);
+        $sanitizedValue = ($fieldConfig['type'] ?? '') === 'repeater'
+            ? Metabox::sanitizeRepeaterRows($fieldConfig, $rawValue)
+            : Metabox::sanitizeValue($fieldConfig, $rawValue);
 
         // ── 4. Determine the meta key and save ──────────────────
 

@@ -15,11 +15,13 @@ document.addEventListener('alpine:init', () => {
 
         // ── State ──────────────────────────────────────────────
 
-        activeEl:      null,
-        panelMode:     'idle',
-        activeBlockId: null,
-        activeFieldId: null,
-        loading:       true,
+        activeEl:          null,
+        panelMode:         'idle',
+        activeBlockId:     null,
+        activeFieldId:     null,
+        activeRepeaterId:  null,
+        openRepeaterRows:  [],
+        loading:           true,
 
         /** Tracks all pending changes: { fieldId → { blockId, fieldId, type, value, originalValue } } */
         changes: {},
@@ -69,6 +71,23 @@ document.addEventListener('alpine:init', () => {
             }));
         },
 
+        get activeRepeaterField() {
+            if (!this.activeRepeaterId) return null;
+            return this.findFieldInfo(this.activeRepeaterId);
+        },
+
+        get activeRepeaterRows() {
+            if (!this.activeRepeaterId) return [];
+            if (this.changes[this.activeRepeaterId]) {
+                return this.changes[this.activeRepeaterId].value;
+            }
+            return this.findFieldInfo(this.activeRepeaterId)?.rows ?? [];
+        },
+
+        get activeRepeaterSubFields() {
+            return this.findFieldInfo(this.activeRepeaterId)?.subFields ?? [];
+        },
+
         // ── Lifecycle ──────────────────────────────────────────
 
         async init() {
@@ -86,6 +105,12 @@ document.addEventListener('alpine:init', () => {
                     window.location.assign(adminBarExitLink.href);
                 });
             }
+
+            // Intercept ALL internal link clicks before any SPA router (Swup, Barba, etc.)
+            // can handle them. Forces a full page reload with ?taw_visual_edit=1 so PHP
+            // renders section wrappers and localizes fresh editor data for the new page.
+            // The existing beforeunload handler covers the "unsaved changes" warning.
+            document.addEventListener('click', this._interceptNavigation.bind(this), { capture: true });
 
             document.addEventListener('click', (e) => {
                 const fieldEl   = e.target.closest('[data-taw-field]');
@@ -113,12 +138,7 @@ document.addEventListener('alpine:init', () => {
                 }
             });
 
-            window.addEventListener('beforeunload', (e) => {
-                if (this.hasChanges) {
-                    e.preventDefault();
-                    e.returnValue = '';
-                }
-            });
+            // No beforeunload warning — unsaved-change count in the panel is sufficient.
 
             console.log(
                 '[TAW Editor] Initialized.',
@@ -278,9 +298,11 @@ document.addEventListener('alpine:init', () => {
 
         deselect() {
             this.clearActiveState();
-            this.panelMode     = 'idle';
-            this.activeBlockId = null;
-            this.activeFieldId = null;
+            this.panelMode        = 'idle';
+            this.activeBlockId    = null;
+            this.activeFieldId    = null;
+            this.activeRepeaterId = null;
+            this.openRepeaterRows = [];
             this.hideToolbar();
         },
 
@@ -450,6 +472,95 @@ document.addEventListener('alpine:init', () => {
                 if (found) return found;
             }
             return null;
+        },
+
+        // ── Repeater Editing ───────────────────────────────────
+
+        selectRepeater(fieldId) {
+            this.activeRepeaterId = fieldId;
+            this.openRepeaterRows = [];
+            this.panelMode = 'repeater';
+        },
+
+        /** Ensure a change-tracking entry exists for the active repeater. */
+        _ensureRepeaterChange() {
+            if (this.changes[this.activeRepeaterId]) return;
+            const fi = this.findFieldInfo(this.activeRepeaterId);
+            const originalRows = fi?.rows ?? [];
+            this.changes[this.activeRepeaterId] = {
+                blockId:       this.activeBlockId,
+                fieldId:       this.activeRepeaterId,
+                type:          'repeater',
+                value:         JSON.parse(JSON.stringify(originalRows)),
+                originalValue: JSON.stringify(originalRows),
+            };
+        },
+
+        toggleRepeaterRow(index) {
+            const i = this.openRepeaterRows.indexOf(index);
+            if (i === -1) this.openRepeaterRows.push(index);
+            else          this.openRepeaterRows.splice(i, 1);
+        },
+
+        addRepeaterRow() {
+            this._ensureRepeaterChange();
+            const emptyRow = {};
+            for (const sf of this.activeRepeaterSubFields) emptyRow[sf.id] = '';
+            const rows = this.changes[this.activeRepeaterId].value;
+            rows.push(emptyRow);
+            this.openRepeaterRows.push(rows.length - 1);
+        },
+
+        removeRepeaterRow(index) {
+            this._ensureRepeaterChange();
+            const rows = this.changes[this.activeRepeaterId].value;
+            rows.splice(index, 1);
+            this.openRepeaterRows = this.openRepeaterRows
+                .filter(i => i !== index)
+                .map(i => i > index ? i - 1 : i);
+            this._pruneRepeaterIfUnchanged();
+        },
+
+        repeaterRowFieldUpdate(rowIndex, subFieldId, newValue) {
+            this._ensureRepeaterChange();
+            const rows = this.changes[this.activeRepeaterId].value;
+            if (!rows[rowIndex]) return;
+            rows[rowIndex][subFieldId] = newValue;
+            this._pruneRepeaterIfUnchanged();
+        },
+
+        repeaterRowImagePicker(rowIndex, subFieldId) {
+            this._ensureRepeaterChange();
+            const frame = wp.media({
+                title:    'Select Image',
+                button:   { text: 'Use this image' },
+                multiple: false,
+                library:  { type: 'image' },
+            });
+            frame.on('select', () => {
+                const att = frame.state().get('selection').first().toJSON();
+                const rows = this.changes[this.activeRepeaterId].value;
+                if (rows[rowIndex]) {
+                    rows[rowIndex][subFieldId]              = att.id;
+                    rows[rowIndex]['_' + subFieldId + '_url'] = att.url;
+                }
+            });
+            frame.open();
+        },
+
+        getRepeaterRowImageUrl(row, subFieldId) {
+            // Prefer the display URL resolved by PHP or set by the picker
+            if (row['_' + subFieldId + '_url']) return row['_' + subFieldId + '_url'];
+            // If the stored value is already a URL string, use it
+            const val = String(row[subFieldId] ?? '');
+            return val.startsWith('http') ? val : '';
+        },
+
+        _pruneRepeaterIfUnchanged() {
+            const ch = this.changes[this.activeRepeaterId];
+            if (ch && JSON.stringify(ch.value) === ch.originalValue) {
+                delete this.changes[this.activeRepeaterId];
+            }
         },
 
         // ── Inline Editing ─────────────────────────────────────
@@ -633,10 +744,15 @@ document.addEventListener('alpine:init', () => {
             if (!confirm('Discard all unsaved changes?')) return;
 
             for (const [fieldId, change] of Object.entries(this.changes)) {
-                const el = document.querySelector(`[data-taw-field="${CSS.escape(fieldId)}"]`);
+                if (change.type === 'repeater') {
+                    // Restore original rows on the fieldInfo object so the panel re-renders
+                    const fi = this.findFieldInfo(fieldId);
+                    if (fi) fi.rows = JSON.parse(change.originalValue);
+                    continue;
+                }
 
+                const el = document.querySelector(`[data-taw-field="${CSS.escape(fieldId)}"]`);
                 if (el) {
-                    // DOM-annotated element — restore directly
                     if (change.type === 'image') {
                         if (el.tagName === 'IMG') el.src = change.originalValue;
                         else el.style.backgroundImage = change.originalValue;
@@ -644,20 +760,16 @@ document.addEventListener('alpine:init', () => {
                         el.textContent = change.originalValue;
                     }
                 } else {
-                    // Panel-only field — reverse the content-match live preview
                     const fieldInfo = this.findFieldInfo(fieldId);
-                    if (fieldInfo?._lastPreviewValue !== null && fieldInfo?._lastPreviewValue !== undefined) {
-                        this.livePreviewTextContent(
-                            change.blockId,
-                            fieldInfo._lastPreviewValue,
-                            change.originalValue
-                        );
+                    if (fieldInfo?._lastPreviewValue != null) {
+                        this.livePreviewTextContent(change.blockId, fieldInfo._lastPreviewValue, change.originalValue);
                         fieldInfo._lastPreviewValue = null;
                     }
                 }
             }
 
             this.changes = {};
+            this.openRepeaterRows = [];
             this.deselect();
             this.toast('Changes discarded', 'info');
         },
@@ -687,6 +799,38 @@ document.addEventListener('alpine:init', () => {
             setTimeout(() => {
                 this.toasts = this.toasts.filter(t => t.id !== id);
             }, 300);
+        },
+
+        // ── Navigation Intercept ───────────────────────────────
+
+        /**
+         * Run in capture phase so it fires before Swup / Barba / any SPA router.
+         * Rewrites the destination URL to include ?taw_visual_edit=1 and forces a
+         * full page load so PHP renders section wrappers on the next page.
+         * Same-page hash/anchor links and external links are left alone.
+         */
+        _interceptNavigation(e) {
+            const link = e.target.closest('a[href]');
+            if (!link) return;
+
+            // Let the WP admin bar and the editor panel handle their own links
+            if (link.closest('#wpadminbar') || link.closest('.taw-editor-panel')) return;
+
+            try {
+                const url = new URL(link.href, window.location.origin);
+
+                // External links — don't touch
+                if (url.hostname !== window.location.hostname) return;
+
+                // Same pathname + same query string = hash-only anchor navigation — skip
+                if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                url.searchParams.set('taw_visual_edit', '1');
+                window.location.assign(url.toString());
+            } catch (_) { /* skip non-parseable hrefs e.g. javascript: */ }
         },
 
         // ── Utilities ──────────────────────────────────────────

@@ -402,3 +402,69 @@ body.taw-visual-editor-active {
   background: var(--taw-editor-text);
   color: #fff;
 }
+
+/* =========================================================
+   Repeater Field Styles
+   ========================================================= */
+
+.taw-editor-panel__repeater-open {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.taw-editor-panel__repeater-row {
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.taw-editor-panel__repeater-row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: #f9fafb;
+  user-select: none;
+}
+
+.taw-editor-panel__repeater-row-header:hover {
+  background: #f3f4f6;
+}
+
+.taw-editor-panel__repeater-toggle {
+  color: var(--taw-editor-text-muted);
+  font-size: 11px;
+  min-width: 12px;
+}
+
+.taw-editor-panel__repeater-remove {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--taw-editor-text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.taw-editor-panel__repeater-remove:hover {
+  background: #fee2e2;
+  color: var(--taw-editor-danger);
+}
+
+.taw-editor-panel__repeater-row-body {
+  padding: 10px 12px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.taw-editor-panel__add-row {
+  width: 100%;
+  margin-top: 8px;
+}
