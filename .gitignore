@@ -9,6 +9,9 @@ composer.lock
 .env.local
 .env.*.local
 
+# Claude Code
+.claude/memory/
+
 # IDE and editor files
 .idea/
 .vscode/
