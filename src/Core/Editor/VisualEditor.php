@@ -16,6 +16,12 @@ class VisualEditor
     private static ?bool $active = null;
 
     /**
+     * Whether the visual editor has been explicitly enabled for this theme.
+     * Must call VisualEditor::enable() in functions.php to activate.
+     */
+    private static bool $enabled = false;
+
+    /**
      * The query parameter that activates the visual editor.
      */
     public const QUERY_PARAM = 'taw_visual_edit';
@@ -26,11 +32,23 @@ class VisualEditor
     public const CAPABILITY = 'edit_posts';
 
     /**
+     * Opt-in to the visual editor system.
+     * Call this in the theme's functions.php before Theme::boot().
+     */
+    public static function enable(): void
+    {
+        self::$enabled = true;
+    }
+
+    /**
      * Boot the visual editor system.
-     * Call this once during theme initialization (functions.php)
+     * No-op unless enable() was called first.
      */
     public static function init(): void
     {
+        if (!self::$enabled) {
+            return;
+        }
 
         // Add the "Edit Visually" button to the admin bar
         add_action('admin_bar_menu', [self::class, 'addAdminBarButton'], 90);
@@ -52,6 +70,10 @@ class VisualEditor
      */
     public static function isActive(): bool
     {
+        if (!self::$enabled) {
+            return false;
+        }
+
         if (self::$active !== null) {
             return self::$active;
         }

@@ -242,9 +242,14 @@ document.addEventListener('alpine:init', () => {
             this.activeFieldId = null;
             this.panelMode     = 'section';
 
+            // Highlight data-taw-field elements inside the block
             document.querySelectorAll(`[data-taw-block="${CSS.escape(blockId)}"]`).forEach(el => {
                 el.classList.add('taw-editor-active');
             });
+
+            // Highlight the block's auto-wrapped section container
+            const sectionEl = document.querySelector(`[data-taw-block-section="${CSS.escape(blockId)}"]`);
+            if (sectionEl) sectionEl.classList.add('taw-section-active');
         },
 
         expandToSection() {
@@ -284,6 +289,9 @@ document.addEventListener('alpine:init', () => {
                 el.classList.remove('taw-editor-active', 'taw-editor-editing');
                 el.removeAttribute('contenteditable');
             });
+            document.querySelectorAll('.taw-section-active').forEach(el => {
+                el.classList.remove('taw-section-active');
+            });
             this.hideToolbar();
         },
 
@@ -306,7 +314,7 @@ document.addEventListener('alpine:init', () => {
                     originalValue = String(fieldInfo.value ?? '');
                 }
                 this.changes[fieldId] = {
-                    blockId:       this.activeBlockId || fieldInfo.metaboxId,
+                    blockId:       this.activeBlockId,
                     fieldId,
                     type:          fieldInfo.type,
                     value:         originalValue,
@@ -314,16 +322,54 @@ document.addEventListener('alpine:init', () => {
                 };
             }
 
-            // Update the live DOM element if it exists
+            // Update the live DOM element if annotated with data-taw-field
             if (el && fieldInfo.type !== 'image') {
                 el.textContent = newValue;
+            }
+
+            // Live preview for panel-only text fields via content matching
+            if (!el && ['text', 'textarea', 'wysiwyg', 'url', 'number'].includes(fieldInfo.type)) {
+                const prevValue = fieldInfo._lastPreviewValue
+                    ?? this.changes[fieldId].originalValue;
+                this.livePreviewTextContent(this.activeBlockId, prevValue, newValue);
+                fieldInfo._lastPreviewValue = newValue;
             }
 
             // Track or un-track the change
             if (newValue === this.changes[fieldId].originalValue) {
                 delete this.changes[fieldId];
+                fieldInfo._lastPreviewValue = null;
             } else {
                 this.changes[fieldId].value = newValue;
+            }
+        },
+
+        /**
+         * Find the text node in a block section whose trimmed content matches
+         * oldValue and replace it with newValue. Used for live preview of
+         * panel-only fields that have no data-taw-field DOM annotation.
+         */
+        livePreviewTextContent(blockId, oldValue, newValue) {
+            if (!blockId || !String(oldValue ?? '').trim()) return;
+
+            const sectionEl = document.querySelector(
+                `[data-taw-block-section="${CSS.escape(blockId)}"]`
+            );
+            if (!sectionEl) return;
+
+            const search  = String(oldValue).trim();
+            const replace = String(newValue ?? '');
+
+            const walker = document.createTreeWalker(sectionEl, NodeFilter.SHOW_TEXT);
+            let node;
+            while ((node = walker.nextNode())) {
+                const text    = node.textContent;
+                const trimmed = text.trim();
+                if (trimmed === search) {
+                    // Preserve surrounding whitespace (leading/trailing)
+                    node.textContent = text.replace(search, replace);
+                    return;
+                }
             }
         },
 
@@ -588,13 +634,26 @@ document.addEventListener('alpine:init', () => {
 
             for (const [fieldId, change] of Object.entries(this.changes)) {
                 const el = document.querySelector(`[data-taw-field="${CSS.escape(fieldId)}"]`);
-                if (!el) continue;
 
-                if (change.type === 'image') {
-                    if (el.tagName === 'IMG') el.src = change.originalValue;
-                    else el.style.backgroundImage = change.originalValue;
+                if (el) {
+                    // DOM-annotated element — restore directly
+                    if (change.type === 'image') {
+                        if (el.tagName === 'IMG') el.src = change.originalValue;
+                        else el.style.backgroundImage = change.originalValue;
+                    } else {
+                        el.textContent = change.originalValue;
+                    }
                 } else {
-                    el.textContent = change.originalValue;
+                    // Panel-only field — reverse the content-match live preview
+                    const fieldInfo = this.findFieldInfo(fieldId);
+                    if (fieldInfo?._lastPreviewValue !== null && fieldInfo?._lastPreviewValue !== undefined) {
+                        this.livePreviewTextContent(
+                            change.blockId,
+                            fieldInfo._lastPreviewValue,
+                            change.originalValue
+                        );
+                        fieldInfo._lastPreviewValue = null;
+                    }
                 }
             }
 

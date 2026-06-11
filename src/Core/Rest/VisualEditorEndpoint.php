@@ -138,13 +138,15 @@ class VisualEditorEndpoint
                 continue;
             }
 
-            $metaboxId    = $config['metabox_id']    ?? 'unknown';
-            $metaboxTitle = $config['metabox_title'] ?? $metaboxId;
+            // Group by block_id so JS keys match data-taw-block-section DOM attributes.
+            // Fall back to metabox_id for metaboxes registered outside a MetaBlock.
+            $groupId      = $config['block_id']      ?? ($config['metabox_id'] ?? 'unknown');
+            $metaboxTitle = $config['metabox_title'] ?? $groupId;
             $prefix       = $config['prefix']        ?? '_taw_';
             $value        = get_post_meta($postId, $prefix . $fieldId, true);
 
-            if (!isset($groups[$metaboxId])) {
-                $groups[$metaboxId] = [
+            if (!isset($groups[$groupId])) {
+                $groups[$groupId] = [
                     'title'  => $metaboxTitle,
                     'fields' => [],
                 ];
@@ -161,7 +163,7 @@ class VisualEditorEndpoint
                 $field['options'] = $config['options'];
             }
 
-            $groups[$metaboxId]['fields'][] = $field;
+            $groups[$groupId]['fields'][] = $field;
         }
 
         return new \WP_REST_Response(['success' => true, 'groups' => $groups]);

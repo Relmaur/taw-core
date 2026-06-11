@@ -398,26 +398,37 @@ Every successful submission is saved as a `taw_submission` CPT entry (WP Admin �
 
 ## Visual Editor
 
-Inline admin editing on the frontend. Enabled by `Theme::boot()`. Activate via **Edit Visually** in the admin bar or by appending `?taw_visual_edit=1` (requires `edit_posts` capability).
+Inline admin editing on the frontend. **Opt-in** — must be explicitly enabled per theme:
 
-All registered metabox fields are visible in the editor panel automatically — no per-field opt-in required. Set `'editor' => false` on a field to explicitly exclude it.
+```php
+// In the theme's functions.php, before Theme::boot()
+use TAW\Core\Editor\VisualEditor;
+VisualEditor::enable();
+```
+
+Once enabled, activate via **Edit Visually** in the admin bar or append `?taw_visual_edit=1` (requires `edit_posts`).
+
+**What works automatically (no template changes needed):**
+- All MetaBlock sections are wrapped in a clickable container (`data-taw-block-section`) showing hover/active outlines
+- Clicking a section on the page opens its fields in the panel
+- Typing in a panel text field updates the matching text on the page in real time (content-matching heuristic — works when the field value appears as a discrete text node)
+- The panel shows only the blocks queued for the current page (via `BlockRegistry::queue()`)
+
+All registered metabox fields appear in the editor panel automatically. Set `'editor' => false` on a field to exclude it.
 
 Changes saved via `POST /wp-json/taw/v1/visual-editor/save` using the same sanitization pipeline as metaboxes.
 
-**Template annotation** (optional — enables inline click-to-edit on the page):
+**Optional template annotations** (for precise inline editing):
 
 ```php
-// On the block's outermost element (enables section-click selection)
-<section <?= Editor::section('hero') ?>>
-
-// Wrap a value so it's clickable inline
+// Wrap a value so it's directly clickable on the page
 <?= Editor::field($data['headline'], 'hero', 'headline', 'h2') ?>
 
 // Add attrs to an existing element (e.g. <img>)
 <img <?= Editor::attrs('hero', 'hero_image') ?> src="...">
 ```
 
-Without annotations the panel still shows and saves all fields — annotations only add the click-on-page shortcut.
+Annotations give the editor a direct DOM reference, making live updates exact and enabling "Edit inline on page" mode. Without them, the panel still shows and saves all fields, and live preview works via content matching.
 
 ---
 

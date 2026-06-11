@@ -30,6 +30,8 @@
 - Repeater and `files` field values are stored as JSON strings — callers must `json_decode()`.
 - Use `Metabox::get()` and `OptionsPage::get()` as the read API; don't call `get_post_meta()` / `get_option()` directly for framework-managed fields.
 - All registered metabox fields are visual-editor-enabled by default. Use `'editor' => false` to explicitly opt a field out.
+- **Visual editor is opt-in.** Call `VisualEditor::enable()` in the theme's `functions.php` before `Theme::boot()`. Without it, `isActive()` always returns false and nothing renders.
+- When the visual editor is active, `MetaBlock::render()` automatically wraps every block's output in `<div data-taw-block-section="{id}">`. The editor panel groups fields by block ID (matching the section attribute). Live text preview works via text-node content matching — no template annotations required for basic use.
 
 ## Don't
 

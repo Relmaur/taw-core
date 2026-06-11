@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core\Block;
 
+use TAW\Core\Editor\VisualEditor;
 use TAW\Core\Metabox\Metabox;
 
 abstract class MetaBlock extends BaseBlock
@@ -73,7 +74,9 @@ abstract class MetaBlock extends BaseBlock
     abstract protected function getData(int|false $postId): array;
 
     /**
-     * Render this block for a given post
+     * Render this block for a given post.
+     * When the visual editor is active, wraps output in a section container
+     * so the editor can identify and highlight editable regions.
      */
     public function render(?int $postId = null): void
     {
@@ -81,7 +84,14 @@ abstract class MetaBlock extends BaseBlock
         if (!$postId) return;
 
         $data = $this->getData($postId);
-        $this->renderTemplate($data);
+
+        if (VisualEditor::isActive()) {
+            echo '<div data-taw-block-section="' . esc_attr($this->id) . '">';
+            $this->renderTemplate($data);
+            echo '</div>';
+        } else {
+            $this->renderTemplate($data);
+        }
     }
 
     /**
