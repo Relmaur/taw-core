@@ -50,6 +50,14 @@ class BlockRegistry
     }
 
     /**
+     * Return the IDs of all blocks queued for the current page.
+     */
+    public static function getQueued(): array
+    {
+        return self::$queued;
+    }
+
+    /**
      * Enqueue assets for all queued blocks.
      * Hooked to wp_enqueue_scripts in functions.php
      */

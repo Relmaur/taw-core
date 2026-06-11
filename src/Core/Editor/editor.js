@@ -76,6 +76,17 @@ document.addEventListener('alpine:init', () => {
             await this.fetchFieldsFromApi();
             this.loading = false;
 
+            // Force full-page navigation for the admin bar exit link so Swup
+            // (or any other SPA router) cannot intercept and do a partial swap.
+            const adminBarExitLink = document.querySelector('#wp-admin-bar-taw-visual-editor a');
+            if (adminBarExitLink) {
+                adminBarExitLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    window.location.assign(adminBarExitLink.href);
+                });
+            }
+
             document.addEventListener('click', (e) => {
                 const fieldEl   = e.target.closest('[data-taw-field]');
                 const sectionEl = e.target.closest('[data-taw-block-section]');
@@ -155,8 +166,12 @@ document.addEventListener('alpine:init', () => {
          */
         async fetchFieldsFromApi() {
             try {
+                const blockParam = tawEditor.queuedBlocks?.length
+                    ? `&blocks=${encodeURIComponent(tawEditor.queuedBlocks.join(','))}`
+                    : '';
+
                 const res = await fetch(
-                    `${tawEditor.restUrl}fields?post_id=${tawEditor.postId}`,
+                    `${tawEditor.restUrl}fields?post_id=${tawEditor.postId}${blockParam}`,
                     { headers: { 'X-WP-Nonce': tawEditor.nonce } }
                 );
 

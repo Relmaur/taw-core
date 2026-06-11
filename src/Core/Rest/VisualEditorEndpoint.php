@@ -39,6 +39,11 @@ class VisualEditorEndpoint
                     'validate_callback' => fn($v) => absint($v) > 0,
                     'description'       => 'The post ID to load field values for.',
                 ],
+                'blocks' => [
+                    'required'          => false,
+                    'sanitize_callback' => 'sanitize_text_field',
+                    'description'       => 'Comma-separated list of block IDs to filter results.',
+                ],
             ],
         ]);
     }
@@ -105,10 +110,24 @@ class VisualEditorEndpoint
             return new \WP_REST_Response(['success' => false, 'message' => 'Forbidden.'], 403);
         }
 
+        // Optional block filter — only include fields whose block_id is in this list.
+        $blocksParam   = $request->get_param('blocks');
+        $allowedBlocks = $blocksParam
+            ? array_filter(array_map('trim', explode(',', $blocksParam)))
+            : null;
+
         $allFields = Metabox::getAllFieldConfigs();
         $groups    = [];
 
         foreach ($allFields as $fieldId => $config) {
+            // Filter by queued blocks when the caller provides a list
+            if ($allowedBlocks !== null) {
+                $blockId = $config['block_id'] ?? null;
+                if (!$blockId || !in_array($blockId, $allowedBlocks, true)) {
+                    continue;
+                }
+            }
+
             // Skip fields explicitly opted out of the editor
             if (Metabox::get_editor_config($fieldId) === null) {
                 continue;

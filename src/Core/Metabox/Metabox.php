@@ -74,6 +74,9 @@ class Metabox
     /** @var bool Guards against registering SEO integration hooks more than once. */
     private static bool $seo_integration_registered = false;
 
+    /** @var string|null Set by MetaBlock::initMetaboxes() so every Metabox created inside registerMetaboxes() is tagged with its owning block ID. */
+    private static ?string $currentBlockId = null;
+
     /**
      * Global registry of field configurations, keyed by field ID.
      * Populated during metabox construction.
@@ -170,12 +173,15 @@ class Metabox
         }
 
         // Register fields in the static registry for the visual editor
+        $registryBase = [
+            'metabox_id'    => $this->id,
+            'metabox_title' => $this->title,
+            'prefix'        => $this->prefix,
+            'block_id'      => self::$currentBlockId,
+        ];
+
         foreach ($this->fields as $field) {
-            self::$fieldRegistry[$field['id']] = array_merge($field, [
-                'metabox_id'    => $this->id,
-                'metabox_title' => $this->title,
-                'prefix'        => $this->prefix,
-            ]);
+            self::$fieldRegistry[$field['id']] = array_merge($field, $registryBase);
 
             // Group: register sub-fields with compound IDs
             if (($field['type'] ?? '') === 'group' && !empty($field['fields'])) {
@@ -188,11 +194,8 @@ class Metabox
                         $subField['editor'] = $groupEditorSetting;
                     }
 
-                    self::$fieldRegistry[$compoundId] = array_merge($subField, [
-                        'metabox_id'    => $this->id,
-                        'metabox_title' => $this->title,
-                        'prefix'        => $this->prefix,
-                        'parent_group'  => $field['id'],
+                    self::$fieldRegistry[$compoundId] = array_merge($subField, $registryBase, [
+                        'parent_group' => $field['id'],
                     ]);
                 }
             }
@@ -2983,6 +2986,15 @@ class Metabox
     public static function getAllFieldConfigs(): array
     {
         return self::$fieldRegistry;
+    }
+
+    /**
+     * Set (or clear) the block ID context for the next Metabox construction.
+     * Called by MetaBlock::initMetaboxes() around registerMetaboxes().
+     */
+    public static function setCurrentBlockId(?string $blockId): void
+    {
+        self::$currentBlockId = $blockId;
     }
 
     public static function get_editor_config(string $fieldId): mixed

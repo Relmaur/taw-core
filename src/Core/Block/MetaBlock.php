@@ -27,7 +27,10 @@ abstract class MetaBlock extends BaseBlock
 
     public function initMetaboxes(): void
     {
+        // Tag all Metabox instances created inside registerMetaboxes() with this block's ID.
+        Metabox::setCurrentBlockId($this->id);
         $this->registerMetaboxes();
+        Metabox::setCurrentBlockId(null);
     }
 
     /**

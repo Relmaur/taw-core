@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core\Editor;
 
+use TAW\Core\Block\BlockRegistry;
 use TAW\Helpers\Framework;
 
 class VisualEditor
@@ -161,10 +162,11 @@ class VisualEditor
 
         // Pass data to the editor script
         wp_localize_script('taw-visual-editor', 'tawEditor', [
-            'postId'  => get_queried_object_id(),
-            'restUrl' => rest_url('taw/v1/visual-editor/'),
-            'nonce'   => wp_create_nonce('wp_rest'),
-            'exitUrl' => get_permalink(get_queried_object_id()),
+            'postId'       => get_queried_object_id(),
+            'restUrl'      => rest_url('taw/v1/visual-editor/'),
+            'nonce'        => wp_create_nonce('wp_rest'),
+            'exitUrl'      => get_permalink(get_queried_object_id()),
+            'queuedBlocks' => BlockRegistry::getQueued(),
         ]);
 
         // Add body class for layout shift
@@ -226,7 +228,8 @@ class VisualEditor
                 <!-- Panel Header -->
                 <div class="taw-editor-panel__header">
                     <h2 class="taw-editor-panel__title">Visual Editor</h2>
-                    <a :href="tawEditor.exitUrl" class="taw-editor-panel__close" title="Exit editor">✕</a>
+                    <button class="taw-editor-panel__close" title="Exit editor"
+                            @click="window.location.assign(tawEditor.exitUrl)">✕</button>
                 </div>
 
                 <!-- Idle State: list available metaboxes -->
