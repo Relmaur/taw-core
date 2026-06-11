@@ -1,6 +1,6 @@
 ---
 name: visual-editor-repeater-limitation
-description: Repeater sub-fields are intentionally excluded from the visual editor's field registry — planned for a future iteration
+description: Repeater sub-fields excluded from visual editor and the /fields API — all other field types enabled by default since opt-out model was adopted
 metadata:
   type: project
 ---

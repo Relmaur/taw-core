@@ -172,8 +172,9 @@ class Metabox
         // Register fields in the static registry for the visual editor
         foreach ($this->fields as $field) {
             self::$fieldRegistry[$field['id']] = array_merge($field, [
-                'metabox_id' => $this->id,
-                'prefix'     => $this->prefix,
+                'metabox_id'    => $this->id,
+                'metabox_title' => $this->title,
+                'prefix'        => $this->prefix,
             ]);
 
             // Group: register sub-fields with compound IDs
@@ -188,9 +189,10 @@ class Metabox
                     }
 
                     self::$fieldRegistry[$compoundId] = array_merge($subField, [
-                        'metabox_id'   => $this->id,
-                        'prefix'       => $this->prefix,
-                        'parent_group' => $field['id'],
+                        'metabox_id'    => $this->id,
+                        'metabox_title' => $this->title,
+                        'prefix'        => $this->prefix,
+                        'parent_group'  => $field['id'],
                     ]);
                 }
             }
@@ -2974,7 +2976,15 @@ class Metabox
      * Returns null if the field doesn't exists or has editor disabled.
      * Returns true for simple 'editor' => true declarations.
      * Returns the settings array for 'editor' => [...] declarations.
+     *
+     * All registered fields are editor-enabled by default.
+     * Set 'editor' => false on a field to explicitly opt it out.
      */
+    public static function getAllFieldConfigs(): array
+    {
+        return self::$fieldRegistry;
+    }
+
     public static function get_editor_config(string $fieldId): mixed
     {
         $field = self::$fieldRegistry[$fieldId] ?? null;
@@ -2983,9 +2993,9 @@ class Metabox
             return null;
         }
 
-        $editor = $field['editor'] ?? false;
+        // Default true — opt-out via 'editor' => false
+        $editor = $field['editor'] ?? true;
 
-        // Not editor-enabled
         if ($editor === false || $editor === null) {
             return null;
         }

@@ -27,6 +27,20 @@ class VisualEditorEndpoint
             'permission_callback' => [$this, 'check_permission'],
             'args'                => $this->get_save_args(),
         ]);
+
+        register_rest_route(self::NAMESPACE, '/visual-editor/fields', [
+            'methods'             => \WP_REST_Server::READABLE,
+            'callback'            => [$this, 'get_fields'],
+            'permission_callback' => [$this, 'check_permission'],
+            'args'                => [
+                'post_id' => [
+                    'required'          => true,
+                    'sanitize_callback' => 'absint',
+                    'validate_callback' => fn($v) => absint($v) > 0,
+                    'description'       => 'The post ID to load field values for.',
+                ],
+            ],
+        ]);
     }
 
     /**
@@ -61,6 +75,77 @@ class VisualEditorEndpoint
                 'description'       => 'Object of field changes keyed by field ID.',
             ],
         ];
+    }
+
+    /**
+     * Return all editor-enabled fields for a post, grouped by metabox.
+     *
+     * Powers the visual editor panel so it can show all registered fields
+     * without requiring data-taw-field annotations in templates.
+     *
+     * Response shape:
+     * {
+     *   "success": true,
+     *   "groups": {
+     *     "taw_hero": {
+     *       "title": "Hero Fields",
+     *       "fields": [
+     *         { "fieldId": "hero_heading", "type": "text", "label": "Heading", "value": "Hello" },
+     *         { "fieldId": "hero_image",   "type": "image", "label": "Image",  "value": 42 }
+     *       ]
+     *     }
+     *   }
+     * }
+     */
+    public function get_fields(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $postId = $request->get_param('post_id');
+
+        if (!current_user_can('edit_post', $postId)) {
+            return new \WP_REST_Response(['success' => false, 'message' => 'Forbidden.'], 403);
+        }
+
+        $allFields = Metabox::getAllFieldConfigs();
+        $groups    = [];
+
+        foreach ($allFields as $fieldId => $config) {
+            // Skip fields explicitly opted out of the editor
+            if (Metabox::get_editor_config($fieldId) === null) {
+                continue;
+            }
+
+            // Repeater sub-fields have no independent meta key — skip for now
+            if (($config['type'] ?? 'text') === 'repeater') {
+                continue;
+            }
+
+            $metaboxId    = $config['metabox_id']    ?? 'unknown';
+            $metaboxTitle = $config['metabox_title'] ?? $metaboxId;
+            $prefix       = $config['prefix']        ?? '_taw_';
+            $value        = get_post_meta($postId, $prefix . $fieldId, true);
+
+            if (!isset($groups[$metaboxId])) {
+                $groups[$metaboxId] = [
+                    'title'  => $metaboxTitle,
+                    'fields' => [],
+                ];
+            }
+
+            $field = [
+                'fieldId' => $fieldId,
+                'type'    => $config['type']  ?? 'text',
+                'label'   => $config['label'] ?? $fieldId,
+                'value'   => $value,
+            ];
+
+            if (!empty($config['options'])) {
+                $field['options'] = $config['options'];
+            }
+
+            $groups[$metaboxId]['fields'][] = $field;
+        }
+
+        return new \WP_REST_Response(['success' => true, 'groups' => $groups]);
     }
 
     /**

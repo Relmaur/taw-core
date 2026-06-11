@@ -259,6 +259,6 @@ class Editor
             return '';
         }
 
-        return sprintf('data-taw-section="%s"', esc_attr($blockId));
+        return sprintf('data-taw-block-section="%s"', esc_attr($blockId));
     }
 }

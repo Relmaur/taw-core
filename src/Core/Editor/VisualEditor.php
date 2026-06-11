@@ -161,10 +161,10 @@ class VisualEditor
 
         // Pass data to the editor script
         wp_localize_script('taw-visual-editor', 'tawEditor', [
-            'postId' => get_queried_object_id(),
+            'postId'  => get_queried_object_id(),
             'restUrl' => rest_url('taw/v1/visual-editor/'),
-            'nonce' => wp_create_nonce('wp_rest'),
-            'exitUrl' => get_permalink(get_queried_object_id())
+            'nonce'   => wp_create_nonce('wp_rest'),
+            'exitUrl' => get_permalink(get_queried_object_id()),
         ]);
 
         // Add body class for layout shift
@@ -229,16 +229,19 @@ class VisualEditor
                     <a :href="tawEditor.exitUrl" class="taw-editor-panel__close" title="Exit editor">✕</a>
                 </div>
 
-                <!-- Idle State: list available blocks -->
+                <!-- Idle State: list available metaboxes -->
                 <div x-show="panelMode === 'idle'" class="taw-editor-panel__body">
-                    <p class="taw-editor-panel__hint">
-                        Click any editable element on the page, or select a section below.
+                    <p class="taw-editor-panel__hint" x-show="availableBlocks.length === 0 && !loading">
+                        No editable sections found on this page.
                     </p>
-                    <div class="taw-editor-panel__blocks">
+                    <p class="taw-editor-panel__hint" x-show="loading">
+                        Loading fields…
+                    </p>
+                    <div class="taw-editor-panel__blocks" x-show="!loading">
                         <template x-for="block in availableBlocks" :key="block.blockId">
                             <button class="taw-editor-panel__block-btn"
                                 @click="selectSection(block.blockId)">
-                                <span class="taw-editor-panel__block-name" x-text="block.blockId"></span>
+                                <span class="taw-editor-panel__block-name" x-text="block.title || block.blockId"></span>
                                 <span class="taw-editor-panel__block-count"
                                     x-text="block.fieldCount + ' field' + (block.fieldCount !== 1 ? 's' : '')"></span>
                             </button>
@@ -249,7 +252,7 @@ class VisualEditor
                 <!-- Field Mode: single field editor -->
                 <div x-show="panelMode === 'field'" class="taw-editor-panel__body">
                     <button class="taw-editor-panel__back" @click="expandToSection()">
-                        ← All <span x-text="activeBlockId"></span> fields
+                        ← All <span x-text="activeBlockTitle || activeBlockId"></span> fields
                     </button>
 
                     <template x-if="activeFieldInfo">
@@ -257,7 +260,7 @@ class VisualEditor
                             <label class="taw-editor-panel__field-label" x-text="activeFieldInfo.label"></label>
                             <span class="taw-editor-panel__field-type" x-text="activeFieldInfo.type"></span>
 
-                            <!-- Text / URL / Number input -->
+                            <!-- Text / URL / Number -->
                             <template x-if="['text', 'url', 'number'].includes(activeFieldInfo.type)">
                                 <input class="taw-editor-panel__input"
                                     :type="activeFieldInfo.type === 'number' ? 'number' : 'text'"
@@ -265,28 +268,43 @@ class VisualEditor
                                     @input="panelFieldUpdate(activeFieldInfo.fieldId, $event.target.value)">
                             </template>
 
-                            <!-- Textarea -->
-                            <template x-if="activeFieldInfo.type === 'textarea'">
+                            <!-- Textarea / WYSIWYG -->
+                            <template x-if="activeFieldInfo.type === 'textarea' || activeFieldInfo.type === 'wysiwyg'">
                                 <textarea class="taw-editor-panel__textarea"
-                                    rows="4"
+                                    :rows="activeFieldInfo.type === 'wysiwyg' ? 6 : 4"
                                     :value="getFieldValue(activeFieldInfo.fieldId)"
                                     @input="panelFieldUpdate(activeFieldInfo.fieldId, $event.target.value)"></textarea>
                             </template>
 
-                            <!-- WYSIWYG (simplified textarea for MVP) -->
-                            <template x-if="activeFieldInfo.type === 'wysiwyg'">
-                                <textarea class="taw-editor-panel__textarea"
-                                    rows="6"
+                            <!-- Select -->
+                            <template x-if="activeFieldInfo.type === 'select' && activeFieldInfo.options">
+                                <select class="taw-editor-panel__input"
                                     :value="getFieldValue(activeFieldInfo.fieldId)"
-                                    @input="panelFieldUpdate(activeFieldInfo.fieldId, $event.target.value)"></textarea>
+                                    @change="panelFieldUpdate(activeFieldInfo.fieldId, $event.target.value)">
+                                    <template x-for="[optVal, optLabel] in Object.entries(activeFieldInfo.options)" :key="optVal">
+                                        <option :value="optVal"
+                                            :selected="getFieldValue(activeFieldInfo.fieldId) === optVal"
+                                            x-text="optLabel"></option>
+                                    </template>
+                                </select>
+                            </template>
+
+                            <!-- Checkbox -->
+                            <template x-if="activeFieldInfo.type === 'checkbox'">
+                                <label class="taw-editor-panel__checkbox-label">
+                                    <input type="checkbox"
+                                        :checked="getFieldValue(activeFieldInfo.fieldId) === '1'"
+                                        @change="panelFieldUpdate(activeFieldInfo.fieldId, $event.target.checked ? '1' : '0')">
+                                    <span x-text="activeFieldInfo.label"></span>
+                                </label>
                             </template>
 
                             <!-- Image -->
                             <template x-if="activeFieldInfo.type === 'image'">
                                 <div class="taw-editor-panel__image-field">
-                                    <img :src="getFieldValue(activeFieldInfo.fieldId)"
+                                    <img :src="getFieldDisplayUrl(activeFieldInfo.fieldId)"
                                         class="taw-editor-panel__image-preview"
-                                        x-show="getFieldValue(activeFieldInfo.fieldId)">
+                                        x-show="getFieldDisplayUrl(activeFieldInfo.fieldId)">
                                     <button class="taw-editor-panel__btn"
                                         @click="panelImagePicker(activeFieldInfo.fieldId)">
                                         Change Image
@@ -294,8 +312,8 @@ class VisualEditor
                                 </div>
                             </template>
 
-                            <!-- Inline edit shortcut for text types -->
-                            <template x-if="['text', 'textarea', 'wysiwyg'].includes(activeFieldInfo.type)">
+                            <!-- Inline edit shortcut for text-based types -->
+                            <template x-if="activeFieldInfo.el && ['text', 'textarea', 'wysiwyg'].includes(activeFieldInfo.type)">
                                 <button class="taw-editor-panel__btn taw-editor-panel__btn--secondary"
                                     @click="startInlineEdit(activeFieldInfo.el)">
                                     Edit inline on page
@@ -305,12 +323,12 @@ class VisualEditor
                     </template>
                 </div>
 
-                <!-- Section Mode: all fields for a block -->
+                <!-- Section Mode: all fields for a metabox -->
                 <div x-show="panelMode === 'section'" class="taw-editor-panel__body">
                     <button class="taw-editor-panel__back" @click="deselect()">
                         ← Back to overview
                     </button>
-                    <h3 class="taw-editor-panel__section-title" x-text="activeBlockId"></h3>
+                    <h3 class="taw-editor-panel__section-title" x-text="activeBlockTitle || activeBlockId"></h3>
 
                     <template x-for="field in activeSectionFields" :key="field.fieldId">
                         <div class="taw-editor-panel__field"
@@ -334,11 +352,32 @@ class VisualEditor
                                     @click.stop></textarea>
                             </template>
 
+                            <template x-if="field.type === 'select' && field.options">
+                                <select class="taw-editor-panel__input"
+                                    @change="panelFieldUpdate(field.fieldId, $event.target.value)"
+                                    @click.stop>
+                                    <template x-for="[optVal, optLabel] in Object.entries(field.options)" :key="optVal">
+                                        <option :value="optVal"
+                                            :selected="getFieldValue(field.fieldId) === optVal"
+                                            x-text="optLabel"></option>
+                                    </template>
+                                </select>
+                            </template>
+
+                            <template x-if="field.type === 'checkbox'">
+                                <label class="taw-editor-panel__checkbox-label" @click.stop>
+                                    <input type="checkbox"
+                                        :checked="getFieldValue(field.fieldId) === '1'"
+                                        @change="panelFieldUpdate(field.fieldId, $event.target.checked ? '1' : '0')">
+                                    <span x-text="field.label"></span>
+                                </label>
+                            </template>
+
                             <template x-if="field.type === 'image'">
                                 <div class="taw-editor-panel__image-field" @click.stop>
-                                    <img :src="getFieldValue(field.fieldId)"
+                                    <img :src="getFieldDisplayUrl(field.fieldId)"
                                         class="taw-editor-panel__image-preview"
-                                        x-show="getFieldValue(field.fieldId)">
+                                        x-show="getFieldDisplayUrl(field.fieldId)">
                                     <button class="taw-editor-panel__btn"
                                         @click="panelImagePicker(field.fieldId)">
                                         Change

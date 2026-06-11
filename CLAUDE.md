@@ -29,6 +29,7 @@
 - `getData(int|false $postId)` — `$postId` is `false` on 404 pages; all meta helpers (`getMeta`, `getImageUrl`, `getRepeater`) return safe empty values for `false`.
 - Repeater and `files` field values are stored as JSON strings — callers must `json_decode()`.
 - Use `Metabox::get()` and `OptionsPage::get()` as the read API; don't call `get_post_meta()` / `get_option()` directly for framework-managed fields.
+- All registered metabox fields are visual-editor-enabled by default. Use `'editor' => false` to explicitly opt a field out.
 
 ## Don't
 
@@ -37,4 +38,5 @@
 - **Don't call `ViteLoader::init()` more than once.** It runs the dev-mode socket check and caches the manifest; re-calling resets state mid-request.
 - **Don't add templates or theme-specific logic here.** This is a library; theme code belongs in taw-theme.
 - **Don't use raw WP meta/option functions** for framework fields — `get_post_meta` / `get_option` bypass the framework's type coercion.
+- **Don't add `'editor' => true` to fields** — that was the old opt-in model. The default is now opt-out; only add `'editor' => false` to exclude a field.
 - **Don't forget to update README.md** when changing the public API, adding field types, or changing boot behavior.

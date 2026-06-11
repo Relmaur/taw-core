@@ -278,13 +278,13 @@ class Form
             wp_send_json_error(['errors' => $errors]);
         }
 
-        $sent = $this->sendEmail($data);
-
-        if (!$sent) {
-            wp_send_json_error(['general' => __('There was a problem sending your message. Please try again later.', 'taw')]);
-        }
-
+        // Save first — guaranteed record regardless of email outcome.
         SubmissionsHandler::saveSubmission($this->id, $inputFields, $data);
+
+        $sent = $this->sendEmail($data);
+        if (!$sent) {
+            error_log('[TAW Form] Email delivery failed for form "' . $this->id . '" — submission was saved to the database.');
+        }
 
         wp_send_json_success([
             'message' => $this->config['messages']['success'] ?? __('Thank you! Your message has been sent.', 'taw'),

@@ -400,7 +400,24 @@ Every successful submission is saved as a `taw_submission` CPT entry (WP Admin �
 
 Inline admin editing on the frontend. Enabled by `Theme::boot()`. Activate via **Edit Visually** in the admin bar or by appending `?taw_visual_edit=1` (requires `edit_posts` capability).
 
+All registered metabox fields are visible in the editor panel automatically — no per-field opt-in required. Set `'editor' => false` on a field to explicitly exclude it.
+
 Changes saved via `POST /wp-json/taw/v1/visual-editor/save` using the same sanitization pipeline as metaboxes.
+
+**Template annotation** (optional — enables inline click-to-edit on the page):
+
+```php
+// On the block's outermost element (enables section-click selection)
+<section <?= Editor::section('hero') ?>>
+
+// Wrap a value so it's clickable inline
+<?= Editor::field($data['headline'], 'hero', 'headline', 'h2') ?>
+
+// Add attrs to an existing element (e.g. <img>)
+<img <?= Editor::attrs('hero', 'hero_image') ?> src="...">
+```
+
+Without annotations the panel still shows and saves all fields — annotations only add the click-on-page shortcut.
 
 ---
 
@@ -408,8 +425,9 @@ Changes saved via `POST /wp-json/taw/v1/visual-editor/save` using the same sanit
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| `POST` | `/taw/v1/visual-editor/save` | Save visual editor changes |
-| `GET`  | `/taw/v1/search-posts`       | Post search for `post_select` fields |
+| `POST` | `/taw/v1/visual-editor/save`   | Save visual editor changes |
+| `GET`  | `/taw/v1/visual-editor/fields` | Load all registered fields + current values for the editor panel |
+| `GET`  | `/taw/v1/search-posts`         | Post search for `post_select` fields |
 
 ---
 

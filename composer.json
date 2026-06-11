@@ -17,6 +17,9 @@
     "require-dev": {
         "spatie/mjml-php": "^1.0"
     },
+    "suggest": {
+        "emailit/emailit-php": "Required for EmailConfig::useEmailit() — route all wp_mail() through the Emailit REST API"
+    },
     "autoload": {
         "psr-4": {
             "TAW\\": "src/"
