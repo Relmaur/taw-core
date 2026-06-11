@@ -216,17 +216,21 @@ document.addEventListener('alpine:init', () => {
 
                         if (existing) {
                             // Enrich the DOM-found entry with API data
-                            existing.options = apiField.options || null;
-                            existing.value   = apiField.value;
+                            existing.options   = apiField.options   || null;
+                            existing.value     = apiField.value;
+                            existing.subFields = apiField.subFields || null;
+                            existing.rows      = apiField.rows      || [];
                         } else {
                             // Panel-only field — no DOM element
                             this.blockFields[groupId].fields.push({
-                                fieldId: apiField.fieldId,
-                                type:    apiField.type,
-                                label:   apiField.label,
-                                options: apiField.options || null,
-                                value:   apiField.value,
-                                el:      null,
+                                fieldId:   apiField.fieldId,
+                                type:      apiField.type,
+                                label:     apiField.label,
+                                options:   apiField.options   || null,
+                                value:     apiField.value,
+                                subFields: apiField.subFields || null,
+                                rows:      apiField.rows      || [],
+                                el:        null,
                             });
                         }
                     }
