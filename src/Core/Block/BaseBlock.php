@@ -97,13 +97,10 @@ abstract class BaseBlock
         }
 
         if (file_exists($this->dir . '/script.js')) {
-            wp_enqueue_script(
-                'taw-block-' . $assetId,
-                ViteLoader::DEV_SERVER . '/' . $relative_dir . '/script.js',
-                ['vite-client'],
-                null,
-                true  // footer — scripts DO have a footer fallback
-            );
+            $handle = 'taw-block-' . $assetId;
+            wp_enqueue_script($handle, ViteLoader::DEV_SERVER . '/' . $relative_dir . '/script.js', ['vite-client'], null, false);
+            ViteLoader::$moduleHandles[] = $handle;
+            wp_script_add_data($handle, 'group', 0);
         }
     }
 
@@ -167,13 +164,10 @@ abstract class BaseBlock
         }
 
         if (isset($manifest[$js_key])) {
-            wp_enqueue_script(
-                'taw-block-' . $assetId,
-                ViteLoader::distUrl($manifest[$js_key]['file']),
-                [],
-                null,
-                true
-            );
+            $handle = 'taw-block-' . $assetId;
+            wp_enqueue_script($handle, ViteLoader::distUrl($manifest[$js_key]['file']), [], null, false);
+            ViteLoader::$moduleHandles[] = $handle;
+            wp_script_add_data($handle, 'group', 0);
         }
     }
 
