@@ -103,13 +103,13 @@ class ViteLoader
     {
         if (self::isDevServerRunning()) {
             if (!wp_script_is('vite-client', 'registered')) {
-                wp_register_script('vite-client', self::DEV_SERVER . '/@vite/client', [], null, false);
+                wp_register_script('vite-client', self::devServerOrigin() . '/@vite/client', [], null, false);
                 self::$moduleHandles[] = 'vite-client';
             }
             wp_enqueue_script('vite-client');
 
             self::$moduleHandles[] = 'theme-app';
-            wp_enqueue_script('theme-app', self::DEV_SERVER . '/' . ltrim($entry_point, '/'), ['vite-client'], null, false);
+            wp_enqueue_script('theme-app', self::devServerOrigin() . '/' . ltrim($entry_point, '/'), ['vite-client'], null, false);
 
             return;
         }
@@ -160,7 +160,32 @@ class ViteLoader
     // ── Dev-server detection ───────────────────────────────────────────────
 
     /**
-     * Returns true when the Vite dev server is reachable on localhost.
+     * Returns true when the Vite dev server is actually reachable and
+     * responding — not just "something is listening on the port."
+     *
+     * A bare TCP port probe (the old implementation: fsockopen($host, 5173))
+     * is a false-positive trap: any unrelated process — a Docker container,
+     * another dev tool, literally anything — can end up bound to port 5173
+     * for reasons that have nothing to do with Vite. When that happens the
+     * theme serves dead localhost:5173 asset URLs in production, with no
+     * assets loading at all, even though `npm run build` succeeded and the
+     * manifest on disk is completely correct. This is a real bug that has
+     * happened on a real project (a stray Docker process squatting the port).
+     *
+     * Fixed by verifying at the HTTP level, not just the TCP level: after
+     * connecting, request GET /@vite/client — the module every Vite dev
+     * server always serves — and check for a response that actually looks
+     * like it (HTTP 200 status). Only a real Vite dev server passes this;
+     * an unrelated process on the same port will not.
+     *
+     * The theme's optional hot-file convention (vite.config.js writing the
+     * dev server's actual URL to dist/hot or public/build/hot on startup) is
+     * used to resolve which host:port to check, when present — this matters
+     * because Vite can pick a different port than 5173 if it's already
+     * taken. Falls back to the hardcoded default host:port when no hot file
+     * exists (an unmodified vite.config.js, or the dev server simply isn't
+     * running) — the HTTP-level check makes this fallback safe even without
+     * the hot file, unlike the old bare TCP probe.
      *
      * Result is cached for the lifetime of the request via a static variable.
      */
@@ -172,15 +197,93 @@ class ViteLoader
             return $is_dev;
         }
 
-        $is_dev  = false;
-        $handle  = @fsockopen(self::DEV_HOST, self::DEV_PORT, $errno, $errstr, 0.1);
+        $host = self::DEV_HOST;
+        $port = self::DEV_PORT;
 
-        if ($handle) {
-            fclose($handle);
-            $is_dev = true;
+        $hot_url = self::hotFileUrl();
+        if ($hot_url !== null) {
+            $parts = parse_url($hot_url);
+            $host  = $parts['host'] ?? $host;
+            $port  = (int) ($parts['port'] ?? $port);
         }
 
+        $is_dev = self::probeViteDevServer($host, $port);
+
         return $is_dev;
+    }
+
+    /**
+     * TCP-connect to $host:$port and confirm a real Vite dev server answers
+     * by requesting GET /@vite/client and checking for an HTTP 200 response.
+     * A bare TCP connect alone isn't enough — see isDevServerRunning() docblock.
+     */
+    private static function probeViteDevServer(string $host, int $port): bool
+    {
+        $handle = @fsockopen($host, $port, $errno, $errstr, 0.2);
+
+        if (!$handle) {
+            return false;
+        }
+
+        stream_set_timeout($handle, 0, 200000); // 200ms
+
+        $request = "GET /@vite/client HTTP/1.1\r\nHost: {$host}\r\nConnection: close\r\n\r\n";
+        fwrite($handle, $request);
+
+        $status_line = fgets($handle, 1024);
+        fclose($handle);
+
+        if ($status_line === false) {
+            return false;
+        }
+
+        return (bool) preg_match('#^HTTP/\d\.\d\s+200\b#', $status_line);
+    }
+
+    /**
+     * Read the dev server URL from the theme's hot file, if present.
+     *
+     * Convention (matching Laravel's Vite plugin): the theme's vite.config.js
+     * writes its actual dev server origin (e.g. "http://localhost:5173") to
+     * dist/hot or public/build/hot when the server starts, and deletes it on
+     * shutdown. Not every theme's vite.config.js implements this — absence
+     * just means isDevServerRunning() falls back to the legacy port probe.
+     *
+     * Result is cached for the lifetime of the request via a static variable.
+     */
+    private static function hotFileUrl(): ?string
+    {
+        static $checked = false;
+        static $url     = null;
+
+        if ($checked) {
+            return $url;
+        }
+
+        $checked = true;
+
+        foreach (['dist/hot', 'public/build/hot'] as $candidate) {
+            $path = Framework::themePath($candidate);
+            if (file_exists($path)) {
+                $contents = trim((string) file_get_contents($path));
+                if ($contents !== '') {
+                    $url = $contents;
+                }
+                break;
+            }
+        }
+
+        return $url;
+    }
+
+    /**
+     * The dev server origin to use for asset URLs — the hot file's actual
+     * URL if available (correct even if Vite picked a non-default port),
+     * otherwise the hardcoded default.
+     */
+    private static function devServerOrigin(): string
+    {
+        return self::hotFileUrl() ?? self::DEV_SERVER;
     }
 
     // ── Manifest ───────────────────────────────────────────────────────────
@@ -292,13 +395,13 @@ class ViteLoader
     private static function enqueueDevAsset(string $handle, string $entry_point, array $dependencies, bool $enqueue): void
     {
         if (!wp_script_is('vite-client', 'registered')) {
-            wp_register_script('vite-client', self::DEV_SERVER . '/@vite/client', [], null, true);
+            wp_register_script('vite-client', self::devServerOrigin() . '/@vite/client', [], null, true);
             self::$moduleHandles[] = 'vite-client';
         }
 
         $deps = array_merge(['vite-client'], $dependencies);
 
-        wp_register_script($handle, self::DEV_SERVER . '/' . ltrim($entry_point, '/'), $deps, null, true);
+        wp_register_script($handle, self::devServerOrigin() . '/' . ltrim($entry_point, '/'), $deps, null, true);
 
         if ($enqueue) {
             wp_enqueue_script($handle);
@@ -454,7 +557,7 @@ class ViteLoader
     public static function assetUrl(string $path): string
     {
         if (self::isDevServerRunning()) {
-            return self::DEV_SERVER . '/' . ltrim($path, '/');
+            return self::devServerOrigin() . '/' . ltrim($path, '/');
         }
 
         $manifest = self::getManifest();

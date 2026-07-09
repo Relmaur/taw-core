@@ -315,7 +315,9 @@ Group sub-fields are each stored as their own option, named `{prefix}{group_id}_
 
 ## Vite Asset Pipeline
 
-Dev mode detected via socket to `localhost:5173`. Production reads `dist/.vite/manifest.json` (cached 24 hours in-process).
+Dev mode detection: connects to the dev server host:port (default `localhost:5173`, or whatever the theme's `vite.config.js` hot-file plugin last wrote to `dist/hot` / `public/build/hot`, if present) and confirms it's actually Vite by requesting `GET /@vite/client` and checking for an HTTP 200 response — not just that *something* is listening on the port. A bare TCP-connect check is a false-positive trap: any unrelated process (another dev server, a Docker container, anything) can end up bound to that port for reasons that have nothing to do with this project, which would otherwise make the theme serve dead dev-server asset URLs in production with no assets loading at all, even though the production build and manifest are completely correct. Production reads `dist/.vite/manifest.json` (or `dist/manifest.json`, or the `public/build/` equivalents — checks all four) (cached 24 hours in-process).
+
+**Hot-file convention (optional but recommended):** have the theme's `vite.config.js` write the dev server's actual URL to `dist/hot` or `public/build/hot` on startup and delete it on shutdown (Laravel Vite plugin-style). `ViteLoader` reads this to resolve the correct host:port before probing — this matters if the dev server ever binds a non-default port. Without a hot file, `ViteLoader` falls back to the hardcoded default (`localhost:5173`).
 
 ```php
 use TAW\Support\ViteLoader;
@@ -466,7 +468,10 @@ Every successful submission is saved as a `taw_submission` CPT entry (WP Admin �
 Inline admin editing on the frontend. **Opt-in** — must be explicitly enabled per theme:
 
 ```php
-// In the theme's functions.php, before Theme::boot()
+// In inc/customizations.php (not functions.php, which is framework-owned in
+// taw-theme scaffolds using Theme::bootstrapFullSite()) — must run before
+// Theme::boot(), which bootstrapFullSite() guarantees by loading
+// customizations.php first.
 use TAW\Core\Editor\VisualEditor;
 VisualEditor::enable();
 ```
