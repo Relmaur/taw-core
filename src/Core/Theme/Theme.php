@@ -154,6 +154,17 @@ class Theme
             require_once $optionsFile;
         }
 
+        // customizations.php loads BEFORE boot() deliberately — some framework
+        // opt-ins (e.g. VisualEditor::enable()) are plain synchronous flags that
+        // boot() reads immediately (VisualEditor::init() no-ops unless enable()
+        // already ran). Hook-registration-only customizations (add_action calls
+        // that fire on a later event) work fine either order, but the flag-style
+        // opt-ins only work if this runs first.
+        $customizationsFile = $themeDir . '/inc/customizations.php';
+        if (file_exists($customizationsFile)) {
+            require_once $customizationsFile;
+        }
+
         self::boot();
 
         // Lock each page's metabox order to match its template's
@@ -182,10 +193,5 @@ class Theme
             $enabled = (bool) OptionsPage::get('css_studio_enabled');
             echo '<script>window.tawConfig = window.tawConfig || {}; window.tawConfig.cssStudioEnabled = ' . ($enabled ? 'true' : 'false') . ';</script>' . PHP_EOL;
         }, 1);
-
-        $customizationsFile = $themeDir . '/inc/customizations.php';
-        if (file_exists($customizationsFile)) {
-            require_once $customizationsFile;
-        }
     }
 }
