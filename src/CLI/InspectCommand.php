@@ -118,10 +118,17 @@ class InspectCommand extends Command
     }
 
     /**
-     * Best-effort static check: does functions.php call
-     * MetaboxOrder::lockFromTemplate() or MetaboxOrder::lock()?
+     * Best-effort static check: is MetaboxOrder locking active for this site?
      * Intentionally a source-text check, not a runtime one — there's no
      * runtime flag on MetaboxOrder itself to query.
+     *
+     * Two ways this can be true:
+     *   1. functions.php calls Theme::bootstrapFullSite() — which always
+     *      calls MetaboxOrder::lockFromTemplate() internally as of taw/core
+     *      v1.16.63, regardless of what's in functions.php itself.
+     *   2. functions.php (pre-bootstrapFullSite theme, or a site that
+     *      customized it) directly calls MetaboxOrder::lockFromTemplate()
+     *      or MetaboxOrder::lock() itself.
      */
     private function detectMetaboxOrderLock(): bool
     {
@@ -132,6 +139,10 @@ class InspectCommand extends Command
         }
 
         $contents = file_get_contents($functionsPhp) ?: '';
+
+        if (preg_match('/Theme::bootstrapFullSite\s*\(/', $contents)) {
+            return true;
+        }
 
         return (bool) preg_match('/MetaboxOrder::(lockFromTemplate|lock)\s*\(/', $contents);
     }
