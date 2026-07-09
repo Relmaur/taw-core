@@ -19,11 +19,14 @@ namespace TAW\Core\Metabox;
  * Usage — derive order from the page template's block render sequence:
  *   MetaboxOrder::lockFromTemplate();
  *
- * The latter statically scans the post's assigned page template file for
- * `BlockRegistry::render('block_id')` calls (in source order — the file is
- * never executed) and maps each block ID to the metabox ID(s) it registered
- * via Metabox::getFieldRegistry(). Only page templates (get_page_template_slug)
- * are supported; posts on the default template are left unordered.
+ * The latter statically scans the template file that will actually render
+ * the post for `BlockRegistry::render('block_id')` calls (in source order —
+ * the file is never executed) and maps each block ID to the metabox ID(s) it
+ * registered via Metabox::getFieldRegistry(). Resolves the explicitly
+ * selected page template (get_page_template_slug) first, then falls back to
+ * front-page.php for the site's static front page — no Template Name header
+ * or Page Attributes selection required for that case. Posts with neither
+ * are left unordered.
  */
 class MetaboxOrder
 {
@@ -71,22 +74,46 @@ class MetaboxOrder
     }
 
     /**
-     * Resolve the metabox order for a post from its assigned page template.
+     * Resolve the metabox order for a post from the template that will
+     * actually render it.
+     *
+     * Prefers the explicitly-selected page template (Page Attributes
+     * dropdown / _wp_page_template meta). If none is set, falls back to
+     * WordPress's own template-hierarchy conventions for the static front
+     * page — front-page.php renders whenever is_front_page() is true,
+     * regardless of what (if anything) is selected in Page Attributes, and
+     * usually can't even be selected there since it rarely declares a
+     * Template Name header.
      */
     private static function orderForPost(\WP_Post $post): array
     {
         $slug = get_page_template_slug($post->ID);
-        if (!$slug) {
-            return [];
+        $file = $slug ? locate_template([$slug]) : false;
+
+        if (!$file && self::isStaticFrontPage($post)) {
+            $file = locate_template(['front-page.php']);
         }
 
-        $file = locate_template([$slug]);
         if (!$file) {
             return [];
         }
 
         $blockIds = self::blockOrderFromTemplateFile($file);
         return self::metaboxOrderForBlocks($blockIds);
+    }
+
+    /**
+     * Whether $post is the site's static front page (Settings > Reading).
+     *
+     * Note: the posts page (page_for_posts / home.php) has the same
+     * filename-convention problem but isn't covered here — home.php only
+     * governs the posts listing, not a single editable page's own fields in
+     * the same way, so it's left as a follow-up if that need arises.
+     */
+    private static function isStaticFrontPage(\WP_Post $post): bool
+    {
+        return get_option('show_on_front') === 'page'
+            && (int) get_option('page_on_front') === $post->ID;
     }
 
     /**

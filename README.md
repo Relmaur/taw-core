@@ -252,7 +252,15 @@ BlockRegistry::render('post_grid--galerias');
 BlockRegistry::render('post_grid--noticias');
 ```
 
-the edit screen for any page assigned that template will always show those blocks' metaboxes in that exact order, and dragging is disabled. This works via a static scan of the template file (it's never executed in wp-admin) and only supports posts with an assigned page template (`get_page_template_slug()`) — posts on the default template are left unordered. Boxes not tied to a block on the page (e.g. core WordPress boxes) keep their relative position and render after the ordered ones.
+the edit screen for any page assigned that template will always show those blocks' metaboxes in that exact order, and dragging is disabled. This works via a static scan of the template file (it's never executed in wp-admin). Boxes not tied to a block on the page (e.g. core WordPress boxes) keep their relative position and render after the ordered ones.
+
+Template resolution mirrors WordPress's own hierarchy, not just the raw Page Attributes selection:
+
+- If the post has an explicit page template selected (`get_page_template_slug()`), that file is used — as above.
+- Otherwise, if the post is the site's static front page (Settings → Reading), `front-page.php` is used automatically — no `Template Name:` header or Page Attributes selection required, since `front-page.php` renders whenever `is_front_page()` is true regardless of what's picked in that dropdown.
+- Posts matching neither are left unordered.
+
+The posts page (`page_for_posts` / `home.php`) has the same filename-convention resolution in core WordPress but isn't handled yet — a candidate for the same treatment if needed.
 
 ---
 
