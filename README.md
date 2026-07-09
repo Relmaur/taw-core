@@ -224,11 +224,41 @@ $rows  = json_decode(Metabox::get($post_id, 'team'), true); // repeater
 ],
 ```
 
+### Locking Metabox Order
+
+By default WordPress lets any user drag-and-drop reorder metaboxes, saved per-user — so the same screen can look different for every editor. `MetaboxOrder` forces a fixed order and disables dragging.
+
+Explicit order:
+
+```php
+use TAW\Core\Metabox\MetaboxOrder;
+
+MetaboxOrder::lock('page', ['hero_settings', 'video_settings', 'faq_settings']);
+```
+
+Or derive the order automatically per-post from the page template's `BlockRegistry::render()` call sequence — call once in `functions.php`:
+
+```php
+MetaboxOrder::lockFromTemplate(); // screen defaults to 'page'
+```
+
+For a template like:
+
+```php
+BlockRegistry::render('hero_standard');
+BlockRegistry::render('post_grid--videos');
+BlockRegistry::render('post_grid--guias');
+BlockRegistry::render('post_grid--galerias');
+BlockRegistry::render('post_grid--noticias');
+```
+
+the edit screen for any page assigned that template will always show those blocks' metaboxes in that exact order, and dragging is disabled. This works via a static scan of the template file (it's never executed in wp-admin) and only supports posts with an assigned page template (`get_page_template_slug()`) — posts on the default template are left unordered. Boxes not tied to a block on the page (e.g. core WordPress boxes) keep their relative position and render after the ordered ones.
+
 ---
 
 ## Options Page
 
-Same field types as Metabox. Backed by `wp_options`.
+Same field types, tabs, groups, repeaters, and conditional fields as Metabox. Backed by `wp_options` instead of post meta.
 
 ```php
 use TAW\Core\OptionsPage\OptionsPage;
@@ -237,14 +267,41 @@ new OptionsPage([
     'id'         => 'taw_settings',
     'title'      => 'Theme Settings',
     'menu_title' => 'Settings',
+    'capability' => 'manage_options', // default
+    'prefix'     => '_taw_',          // default; option names are prefix + field id
+    'icon'       => 'dashicons-admin-generic', // default; admin menu icon
+    'position'   => null,              // default; admin menu position
     'fields'     => [
-        ['id' => 'company_phone', 'label' => 'Phone', 'type' => 'text'],
+        ['id' => 'company_phone', 'label' => 'Phone', 'type' => 'text', 'required' => true],
         ['id' => 'logo',          'label' => 'Logo',  'type' => 'image'],
     ],
 ]);
 
 $phone = OptionsPage::get('company_phone');
+$logo  = OptionsPage::get_image_url('logo', 'thumbnail');
 ```
+
+### Tabs
+
+```php
+new OptionsPage([
+    'id'     => 'taw_settings',
+    'title'  => 'Theme Settings',
+    'fields' => [/* all fields */],
+    'tabs'   => [
+        ['id' => 'general', 'label' => 'General', 'icon' => '...', 'fields' => ['company_phone']],
+        ['id' => 'media',   'label' => 'Media',   'fields' => ['logo']],
+    ],
+]);
+```
+
+### Groups
+
+Group sub-fields are each stored as their own option, named `{prefix}{group_id}_{sub_id}` — read them individually with `OptionsPage::get('group_id_sub_id')`, not the group's own id.
+
+### Validation
+
+`required`, `url`, and `number` (`min`/`max`) fields are validated on save; a custom `validate` callable may also be supplied per field. Failures are surfaced inline via WordPress's `settings_errors()` and the previous saved value is kept.
 
 ---
 
