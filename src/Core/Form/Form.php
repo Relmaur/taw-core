@@ -95,6 +95,24 @@ class Form
         return $instance;
     }
 
+    /**
+     * Get every registered form, keyed by id.
+     *
+     * @return array<string, self>
+     */
+    public static function getAll(): array
+    {
+        return self::$registry;
+    }
+
+    /**
+     * The raw config array this form was registered with.
+     */
+    public function getConfig(): array
+    {
+        return $this->config;
+    }
+
     public static function display(string $id): void
     {
         $form = self::$registry[$id] ?? null;

@@ -35,6 +35,16 @@ class BlockRegistry
     }
 
     /**
+     * Get every registered block, keyed by id.
+     *
+     * @return array<string, MetaBlock>
+     */
+    public static function getAll(): array
+    {
+        return self::$blocks;
+    }
+
+    /**
      * Queue one or more blocks for the current page.
      * Call BEFORE get_header() so assets land in <head>.
      *
