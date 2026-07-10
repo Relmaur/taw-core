@@ -23,7 +23,7 @@
         "emailit/emailit-php": "Required for EmailConfig::useEmailit() — route all wp_mail() through the Emailit REST API"
     },
     "scripts": {
-        "phpstan": "phpstan analyse --memory-limit=768M"
+        "phpstan": "phpstan analyse --memory-limit=-1"
     },
     "autoload": {
         "psr-4": {
