@@ -289,6 +289,8 @@ $phone = OptionsPage::get('company_phone');
 $logo  = OptionsPage::get_image_url('logo', 'thumbnail');
 ```
 
+> **Note:** If you're registering an `OptionsPage` from `inc/options.php` in a `Theme::bootstrapFullSite()` scaffold, translated field labels (`__('Phone', 'taw-theme')`) are safe to use as-is — `bootstrapFullSite()` defers both the textdomain load and `inc/options.php`'s own require to `after_setup_theme` (in that order) specifically so this doesn't trip WordPress 6.7+'s `_load_textdomain_just_in_time` notice. Don't call `load_theme_textdomain()` yourself in `inc/customizations.php` — it's already handled.
+
 ### Tabs
 
 ```php

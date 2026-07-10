@@ -149,9 +149,22 @@ class Theme
      */
     public static function bootstrapFullSite(string $themeDir): void
     {
+        // WordPress's _load_textdomain_just_in_time() only warns when a
+        // translation function fires before after_setup_theme has started
+        // (WP_DEBUG-only doing_it_wrong, added 6.7) — not "before init" as
+        // its own message text says. options.php's OptionsPage/Metabox
+        // configs call __('...', 'taw-theme') at file scope, so both the
+        // textdomain load and the options.php require must be deferred to
+        // after_setup_theme (not run synchronously here), in that order.
+        add_action('after_setup_theme', static function () use ($themeDir): void {
+            load_theme_textdomain('taw-theme', $themeDir . '/languages');
+        }, 1);
+
         $optionsFile = $themeDir . '/inc/options.php';
         if (file_exists($optionsFile)) {
-            require_once $optionsFile;
+            add_action('after_setup_theme', static function () use ($optionsFile): void {
+                require_once $optionsFile;
+            }, 5);
         }
 
         // customizations.php loads BEFORE boot() deliberately — some framework
