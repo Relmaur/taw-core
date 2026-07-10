@@ -402,6 +402,14 @@ Get keys from the [Cloudflare Turnstile dashboard](https://dash.cloudflare.com/?
 
 `pattern` is a PHP regex (no delimiters — the field wraps it), matched against the whole value. These also render as native HTML `minlength`/`maxlength`/`pattern`/`min`/`max` attributes for client-side UX, but the authoritative check is always server-side — HTML attributes are trivially removable from the DOM. An empty, non-required field never fails these checks.
 
+**Custom per-field error messages** — every rule (`required`, the built-in `email` format check, `min_length`, `max_length`, `pattern`, `min`, `max`) accepts a `{rule}_message` override; falls back to a generic default (with the field's `label` interpolated) when not set:
+
+```php
+['id' => 'name',  'type' => 'text',  'required' => true, 'required_message' => 'Please tell us your name.'],
+['id' => 'email', 'type' => 'email', 'required' => true, 'email_message' => 'That doesn\'t look like a real email address.'],
+['id' => 'age',   'type' => 'number', 'min' => 18, 'min_message' => 'You must be 18 or older.'],
+```
+
 ### Email Configuration
 
 ```php
