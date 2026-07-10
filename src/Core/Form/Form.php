@@ -17,7 +17,9 @@ if (!defined('ABSPATH')) {
  * Features:
  *  - CSRF protection (WordPress nonces)
  *  - Honeypot spam protection
- *  - Field sanitization & validation
+ *  - Rate limiting (per-IP, per-form, transient-backed — 5 attempts/60s by default)
+ *  - Optional Cloudflare Turnstile bot verification ('turnstile' => true + wp-config.php keys)
+ *  - Field sanitization & validation, including optional min_length/max_length/pattern/min/max rules
  *  - AJAX submission via admin-ajax.php — bypasses WP routing, no 404 risk
  *  - Inline field-level and general error display
  *  - Optional email delivery via Mailer + MJML templates
@@ -33,10 +35,14 @@ if (!defined('ABSPATH')) {
  *   Form::register([
  *       'id'           => 'contact',
  *       'submit_label' => 'Send Message',
+ *       'rate_limit'   => ['max' => 5, 'window' => 60], // optional — this is the default; pass false to disable
+ *       'turnstile'    => true, // optional — requires TAW_TURNSTILE_SITE_KEY/SECRET_KEY in wp-config.php
  *       'fields'       => [
- *           ['id' => 'name',    'label' => 'Name',    'type' => 'text',  'required' => true],
+ *           ['id' => 'name',    'label' => 'Name',    'type' => 'text',  'required' => true, 'min_length' => 2, 'max_length' => 80],
  *           ['id' => 'email',   'label' => 'Email',   'type' => 'email', 'required' => true],
- *           ['id' => 'message', 'label' => 'Message', 'type' => 'textarea'],
+ *           ['id' => 'phone',   'label' => 'Phone',   'type' => 'tel', 'pattern' => '[0-9+ ()-]{7,20}', 'pattern_message' => 'Enter a valid phone number.'],
+ *           ['id' => 'guests',  'label' => 'Guests',  'type' => 'number', 'min' => 1, 'max' => 20],
+ *           ['id' => 'message', 'label' => 'Message', 'type' => 'textarea', 'max_length' => 2000],
  *       ],
  *   ]);
  *
@@ -242,11 +248,44 @@ class Form
 
     public function process(): void
     {
+        // Rate limit BEFORE the nonce check — a flooding script doesn't need a
+        // valid nonce to cause load (check_ajax_referer() dies cheaply on a bad
+        // nonce, but WP still bootstraps the full request each time), so this
+        // has to be the very first thing that runs.
+        $rateLimit = $this->config['rate_limit'] ?? ['max' => 5, 'window' => 60];
+        if ($rateLimit !== false) {
+            $max = $rateLimit['max'] ?? 5;
+            $window = $rateLimit['window'] ?? 60;
+            $ip = SubmissionsHandler::getUserIp();
+
+            if (RateLimiter::tooManyAttempts($this->id, $ip, $max, $window)) {
+                wp_send_json_error([
+                    'general' => $this->config['messages']['rate_limited']
+                        ?? __('Too many attempts. Please wait a moment and try again.', 'taw'),
+                ]);
+            }
+        }
+
         check_ajax_referer($this->id . '_action', $this->id . '_nonce');
 
         // Honeypot — silently succeed so bots think they submitted correctly.
         if (!empty($_POST['taw_hp_check'])) {
             wp_send_json_success();
+        }
+
+        // Turnstile — checked after the cheap local checks above (rate limit,
+        // nonce, honeypot), since this one costs an outbound HTTP call to
+        // Cloudflare; no point paying that cost for a request that was going
+        // to be rejected locally anyway.
+        if (!empty($this->config['turnstile']) && Turnstile::isConfigured()) {
+            $token = isset($_POST['cf-turnstile-response']) ? (string) wp_unslash($_POST['cf-turnstile-response']) : '';
+
+            if (!Turnstile::verify($token, SubmissionsHandler::getUserIp())) {
+                wp_send_json_error([
+                    'general' => $this->config['messages']['turnstile_failed']
+                        ?? __('We could not verify you are human. Please try again.', 'taw'),
+                ]);
+            }
         }
 
         $inputFields = $this->getInputFields();
@@ -283,6 +322,16 @@ class Form
                 continue;
             }
 
+            // Skip length/pattern/range checks on an empty, non-required field —
+            // "optional and blank" shouldn't fail a min_length/pattern rule.
+            if ('' !== trim((string) $value)) {
+                $ruleError = $this->validateRules($field, (string) $value, $label);
+                if ($ruleError !== null) {
+                    $errors[$fieldId] = $ruleError;
+                    continue;
+                }
+            }
+
             $sanitized = $this->sanitize($value, $field['type'] ?? 'text');
 
             if (($field['type'] ?? '') === 'email' && !empty($sanitized) && !is_email($sanitized)) {
@@ -312,6 +361,59 @@ class Form
     /* -------------------------------------------------------------------------
      * Sanitize / Conditions
      * ---------------------------------------------------------------------- */
+
+    /**
+     * Validate a non-empty field value against its optional min_length,
+     * max_length, pattern, min, and max rules. Only called for values that
+     * already passed the required check and aren't blank — an optional
+     * empty field never fails these.
+     *
+     * @return string|null Error message, or null if the value is valid.
+     */
+    private function validateRules(array $field, string $value, string $label): ?string
+    {
+        if (isset($field['min_length']) && mb_strlen($value) < (int) $field['min_length']) {
+            /* translators: 1: field label, 2: minimum length */
+            return sprintf(__('%1$s must be at least %2$d characters.', 'taw'), $label, (int) $field['min_length']);
+        }
+
+        if (isset($field['max_length']) && mb_strlen($value) > (int) $field['max_length']) {
+            /* translators: 1: field label, 2: maximum length */
+            return sprintf(__('%1$s must be no more than %2$d characters.', 'taw'), $label, (int) $field['max_length']);
+        }
+
+        if (!empty($field['pattern'])) {
+            // Field-authored regex, not user input — @ delimiter avoids clashing
+            // with a pattern that itself contains a forward slash.
+            $matched = @preg_match('@^(?:' . $field['pattern'] . ')$@u', $value);
+            if ($matched === false) {
+                // Malformed pattern in the field config itself — a developer
+                // error, not a user-input problem. Fail safe (reject) and log,
+                // rather than silently accepting anything.
+                error_log('[TAW Form] Invalid pattern in field "' . $field['id'] . '": ' . $field['pattern']);
+                return sprintf(__('%s could not be validated.', 'taw'), $label);
+            }
+            if ($matched === 0) {
+                return $field['pattern_message'] ?? sprintf(__('%s is not in the correct format.', 'taw'), $label);
+            }
+        }
+
+        if (($field['type'] ?? '') === 'number' && is_numeric($value)) {
+            $numeric = (float) $value;
+
+            if (isset($field['min']) && $numeric < (float) $field['min']) {
+                /* translators: 1: field label, 2: minimum value */
+                return sprintf(__('%1$s must be at least %2$s.', 'taw'), $label, $field['min']);
+            }
+
+            if (isset($field['max']) && $numeric > (float) $field['max']) {
+                /* translators: 1: field label, 2: maximum value */
+                return sprintf(__('%1$s must be no more than %2$s.', 'taw'), $label, $field['max']);
+            }
+        }
+
+        return null;
+    }
 
     private function sanitize(mixed $value, string $type): string
     {
@@ -506,6 +608,10 @@ class Form
         echo '<label>Leave this empty <input type="text" name="taw_hp_check" value="" tabindex="-1" autocomplete="off"></label>';
         echo '</div>';
 
+        if (!empty($this->config['turnstile'])) {
+            $this->renderTurnstile();
+        }
+
         echo '<div class="taw-hidden taw-general-error" data-taw-general-error role="alert"></div>';
 
         if ($isMultiStep) {
@@ -612,6 +718,37 @@ class Form
         echo '</button>';
     }
 
+    /**
+     * Render the Cloudflare Turnstile widget, if configured. A form can opt
+     * in via `'turnstile' => true`, but this only actually renders anything
+     * when TAW_TURNSTILE_SITE_KEY is defined — an opted-in form on a site
+     * that hasn't configured keys yet degrades to "no widget, no
+     * server-side check" (see process()) rather than blocking submission
+     * outright, with a WP_DEBUG-only notice so misconfiguration is visible
+     * to developers, not to visitors.
+     */
+    private function renderTurnstile(): void
+    {
+        $siteKey = Turnstile::siteKey();
+
+        if ($siteKey === null) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_trigger_error
+                trigger_error(
+                    '[TAW Form] Form "' . esc_html($this->id) . '" has \'turnstile\' => true, '
+                    . 'but TAW_TURNSTILE_SITE_KEY/TAW_TURNSTILE_SECRET_KEY are not defined. '
+                    . 'The widget will not render and no verification will run.',
+                    E_USER_WARNING
+                );
+            }
+            return;
+        }
+
+        Turnstile::enqueueScript();
+
+        echo '<div class="cf-turnstile" data-sitekey="' . esc_attr($siteKey) . '" data-theme="light"></div>';
+    }
+
     /* -------------------------------------------------------------------------
      * Field rendering
      * ---------------------------------------------------------------------- */
@@ -682,11 +819,12 @@ class Form
 
             case 'textarea':
                 printf(
-                    '<textarea id="%1$s" name="%1$s" rows="%2$d" class="%3$s" placeholder="%4$s"></textarea>',
+                    '<textarea id="%1$s" name="%1$s" rows="%2$d" class="%3$s" placeholder="%4$s"%5$s></textarea>',
                     esc_attr($id),
                     intval($field['rows'] ?? 4),
                     $inputClass,
-                    esc_attr($placeholder)
+                    esc_attr($placeholder),
+                    $this->lengthAttrs($field)
                 );
                 break;
 
@@ -782,17 +920,61 @@ class Form
             default:
                 // Covers: text, email, url, tel, number, password, and any valid HTML input type.
                 printf(
-                    '<input type="%1$s" id="%2$s" name="%2$s" class="%3$s" placeholder="%4$s">',
+                    '<input type="%1$s" id="%2$s" name="%2$s" class="%3$s" placeholder="%4$s"%5$s%6$s>',
                     esc_attr($type),
                     esc_attr($id),
                     $inputClass,
-                    esc_attr($placeholder)
+                    esc_attr($placeholder),
+                    $this->lengthAttrs($field),
+                    $type === 'number' ? $this->rangeAttrs($field) : ''
                 );
                 break;
         }
 
         echo '<span class="taw-hidden taw-field-error" data-taw-field-error="' . esc_attr($id) . '" role="alert"></span>';
         echo '</div>';
+    }
+
+    /**
+     * HTML attribute string for min_length/max_length/pattern — native
+     * browser-level validation as a UX nicety. The authoritative check is
+     * always server-side in process() via validateRules(); these attributes
+     * can be removed from the DOM trivially, so they're a convenience, not
+     * a security boundary.
+     */
+    private function lengthAttrs(array $field): string
+    {
+        $attrs = '';
+
+        if (isset($field['min_length'])) {
+            $attrs .= ' minlength="' . (int) $field['min_length'] . '"';
+        }
+        if (isset($field['max_length'])) {
+            $attrs .= ' maxlength="' . (int) $field['max_length'] . '"';
+        }
+        if (!empty($field['pattern'])) {
+            $attrs .= ' pattern="' . esc_attr($field['pattern']) . '"';
+        }
+
+        return $attrs;
+    }
+
+    /**
+     * HTML attribute string for a number field's min/max — same
+     * convenience-only caveat as lengthAttrs().
+     */
+    private function rangeAttrs(array $field): string
+    {
+        $attrs = '';
+
+        if (isset($field['min'])) {
+            $attrs .= ' min="' . esc_attr((string) $field['min']) . '"';
+        }
+        if (isset($field['max'])) {
+            $attrs .= ' max="' . esc_attr((string) $field['max']) . '"';
+        }
+
+        return $attrs;
     }
 
     /* -------------------------------------------------------------------------

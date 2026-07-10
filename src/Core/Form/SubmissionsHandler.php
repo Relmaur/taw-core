@@ -359,7 +359,7 @@ class SubmissionsHandler
      * Helpers
      * =================================================================== */
 
-    private static function getUserIp(): string
+    public static function getUserIp(): string
     {
         $ip = $_SERVER['HTTP_X_FORWARDED_FOR']
             ?? $_SERVER['HTTP_X_REAL_IP']

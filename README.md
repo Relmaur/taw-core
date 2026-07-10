@@ -335,7 +335,7 @@ ViteLoader::preloadAssets(['resources/js/chunks/vendor.js']);
 
 ## Forms
 
-Configuration-driven AJAX forms with CSRF protection, honeypot spam filtering, per-field validation, email delivery, and submission persistence.
+Configuration-driven AJAX forms with CSRF protection, honeypot spam filtering, rate limiting, optional Cloudflare Turnstile bot verification, per-field validation, email delivery, and submission persistence.
 
 > **Critical:** Forms must be registered before templates load — `admin-ajax.php` never runs theme templates, so AJAX handlers registered inside a template don't exist on submission. Register in `MetaBlock::boot()` wrapped in `add_action('init', ...)`.
 
@@ -358,6 +358,49 @@ public static function boot(): void
 ```
 
 Render in a template: `Form::display('contact');`
+
+### Security
+
+Every form has CSRF (nonce) protection and honeypot spam filtering by default, no configuration needed. Two more layers are available:
+
+**Rate limiting** — on by default (5 attempts per 60 seconds, per IP, per form), backed by WP transients (no Redis/external cache required). Checked before the nonce check, since a flooding script doesn't need a valid nonce to cause load.
+
+```php
+Form::register([
+    'id' => 'contact',
+    'rate_limit' => ['max' => 3, 'window' => 120], // override the default
+    // 'rate_limit' => false, // or disable entirely
+    'fields' => [...],
+]);
+```
+
+**Cloudflare Turnstile** — opt-in bot verification. Requires site/secret keys defined as PHP constants in `wp-config.php` (the same pattern as DB credentials — never store a secret key in `wp_options`, which is readable via REST by anyone with `edit_posts`):
+
+```php
+// wp-config.php
+define('TAW_TURNSTILE_SITE_KEY', '0x...');
+define('TAW_TURNSTILE_SECRET_KEY', '0x...');
+```
+
+```php
+Form::register([
+    'id' => 'contact',
+    'turnstile' => true,
+    'fields' => [...],
+]);
+```
+
+Get keys from the [Cloudflare Turnstile dashboard](https://dash.cloudflare.com/?to=/:account/turnstile). If a form opts in but keys aren't configured, the widget silently doesn't render and no verification runs (a `WP_DEBUG`-only notice flags the misconfiguration to developers, not visitors) — it degrades gracefully rather than blocking submission outright. `Turnstile::verify()` fails closed on any network error or malformed response.
+
+**Field validation rules** — beyond `required`, any input field accepts:
+
+```php
+['id' => 'name',  'type' => 'text', 'min_length' => 2, 'max_length' => 80],
+['id' => 'phone', 'type' => 'tel',  'pattern' => '[0-9+ ()-]{7,20}', 'pattern_message' => 'Enter a valid phone number.'],
+['id' => 'guests','type' => 'number', 'min' => 1, 'max' => 20],
+```
+
+`pattern` is a PHP regex (no delimiters — the field wraps it), matched against the whole value. These also render as native HTML `minlength`/`maxlength`/`pattern`/`min`/`max` attributes for client-side UX, but the authoritative check is always server-side — HTML attributes are trivially removable from the DOM. An empty, non-required field never fails these checks.
 
 ### Email Configuration
 
