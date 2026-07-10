@@ -569,9 +569,14 @@ foreach ($menu->items() as $item) {
 php bin/taw make:block HeroSection --type=meta --group=sections
 php bin/taw import:block path/to/block
 php bin/taw export:block HeroSection
+php bin/taw inspect --json                          # live registry: blocks, fields, forms
+php bin/taw fields:get 42 hero_heading --json        # read a field's current value
+php bin/taw fields:set 42 hero_heading "Welcome"     # write a field's value
 ```
 
 `make:block` generates the block folder, PHP class, template file, and Vite entry points.
+
+`fields:get`/`fields:set` are the read/write halves of the same primitive `VisualEditorEndpoint` uses for its REST-driven saves — they resolve a field's type from the live `Metabox` registry, then dispatch to the matching type-aware getter/sanitizer (`Metabox::get_repeater()`, `sanitizeRepeaterRows()`, etc.), so a repeater, `post_select`, or `files` field is read/written in exactly the shape the admin form itself would produce, with the same sanitization rules (XSS-stripping, ID coercion, JSON re-encoding). `fields:set` takes `--file=path.json` for repeater/array-shaped values, to sidestep shell JSON-quoting, and `--dry-run` to preview the sanitized result without writing. Both commands boot WordPress, like `inspect` — field configs and post data only exist once WordPress is loaded, so they walk up from the theme directory to find `wp-load.php` via the shared `TAW\CLI\WpLoader` helper.
 
 ---
 

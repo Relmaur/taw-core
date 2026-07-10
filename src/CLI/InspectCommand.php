@@ -19,10 +19,11 @@ use TAW\Core\Metabox\Metabox;
  * metabox field schemas, registered forms, taw/core version, and a couple
  * of well-known scaffold flags (MetaboxOrder).
  *
- * Unlike the other CLI commands, this one needs WordPress fully booted —
- * the data it reports (registered blocks, forms, field configs) only
- * exists once `after_setup_theme` / `init` have fired. It locates and
- * loads `wp-load.php` itself; no other command in this package does that.
+ * Unlike make:block/export:block/import:block, this one needs WordPress
+ * fully booted — the data it reports (registered blocks, forms, field
+ * configs) only exists once `after_setup_theme` / `init` have fired.
+ * Locates and loads `wp-load.php` itself via WpLoader, same as
+ * FieldsGetCommand/FieldsSetCommand.
  *
  * PORTABILITY NOTE: same pattern as MakeBlockCommand — this class lives in
  * vendor/taw/core/ and receives the theme root via constructor injection.
@@ -60,7 +61,7 @@ class InspectCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $asJson = (bool) $input->getOption('json');
 
-        $wpLoad = $this->locateWpLoad();
+        $wpLoad = WpLoader::locate($this->themeDir);
 
         if ($wpLoad === null) {
             $io->error('Could not locate wp-load.php by walking up from the theme directory. Is this theme installed inside a WordPress site (wp-content/themes/<theme>)?');
@@ -95,26 +96,6 @@ class InspectCommand extends Command
         $this->renderHuman($io, $report);
 
         return Command::SUCCESS;
-    }
-
-    /**
-     * Walk up from the theme directory looking for wp-load.php.
-     * A theme normally lives at .../wp-content/themes/<theme>, so this is
-     * typically 3 levels up — walk a few extra levels for unusual layouts.
-     */
-    private function locateWpLoad(): ?string
-    {
-        $dir = $this->themeDir;
-
-        for ($i = 0; $i < 6; $i++) {
-            $dir = dirname($dir);
-            $candidate = $dir . '/wp-load.php';
-            if (file_exists($candidate)) {
-                return $candidate;
-            }
-        }
-
-        return null;
     }
 
     /**
