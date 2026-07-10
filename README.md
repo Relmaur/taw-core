@@ -600,3 +600,13 @@ Dump::log($value);
 | `symfony/console ^7.4` | CLI commands |
 | `enshrined/svg-sanitize ^0.22.0` | SVG XSS prevention on upload |
 | `spatie/mjml-php ^1.0` _(dev)_ | Email template transpilation |
+| `phpstan/phpstan ^2.2` _(dev)_ | Static analysis |
+| `szepeviktor/phpstan-wordpress ^2.0` _(dev)_ | WordPress core stubs for PHPStan |
+
+## Static Analysis
+
+```bash
+composer run phpstan   # level 5, src/ only, WordPress-aware — also runs in CI
+```
+
+`phpstan-baseline.neon` currently holds 26 pre-existing findings (mostly WP_Post dynamic-property access in `MenuItem`, a Symfony Console helper interface gap, and a few PHPDoc-narrowing false positives) captured when the check was first introduced — don't add newly-introduced errors to it; fix those at the source. Chip away at the baseline over time rather than treating it as permanent.

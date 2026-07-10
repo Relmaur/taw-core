@@ -15,10 +15,15 @@
         "enshrined/svg-sanitize": "^0.22.0"
     },
     "require-dev": {
-        "spatie/mjml-php": "^1.0"
+        "spatie/mjml-php": "^1.0",
+        "phpstan/phpstan": "^2.2",
+        "szepeviktor/phpstan-wordpress": "^2.0"
     },
     "suggest": {
         "emailit/emailit-php": "Required for EmailConfig::useEmailit() — route all wp_mail() through the Emailit REST API"
+    },
+    "scripts": {
+        "phpstan": "phpstan analyse --memory-limit=768M"
     },
     "autoload": {
         "psr-4": {

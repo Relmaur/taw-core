@@ -1,0 +1,145 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Call to function method_exists\(\) with TAW\\Core\\Block\\MetaBlock and ''getVariation'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/CLI/InspectCommand.php
+
+		-
+			message: '#^Call to an undefined method Symfony\\Component\\Console\\Helper\\HelperInterface\:\:ask\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/CLI/MakeBlockCommand.php
+
+		-
+			message: '#^Call to function is_wp_error\(\) with int\<1, max\> will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: src/Core/Form/SubmissionsHandler.php
+
+		-
+			message: '#^Access to an undefined property WP_Post\:\:\$classes\.$#'
+			identifier: property.notFound
+			count: 2
+			path: src/Core/Menu/MenuItem.php
+
+		-
+			message: '#^Access to an undefined property WP_Post\:\:\$current\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Core/Menu/MenuItem.php
+
+		-
+			message: '#^Access to an undefined property WP_Post\:\:\$current_item_ancestor\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Core/Menu/MenuItem.php
+
+		-
+			message: '#^Access to an undefined property WP_Post\:\:\$current_item_parent\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Core/Menu/MenuItem.php
+
+		-
+			message: '#^Access to an undefined property WP_Post\:\:\$object\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Core/Menu/MenuItem.php
+
+		-
+			message: '#^Access to an undefined property WP_Post\:\:\$object_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Core/Menu/MenuItem.php
+
+		-
+			message: '#^Access to an undefined property WP_Post\:\:\$target\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Core/Menu/MenuItem.php
+
+		-
+			message: '#^Access to an undefined property WP_Post\:\:\$title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Core/Menu/MenuItem.php
+
+		-
+			message: '#^Access to an undefined property WP_Post\:\:\$url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: src/Core/Menu/MenuItem.php
+
+		-
+			message: '#^Constructor of class TAW\\Core\\Menu\\MenuItem has an unused parameter \$children\.$#'
+			identifier: constructor.unusedParameter
+			count: 1
+			path: src/Core/Menu/MenuItem.php
+
+		-
+			message: '#^Method TAW\\Core\\Metabox\\Metabox\:\:render_tabs\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: src/Core/Metabox/Metabox.php
+
+		-
+			message: '#^PHPDoc tag @param references unknown parameter\: \$args$#'
+			identifier: parameter.notFound
+			count: 2
+			path: src/Core/Metabox/Metabox.php
+
+		-
+			message: '#^PHPDoc tag @param references unknown parameter\: \$depth$#'
+			identifier: parameter.notFound
+			count: 1
+			path: src/Core/Metabox/Metabox.php
+
+		-
+			message: '#^PHPDoc tag @param references unknown parameter\: \$id$#'
+			identifier: parameter.notFound
+			count: 1
+			path: src/Core/Metabox/Metabox.php
+
+		-
+			message: '#^PHPDoc tag @param references unknown parameter\: \$item_id$#'
+			identifier: parameter.notFound
+			count: 1
+			path: src/Core/Metabox/Metabox.php
+
+		-
+			message: '#^PHPDoc tag @param references unknown parameter\: \$menu_id$#'
+			identifier: parameter.notFound
+			count: 1
+			path: src/Core/Metabox/Metabox.php
+
+		-
+			message: '#^Property TAW\\Core\\Metabox\\Metabox\:\:\$tabs is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Core/Metabox/Metabox.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between mixed and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: src/Core/Metabox/Metabox.php
+
+		-
+			message: '#^Offset 1 on array\{list\<string\>, list\<non\-empty\-string\>\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Core/Metabox/MetaboxOrder.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Core/Metabox/SeoContentIntegration.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between mixed and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: src/Core/Metabox/SeoContentIntegration.php

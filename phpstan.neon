@@ -1,0 +1,19 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+    - phpstan-baseline.neon
+
+parameters:
+    level: 5
+    paths:
+        - src/
+
+    parallel:
+        maximumNumberOfProcesses: 2
+
+    excludePaths:
+        - vendor/
+
+    ignoreErrors:
+        # taw/core is a WordPress framework package, not a plugin/theme — most
+        # errors here should be fixed with accurate PHPDoc, not ignored. Add
+        # targeted, documented exceptions only when truly unavoidable.
