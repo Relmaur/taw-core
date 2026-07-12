@@ -20,7 +20,11 @@ if (!defined('ABSPATH')) {
  *  - Rate limiting (per-IP, per-form, transient-backed — 5 attempts/60s by default)
  *  - Optional Cloudflare Turnstile bot verification ('turnstile' => true + wp-config.php keys)
  *  - Field sanitization & validation, including optional min_length/max_length/pattern/min/max rules,
- *    each with an optional per-field custom message ('{rule}_message', e.g. 'required_message')
+ *    each with an optional per-field custom message ('{rule}_message', e.g. 'required_message').
+ *    A form-wide default can also be set once via 'messages' => ['required' => '...', 'email' => '...',
+ *    'min_length' => '...', 'max_length' => '...', 'pattern' => '...', 'min' => '...', 'max' => '...']
+ *    (label/value placeholders use sprintf's %s/%d — see the built-in defaults for the exact signature
+ *    per rule). Precedence: field-level '{rule}_message' > form-level 'messages.{rule}' > English default.
  *  - AJAX submission via admin-ajax.php — bypasses WP routing, no 404 risk
  *  - Inline field-level and general error display
  *  - Optional email delivery via Mailer + MJML templates
@@ -319,7 +323,8 @@ class Form
 
             if (!empty($field['required']) && '' === trim((string) $value)) {
                 /* translators: %s: field label */
-                $errors[$fieldId] = $field['required_message'] ?? sprintf(__('%s is required.', 'taw'), $label);
+                $template = $this->config['messages']['required'] ?? __('%s is required.', 'taw');
+                $errors[$fieldId] = $field['required_message'] ?? sprintf($template, $label);
                 continue;
             }
 
@@ -336,7 +341,9 @@ class Form
             $sanitized = $this->sanitize($value, $field['type'] ?? 'text');
 
             if (($field['type'] ?? '') === 'email' && !empty($sanitized) && !is_email($sanitized)) {
-                $errors[$fieldId] = $field['email_message'] ?? __('Invalid email address.', 'taw');
+                $errors[$fieldId] = $field['email_message']
+                    ?? $this->config['messages']['email']
+                    ?? __('Invalid email address.', 'taw');
             }
 
             $data[$fieldId] = $sanitized;
@@ -375,12 +382,14 @@ class Form
     {
         if (isset($field['min_length']) && mb_strlen($value) < (int) $field['min_length']) {
             /* translators: 1: field label, 2: minimum length */
-            return $field['min_length_message'] ?? sprintf(__('%1$s must be at least %2$d characters.', 'taw'), $label, (int) $field['min_length']);
+            $template = $this->config['messages']['min_length'] ?? __('%1$s must be at least %2$d characters.', 'taw');
+            return $field['min_length_message'] ?? sprintf($template, $label, (int) $field['min_length']);
         }
 
         if (isset($field['max_length']) && mb_strlen($value) > (int) $field['max_length']) {
             /* translators: 1: field label, 2: maximum length */
-            return $field['max_length_message'] ?? sprintf(__('%1$s must be no more than %2$d characters.', 'taw'), $label, (int) $field['max_length']);
+            $template = $this->config['messages']['max_length'] ?? __('%1$s must be no more than %2$d characters.', 'taw');
+            return $field['max_length_message'] ?? sprintf($template, $label, (int) $field['max_length']);
         }
 
         if (!empty($field['pattern'])) {
@@ -395,7 +404,8 @@ class Form
                 return sprintf(__('%s could not be validated.', 'taw'), $label);
             }
             if ($matched === 0) {
-                return $field['pattern_message'] ?? sprintf(__('%s is not in the correct format.', 'taw'), $label);
+                $template = $this->config['messages']['pattern'] ?? __('%s is not in the correct format.', 'taw');
+                return $field['pattern_message'] ?? sprintf($template, $label);
             }
         }
 
@@ -404,12 +414,14 @@ class Form
 
             if (isset($field['min']) && $numeric < (float) $field['min']) {
                 /* translators: 1: field label, 2: minimum value */
-                return $field['min_message'] ?? sprintf(__('%1$s must be at least %2$s.', 'taw'), $label, $field['min']);
+                $template = $this->config['messages']['min'] ?? __('%1$s must be at least %2$s.', 'taw');
+                return $field['min_message'] ?? sprintf($template, $label, $field['min']);
             }
 
             if (isset($field['max']) && $numeric > (float) $field['max']) {
                 /* translators: 1: field label, 2: maximum value */
-                return $field['max_message'] ?? sprintf(__('%1$s must be no more than %2$s.', 'taw'), $label, $field['max']);
+                $template = $this->config['messages']['max'] ?? __('%1$s must be no more than %2$s.', 'taw');
+                return $field['max_message'] ?? sprintf($template, $label, $field['max']);
             }
         }
 
