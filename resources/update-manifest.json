@@ -1,0 +1,22 @@
+{
+    "$comment": "Single source of truth for which taw-theme paths are framework-owned and safe to sync into a client project. Read by both the update-theme Claude Code skill and TAW\\CLI\\SyncCommand (php bin/taw sync) — keep them pointed at this file rather than hardcoding the lists twice. Tier 1 is always overwritten without confirmation; Tier 2 is diffed and requires human review before being applied; anything not listed is never read or touched.",
+    "tier1": [
+        { "path": "functions.php", "type": "file" },
+        { "path": ".claude/skills/", "type": "dir" },
+        { "path": ".agents/skills/", "type": "dir" },
+        { "path": "bin/", "type": "dir" },
+        { "path": ".github/workflows/ci.yml", "type": "file" },
+        { "path": ".github/workflows/framework-sync.yml", "type": "file" }
+    ],
+    "tier2": [
+        { "path": "AGENTS.md", "type": "file" },
+        { "path": "CLAUDE.md", "type": "file" },
+        { "path": ".github/copilot-instructions.md", "type": "file" },
+        { "path": ".windsurfrules", "type": "file" },
+        { "path": "README.md", "type": "file" },
+        { "path": "composer.json", "type": "file" },
+        { "path": "package.json", "type": "file" },
+        { "path": "vite.config.js", "type": "file" },
+        { "path": "phpstan.neon", "type": "file" }
+    ]
+}
