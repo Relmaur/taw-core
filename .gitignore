@@ -11,6 +11,7 @@ composer.lock
 
 # Claude Code
 .claude/memory/
+CLAUDE-HANDOFF.md
 
 # IDE and editor files
 .idea/
