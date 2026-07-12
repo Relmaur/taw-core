@@ -410,6 +410,20 @@ Get keys from the [Cloudflare Turnstile dashboard](https://dash.cloudflare.com/?
 ['id' => 'age',   'type' => 'number', 'min' => 18, 'min_message' => 'You must be 18 or older.'],
 ```
 
+**Form-level default messages** — to set validation copy once for an entire form (e.g. translating every rule for a non-English site) instead of repeating a `{rule}_message` on every field, pass a `messages` entry per rule. Precedence: field-level `{rule}_message` > form-level `messages.{rule}` > built-in English default. `required`/`min_length`/`max_length`/`pattern`/`min`/`max` templates take the same `sprintf()` placeholders as the built-in defaults (field label as `%s`/`%1$s`, the rule's numeric bound as `%2$d`/`%2$s`); `email` takes no placeholders.
+
+```php
+Form::register([
+    'id' => 'contact',
+    'messages' => [
+        'required'   => '%s es obligatorio.',
+        'email'      => 'Correo electrónico no válido.',
+        'min_length' => '%1$s debe tener al menos %2$d caracteres.',
+    ],
+    'fields' => [...],
+]);
+```
+
 ### Email Configuration
 
 ```php
