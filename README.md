@@ -678,6 +678,8 @@ Dump::log($value);
 | `spatie/mjml-php ^1.0` _(dev)_ | Email template transpilation |
 | `phpstan/phpstan ^2.2` _(dev)_ | Static analysis |
 | `szepeviktor/phpstan-wordpress ^2.0` _(dev)_ | WordPress core stubs for PHPStan |
+| `phpunit/phpunit ^11` _(dev)_ | Unit test runner |
+| `brain/monkey ^2.7` _(dev)_ | Mocks individual WP functions for unit tests, no real WordPress install needed |
 
 ## Static Analysis
 
@@ -686,3 +688,19 @@ composer run phpstan   # level 5, src/ only, WordPress-aware — also runs in CI
 ```
 
 `phpstan-baseline.neon` currently holds 26 pre-existing findings (mostly WP_Post dynamic-property access in `MenuItem`, a Symfony Console helper interface gap, and a few PHPDoc-narrowing false positives) captured when the check was first introduced — don't add newly-introduced errors to it; fix those at the source. Chip away at the baseline over time rather than treating it as permanent.
+
+## Unit Tests
+
+```bash
+composer run test   # tests/Unit/ — also runs in CI
+```
+
+Uses [Brain Monkey](https://brain-wp.github.io/BrainMonkey/) to stub individual WordPress functions (`add_action`, `get_transient`, `wp_remote_post`, etc.) per test rather than booting a real WordPress install — fast, no MySQL, no network. This is a deliberate division of labor with `taw-theme`'s `bin/ci/smoke-test.php`, which boots a real WordPress + MySQL environment and exercises the full render path against a live theme: this suite covers `taw-core`'s own logic in isolation (validation rule precedence, rate limiting, Turnstile verification), the smoke test covers "does this actually work end-to-end against a real site."
+
+Every file in `src/` starts with `if (!defined('ABSPATH')) exit;` (the standard WordPress direct-access guard) — `tests/bootstrap.php` defines a dummy `ABSPATH` before the autoloader ever loads a class, or the test process would exit the moment one is included.
+
+**Reflection is used deliberately** for testing private methods (`Form::validateRules()`, `Form::requiredMessage()`, `Form::emailMessage()`) — see `tests/TestCase::callMethod()`. These stay private by design (internal details of a public API), reflection lets tests verify that logic without widening the class's real surface just to make it testable.
+
+**`Brain\Monkey\Functions` is a namespace of functions, not a static class** — call sites are `Functions\when(...)`/`Functions\expect(...)` (after `use Brain\Monkey\Functions;` imports the namespace), not `Functions::when(...)`. Easy to get wrong once from muscle memory with other mocking libraries; the whole suite failed with "Class not found" the first time for exactly this reason.
+
+**Constants defined via `define()` (e.g. `TAW_TURNSTILE_SITE_KEY`) are process-global and permanent** — a test can't "un-define" one for a later test in the same PHPUnit process. `TurnstileTest` defines them once (guarded, `setUpBeforeClass`) and only tests the configured state; `TurnstileNotConfiguredTest` covers the undefined-constants state in its own class, using `#[RunInSeparateProcess]` on every method so neither class's constant state can leak into the other regardless of run order.

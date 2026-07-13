@@ -10,6 +10,8 @@
 | Scaffold block | `php bin/taw make:block <Name> [--type=meta] [--group=<dir>]` |
 | Import block | `php bin/taw import:block <path>` |
 | Export block | `php bin/taw export:block <Name>` |
+| Static analysis | `composer run phpstan` |
+| Unit tests | `composer run test` (Brain Monkey — no real WP install needed) |
 
 ## Architecture
 

@@ -322,9 +322,7 @@ class Form
             $label = $field['label'] ?? $fieldId;
 
             if (!empty($field['required']) && '' === trim((string) $value)) {
-                /* translators: %s: field label */
-                $template = $this->config['messages']['required'] ?? __('%s is required.', 'taw');
-                $errors[$fieldId] = $field['required_message'] ?? sprintf($template, $label);
+                $errors[$fieldId] = $this->requiredMessage($field, $label);
                 continue;
             }
 
@@ -341,9 +339,7 @@ class Form
             $sanitized = $this->sanitize($value, $field['type'] ?? 'text');
 
             if (($field['type'] ?? '') === 'email' && !empty($sanitized) && !is_email($sanitized)) {
-                $errors[$fieldId] = $field['email_message']
-                    ?? $this->config['messages']['email']
-                    ?? __('Invalid email address.', 'taw');
+                $errors[$fieldId] = $this->emailMessage($field);
             }
 
             $data[$fieldId] = $sanitized;
@@ -369,6 +365,32 @@ class Form
     /* -------------------------------------------------------------------------
      * Sanitize / Conditions
      * ---------------------------------------------------------------------- */
+
+    /**
+     * Resolve the error message for a missing required field. Precedence:
+     * field-level 'required_message' > form-level 'messages.required' >
+     * built-in English default.
+     */
+    private function requiredMessage(array $field, string $label): string
+    {
+        /* translators: %s: field label */
+        $template = $this->config['messages']['required'] ?? __('%s is required.', 'taw');
+
+        return $field['required_message'] ?? sprintf($template, $label);
+    }
+
+    /**
+     * Resolve the error message for an invalid email field. Precedence:
+     * field-level 'email_message' > form-level 'messages.email' > built-in
+     * English default. No label interpolation — unlike the other rules,
+     * the built-in default doesn't reference the field name.
+     */
+    private function emailMessage(array $field): string
+    {
+        return $field['email_message']
+            ?? $this->config['messages']['email']
+            ?? __('Invalid email address.', 'taw');
+    }
 
     /**
      * Validate a non-empty field value against its optional min_length,

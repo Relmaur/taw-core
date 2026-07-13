@@ -17,13 +17,16 @@
     "require-dev": {
         "spatie/mjml-php": "^1.0",
         "phpstan/phpstan": "^2.2",
-        "szepeviktor/phpstan-wordpress": "^2.0"
+        "szepeviktor/phpstan-wordpress": "^2.0",
+        "phpunit/phpunit": "^11",
+        "brain/monkey": "^2.6"
     },
     "suggest": {
         "emailit/emailit-php": "Required for EmailConfig::useEmailit() — route all wp_mail() through the Emailit REST API"
     },
     "scripts": {
-        "phpstan": "phpstan analyse --memory-limit=-1"
+        "phpstan": "phpstan analyse --memory-limit=-1",
+        "test": "phpunit"
     },
     "autoload": {
         "psr-4": {
@@ -33,6 +36,11 @@
             "src/Support/performance.php",
             "src/Support/utilities.php"
         ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "TAW\\Tests\\": "tests/"
+        }
     },
     "minimum-stability": "stable",
     "prefer-stable": true

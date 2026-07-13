@@ -35,3 +35,6 @@ jobs:
 
       - name: PHPStan static analysis
         run: composer run phpstan
+
+      - name: PHPUnit unit tests
+        run: composer run test
