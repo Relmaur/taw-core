@@ -6,7 +6,9 @@
         { "path": ".agents/skills/", "type": "dir" },
         { "path": "bin/", "type": "dir" },
         { "path": ".github/workflows/ci.yml", "type": "file" },
-        { "path": ".github/workflows/framework-sync.yml", "type": "file" }
+        { "path": ".github/workflows/framework-sync.yml", "type": "file" },
+        { "path": "tests/bootstrap.php", "type": "file" },
+        { "path": "tests/TestCase.php", "type": "file" }
     ],
     "tier2": [
         { "path": "AGENTS.md", "type": "file" },
@@ -17,6 +19,8 @@
         { "path": "composer.json", "type": "file" },
         { "path": "package.json", "type": "file" },
         { "path": "vite.config.js", "type": "file" },
-        { "path": "phpstan.neon", "type": "file" }
-    ]
+        { "path": "phpstan.neon", "type": "file" },
+        { "path": "phpunit.xml", "type": "file" }
+    ],
+    "$never": "tests/Unit/ is deliberately never listed here, in either tier, and must never become a 'dir' entry — it holds each client project's own block tests (tests/Unit/Blocks/{Name}Test.php), content this manifest doesn't own. A 'dir' entry syncs via 'rsync -a --delete', which would silently delete every client-authored test not present in the canonical repo. Only the harness itself (tests/bootstrap.php, tests/TestCase.php, phpunit.xml) is framework-owned; individual test files are not."
 }
