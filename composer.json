@@ -12,6 +12,7 @@
     "require": {
         "php": ">=8.2",
         "symfony/console": "^7.4",
+        "symfony/process": "^7.4",
         "enshrined/svg-sanitize": "^0.22.0"
     },
     "require-dev": {

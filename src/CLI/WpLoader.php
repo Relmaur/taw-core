@@ -56,9 +56,24 @@ final class WpLoader
      */
     public static function autoConfigureLocalSocket(string $themeDir): void
     {
+        $socket = self::resolveLocalSocket($themeDir);
+        if ($socket !== null) {
+            ini_set('mysqli.default_socket', $socket);
+            ini_set('pdo_mysql.default_socket', $socket);
+        }
+    }
+
+    /**
+     * Same detection as autoConfigureLocalSocket(), without the ini_set()
+     * side effect — for callers that need the raw socket path rather than
+     * an in-process PHP MySQL connection, e.g. WpCliCommand building `-d`
+     * flags for a separate `wp` process it shells out to.
+     */
+    public static function resolveLocalSocket(string $themeDir): ?string
+    {
         $home = getenv('HOME');
         if (!is_string($home) || $home === '') {
-            return;
+            return null;
         }
 
         // macOS is Local by Flywheel's primary supported platform (and the
@@ -81,14 +96,10 @@ final class WpLoader
                 continue;
             }
 
-            $socket = self::findSiteSocket($sites, $localDir, $themeDir);
-            if ($socket !== null) {
-                ini_set('mysqli.default_socket', $socket);
-                ini_set('pdo_mysql.default_socket', $socket);
-            }
-
-            return;
+            return self::findSiteSocket($sites, $localDir, $themeDir);
         }
+
+        return null;
     }
 
     /**
