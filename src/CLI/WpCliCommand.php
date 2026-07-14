@@ -90,7 +90,19 @@ class WpCliCommand extends Command
 
         $process = new Process($command);
         $process->setTimeout(null);
-        $process->setTty(Process::isTtySupported());
+
+        // A real interactive terminal's stdin is always a TTY; piped or
+        // redirected stdin (`wp eval-file -`, `echo ... | wp eval-file -`)
+        // never is — that's the standard Unix signal for "forward this."
+        // Using it this way (rather than always forwarding stdin) avoids
+        // the child process blocking on a live interactive session that
+        // has nothing to send, which plain `setInput(STDIN)` unconditionally
+        // would risk.
+        if (Process::isTtySupported() && stream_isatty(STDIN)) {
+            $process->setTty(true);
+        } elseif (!stream_isatty(STDIN)) {
+            $process->setInput(STDIN);
+        }
 
         $process->run(static function (string $type, string $buffer) use ($output): void {
             $output->write($buffer);

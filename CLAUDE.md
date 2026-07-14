@@ -13,8 +13,8 @@
 | Static analysis | `composer run phpstan` |
 | Unit tests | `composer run test` (Brain Monkey — no real WP install needed) |
 | Static site export | `php bin/taw export:static [--dir=<path>] [--prod-url=<url>]` |
-| SEO/copy audit — extract | `php bin/taw seo:extract <post_id> [--output=<path>]` |
-| SEO/copy audit — inject | `php bin/taw seo:inject <post_id> [--input=<path>] [--dry-run]` |
+| SEO/copy audit — extract | `php bin/taw seo:extract <post_id>\|--all [--output=<path>]` |
+| SEO/copy audit — inject | `php bin/taw seo:inject <post_id>\|--all [--input=<path>] [--dry-run]` |
 | WP-CLI passthrough | `php bin/taw wp <args>` (auto-resolves Local's socket + `--path`) |
 
 ## Architecture
@@ -39,6 +39,7 @@
 - **Visual editor is opt-in.** Call `VisualEditor::enable()` in the theme's `functions.php` before `Theme::boot()`. Without it, `isActive()` always returns false and nothing renders.
 - When the visual editor is active, `MetaBlock::render()` automatically wraps every block's output in `<div data-taw-block-section="{id}">`. The editor panel groups fields by block ID (matching the section attribute). Live text preview works via text-node content matching — no template annotations required for basic use.
 - **Headless CORS is opt-in.** `TAW\Core\Rest\Cors::register()` (wired into `Theme::boot()`) is a no-op unless `TAW_HEADLESS_ORIGINS` is defined in `wp-config.php` — needed only once a `export:static` bundle is served from a different domain than this WordPress install.
+- **SEO meta (`TAW\Core\Seo\SeoMeta`) always registers, but stands entirely down if any known SEO plugin (Yoast, RankMath, SmartCrawl) is active** — no duplicate `<meta name="description">`/OG tags, no competing admin UI. Yoast specifically gets read/write support (`SeoMeta::targetMetaKeys()` resolves to its meta keys); other plugins just cause TAW's own output to stand down, without write support for their own keys yet.
 
 ## Don't
 

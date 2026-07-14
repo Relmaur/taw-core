@@ -664,7 +664,7 @@ php bin/taw wp post list --post_type=page                      # WP-CLI passthro
 
 ## SEO & Copy Audit
 
-`seo:extract <post_id>` walks the same live field registry `TAW\Core\Metabox\SeoContentIntegration` already walks to feed Yoast/SmartCrawl (`Metabox::getFieldRegistry()`, recursing into repeater rows via their own `fields` sub-schema), but keeps only `text`/`textarea`/`wysiwyg` fields with non-empty content — no image/URL/`post_select`/layout fields, to keep the dump small and focused on rewritable copy. Output is hierarchical JSON grouped by block:
+`seo:extract <post_id>` (or `--all` for every published page/post in one run) walks the same live field registry `TAW\Core\Metabox\SeoContentIntegration` already walks to feed Yoast/SmartCrawl (`Metabox::getFieldRegistry()`, recursing into repeater rows via their own `fields` sub-schema), but keeps only `text`/`textarea`/`wysiwyg` fields with non-empty content — no image/URL/`post_select`/layout fields, to keep the dump small and focused on rewritable copy. Also extracts per-post SEO meta via `TAW\Core\Seo\SeoMeta` (see below). Output is hierarchical JSON grouped by block (`--all`'s shape wraps this in `{"posts": [...]}`):
 
 ```json
 {
@@ -672,6 +672,17 @@ php bin/taw wp post list --post_type=page                      # WP-CLI passthro
     "post_title": "Contact",
     "post_type": "page",
     "post_status": "publish",
+    "seo_meta": {
+        "source": "taw_native",
+        "meta_title": "",
+        "meta_description": "",
+        "og_image_id": 0,
+        "og_image_url": "",
+        "featured_image_id": 0,
+        "candidate_images": [
+            { "field_id": "hero_image", "label": "Image", "block_id": "hero", "attachment_id": 12, "url": "https://..." }
+        ]
+    },
     "blocks": [
         {
             "block_id": "hero",
@@ -684,15 +695,33 @@ php bin/taw wp post list --post_type=page                      # WP-CLI passthro
 }
 ```
 
-`seo:inject <post_id>` writes an edited copy of that same shape back, with real safeguards — this isn't a thin wrapper around `update_post_meta()`:
+`seo:inject <post_id>` (or `--all`) writes an edited copy of that same shape back, with real safeguards — this isn't a thin wrapper around `update_post_meta()`:
 
-- **Every field is validated against the live registry before anything is written.** Renamed/removed field, wrong field type (only `text`/`textarea`/`wysiwyg`/repeaters-of-them are accepted — anything else is rejected, use `fields:set` instead), or a malformed row all fail the whole batch, atomically — never a partial write.
+- **Every field is validated against the live registry before anything is written for a given post.** Renamed/removed field, wrong field type (only `text`/`textarea`/`wysiwyg`/repeaters-of-them are accepted — anything else is rejected, use `fields:set` instead), or a malformed row all fail that post's batch, atomically — never a partial write. With `--all`, each post is validated and applied *independently* — one post failing doesn't block the others; the summary reports exactly which posts succeeded.
 - **Repeater rows are merged, never replaced.** Extraction only keeps a row's text sub-fields (an image/URL sub-field on the same row is dropped, on purpose, to save tokens) — so injection re-reads the *current* live row and overwrites only the sub-field keys actually present in the input, leaving every other sub-field on that row untouched.
 - **Row-count drift refuses instead of guessing.** If the live repeater's row count doesn't match the input (someone edited the post in the admin between extract and inject), the command refuses and says so — index-based row alignment is only meaningful if nothing moved in between.
-- **Never touches core post data.** Only `blocks[].fields[]` is ever read from the input file; a `post_title` key, if present, is silently ignored — same hard boundary `fields:set` documents.
+- **`seo_meta` is validated against the live SEO-plugin state at write time, not what the dump recorded** — if a non-Yoast plugin (RankMath, etc.) has since become active, the write is rejected with a clear reason rather than silently landing in unused fields. `og_image_id: 0` (extraction's "no image set" sentinel) is never mistaken for an instruction to set the image to ID 0 — only a real attachment ID counts as a change, and it's verified to actually be an attachment before being accepted.
+- **Never touches core post data.** Only `blocks[].fields[]` and `seo_meta` are ever read from the input file; a `post_title` key, if present, is silently ignored — same hard boundary `fields:set` documents.
 - `--dry-run` reports the sanitized values that would be written, without writing.
 
-The analysis itself — keyword presence, copywriting/CTA quality, readability — is deliberately not part of either command; that's LLM judgment, not mechanical extraction. See the `audit-seo` Claude Code skill (`taw-theme`'s `.claude/skills/audit-seo/`) for the guided workflow: extract → analyze → report Red Flags/Polish Opportunities → (with explicit approval) inject.
+The analysis itself — keyword presence, copywriting/CTA quality, readability, meta title/description/social image quality — is deliberately not part of either command; that's LLM judgment, not mechanical extraction. See the `audit-seo` Claude Code skill (`taw-theme`'s `.claude/skills/audit-seo/`) for the guided workflow: extract → analyze → report Red Flags/Polish Opportunities → (with explicit approval, direct write or a client-facing report) inject.
+
+### `TAW\Core\Seo\SeoMeta` — per-post SEO meta, Yoast-aware
+
+TAW has never owned meta title/description/social image natively — every real site either has an SEO plugin installed (Yoast, most commonly) or has had nothing at all: no `<meta name="description">`, no Open Graph/Twitter tags, no per-post title override. `SeoMeta` (wired into `Theme::boot()`) fixes this without fighting whatever else might be installed:
+
+- **No SEO plugin active** (the common case): registers its own lightweight metabox (SEO & Social — meta title, meta description, social share image, editor-enabled like any other field) and renders `<meta name="description">`/OG/Twitter tags itself on `wp_head` (priority 1), reading from its own fields with a post-title/featured-image fallback.
+- **Yoast active** (`defined('WPSEO_VERSION')`): TAW's own metabox and `<head>` output both stand down entirely — Yoast already owns both, and duplicating either would split/duplicate SEO signal. `SeoMeta::write()` and the `seo:extract`/`seo:inject` CLI commands read and write Yoast's own meta keys (`_yoast_wpseo_title`, `_yoast_wpseo_metadesc`, `_yoast_wpseo_opengraph-image-id`) directly in this case, so an agent-driven rewrite still lands somewhere the site owner's existing Yoast UI reflects it.
+- **A different plugin active** (RankMath, SmartCrawl): detected only far enough to stand TAW's own UI/`<head>` output down (avoiding duplicates) — not to write its meta. `SeoMeta::targetMetaKeys()['source']` reports `'unsupported'` in this case; `seo:inject` refuses any `seo_meta` write with a clear reason rather than guessing at that plugin's own key scheme.
+
+```php
+use TAW\Core\Seo\SeoMeta;
+
+SeoMeta::isSeoPluginActive();      // true if Yoast, RankMath, or SmartCrawl is active
+SeoMeta::targetMetaKeys();         // ['source' => 'taw_native'|'yoast'|'unsupported', 'title_key' => ?string, 'description_key' => ?string]
+SeoMeta::metaTitle($postId);       // resolves from whichever store is currently authoritative
+SeoMeta::write($postId, $title, $description, $ogImageId);  // null = leave that field unchanged
+```
 
 ---
 

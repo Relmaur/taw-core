@@ -11,20 +11,21 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use TAW\Core\Metabox\Metabox;
+use TAW\Core\Seo\SeoMeta;
 
 /**
  * Write an optimized copy JSON dump (SeoExtractCommand's own output shape,
  * after an agent has edited the text values) back to a post's Metabox
- * fields — the write half of the SEO/copy audit loop.
+ * fields and/or SEO meta — the write half of the SEO/copy audit loop.
  *
  * Deliberately narrower than FieldsSetCommand: only ever writes fields the
  * live registry currently reports as text/textarea/wysiwyg (or repeaters
  * whose touched sub-fields are), and never touches core post data
  * (post_title/post_content/post_status) even if present in the input file
- * — same hard boundary FieldsSetCommand documents. Every field in the
- * input is validated *before* any write happens; if anything fails
- * validation, nothing is written — a partially-applied copy rewrite is a
- * worse failure mode than a rejected one.
+ * — same hard boundary FieldsSetCommand documents. Every field in a post's
+ * input is validated *before* any write happens for that post; if anything
+ * fails validation, nothing is written for that post — a partially-applied
+ * copy rewrite is a worse failure mode than a rejected one.
  *
  * Repeaters need special handling: extraction only kept the text-like
  * sub-fields of each row (an image/url sub-field on the same row was
@@ -33,6 +34,17 @@ use TAW\Core\Metabox\Metabox;
  * every non-text sub-field — silently deleting them. Instead, each
  * optimized row is merged into the CURRENT live row at the same index,
  * overwriting only the keys the optimized JSON actually contains.
+ *
+ * SEO meta (meta_title/meta_description/og_image_id, under an optional
+ * top-level 'seo_meta' key) is validated and written via TAW\Core\Seo\SeoMeta,
+ * which resolves fresh — at write time, not from what the input recorded —
+ * whether TAW's own fields or an active Yoast install's are authoritative.
+ *
+ * --all applies a {"posts": [...]} site-wide dump (SeoExtractCommand --all's
+ * own output shape). Each post is validated and applied INDEPENDENTLY —
+ * unlike the all-or-nothing rule within a single post, one post failing
+ * validation doesn't block every other post in the same run; the summary
+ * reports exactly which posts succeeded and which didn't, and why.
  *
  * Boots WordPress (same pattern as FieldsSetCommand) — field configs and
  * post_meta only exist once WordPress is loaded.
@@ -53,7 +65,7 @@ class SeoInjectCommand extends Command
     {
         $this
             ->setName('seo:inject')
-            ->setDescription('Write an optimized copy JSON dump (from seo:extract) back to a post\'s Metabox fields')
+            ->setDescription('Write an optimized copy JSON dump (from seo:extract) back to a post\'s Metabox fields and/or SEO meta')
             ->setHelp(<<<'HELP'
                 Reads a JSON file shaped like seo:extract's own output, validates every
                 field against the live Metabox registry, and writes the (sanitized)
@@ -61,15 +73,17 @@ class SeoInjectCommand extends Command
                 index — only the sub-fields present in the input are overwritten, every
                 other sub-field on that row (images, URLs, etc.) is left untouched.
 
-                Every field is validated before anything is written — if any field
-                fails validation, nothing is written at all.
+                Every field is validated before anything is written for a given post —
+                if any field on that post fails validation, nothing is written for it.
 
                 Examples:
                   <info>php bin/taw seo:inject 42</info>
                   <info>php bin/taw seo:inject 42 --input=.taw/seo-optimized.json --dry-run</info>
+                  <info>php bin/taw seo:inject --all --input=.taw/seo-site-optimized.json</info>
                 HELP)
-            ->addArgument('post_id', InputArgument::REQUIRED, 'Post ID to write copy back to')
-            ->addOption('input', null, InputOption::VALUE_REQUIRED, 'File path to read the optimized JSON dump from', '.taw/seo-optimized.json')
+            ->addArgument('post_id', InputArgument::OPTIONAL, 'Post ID to write copy back to (omit when using --all)')
+            ->addOption('all', null, InputOption::VALUE_NONE, 'Apply a {"posts": [...]} site-wide dump instead of a single post_id')
+            ->addOption('input', null, InputOption::VALUE_REQUIRED, 'File path to read the optimized JSON dump from (default: .taw/seo-optimized.json, or .taw/seo-site-optimized.json with --all)')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Validate and report what would be written, without writing to the database')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output machine-readable JSON instead of a formatted summary');
     }
@@ -77,10 +91,18 @@ class SeoInjectCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        $postId = (int) $input->getArgument('post_id');
-        $inputPath = (string) $input->getOption('input');
+        $all = (bool) $input->getOption('all');
+        $postIdArg = $input->getArgument('post_id');
         $dryRun = (bool) $input->getOption('dry-run');
         $asJson = (bool) $input->getOption('json');
+
+        if (!$all && $postIdArg === null) {
+            $io->error('Provide a post_id, or pass --all to apply a site-wide dump.');
+            return Command::FAILURE;
+        }
+
+        $inputPath = $input->getOption('input');
+        $inputPath = is_string($inputPath) ? $inputPath : ($all ? '.taw/seo-site-optimized.json' : '.taw/seo-optimized.json');
 
         if (!is_file($inputPath) || !is_readable($inputPath)) {
             $io->error("Cannot read input file: {$inputPath}");
@@ -88,8 +110,8 @@ class SeoInjectCommand extends Command
         }
 
         $decoded = json_decode((string) file_get_contents($inputPath), true);
-        if (!is_array($decoded) || !isset($decoded['blocks']) || !is_array($decoded['blocks'])) {
-            $io->error("Invalid input file: expected a JSON object with a 'blocks' array (the shape seo:extract produces).");
+        if (!is_array($decoded)) {
+            $io->error('Invalid input file: not valid JSON.');
             return Command::FAILURE;
         }
 
@@ -105,19 +127,128 @@ class SeoInjectCommand extends Command
         WpLoader::autoConfigureLocalSocket($this->themeDir);
         require $wpLoad;
 
+        if ($all) {
+            return $this->executeAll($io, $output, $decoded, $dryRun, $asJson);
+        }
+
+        if (!isset($decoded['blocks']) && !isset($decoded['seo_meta'])) {
+            $io->error("Invalid input file: expected 'blocks' and/or 'seo_meta' (the shape seo:extract produces).");
+            return Command::FAILURE;
+        }
+
+        $postId = (int) $postIdArg;
         if (!get_post($postId)) {
             $io->error("No post found with ID {$postId}.");
             return Command::FAILURE;
         }
 
-        // Pass 1 — validate every field entry against the live registry
-        // before writing anything. Only 'blocks[].fields[]' is ever read;
-        // any other top-level key (post_title, etc.) is silently ignored —
-        // this command never touches core post data.
+        [$plan, $seoMetaPlan, $errors] = $this->validatePost($postId, $decoded);
+
+        if ($errors !== []) {
+            $io->error('Validation failed — nothing was written:');
+            foreach ($errors as $error) {
+                $io->text(" - {$error}");
+            }
+            return Command::FAILURE;
+        }
+
+        if (!$dryRun) {
+            $this->applyPost($postId, $plan, $seoMetaPlan);
+        }
+
+        $this->report($io, $output, $asJson, $postId, $plan, $seoMetaPlan, saved: !$dryRun);
+        return Command::SUCCESS;
+    }
+
+    /**
+     * @param array<string, mixed> $decoded
+     */
+    private function executeAll(SymfonyStyle $io, OutputInterface $output, array $decoded, bool $dryRun, bool $asJson): int
+    {
+        if (!isset($decoded['posts']) || !is_array($decoded['posts'])) {
+            $io->error("Invalid input file: expected a 'posts' array (the shape seo:extract --all produces).");
+            return Command::FAILURE;
+        }
+
+        $results = [];
+
+        foreach ($decoded['posts'] as $postDump) {
+            $postId = (int) ($postDump['post_id'] ?? 0);
+            if ($postId <= 0) {
+                $results[] = ['post_id' => 0, 'ok' => false, 'errors' => ["Post entry missing 'post_id'."]];
+                continue;
+            }
+
+            if (!get_post($postId)) {
+                $results[] = ['post_id' => $postId, 'ok' => false, 'errors' => ["No post found with ID {$postId}."]];
+                continue;
+            }
+
+            [$plan, $seoMetaPlan, $errors] = $this->validatePost($postId, $postDump);
+
+            if ($errors !== []) {
+                $results[] = ['post_id' => $postId, 'ok' => false, 'errors' => $errors];
+                continue;
+            }
+
+            if (!$dryRun) {
+                $this->applyPost($postId, $plan, $seoMetaPlan);
+            }
+
+            $results[] = ['post_id' => $postId, 'ok' => true, 'fields' => count($plan), 'seo_meta' => $seoMetaPlan !== null];
+        }
+
+        $succeeded = array_filter($results, static fn (array $r) => $r['ok']);
+        $failed = array_filter($results, static fn (array $r) => !$r['ok']);
+
+        if ($asJson) {
+            $output->writeln((string) json_encode([
+                'saved' => !$dryRun,
+                'results' => $results,
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        } else {
+            $io->success(sprintf(
+                '%s %d/%d post(s).',
+                $dryRun ? '[dry-run] Would apply' : 'Applied',
+                count($succeeded),
+                count($results)
+            ));
+
+            if ($failed !== []) {
+                $io->section('Failed');
+                foreach ($failed as $result) {
+                    $io->text("Post {$result['post_id']}:");
+                    foreach ($result['errors'] as $error) {
+                        $io->text("  - {$error}");
+                    }
+                }
+            }
+        }
+
+        // Per-post atomicity, not global — a partial site-wide run (some
+        // posts applied, some rejected) is still reported as a command
+        // failure so automation doesn't treat it as a clean success, but
+        // every post that DID pass validation was still written for real.
+        return $failed === [] ? Command::SUCCESS : Command::FAILURE;
+    }
+
+    /**
+     * Validates every 'blocks[].fields[]' entry and the optional 'seo_meta'
+     * object against the live registry, WITHOUT writing anything — the
+     * plan returned here is what applyPost() writes once dry-run/validation
+     * has passed. Only 'blocks' and 'seo_meta' are ever read from $decoded;
+     * any other key (post_title, etc.) is silently ignored — this command
+     * never touches core post data.
+     *
+     * @param array<string, mixed> $decoded
+     * @return array{0: array<int, array<string, mixed>>, 1: ?array<string, mixed>, 2: string[]}
+     */
+    private function validatePost(int $postId, array $decoded): array
+    {
         $errors = [];
         $plan = [];
 
-        foreach ($decoded['blocks'] as $block) {
+        foreach ((array) ($decoded['blocks'] ?? []) as $block) {
             foreach ((array) ($block['fields'] ?? []) as $fieldEntry) {
                 $fieldId = (string) ($fieldEntry['field_id'] ?? '');
                 if ($fieldId === '') {
@@ -176,32 +307,78 @@ class SeoInjectCommand extends Command
             }
         }
 
-        if ($errors !== []) {
-            $io->error('Validation failed — nothing was written:');
-            foreach ($errors as $error) {
-                $io->text(" - {$error}");
+        [$seoMetaPlan, $seoMetaErrors] = $this->validateSeoMeta($decoded['seo_meta'] ?? null);
+        $errors = [...$errors, ...$seoMetaErrors];
+
+        return [$plan, $seoMetaPlan, $errors];
+    }
+
+    /**
+     * @param mixed $seoMeta
+     * @return array{0: ?array{meta_title: ?string, meta_description: ?string, og_image_id: ?int}, 1: string[]}
+     */
+    private function validateSeoMeta(mixed $seoMeta): array
+    {
+        if ($seoMeta === null) {
+            return [null, []];
+        }
+
+        if (!is_array($seoMeta)) {
+            return [null, ["'seo_meta' must be an object."]];
+        }
+
+        $hasTitle = array_key_exists('meta_title', $seoMeta) && $seoMeta['meta_title'] !== null;
+        $hasDescription = array_key_exists('meta_description', $seoMeta) && $seoMeta['meta_description'] !== null;
+        // 0 is seo:extract's own "no image set" sentinel, not a real
+        // attachment ID — round-tripping an unedited dump back through
+        // seo:inject must not treat "still 0" as an attempt to set the
+        // image to ID 0. Only a genuine positive ID counts as "has an image."
+        $hasImage = array_key_exists('og_image_id', $seoMeta)
+            && $seoMeta['og_image_id'] !== null
+            && (int) $seoMeta['og_image_id'] > 0;
+
+        if (!$hasTitle && !$hasDescription && !$hasImage) {
+            return [null, []];
+        }
+
+        $keys = SeoMeta::targetMetaKeys();
+        if ($keys['source'] === 'unsupported') {
+            return [null, [
+                'seo_meta was provided, but a non-Yoast SEO plugin is active on this site — ' .
+                'writing meta title/description/social image isn\'t supported for it yet. ' .
+                'Remove seo_meta from the input, or use that plugin\'s own UI/API instead.',
+            ]];
+        }
+
+        $ogImageId = null;
+        if ($hasImage) {
+            $ogImageId = (int) $seoMeta['og_image_id'];
+            $attachment = get_post($ogImageId);
+            if ($attachment === null || $attachment->post_type !== 'attachment') {
+                return [null, ["seo_meta.og_image_id ({$ogImageId}) is not a real attachment."]];
             }
-            return Command::FAILURE;
         }
 
-        if ($dryRun) {
-            $this->report($io, $output, $asJson, $postId, $plan, saved: false);
-            return Command::SUCCESS;
-        }
+        return [[
+            'meta_title' => $hasTitle ? (string) $seoMeta['meta_title'] : null,
+            'meta_description' => $hasDescription ? (string) $seoMeta['meta_description'] : null,
+            'og_image_id' => $ogImageId,
+        ], []];
+    }
 
+    /**
+     * @param array<int, array<string, mixed>> $plan
+     * @param ?array{meta_title: ?string, meta_description: ?string, og_image_id: ?int} $seoMetaPlan
+     */
+    private function applyPost(int $postId, array $plan, ?array $seoMetaPlan): void
+    {
         foreach ($plan as $item) {
-            $result = update_post_meta($postId, $item['meta_key'], $item['value']);
-            if ($result === false) {
-                $current = get_post_meta($postId, $item['meta_key'], true);
-                if ($current != $item['value']) {
-                    $io->error("Failed to save field: {$item['field_id']}");
-                    return Command::FAILURE;
-                }
-            }
+            update_post_meta($postId, $item['meta_key'], $item['value']);
         }
 
-        $this->report($io, $output, $asJson, $postId, $plan, saved: true);
-        return Command::SUCCESS;
+        if ($seoMetaPlan !== null) {
+            SeoMeta::write($postId, $seoMetaPlan['meta_title'], $seoMetaPlan['meta_description'], $seoMetaPlan['og_image_id']);
+        }
     }
 
     /**
@@ -339,12 +516,17 @@ class SeoInjectCommand extends Command
         return [$merged, $errors];
     }
 
+    /**
+     * @param array<int, array<string, mixed>> $plan
+     * @param ?array{meta_title: ?string, meta_description: ?string, og_image_id: ?int} $seoMetaPlan
+     */
     private function report(
         SymfonyStyle $io,
         OutputInterface $output,
         bool $asJson,
         int $postId,
         array $plan,
+        ?array $seoMetaPlan,
         bool $saved
     ): void {
         if ($asJson) {
@@ -359,14 +541,25 @@ class SeoInjectCommand extends Command
                     ],
                     $plan
                 ),
+                'seo_meta' => $seoMetaPlan,
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
             return;
         }
 
-        $io->success(($saved ? 'Saved' : '[dry-run] Would save') . ' ' . count($plan) . " field(s) on post {$postId}.");
+        $verb = $saved ? 'Saved' : '[dry-run] Would save';
+        $count = count($plan) + ($seoMetaPlan !== null ? 1 : 0);
+        $io->success("{$verb} {$count} item(s) on post {$postId}.");
+
         foreach ($plan as $item) {
             $io->section("{$item['field_id']} ({$item['type']})");
             $io->text(is_string($item['preview']) ? $item['preview'] : (string) json_encode($item['preview'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        }
+
+        if ($seoMetaPlan !== null) {
+            $io->section('SEO meta');
+            $io->text('Title: ' . ($seoMetaPlan['meta_title'] ?? '(unchanged)'));
+            $io->text('Description: ' . ($seoMetaPlan['meta_description'] ?? '(unchanged)'));
+            $io->text('OG image ID: ' . ($seoMetaPlan['og_image_id'] !== null ? (string) $seoMetaPlan['og_image_id'] : '(unchanged)'));
         }
     }
 }

@@ -13,6 +13,7 @@ use TAW\Core\OptionsPage\OptionsPage;
 use TAW\Core\Rest\Cors;
 use TAW\Core\Rest\SearchEndpoints;
 use TAW\Core\Rest\VisualEditorEndpoint;
+use TAW\Core\Seo\SeoMeta;
 use TAW\Helpers\Svg;
 use TAW\Support\Performance;
 use TAW\Support\ViteLoader;
@@ -51,6 +52,7 @@ class Theme
      *   5. REST API endpoints (visual editor save, post search) + opt-in headless CORS
      *   6. SVG support (upload allowlist + inline helper)
      *   7. Form submissions (taw_submission CPT + webhook settings page)
+     *   8. SEO meta (meta title/description/social image — stands down if an SEO plugin is active)
      */
     public static function boot(): void
     {
@@ -102,6 +104,11 @@ class Theme
         // Registers the taw_submission CPT so Form::process() can persist
         // every submission, and adds the Settings → Form Webhook admin page.
         new SubmissionsHandler();
+
+        // ── 8. SEO meta (meta title/description/social image) ───────────────────
+        // Stands entirely down if any known SEO plugin (Yoast, RankMath,
+        // SmartCrawl) is active — see SeoMeta's own docblock for why.
+        new SeoMeta();
     }
 
     /**

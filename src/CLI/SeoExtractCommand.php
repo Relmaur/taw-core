@@ -11,6 +11,8 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use TAW\Core\Metabox\Metabox;
+use TAW\Core\Seo\SeoMeta;
+use TAW\Helpers\Image;
 
 /**
  * Extract every text-bearing Metabox field on a post into a clean,
@@ -32,12 +34,24 @@ use TAW\Core\Metabox\Metabox;
  * to see" (a plugin cares about alt text and internal links too; a copy
  * rewrite doesn't touch either).
  *
+ * Also extracts per-post SEO meta (meta title/description/social image) via
+ * TAW\Core\Seo\SeoMeta — a separate 'seo_meta' key, not part of 'blocks',
+ * since it isn't Metabox-field-shaped the same way (its source — TAW's own
+ * fields vs. an active Yoast install's — can change between an extract and
+ * a later inject, which SeoInjectCommand re-resolves fresh rather than
+ * trusting what this dump recorded).
+ *
+ * --all extracts every published page/post in one run instead of a single
+ * post_id, for a site-wide audit — output becomes {"posts": [...]}, one
+ * dump per post in the same per-post shape as a single extraction.
+ *
  * Boots WordPress (same pattern as InspectCommand/FieldsGetCommand) — the
  * field registry and post_meta only exist once WordPress is loaded.
  */
 class SeoExtractCommand extends Command
 {
     private const TEXT_TYPES = ['text', 'textarea', 'wysiwyg'];
+    private const POST_TYPES = ['page', 'post'];
 
     private string $themeDir;
 
@@ -55,22 +69,34 @@ class SeoExtractCommand extends Command
             ->setHelp(<<<'HELP'
                 Walks every registered Metabox field for the given post, keeps only
                 text/textarea/wysiwyg fields (including inside repeaters, recursively)
-                with non-empty content, and writes the result as JSON grouped by block —
-                the same shape SeoInjectCommand expects back after editing.
+                with non-empty content, plus SEO meta (title/description/social image),
+                and writes the result as JSON grouped by block — the same shape
+                SeoInjectCommand expects back after editing.
 
                 Examples:
                   <info>php bin/taw seo:extract 42</info>
                   <info>php bin/taw seo:extract 42 --output=.taw/seo-dump.json</info>
+                  <info>php bin/taw seo:extract --all</info>
+                  <info>php bin/taw seo:extract --all --output=.taw/seo-site-dump.json</info>
                 HELP)
-            ->addArgument('post_id', InputArgument::REQUIRED, 'Post ID to extract copy from')
-            ->addOption('output', null, InputOption::VALUE_REQUIRED, 'File path to write the JSON dump to', '.taw/seo-dump.json');
+            ->addArgument('post_id', InputArgument::OPTIONAL, 'Post ID to extract copy from (omit when using --all)')
+            ->addOption('all', null, InputOption::VALUE_NONE, 'Extract every published page/post instead of a single post_id')
+            ->addOption('output', null, InputOption::VALUE_REQUIRED, 'File path to write the JSON dump to (default: .taw/seo-dump.json, or .taw/seo-site-dump.json with --all)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        $postId = (int) $input->getArgument('post_id');
-        $outputPath = (string) $input->getOption('output');
+        $all = (bool) $input->getOption('all');
+        $postIdArg = $input->getArgument('post_id');
+
+        if (!$all && $postIdArg === null) {
+            $io->error('Provide a post_id, or pass --all to extract every published page/post.');
+            return Command::FAILURE;
+        }
+
+        $outputPath = $input->getOption('output');
+        $outputPath = is_string($outputPath) ? $outputPath : ($all ? '.taw/seo-site-dump.json' : '.taw/seo-dump.json');
 
         $wpLoad = WpLoader::locate($this->themeDir);
         if ($wpLoad === null) {
@@ -84,26 +110,24 @@ class SeoExtractCommand extends Command
         WpLoader::autoConfigureLocalSocket($this->themeDir);
         require $wpLoad;
 
+        $dir = dirname($outputPath);
+        if ($dir !== '.' && !is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+            $io->error("Could not create output directory: {$dir}");
+            return Command::FAILURE;
+        }
+
+        if ($all) {
+            return $this->extractAll($io, $output, $outputPath);
+        }
+
+        $postId = (int) $postIdArg;
         $post = get_post($postId);
         if (!$post) {
             $io->error("No post found with ID {$postId}.");
             return Command::FAILURE;
         }
 
-        $dump = [
-            'post_id' => $postId,
-            'post_title' => get_the_title($post),
-            'post_type' => $post->post_type,
-            'post_status' => $post->post_status,
-            'extracted_at' => current_time('c'),
-            'blocks' => $this->extractBlocks($postId),
-        ];
-
-        $dir = dirname($outputPath);
-        if ($dir !== '.' && !is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
-            $io->error("Could not create output directory: {$dir}");
-            return Command::FAILURE;
-        }
+        $dump = $this->buildPostDump($post);
 
         $json = (string) json_encode($dump, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         file_put_contents($outputPath, $json);
@@ -125,6 +149,109 @@ class SeoExtractCommand extends Command
         return Command::SUCCESS;
     }
 
+    private function extractAll(SymfonyStyle $io, OutputInterface $output, string $outputPath): int
+    {
+        $query = new \WP_Query([
+            'post_type' => self::POST_TYPES,
+            'post_status' => 'publish',
+            'posts_per_page' => -1,
+            'no_found_rows' => true,
+            'orderby' => 'ID',
+            'order' => 'ASC',
+        ]);
+
+        $posts = [];
+        foreach ($query->posts as $post) {
+            $posts[] = $this->buildPostDump($post);
+        }
+
+        $json = (string) json_encode(['posts' => $posts], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        file_put_contents($outputPath, $json);
+
+        $fieldCount = array_sum(array_map(
+            static fn (array $dump) => array_sum(array_map(
+                static fn (array $block) => count($block['fields']),
+                $dump['blocks']
+            )),
+            $posts
+        ));
+
+        $io->success(sprintf(
+            'Extracted %d field(s) across %d post(s) → %s',
+            $fieldCount,
+            count($posts),
+            $outputPath
+        ));
+
+        return Command::SUCCESS;
+    }
+
+    /**
+     * @return array{post_id: int, post_title: string, post_type: string, post_status: string, extracted_at: string, seo_meta: array<string, mixed>, blocks: array<int, array<string, mixed>>}
+     */
+    private function buildPostDump(\WP_Post $post): array
+    {
+        return [
+            'post_id' => $post->ID,
+            'post_title' => get_the_title($post),
+            'post_type' => $post->post_type,
+            'post_status' => $post->post_status,
+            'extracted_at' => current_time('c'),
+            'seo_meta' => $this->extractSeoMeta($post->ID),
+            'blocks' => $this->extractBlocks($post->ID),
+        ];
+    }
+
+    /**
+     * @return array{source: string, meta_title: string, meta_description: string, og_image_id: int, og_image_url: string, featured_image_id: int, candidate_images: array<int, array<string, mixed>>}
+     */
+    private function extractSeoMeta(int $postId): array
+    {
+        $ogImageId = SeoMeta::ogImageId($postId);
+        $featuredImageId = (int) get_post_thumbnail_id($postId);
+
+        $candidates = [];
+        if ($featuredImageId > 0) {
+            $candidates[] = [
+                'field_id' => '_featured_image',
+                'label' => 'Featured Image',
+                'block_id' => null,
+                'attachment_id' => $featuredImageId,
+                'url' => Image::url($featuredImageId, 'medium'),
+            ];
+        }
+
+        foreach (Metabox::getFieldRegistry() as $fieldId => $field) {
+            if (($field['type'] ?? '') !== 'image' || $fieldId === SeoMeta::OG_IMAGE_FIELD) {
+                continue;
+            }
+
+            $prefix = $field['prefix'] ?? '_taw_';
+            $attachmentId = (int) Metabox::get($postId, $fieldId, $prefix);
+            if ($attachmentId <= 0) {
+                continue;
+            }
+
+            $candidates[] = [
+                'field_id' => $fieldId,
+                'label' => $field['label'] ?? $fieldId,
+                'block_id' => $field['block_id'] ?? null,
+                'attachment_id' => $attachmentId,
+                'url' => Image::url($attachmentId, 'medium'),
+            ];
+        }
+
+        return [
+            'source' => SeoMeta::targetMetaKeys()['source'],
+            'meta_title' => SeoMeta::metaTitle($postId),
+            'meta_description' => SeoMeta::metaDescription($postId),
+            'og_image_id' => $ogImageId,
+            'og_image_url' => $ogImageId > 0 ? Image::url($ogImageId, 'medium') : '',
+            'featured_image_id' => $featuredImageId,
+            'candidate_images' => $candidates,
+        ];
+    }
+
     /**
      * Groups the flat field registry by block_id, keeping only fields with
      * non-empty text content for this specific post — a field being
@@ -139,7 +266,13 @@ class SeoExtractCommand extends Command
         $fieldsByBlock = [];
         $titleByBlock = [];
 
+        $seoMetaFieldIds = [SeoMeta::TITLE_FIELD, SeoMeta::DESCRIPTION_FIELD, SeoMeta::OG_IMAGE_FIELD];
+
         foreach (Metabox::getFieldRegistry() as $fieldId => $field) {
+            if (in_array($fieldId, $seoMetaFieldIds, true)) {
+                continue; // reported under 'seo_meta' instead, not 'blocks'
+            }
+
             $type = $field['type'] ?? 'text';
             $blockId = $field['block_id'] ?? '(unassigned)';
             $prefix = $field['prefix'] ?? '_taw_';
