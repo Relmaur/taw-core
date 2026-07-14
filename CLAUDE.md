@@ -15,6 +15,7 @@
 | Static site export | `php bin/taw export:static [--dir=<path>] [--prod-url=<url>]` |
 | SEO/copy audit — extract | `php bin/taw seo:extract <post_id> [--output=<path>]` |
 | SEO/copy audit — inject | `php bin/taw seo:inject <post_id> [--input=<path>] [--dry-run]` |
+| WP-CLI passthrough | `php bin/taw wp <args>` (auto-resolves Local's socket + `--path`) |
 
 ## Architecture
 

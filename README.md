@@ -645,6 +645,7 @@ php bin/taw export:static                            # static HTML export for ed
 php bin/taw export:static --dir=/path --prod-url=https://my-site.pages.dev
 php bin/taw seo:extract 42 --output=.taw/seo-dump.json         # copy audit: extract text fields (see below)
 php bin/taw seo:inject 42 --input=.taw/seo-optimized.json      # copy audit: write rewrites back
+php bin/taw wp post list --post_type=page                      # WP-CLI passthrough, socket/--path auto-resolved (see below)
 ```
 
 `make:block` generates the block folder, PHP class, template file, and Vite entry points.
@@ -656,6 +657,8 @@ php bin/taw seo:inject 42 --input=.taw/seo-optimized.json      # copy audit: wri
 `export:static` fetches every published `page`/`post` over HTTP against its own permalink (a real request, same as a visitor's browser would make — this deliberately picks up anything hooked onto `template_redirect`/`the_content`, unlike rendering templates in-process would), rewrites absolute site-URL references, and writes `<dir>/<slug>/index.html` — plus the built Vite assets (`dist/`) and `wp-content/uploads/` — into a self-contained static bundle for edge hosting (Cloudflare Pages, Vercel, etc.). Boots WordPress the same way `inspect`/`fields:get`/`fields:set` do, via `WpLoader`. By default, absolute links are rewritten to root-relative paths (works on any deploy domain); pass `--prod-url` to rewrite to an absolute URL instead. See the `export-static` Claude Code skill (`taw-theme`'s `.claude/skills/export-static/`) for the guided agent workflow, including the one part of this that's easy to skip: forms and search are **not** exported statically — see below.
 
 `seo:extract`/`seo:inject` are the read/write halves of a copy-and-SEO audit loop — see below.
+
+`wp` is a thin passthrough to WordPress's own official CLI (the real `wp` binary, found on `PATH` via `Symfony\Component\Process\ExecutableFinder`) — every argument after `wp` is forwarded exactly as given, unparsed. Resolves two things that otherwise need manual, hand-typed configuration every time under Local by Flywheel: `--path` (the WordPress root, via the same `WpLoader::locate()` logic every other WP-booting command here uses) and the per-site MySQL socket (`WpLoader::resolveLocalSocket()` — Local runs a separate MySQL instance per site on its own Unix socket, not the system default `mysqli.default_socket`/`pdo_mysql.default_socket` PHP CLI otherwise uses, so a bare `wp` command run from an ordinary terminal fails with a DB connection error even though the site works fine in the browser). A no-op wrapper everywhere this doesn't apply (real hosting, CI, DDEV, Herd) — it still resolves `--path` and runs `wp` normally, just without the extra `-d` flags.
 
 ---
 
@@ -742,6 +745,7 @@ Dump::log($value);
 | Package | Purpose |
 |---------|---------|
 | `symfony/console ^7.4` | CLI commands |
+| `symfony/process ^7.4` | `wp` command — shells out to the real WP-CLI binary |
 | `enshrined/svg-sanitize ^0.22.0` | SVG XSS prevention on upload |
 | `spatie/mjml-php ^1.0` _(dev)_ | Email template transpilation |
 | `phpstan/phpstan ^2.2` _(dev)_ | Static analysis |
