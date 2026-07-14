@@ -68,6 +68,7 @@ class FieldsGetCommand extends Command
         if (!defined('WP_USE_THEMES')) {
             define('WP_USE_THEMES', false);
         }
+        WpLoader::autoConfigureLocalSocket($this->themeDir);
         require $wpLoad;
 
         if (!get_post($postId)) {

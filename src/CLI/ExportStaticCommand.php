@@ -96,6 +96,7 @@ class ExportStaticCommand extends Command
             define('WP_USE_THEMES', false);
         }
 
+        WpLoader::autoConfigureLocalSocket($this->themeDir);
         require $wpLoad;
 
         $outDir = rtrim((string) ($input->getOption('dir') ?? $this->themeDir . '/static-export'), '/');

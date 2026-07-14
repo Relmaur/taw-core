@@ -81,6 +81,7 @@ class SeoExtractCommand extends Command
         if (!defined('WP_USE_THEMES')) {
             define('WP_USE_THEMES', false);
         }
+        WpLoader::autoConfigureLocalSocket($this->themeDir);
         require $wpLoad;
 
         $post = get_post($postId);

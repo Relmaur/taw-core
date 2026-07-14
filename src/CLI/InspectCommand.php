@@ -72,6 +72,8 @@ class InspectCommand extends Command
             define('WP_USE_THEMES', false);
         }
 
+        WpLoader::autoConfigureLocalSocket($this->themeDir);
+
         // Loading wp-load.php runs the full WP bootstrap, including the active
         // theme's functions.php (WP core does this itself) — which is what
         // fires after_setup_theme (BlockLoader::loadAll) and init (Form::register
