@@ -659,6 +659,8 @@ php bin/taw export:static --dir=/path --prod-url=https://my-site.pages.dev
 
 `export:static` only freezes what's actually static: rendered page/post HTML, Vite assets, and uploads. Forms (`admin-ajax.php?action=taw_form_*`) and search (`GET /taw/v1/search-posts`) stay dynamic by design — they keep hitting this WordPress install, over the network, exactly as before. That's the right call: there's no server at a static host to answer them otherwise.
 
+**`export:static` bakes the absolute WordPress URL into every form `action` and search `fetch()` call, unconditionally — this is not affected by `TAW_HEADLESS_ORIGINS` in either direction.** That constant doesn't change *where* those requests go; it only changes whether the *browser* is allowed to let them complete once the page is loaded from a different origin than this WordPress install. Without it, the request still fires at the WordPress domain — the browser's CORS preflight/response check just fails and blocks it client-side. With it set for the exported bundle's actual origin, that block goes away. If you're debugging "the exported form/search doesn't work," check this distinction first: a request that never left the browser (CORS block) and a request that 404s at the WordPress domain are different failures with different fixes.
+
 Once the exported bundle is deployed to a **different domain** than this WordPress install, those requests become cross-origin and the browser will block them until CORS is explicitly opened up — off by default, same posture as Turnstile:
 
 ```php
