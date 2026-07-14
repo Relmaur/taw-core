@@ -132,8 +132,15 @@ class ExportStaticCommand extends Command
             }
 
             $response = wp_remote_get($permalink, [
-                'timeout' => 30,
-                'headers' => ['X-TAW-Static-Export' => '1'],
+                'timeout'   => 30,
+                'headers'   => ['X-TAW-Static-Export' => '1'],
+                // Loopback request to this exact install's own permalink — same
+                // "local request" case WP core itself exempts from strict SSL
+                // verification for cron spawn / Site Health checks (the
+                // https_local_ssl_verify filter, off by default). Local dev
+                // environments almost always run self-signed certs; there's no
+                // third party being trusted here, just this server calling itself.
+                'sslverify' => false,
             ]);
 
             if (is_wp_error($response)) {
@@ -163,12 +170,24 @@ class ExportStaticCommand extends Command
         }
 
         // --- Static assets ---
+        // The exported HTML references assets at their real WordPress URL
+        // (e.g. /wp-content/themes/taw-theme/public/build/...) — that's what
+        // ViteLoader::assetUrl() printed into every page it fetched, and
+        // rewriteUrls() only touches home_url(), not theme-relative paths.
+        // So assets are copied to that exact same path inside the export
+        // dir rather than flattened to the export root, or every asset
+        // reference in the exported HTML would 404 once deployed.
+        $themeRelPath = trim((string) parse_url((string) get_template_directory_uri(), PHP_URL_PATH), '/');
+
         // Vite's outDir is theme-configurable — ViteLoader itself checks both
         // 'dist' and 'public/build' when resolving the manifest, so this does
         // too rather than assuming one.
         $viteDir = $this->detectViteDir();
         $distCopied = $viteDir !== null
-            && $this->copyIfExists($this->themeDir . '/' . $viteDir, $outDir . '/' . $viteDir);
+            && $this->copyIfExists(
+                $this->themeDir . '/' . $viteDir,
+                $outDir . '/' . $themeRelPath . '/' . $viteDir
+            );
 
         $uploadsSrc    = wp_get_upload_dir()['basedir'] ?? '';
         $uploadsCopied = $uploadsSrc !== '' && $this->copyIfExists($uploadsSrc, $outDir . '/wp-content/uploads');
@@ -186,7 +205,7 @@ class ExportStaticCommand extends Command
         $io->section('Assets');
         $io->listing([
             $distCopied
-                ? "Vite build copied → {$outDir}/{$viteDir}"
+                ? "Vite build copied → {$outDir}/{$themeRelPath}/{$viteDir}"
                 : "⚠ No Vite build output found (checked dist/ and public/build/) — run `npm run build` first, then re-export",
             $uploadsCopied
                 ? "Uploads copied → {$outDir}/wp-content/uploads"
