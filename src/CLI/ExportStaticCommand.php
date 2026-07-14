@@ -50,7 +50,7 @@ class ExportStaticCommand extends Command
             ->setHelp(<<<'HELP'
                 Fetches every published page and post over HTTP (its own permalink),
                 rewrites absolute site-URL references, and writes the result to
-                <dir>/<slug>/index.html — plus the built Vite assets (dist/) and
+                <dir>/<slug>/index.html — plus the built Vite assets (dist/ or public/build/) and
                 media uploads, so the export directory is a self-contained bundle
                 ready to deploy.
 
@@ -163,7 +163,13 @@ class ExportStaticCommand extends Command
         }
 
         // --- Static assets ---
-        $distCopied    = $this->copyIfExists($this->themeDir . '/dist', $outDir . '/dist');
+        // Vite's outDir is theme-configurable — ViteLoader itself checks both
+        // 'dist' and 'public/build' when resolving the manifest, so this does
+        // too rather than assuming one.
+        $viteDir = $this->detectViteDir();
+        $distCopied = $viteDir !== null
+            && $this->copyIfExists($this->themeDir . '/' . $viteDir, $outDir . '/' . $viteDir);
+
         $uploadsSrc    = wp_get_upload_dir()['basedir'] ?? '';
         $uploadsCopied = $uploadsSrc !== '' && $this->copyIfExists($uploadsSrc, $outDir . '/wp-content/uploads');
 
@@ -180,8 +186,8 @@ class ExportStaticCommand extends Command
         $io->section('Assets');
         $io->listing([
             $distCopied
-                ? "Vite build copied → {$outDir}/dist"
-                : "⚠ dist/ not found at {$this->themeDir}/dist — run `npm run build` first, then re-export",
+                ? "Vite build copied → {$outDir}/{$viteDir}"
+                : "⚠ No Vite build output found (checked dist/ and public/build/) — run `npm run build` first, then re-export",
             $uploadsCopied
                 ? "Uploads copied → {$outDir}/wp-content/uploads"
                 : '⚠ wp-content/uploads not found or empty — nothing copied',
@@ -230,6 +236,22 @@ class ExportStaticCommand extends Command
         }
 
         return $path;
+    }
+
+    /**
+     * Mirrors TAW\Support\ViteLoader::getManifest()'s own candidate order —
+     * 'dist' is the Vite default, 'public/build' is what this theme's
+     * vite.config.js actually configures.
+     */
+    private function detectViteDir(): ?string
+    {
+        foreach (['dist', 'public/build'] as $candidate) {
+            if (is_dir($this->themeDir . '/' . $candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     private function copyIfExists(string $src, string $dest): bool
