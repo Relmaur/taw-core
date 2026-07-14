@@ -3002,7 +3002,7 @@ class Metabox
             }
         }
 
-        return (string) wp_json_encode($sanitized);
+        return (string) wp_json_encode($sanitized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     /**
