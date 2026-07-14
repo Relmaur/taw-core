@@ -10,6 +10,7 @@ use TAW\Core\Editor\VisualEditor;
 use TAW\Core\Form\SubmissionsHandler;
 use TAW\Core\Metabox\MetaboxOrder;
 use TAW\Core\OptionsPage\OptionsPage;
+use TAW\Core\Rest\Cors;
 use TAW\Core\Rest\SearchEndpoints;
 use TAW\Core\Rest\VisualEditorEndpoint;
 use TAW\Helpers\Svg;
@@ -47,7 +48,7 @@ class Theme
      *   2. Theme asset pipeline (Vite HMR in dev, hashed manifest in prod)
      *   3. Queued block asset enqueuing (for FAUC-free above-the-fold blocks)
      *   4. Visual Editor (admin bar button + frontend editing shell)
-     *   5. REST API endpoints (visual editor save, post search)
+     *   5. REST API endpoints (visual editor save, post search) + opt-in headless CORS
      *   6. SVG support (upload allowlist + inline helper)
      *   7. Form submissions (taw_submission CPT + webhook settings page)
      */
@@ -85,6 +86,13 @@ class Theme
         // Each class registers its routes via rest_api_init in its constructor.
         new VisualEditorEndpoint();
         new SearchEndpoints();
+
+        // ── 5b. Headless CORS ──────────────────────────────────────────────────
+        // Opt-in only — no-op unless TAW_HEADLESS_ORIGINS is defined in
+        // wp-config.php. Lets a statically exported frontend (see `export:static`)
+        // hosted on a different domain reach taw/v1 REST routes and taw_form_*
+        // admin-ajax submissions.
+        Cors::register();
 
         // ── 6. SVG support ─────────────────────────────────────────────────────
         // Allow and sanitize SVG uploads, and provide a helper for inline SVG rendering.

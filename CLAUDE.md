@@ -12,6 +12,7 @@
 | Export block | `php bin/taw export:block <Name>` |
 | Static analysis | `composer run phpstan` |
 | Unit tests | `composer run test` (Brain Monkey — no real WP install needed) |
+| Static site export | `php bin/taw export:static [--dir=<path>] [--prod-url=<url>]` |
 
 ## Architecture
 
@@ -34,6 +35,7 @@
 - All registered metabox fields are visual-editor-enabled by default. Use `'editor' => false` to explicitly opt a field out.
 - **Visual editor is opt-in.** Call `VisualEditor::enable()` in the theme's `functions.php` before `Theme::boot()`. Without it, `isActive()` always returns false and nothing renders.
 - When the visual editor is active, `MetaBlock::render()` automatically wraps every block's output in `<div data-taw-block-section="{id}">`. The editor panel groups fields by block ID (matching the section attribute). Live text preview works via text-node content matching — no template annotations required for basic use.
+- **Headless CORS is opt-in.** `TAW\Core\Rest\Cors::register()` (wired into `Theme::boot()`) is a no-op unless `TAW_HEADLESS_ORIGINS` is defined in `wp-config.php` — needed only once a `export:static` bundle is served from a different domain than this WordPress install.
 
 ## Don't
 
