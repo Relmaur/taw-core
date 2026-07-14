@@ -13,6 +13,8 @@
 | Static analysis | `composer run phpstan` |
 | Unit tests | `composer run test` (Brain Monkey — no real WP install needed) |
 | Static site export | `php bin/taw export:static [--dir=<path>] [--prod-url=<url>]` |
+| SEO/copy audit — extract | `php bin/taw seo:extract <post_id> [--output=<path>]` |
+| SEO/copy audit — inject | `php bin/taw seo:inject <post_id> [--input=<path>] [--dry-run]` |
 
 ## Architecture
 

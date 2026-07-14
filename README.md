@@ -643,6 +643,8 @@ php bin/taw sync --json                              # check for framework drift
 php bin/taw sync --apply                             # also write Tier 1 scaffold changes
 php bin/taw export:static                            # static HTML export for edge hosting (see below)
 php bin/taw export:static --dir=/path --prod-url=https://my-site.pages.dev
+php bin/taw seo:extract 42 --output=.taw/seo-dump.json         # copy audit: extract text fields (see below)
+php bin/taw seo:inject 42 --input=.taw/seo-optimized.json      # copy audit: write rewrites back
 ```
 
 `make:block` generates the block folder, PHP class, template file, and Vite entry points.
@@ -652,6 +654,42 @@ php bin/taw export:static --dir=/path --prod-url=https://my-site.pages.dev
 `sync` is the scriptable core of the `update-theme` Claude Code skill and the `.github/workflows/framework-sync.yml` CI workflow — it checks whether the installed `taw/core` version is behind the latest GitHub tag, and whether the project's Tier 1/Tier 2 `taw-theme` scaffold paths (defined once in `resources/update-manifest.json`, shipped with this package) differ from the canonical repo. Unlike every other command here, it deliberately does **not** boot WordPress — the checks don't need it, and CI runners won't have a WP+DB environment available. Tier 1 paths (nothing client-specific has ever lived there) can be applied directly with `--apply`; Tier 2 paths (docs/build config that can legitimately accumulate client-specific additions) are always report-only — `sync` never writes them, by design, regardless of flags. It never touches `taw/core` itself either; run `composer update taw/core` separately.
 
 `export:static` fetches every published `page`/`post` over HTTP against its own permalink (a real request, same as a visitor's browser would make — this deliberately picks up anything hooked onto `template_redirect`/`the_content`, unlike rendering templates in-process would), rewrites absolute site-URL references, and writes `<dir>/<slug>/index.html` — plus the built Vite assets (`dist/`) and `wp-content/uploads/` — into a self-contained static bundle for edge hosting (Cloudflare Pages, Vercel, etc.). Boots WordPress the same way `inspect`/`fields:get`/`fields:set` do, via `WpLoader`. By default, absolute links are rewritten to root-relative paths (works on any deploy domain); pass `--prod-url` to rewrite to an absolute URL instead. See the `export-static` Claude Code skill (`taw-theme`'s `.claude/skills/export-static/`) for the guided agent workflow, including the one part of this that's easy to skip: forms and search are **not** exported statically — see below.
+
+`seo:extract`/`seo:inject` are the read/write halves of a copy-and-SEO audit loop — see below.
+
+---
+
+## SEO & Copy Audit
+
+`seo:extract <post_id>` walks the same live field registry `TAW\Core\Metabox\SeoContentIntegration` already walks to feed Yoast/SmartCrawl (`Metabox::getFieldRegistry()`, recursing into repeater rows via their own `fields` sub-schema), but keeps only `text`/`textarea`/`wysiwyg` fields with non-empty content — no image/URL/`post_select`/layout fields, to keep the dump small and focused on rewritable copy. Output is hierarchical JSON grouped by block:
+
+```json
+{
+    "post_id": 42,
+    "post_title": "Contact",
+    "post_type": "page",
+    "post_status": "publish",
+    "blocks": [
+        {
+            "block_id": "hero",
+            "metabox_title": "Hero Section",
+            "fields": [
+                { "field_id": "hero_heading", "label": "Heading", "type": "text", "value": "Lorem Ipsum" }
+            ]
+        }
+    ]
+}
+```
+
+`seo:inject <post_id>` writes an edited copy of that same shape back, with real safeguards — this isn't a thin wrapper around `update_post_meta()`:
+
+- **Every field is validated against the live registry before anything is written.** Renamed/removed field, wrong field type (only `text`/`textarea`/`wysiwyg`/repeaters-of-them are accepted — anything else is rejected, use `fields:set` instead), or a malformed row all fail the whole batch, atomically — never a partial write.
+- **Repeater rows are merged, never replaced.** Extraction only keeps a row's text sub-fields (an image/URL sub-field on the same row is dropped, on purpose, to save tokens) — so injection re-reads the *current* live row and overwrites only the sub-field keys actually present in the input, leaving every other sub-field on that row untouched.
+- **Row-count drift refuses instead of guessing.** If the live repeater's row count doesn't match the input (someone edited the post in the admin between extract and inject), the command refuses and says so — index-based row alignment is only meaningful if nothing moved in between.
+- **Never touches core post data.** Only `blocks[].fields[]` is ever read from the input file; a `post_title` key, if present, is silently ignored — same hard boundary `fields:set` documents.
+- `--dry-run` reports the sanitized values that would be written, without writing.
+
+The analysis itself — keyword presence, copywriting/CTA quality, readability — is deliberately not part of either command; that's LLM judgment, not mechanical extraction. See the `audit-seo` Claude Code skill (`taw-theme`'s `.claude/skills/audit-seo/`) for the guided workflow: extract → analyze → report Red Flags/Polish Opportunities → (with explicit approval) inject.
 
 ---
 
