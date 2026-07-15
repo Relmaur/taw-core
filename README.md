@@ -708,11 +708,15 @@ The analysis itself — keyword presence, copywriting/CTA quality, readability, 
 
 ### `TAW\Core\Seo\SeoMeta` — per-post SEO meta, Yoast-aware
 
-TAW has never owned meta title/description/social image natively — every real site either has an SEO plugin installed (Yoast, most commonly) or has had nothing at all: no `<meta name="description">`, no Open Graph/Twitter tags, no per-post title override. `SeoMeta` (wired into `Theme::boot()`) fixes this without fighting whatever else might be installed:
+TAW has never owned meta title/description/social image natively — every real site either has an SEO plugin installed (Yoast, most commonly) or has had nothing at all: no `<title>` override, no `<link rel="canonical">`, no `<meta name="description">`, no Open Graph/Twitter tags, no robots control. `SeoMeta` (wired into `Theme::boot()`) fixes this without fighting whatever else might be installed:
 
-- **No SEO plugin active** (the common case): registers its own lightweight metabox (SEO & Social — meta title, meta description, social share image, editor-enabled like any other field) and renders `<meta name="description">`/OG/Twitter tags itself on `wp_head` (priority 1), reading from its own fields with a post-title/featured-image fallback.
-- **Yoast active** (`defined('WPSEO_VERSION')`): TAW's own metabox and `<head>` output both stand down entirely — Yoast already owns both, and duplicating either would split/duplicate SEO signal. `SeoMeta::write()` and the `seo:extract`/`seo:inject` CLI commands read and write Yoast's own meta keys (`_yoast_wpseo_title`, `_yoast_wpseo_metadesc`, `_yoast_wpseo_opengraph-image-id`) directly in this case, so an agent-driven rewrite still lands somewhere the site owner's existing Yoast UI reflects it.
-- **A different plugin active** (RankMath, SmartCrawl): detected only far enough to stand TAW's own UI/`<head>` output down (avoiding duplicates) — not to write its meta. `SeoMeta::targetMetaKeys()['source']` reports `'unsupported'` in this case; `seo:inject` refuses any `seo_meta` write with a clear reason rather than guessing at that plugin's own key scheme.
+- **No SEO plugin active** (the common case): registers its own lightweight metabox (SEO & Social — meta title, meta description, social share image, "hide from search engines" checkbox, editor-enabled like any other field) and:
+  - Overrides the real `<title>` tag via the `document_title_parts` filter (only the page-specific half — WordPress's own "Title — Site Name" assembly still applies).
+  - Adds `noindex` via the `wp_robots` filter (core's own pipeline since WP 5.7) when the checkbox is set — never a hand-printed `<meta name="robots">` tag, which would duplicate/conflict with core's own `max-image-preview:large` default.
+  - Renders `<link rel="canonical">`, `<meta name="description">`, and OG/Twitter tags on `wp_head` (priority 1) — `og:type` is `article` for posts and `website` for everything else, with `article:published_time`/`article:modified_time` added for posts. `og:site_name`/`og:locale` are always included; `twitter:site` is pulled from the Twitter/X handle configured on `Schema`'s options page (see below), if set.
+  - **Covers more than singular posts/pages** — home (front page or blog index), archives (category/tag/taxonomy/post-type/date/author), and search results all get a title/description/canonical/OG/Twitter treatment too, not just single posts/pages.
+- **Yoast active** (`defined('WPSEO_VERSION')`): TAW's own metabox and all of the above output stand down entirely — Yoast already owns it, and duplicating any of it would split/duplicate SEO signal. `SeoMeta::write()` and the `seo:extract`/`seo:inject` CLI commands read and write Yoast's own meta keys (`_yoast_wpseo_title`, `_yoast_wpseo_metadesc`, `_yoast_wpseo_opengraph-image-id`) directly in this case, so an agent-driven rewrite still lands somewhere the site owner's existing Yoast UI reflects it.
+- **A different plugin active** (RankMath, SmartCrawl): detected only far enough to stand TAW's own UI/output down (avoiding duplicates) — not to write its meta. `SeoMeta::targetMetaKeys()['source']` reports `'unsupported'` in this case; `seo:inject` refuses any `seo_meta` write with a clear reason rather than guessing at that plugin's own key scheme.
 
 ```php
 use TAW\Core\Seo\SeoMeta;
@@ -722,6 +726,31 @@ SeoMeta::targetMetaKeys();         // ['source' => 'taw_native'|'yoast'|'unsuppo
 SeoMeta::metaTitle($postId);       // resolves from whichever store is currently authoritative
 SeoMeta::write($postId, $title, $description, $ogImageId);  // null = leave that field unchanged
 ```
+
+### `TAW\Core\Seo\Schema` — sitewide JSON-LD structured data
+
+Before this existed, TAW emitted zero `schema.org` structured data anywhere — the single largest gap for AI-search/GEO visibility, regardless of whether `SeoMeta`'s own tags were present. `Schema` (also wired into `Theme::boot()`, right after `SeoMeta`) mirrors the same plugin-detection stand-down: no settings page, no output, whenever `SeoMeta::isSeoPluginActive()` is true — Yoast/RankMath/etc. already emit their own Organization/WebSite/Article/Breadcrumb schema, and duplicating it would produce conflicting structured data.
+
+When no SEO plugin is active, it registers its own **SEO Schema** admin settings page (organization type, name, logo, phone, Twitter/X handle, and a repeater of social profile URLs feeding the `sameAs` entity signal) and renders one `<script type="application/ld+json">` per page on `wp_footer` — deliberately not `wp_head`, since blocks (which can contribute their own nodes) render in the body, after `wp_head` has already fired. The `@graph` always includes:
+
+- **Organization** (or **LocalBusiness**, if selected) — name/url/logo/telephone/`sameAs`.
+- **WebSite** — linked to the Organization node via `publisher`.
+- **Article** — on singular posts only: headline, `datePublished`/`dateModified`, author (`Person`), image, linked to the Organization node via `publisher`.
+- **BreadcrumbList** — on any singular post/page: Home → parent pages (for a `Page`) or primary category (for a `Post`) → current.
+
+Blocks can add their own nodes to the same graph:
+
+```php
+use TAW\Core\Seo\Schema;
+
+// Anywhere during template rendering, before wp_footer fires:
+Schema::push(Schema::faqPage($items));  // $items: [['question' => ..., 'answer' => ...], ...]
+
+// Or push an arbitrary schema.org node directly:
+Schema::push(['@type' => 'HowTo', 'name' => '...', /* ... */]);
+```
+
+`Schema::faqPage()` is the reference example — `taw-theme`'s `FAQ` block calls it in its `index.php` template, from the exact same `$items` array the accordion markup renders from, so the two can never drift out of sync.
 
 ---
 

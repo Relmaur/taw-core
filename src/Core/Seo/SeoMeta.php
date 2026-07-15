@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\Seo;
 
 use TAW\Core\Metabox\Metabox;
+use TAW\Core\OptionsPage\OptionsPage;
 use TAW\Helpers\Image;
 
 if (!defined('ABSPATH')) {
@@ -12,19 +13,21 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Per-post SEO meta (meta title, meta description, social/OG image) — a
- * capability TAW has never owned natively. Every real site either has an
+ * Per-post SEO meta (meta title, meta description, social/OG image,
+ * noindex) plus the technical on-page signals that ride alongside them —
+ * a capability TAW has never owned natively. Every real site either has an
  * SEO plugin installed (Yoast, most commonly) or has nothing at all: no
- * <meta name="description">, no OG/Twitter tags, no per-post title
- * override.
+ * <title> override, no <meta name="description">, no canonical tag, no
+ * OG/Twitter tags, no robots control.
  *
  * Dual-write, Yoast-aware by design — never assumes a plugin is present,
  * never fights one that is:
  *
  *   - No SEO plugin active: registers its own lightweight metabox
- *     (`_taw_seo_meta_title`/`_taw_seo_meta_description`/`_taw_seo_og_image`)
- *     and renders the actual <head> tags itself on wp_head.
- *   - Yoast active: TAW's own metabox and <head> output both stand down —
+ *     (`_taw_seo_meta_title`/`_taw_seo_meta_description`/`_taw_seo_og_image`/
+ *     `_taw_seo_noindex`) and renders the actual <title>, <link rel="canonical">,
+ *     <meta name="description">, robots, and OG/Twitter tags itself.
+ *   - Yoast active: TAW's own metabox and output both stand down —
  *     Yoast already owns both the editor UI and the <head> tags, and
  *     duplicating either would be actively harmful (split/duplicate SEO
  *     signal, confusing crawlers). SeoExtractCommand/SeoInjectCommand
@@ -43,6 +46,7 @@ final class SeoMeta
     public const TITLE_FIELD = 'seo_meta_title';
     public const DESCRIPTION_FIELD = 'seo_meta_description';
     public const OG_IMAGE_FIELD = 'seo_og_image';
+    public const NOINDEX_FIELD = 'seo_noindex';
 
     private const YOAST_TITLE_KEY = '_yoast_wpseo_title';
     private const YOAST_DESCRIPTION_KEY = '_yoast_wpseo_metadesc';
@@ -54,6 +58,8 @@ final class SeoMeta
         if (!self::isSeoPluginActive()) {
             add_action('init', [$this, 'registerMetabox']);
             add_action('wp_head', [$this, 'renderHeadTags'], 1);
+            add_filter('document_title_parts', [$this, 'filterDocumentTitle']);
+            add_filter('wp_robots', [$this, 'filterRobots']);
         }
     }
 
@@ -194,7 +200,7 @@ final class SeoMeta
                     'id' => self::TITLE_FIELD,
                     'label' => __('Meta Title', 'taw-theme'),
                     'type' => 'text',
-                    'description' => __('Falls back to the post title when empty.', 'taw-theme'),
+                    'description' => __('Falls back to the post title when empty. Also used as the <title> tag itself, not just social previews.', 'taw-theme'),
                 ],
                 [
                     'id' => self::DESCRIPTION_FIELD,
@@ -208,32 +214,94 @@ final class SeoMeta
                     'type' => 'image',
                     'description' => __('Used for Open Graph/Twitter card previews. Falls back to the featured image when empty.', 'taw-theme'),
                 ],
+                [
+                    'id' => self::NOINDEX_FIELD,
+                    'label' => __('Hide from search engines', 'taw-theme'),
+                    'type' => 'checkbox',
+                    'description' => __('Adds noindex — the page stays live but search engines are asked not to list it.', 'taw-theme'),
+                ],
             ],
         ]);
     }
 
-    public function renderHeadTags(): void
+    /**
+     * Overrides the actual <title> tag via document_title_parts — separate
+     * from renderHeadTags()'s og:title/twitter:title, which read the same
+     * stored value but were, before this existed, the *only* place it was
+     * ever used. Leaves the 'site' part of $parts alone so the default
+     * "Page Title {separator} Site Name" assembly still applies; this only
+     * replaces the page-specific half.
+     *
+     * @param array<string, string> $parts
+     * @return array<string, string>
+     */
+    public function filterDocumentTitle(array $parts): array
     {
         if (!is_singular()) {
-            return;
+            return $parts;
         }
 
         $postId = get_the_ID();
         if (!$postId) {
+            return $parts;
+        }
+
+        $title = self::metaTitle($postId);
+        if ($title !== '') {
+            $parts['title'] = $title;
+        }
+
+        return $parts;
+    }
+
+    /**
+     * Adds noindex to WordPress core's wp_robots pipeline (available since
+     * 5.7) instead of printing a separate <meta name="robots"> tag —
+     * avoids a duplicate/conflicting tag alongside core's own
+     * max-image-preview:large default and anything else already hooked
+     * into wp_robots.
+     *
+     * @param array<string, bool> $robots
+     * @return array<string, bool>
+     */
+    public function filterRobots(array $robots): array
+    {
+        if (!is_singular()) {
+            return $robots;
+        }
+
+        $postId = get_the_ID();
+        if ($postId && Metabox::get_bool($postId, self::NOINDEX_FIELD)) {
+            $robots['noindex'] = true;
+        }
+
+        return $robots;
+    }
+
+    public function renderHeadTags(): void
+    {
+        $context = $this->resolveContext();
+        if ($context === null) {
             return;
         }
 
-        $title = self::metaTitle($postId) ?: get_the_title($postId);
-        $description = self::metaDescription($postId);
-        $ogImageId = self::ogImageId($postId) ?: get_post_thumbnail_id($postId);
-        $imageUrl = $ogImageId ? Image::url($ogImageId, 'full') : '';
-        $url = (string) get_permalink($postId);
+        $title = $context['title'];
+        $description = $context['description'];
+        $url = $context['url'];
+        $ogType = $context['og_type'];
+        $imageUrl = $context['image_id'] ? Image::url($context['image_id'], 'full') : '';
+
+        if ($url !== '') {
+            printf('<link rel="canonical" href="%s">' . "\n", esc_url($url));
+        }
 
         if ($description !== '') {
             printf('<meta name="description" content="%s">' . "\n", esc_attr($description));
         }
 
-        printf('<meta property="og:type" content="website">' . "\n");
+        printf('<meta property="og:site_name" content="%s">' . "\n", esc_attr(get_bloginfo('name')));
+        printf('<meta property="og:locale" content="%s">' . "\n", esc_attr(get_locale()));
+        printf('<meta property="og:type" content="%s">' . "\n", esc_attr($ogType));
         printf('<meta property="og:title" content="%s">' . "\n", esc_attr($title));
         if ($description !== '') {
             printf('<meta property="og:description" content="%s">' . "\n", esc_attr($description));
@@ -244,8 +312,20 @@ final class SeoMeta
         if ($imageUrl !== '') {
             printf('<meta property="og:image" content="%s">' . "\n", esc_url($imageUrl));
         }
+        if ($ogType === 'article') {
+            if ($context['published'] !== '') {
+                printf('<meta property="article:published_time" content="%s">' . "\n", esc_attr($context['published']));
+            }
+            if ($context['modified'] !== '') {
+                printf('<meta property="article:modified_time" content="%s">' . "\n", esc_attr($context['modified']));
+            }
+        }
 
         printf('<meta name="twitter:card" content="%s">' . "\n", $imageUrl !== '' ? 'summary_large_image' : 'summary');
+        $twitterHandle = (string) OptionsPage::get('twitter_handle');
+        if ($twitterHandle !== '') {
+            printf('<meta name="twitter:site" content="%s">' . "\n", esc_attr($twitterHandle));
+        }
         printf('<meta name="twitter:title" content="%s">' . "\n", esc_attr($title));
         if ($description !== '') {
             printf('<meta name="twitter:description" content="%s">' . "\n", esc_attr($description));
@@ -253,5 +333,90 @@ final class SeoMeta
         if ($imageUrl !== '') {
             printf('<meta name="twitter:image" content="%s">' . "\n", esc_url($imageUrl));
         }
+    }
+
+    /**
+     * Resolves the current request into head-tag data, or null when the
+     * current context has nothing sensible to describe (404, feeds, admin,
+     * etc.). Covers more than singular posts/pages — home, archives (term,
+     * date, author, post-type), and search all previously rendered no
+     * description/OG/Twitter/canonical output at all, even with no SEO
+     * plugin installed.
+     *
+     * @return array{title: string, description: string, url: string, og_type: string, image_id: int, published: string, modified: string}|null
+     */
+    private function resolveContext(): ?array
+    {
+        if (is_singular()) {
+            return $this->singularContext();
+        }
+
+        if (is_front_page() || is_home()) {
+            return [
+                'title' => get_bloginfo('name'),
+                'description' => get_bloginfo('description'),
+                'url' => home_url('/'),
+                'og_type' => 'website',
+                'image_id' => 0,
+                'published' => '',
+                'modified' => '',
+            ];
+        }
+
+        if (is_archive() || is_search()) {
+            $title = is_search()
+                ? sprintf(__('Search results for "%s"', 'taw-theme'), get_search_query())
+                : (string) get_the_archive_title();
+
+            return [
+                'title' => $title,
+                'description' => wp_strip_all_tags((string) get_the_archive_description()),
+                'url' => $this->currentUrl(),
+                'og_type' => 'website',
+                'image_id' => 0,
+                'published' => '',
+                'modified' => '',
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{title: string, description: string, url: string, og_type: string, image_id: int, published: string, modified: string}|null
+     */
+    private function singularContext(): ?array
+    {
+        $postId = get_the_ID();
+        if (!$postId) {
+            return null;
+        }
+
+        $isPost = get_post_type($postId) === 'post';
+
+        return [
+            'title' => self::metaTitle($postId) ?: get_the_title($postId),
+            'description' => self::metaDescription($postId),
+            'url' => (string) (wp_get_canonical_url($postId) ?: get_permalink($postId)),
+            'og_type' => $isPost ? 'article' : 'website',
+            'image_id' => self::ogImageId($postId) ?: (int) get_post_thumbnail_id($postId),
+            'published' => $isPost ? (string) get_the_date('c', $postId) : '',
+            'modified' => $isPost ? (string) get_the_modified_date('c', $postId) : '',
+        ];
+    }
+
+    /**
+     * Best-effort current-URL resolution for non-singular contexts, where
+     * wp_get_canonical_url() (core's own helper) doesn't apply — it only
+     * ever resolves singular posts/pages. Built from $wp->request (the
+     * matched rewrite path), the same primitive core itself resolves
+     * pretty-permalink archive/search URLs from.
+     */
+    private function currentUrl(): string
+    {
+        global $wp;
+        $path = isset($wp->request) ? (string) $wp->request : '';
+
+        return $path !== '' ? home_url(user_trailingslashit($path)) : home_url('/');
     }
 }

@@ -13,6 +13,7 @@ use TAW\Core\OptionsPage\OptionsPage;
 use TAW\Core\Rest\Cors;
 use TAW\Core\Rest\SearchEndpoints;
 use TAW\Core\Rest\VisualEditorEndpoint;
+use TAW\Core\Seo\Schema;
 use TAW\Core\Seo\SeoMeta;
 use TAW\Helpers\Svg;
 use TAW\Support\Performance;
@@ -53,6 +54,7 @@ class Theme
      *   6. SVG support (upload allowlist + inline helper)
      *   7. Form submissions (taw_submission CPT + webhook settings page)
      *   8. SEO meta (meta title/description/social image — stands down if an SEO plugin is active)
+     *   9. SEO structured data (JSON-LD Organization/WebSite/Article/BreadcrumbList — stands down if an SEO plugin is active)
      */
     public static function boot(): void
     {
@@ -109,6 +111,12 @@ class Theme
         // Stands entirely down if any known SEO plugin (Yoast, RankMath,
         // SmartCrawl) is active — see SeoMeta's own docblock for why.
         new SeoMeta();
+
+        // ── 9. SEO structured data (JSON-LD) ──────────────────────────────────
+        // Organization/WebSite/Article/BreadcrumbList on wp_footer, plus
+        // whatever individual blocks push onto the graph (e.g. the FAQ
+        // block's FAQPage node). Same plugin-detection stand-down as SeoMeta.
+        new Schema();
     }
 
     /**
