@@ -20,6 +20,31 @@ Auto-discovers blocks, initializes Vite, registers REST endpoints, enables the v
 
 ---
 
+## Versioning — a change on `main` is invisible downstream until tagged
+
+Consuming projects (`taw-theme` and any client site) never install `main` — they pin via
+`composer.json`'s `"taw/core": "^1.0"` constraint, resolved and locked to a specific **tag** in
+their own `composer.lock`. Pushing a commit to this repo's `main` branch, by itself, changes
+nothing for any consumer, no matter how long it sits there:
+
+1. **Tag a release** (see the `taw-release` Claude Code skill, umbrella-side) — an annotated
+   `vX.Y.Z` tag, pushed.
+2. **Only then** does a consumer's `composer update taw/core` have anything new to pick up —
+   and that update still needs to happen and be committed (`composer.lock`) in the consumer's
+   own repo before its CI, or anyone else's `composer install`, sees the change.
+
+**This bit a real release**: a new `TAW\Core\Seo\Schema` class was added and pushed to `main`,
+a consumer block (`taw-theme`'s `FAQ`) was written against it, and local validation passed —
+but only because validation copied source files directly into the consumer's `vendor/taw/core/`
+by hand, which bypasses Composer's actual version resolution entirely. CI then failed with
+`class.notFound`, because the consumer's real `composer.lock` was still pinned to the previous
+tag, which predated the new class. **Never validate a `taw-core` change against a consumer by
+hand-copying files into its `vendor/`** — the only way to get a true read is: tag → push tag →
+`composer update taw/core` in the consumer → run its checks against what that actually
+resolved to.
+
+---
+
 ## Architecture
 
 ```
