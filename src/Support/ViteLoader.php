@@ -160,8 +160,9 @@ class ViteLoader
     // ── Dev-server detection ───────────────────────────────────────────────
 
     /**
-     * Returns true when the Vite dev server is actually reachable and
-     * responding — not just "something is listening on the port."
+     * Returns true when *this project's* Vite dev server is actually
+     * reachable and responding — not just "something is listening on the
+     * port," and not just "some Vite dev server is listening on the port."
      *
      * A bare TCP port probe (the old implementation: fsockopen($host, 5173))
      * is a false-positive trap: any unrelated process — a Docker container,
@@ -172,20 +173,23 @@ class ViteLoader
      * manifest on disk is completely correct. This is a real bug that has
      * happened on a real project (a stray Docker process squatting the port).
      *
-     * Fixed by verifying at the HTTP level, not just the TCP level: after
-     * connecting, request GET /@vite/client — the module every Vite dev
-     * server always serves — and check for a response that actually looks
-     * like it (HTTP 200 status). Only a real Vite dev server passes this;
-     * an unrelated process on the same port will not.
+     * Verifying at the HTTP level (GET /@vite/client → 200) fixes the
+     * non-Vite-process case, but is *not* sufficient on its own: that
+     * endpoint is generic — every Vite dev server, from any project on the
+     * machine, answers it identically. A second real incident on a real
+     * client project proved this: an unrelated, non-TAW Vite project
+     * happened to be running its own dev server on port 5173 while this
+     * project only ran `npm run build` (no dev server active at all) —
+     * the HTTP check still passed, because *a* Vite server answered, just
+     * not *this project's*.
      *
-     * The theme's optional hot-file convention (vite.config.js writing the
-     * dev server's actual URL to dist/hot or public/build/hot on startup) is
-     * used to resolve which host:port to check, when present — this matters
-     * because Vite can pick a different port than 5173 if it's already
-     * taken. Falls back to the hardcoded default host:port when no hot file
-     * exists (an unmodified vite.config.js, or the dev server simply isn't
-     * running) — the HTTP-level check makes this fallback safe even without
-     * the hot file, unlike the old bare TCP probe.
+     * The fix: only ever probe a host:port sourced from this project's own
+     * hot file (vite.config.js writing its actual dev server origin to
+     * dist/hot or public/build/hot on startup, deleting it on shutdown —
+     * see hotFileUrl()). No hot file is treated as definitive proof this
+     * project's dev server isn't running — never fall back to guessing at
+     * the hardcoded default port, which is exactly what let an unrelated
+     * project's dev server be mistaken for this one's.
      *
      * Result is cached for the lifetime of the request via a static variable.
      */
@@ -197,15 +201,17 @@ class ViteLoader
             return $is_dev;
         }
 
-        $host = self::DEV_HOST;
-        $port = self::DEV_PORT;
-
         $hot_url = self::hotFileUrl();
-        if ($hot_url !== null) {
-            $parts = parse_url($hot_url);
-            $host  = $parts['host'] ?? $host;
-            $port  = (int) ($parts['port'] ?? $port);
+
+        if ($hot_url === null) {
+            $is_dev = false;
+
+            return $is_dev;
         }
+
+        $parts = parse_url($hot_url);
+        $host  = $parts['host'] ?? self::DEV_HOST;
+        $port  = (int) ($parts['port'] ?? self::DEV_PORT);
 
         $is_dev = self::probeViteDevServer($host, $port);
 
@@ -213,9 +219,14 @@ class ViteLoader
     }
 
     /**
-     * TCP-connect to $host:$port and confirm a real Vite dev server answers
-     * by requesting GET /@vite/client and checking for an HTTP 200 response.
-     * A bare TCP connect alone isn't enough — see isDevServerRunning() docblock.
+     * TCP-connect to $host:$port (sourced from this project's own hot file
+     * — see isDevServerRunning()) and confirm a real Vite dev server
+     * answers by requesting GET /@vite/client and checking for an HTTP 200
+     * response. A bare TCP connect alone isn't enough — see
+     * isDevServerRunning()'s docblock. This check alone also isn't enough
+     * to identify *whose* Vite dev server it is, which is why the caller
+     * must only ever pass a host:port already known to belong to this
+     * project (from the hot file), never a hardcoded guess.
      */
     private static function probeViteDevServer(string $host, int $port): bool
     {
@@ -246,8 +257,12 @@ class ViteLoader
      * Convention (matching Laravel's Vite plugin): the theme's vite.config.js
      * writes its actual dev server origin (e.g. "http://localhost:5173") to
      * dist/hot or public/build/hot when the server starts, and deletes it on
-     * shutdown. Not every theme's vite.config.js implements this — absence
-     * just means isDevServerRunning() falls back to the legacy port probe.
+     * shutdown. isDevServerRunning() treats absence as definitive proof this
+     * project's dev server isn't running — a theme whose vite.config.js
+     * doesn't implement this convention (very old/hand-rolled, predating the
+     * canonical scaffold's hotFilePlugin) will simply never report dev mode
+     * via this class; that's the deliberate tradeoff for eliminating the
+     * false-positive risk of guessing at a hardcoded default port.
      *
      * Result is cached for the lifetime of the request via a static variable.
      */
