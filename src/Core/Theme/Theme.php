@@ -216,13 +216,13 @@ class Theme
         self::performance($performanceConfig);
 
         // CSS Studio — inject tawConfig so app.js can check the toggle.
-        // Only emitted when the Vite dev server is active.
+        // Only emitted when the Vite dev server is active. Uses
+        // ViteLoader::isDevServerRunning() rather than a bare port probe —
+        // hot-file-aware (correct even when Vite fell back off port 5173 to
+        // avoid a conflict with another project's dev server) and verified
+        // at the HTTP level, not just "something is listening on the port."
         add_action('wp_head', static function () {
-            $is_dev = function_exists('vite_is_dev')
-                ? vite_is_dev()
-                : (bool) @fsockopen('localhost', 5173, $errno, $errstr, 0.1);
-
-            if (!$is_dev) {
+            if (!ViteLoader::isDevServerRunning()) {
                 return;
             }
 
