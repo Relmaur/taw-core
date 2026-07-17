@@ -86,7 +86,7 @@ abstract class BaseBlock
         $head_done = did_action('wp_head') > 0;
 
         if ($style_ext) {
-            $url = ViteLoader::DEV_SERVER . '/' . $relative_dir . '/' . $style_ext;
+            $url = ViteLoader::devServerOrigin() . '/' . $relative_dir . '/' . $style_ext;
 
             if ($head_done) {
                 // Fallback: wp_head already fired, print inline
@@ -98,7 +98,7 @@ abstract class BaseBlock
 
         if (file_exists($this->dir . '/script.js')) {
             $handle = 'taw-block-' . $assetId;
-            wp_enqueue_script($handle, ViteLoader::DEV_SERVER . '/' . $relative_dir . '/script.js', ['vite-client'], null, false);
+            wp_enqueue_script($handle, ViteLoader::devServerOrigin() . '/' . $relative_dir . '/script.js', ['vite-client'], null, false);
             ViteLoader::$moduleHandles[] = $handle;
             wp_script_add_data($handle, 'group', 0);
         }

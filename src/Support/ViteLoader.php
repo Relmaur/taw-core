@@ -295,8 +295,15 @@ class ViteLoader
      * The dev server origin to use for asset URLs — the hot file's actual
      * URL if available (correct even if Vite picked a non-default port),
      * otherwise the hardcoded default.
+     *
+     * Public: BaseBlock::enqueueDevAssets() (a different class) needs this
+     * for per-block style.{css,scss}/script.js URLs too — every other dev
+     * asset path in this class already goes through here; that block-level
+     * path was the one spot still trusting the hardcoded DEV_SERVER
+     * constant unconditionally, silently pointing at the wrong origin
+     * whenever Vite fell back off the default port.
      */
-    private static function devServerOrigin(): string
+    public static function devServerOrigin(): string
     {
         return self::hotFileUrl() ?? self::DEV_SERVER;
     }
