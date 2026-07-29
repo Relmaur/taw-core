@@ -8,6 +8,8 @@ use TAW\Core\Block\BlockLoader;
 use TAW\Core\Block\BlockRegistry;
 use TAW\Core\Editor\VisualEditor;
 use TAW\Core\Form\SubmissionsHandler;
+use TAW\Core\Icons\Lucide;
+use TAW\Core\Media\MediaFolders;
 use TAW\Core\Metabox\MetaboxOrder;
 use TAW\Core\OptionsPage\OptionsPage;
 use TAW\Core\Rest\Cors;
@@ -55,6 +57,8 @@ class Theme
      *   7. Form submissions (taw_submission CPT + webhook settings page)
      *   8. SEO meta (meta title/description/social image — stands down if an SEO plugin is active)
      *   9. SEO structured data (JSON-LD Organization/WebSite/Article/BreadcrumbList — stands down if an SEO plugin is active)
+     *  10. Lucide icon picker (opt-in — no-op unless Lucide::enable() was called)
+     *  11. Media Folders (opt-in — no-op unless MediaFolders::enable() was called)
      */
     public static function boot(): void
     {
@@ -117,6 +121,17 @@ class Theme
         // whatever individual blocks push onto the graph (e.g. the FAQ
         // block's FAQPage node). Same plugin-detection stand-down as SeoMeta.
         new Schema();
+
+        // ── 10. Lucide icon picker ──────────────────────────────────────────
+        // Opt-in only — no-op unless Lucide::enable() was called. Adds the
+        // 'icon' Metabox/OptionsPage field type and its wp-admin picker.
+        Lucide::init();
+
+        // ── 11. Media Folders ────────────────────────────────────────────────
+        // Opt-in only — no-op unless MediaFolders::enable() was called.
+        // Nestable Media Library folders: a dedicated Media -> Folders
+        // screen plus a filter/column/bulk-action on the classic List view.
+        MediaFolders::init();
     }
 
     /**

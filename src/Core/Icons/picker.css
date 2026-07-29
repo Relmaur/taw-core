@@ -1,0 +1,127 @@
+.taw-icon-field {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.taw-icon-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 8rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.taw-icon-preview__svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.taw-icon-preview__name {
+  font-family: Consolas, Monaco, monospace;
+  font-size: 12px;
+  color: #444;
+}
+
+.taw-icon-preview__empty {
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+}
+
+.taw-icon-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 160000;
+  background: rgba(0, 0, 0, 0.5);
+  align-items: center;
+  justify-content: center;
+
+  &.is-open {
+    display: flex;
+  }
+}
+
+.taw-icon-modal__dialog {
+  width: min(720px, 92vw);
+  max-height: 80vh;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.taw-icon-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid #ddd;
+
+  .taw-icon-modal__search {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    font-size: 14px;
+  }
+
+  .taw-icon-modal__close {
+    border: none;
+    background: transparent;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    color: #555;
+    padding: 0 0.25rem;
+  }
+}
+
+.taw-icon-modal__grid {
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 0.35rem;
+
+  &[aria-busy='true'] {
+    opacity: 0.5;
+  }
+}
+
+.taw-icon-modal__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0.5rem;
+
+  &:hover,
+  &:focus-visible {
+    border-color: #999;
+    background: #f0f0f1;
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+    color: #23282d;
+  }
+}
+
+.taw-icon-modal__empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: #888;
+  padding: 2rem 0;
+}

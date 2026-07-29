@@ -190,6 +190,7 @@ new Metabox([
 | `post_select` | AJAX post picker; single or multi |
 | `repeater` | Dynamic rows stored as JSON; supports nesting |
 | `datepicker` | jQuery UI; stored as date string; `date_format`, `min_date`, `max_date` |
+| `icon` | Lucide icon picker; stores icon name — **opt-in**, requires `Lucide::enable()` (see [Icon System](#icon-system)) |
 
 All fields accept: `id`, `label`, `description`, `placeholder`, `default`, `required`, `width` (%).
 
@@ -601,6 +602,7 @@ Annotations give the editor a direct DOM reference, making live updates exact an
 | `POST` | `/taw/v1/visual-editor/save`   | Save visual editor changes |
 | `GET`  | `/taw/v1/visual-editor/fields` | Load all registered fields + current values for the editor panel |
 | `GET`  | `/taw/v1/search-posts`         | Post search for `post_select` fields |
+| `GET`  | `/taw/v1/icons`                | Lucide icon search for the `icon` field type — only registered when `Lucide::enable()` was called |
 
 Cross-origin access to these routes (and to `admin-ajax.php?action=taw_form_*`) is opt-in and off by default — see [Static Export & Headless CORS](#static-export--headless-cors).
 
@@ -618,6 +620,36 @@ $url = Svg::url($attachment_id);
 ```
 
 Sanitized on upload via `enshrined/svg-sanitize`. Sub-sizes are not generated.
+
+---
+
+## Icon System
+
+Lucide's full icon set (~1,750 icons, [lucide.dev](https://lucide.dev)) is vendored locally into this package (`resources/icons/lucide/` + `resources/icons/lucide-index.json`, populated by `php bin/taw icons:sync`) — the admin picker never makes a network call.
+
+**Opt-in.** The `icon` field type and its wp-admin picker only work once enabled, in the theme's `inc/customizations.php`, before `Theme::boot()`:
+
+```php
+TAW\Core\Icons\Lucide::enable();
+```
+
+Without it, an `'type' => 'icon'` field renders an inline notice instead of the picker, telling you to call `enable()`.
+
+Once enabled, use it like any other Metabox/OptionsPage field:
+
+```php
+['id' => 'feature_icon', 'label' => 'Icon', 'type' => 'icon']
+```
+
+The stored value is a bare icon name (e.g. `'house'`), sanitized with `sanitize_key()`. Render it in a template with `Lucide::render()` — this part needs **no** `enable()` call, same relationship as `Svg::register()` (upload support) vs `Svg::inline()`/`Svg::render()` (template output):
+
+```php
+use TAW\Core\Icons\Lucide;
+
+echo Lucide::render('house', ['class' => 'w-5 h-5', 'title' => 'Home']);
+```
+
+Icons are Lucide's raw `stroke="currentColor"` SVGs, so CSS/Tailwind text-color utilities control their color for free. `Lucide::render()` returns `''` for an unknown or malformed icon name — safe to echo unconditionally.
 
 ---
 
@@ -655,6 +687,30 @@ foreach ($menu->items() as $item) {
 
 ---
 
+## Media Folders
+
+Nestable Media Library folders, built on a single hierarchical taxonomy (`taw_media_folder`) registered on `attachment` with `show_in_rest => true`. That one flag is what gives the admin UI, for free, from WordPress core itself — no custom REST endpoint exists for this feature:
+
+- full folder (term) CRUD, including re-nesting via `parent`, at `wp/v2/taw_media_folder`
+- a `taw_media_folder` param on the existing `wp/v2/media` route, for filtering and for reassigning a file's folder
+
+**Opt-in**, same pattern as everything else here:
+
+```php
+TAW\Core\Media\MediaFolders::enable();
+```
+
+`taw-theme`'s own `inc/customizations.php` scaffold calls this by default, so it ships active on every new taw-theme site — remove the line there if a given site doesn't need it. Folder management needs only the `upload_files` capability, not `manage_options`.
+
+Two admin surfaces:
+
+- **Media → Folders** — a dedicated screen: a folder tree (create/rename/delete, drag-and-drop to re-nest) and a drag-and-drop attachment grid, including an "Unfiled" pseudo-folder for attachments with no folder assigned. Entirely our own markup/JS/REST calls — no WordPress core Grid-view (Backbone) internals are touched, deliberately, since patching those would be fragile across WP core versions.
+- The classic Media Library **List view** (`upload.php?mode=list`) — a folder filter dropdown, a "Folder" column, and a "Move to folder…" bulk action, for anyone who prefers browsing there.
+
+A folder's place in the tree is its only "category" — one folder per attachment (`wp_set_object_terms()`), no separate tagging layer.
+
+---
+
 ## CLI
 
 ```bash
@@ -671,6 +727,7 @@ php bin/taw export:static --dir=/path --prod-url=https://my-site.pages.dev
 php bin/taw seo:extract 42 --output=.taw/seo-dump.json         # copy audit: extract text fields (see below)
 php bin/taw seo:inject 42 --input=.taw/seo-optimized.json      # copy audit: write rewrites back
 php bin/taw wp post list --post_type=page                      # WP-CLI passthrough, socket/--path auto-resolved (see below)
+php bin/taw icons:sync                                          # re-vendor the Lucide icon set (see Icon System)
 ```
 
 `make:block` generates the block folder, PHP class, template file, and Vite entry points.
@@ -684,6 +741,8 @@ php bin/taw wp post list --post_type=page                      # WP-CLI passthro
 `seo:extract`/`seo:inject` are the read/write halves of a copy-and-SEO audit loop — see below.
 
 `wp` is a thin passthrough to WordPress's own official CLI (the real `wp` binary, found on `PATH` via `Symfony\Component\Process\ExecutableFinder`) — every argument after `wp` is forwarded exactly as given, unparsed. Resolves two things that otherwise need manual, hand-typed configuration every time under Local by Flywheel: `--path` (the WordPress root, via the same `WpLoader::locate()` logic every other WP-booting command here uses) and the per-site MySQL socket (`WpLoader::resolveLocalSocket()` — Local runs a separate MySQL instance per site on its own Unix socket, not the system default `mysqli.default_socket`/`pdo_mysql.default_socket` PHP CLI otherwise uses, so a bare `wp` command run from an ordinary terminal fails with a DB connection error even though the site works fine in the browser). A no-op wrapper everywhere this doesn't apply (real hosting, CI, DDEV, Herd) — it still resolves `--path` and runs `wp` normally, just without the extra `-d` flags.
+
+`icons:sync` re-vendors the Lucide icon set this package ships (see [Icon System](#icon-system)) — shallow-clones `lucide-icons/lucide`, copies every icon SVG into `resources/icons/lucide/`, and rebuilds `resources/icons/lucide-index.json`. Doesn't boot WordPress or touch a consuming theme; only run it here, in `taw-core` itself, when Lucide ships new icons.
 
 ---
 

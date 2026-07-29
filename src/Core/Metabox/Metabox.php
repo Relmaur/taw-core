@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core\Metabox;
 
+use TAW\Core\Icons\Lucide;
 use TAW\Helpers\Framework;
 
 /**
@@ -751,6 +752,10 @@ class Metabox
         if (in_array('datepicker', $all_types, true)) {
             wp_enqueue_script('jquery-ui-datepicker');
             self::enqueue_datepicker_script();
+        }
+
+        if (in_array('icon', $all_types, true) && Lucide::isEnabled()) {
+            Lucide::enqueuePickerAssets();
         }
     }
 
@@ -2003,6 +2008,45 @@ class Metabox
                 </div>
             <?php break;
 
+            /* ---- MARK: Icon (Lucide) ---- */
+            case 'icon':
+                if (!Lucide::isEnabled()) {
+            ?>
+                    <p class="description">
+                        <?php esc_html_e('Lucide icons aren\'t enabled for this site — call TAW\\Core\\Icons\\Lucide::enable() in customizations.php before Theme::boot().', 'taw-theme'); ?>
+                    </p>
+                <?php
+                    break;
+                }
+
+                $icon_name = (string) $value;
+            ?>
+                <div class="taw-icon-field">
+                    <input type="hidden"
+                        class="taw-icon-input"
+                        id="<?php echo esc_attr($field_id); ?>"
+                        name="<?php echo esc_attr($field_id); ?>"
+                        value="<?php echo esc_attr($icon_name); ?>">
+
+                    <div class="taw-icon-preview">
+                        <?php if ($icon_name): ?>
+                            <?php echo Lucide::render($icon_name, ['class' => 'taw-icon-preview__svg']); ?>
+                            <span class="taw-icon-preview__name"><?php echo esc_html($icon_name); ?></span>
+                        <?php else: ?>
+                            <span class="taw-icon-preview__empty"><?php esc_html_e('No icon selected', 'taw-theme'); ?></span>
+                        <?php endif; ?>
+                    </div>
+
+                    <button type="button" class="button taw-icon-choose">
+                        <?php esc_html_e('Choose Icon', 'taw-theme'); ?>
+                    </button>
+                    <button type="button" class="button taw-icon-remove"
+                        style="<?php echo $icon_name ? '' : 'display:none;'; ?>">
+                        <?php esc_html_e('Remove', 'taw-theme'); ?>
+                    </button>
+                </div>
+            <?php break;
+
             /* ---- MARK: Files (multi-attachment gallery) ---- */
             case 'files':
                 $ids = $value ? json_decode($value, true) : [];
@@ -2643,6 +2687,7 @@ class Metabox
             'range'          => floatval($value),
             'color'          => sanitize_hex_color($value) ?: '',
             'datepicker'     => sanitize_text_field($value),
+            'icon'           => sanitize_key($value),
             'post_select'       => $this->sanitize_post_select($field, $value),
             'repeater'          => $this->sanitize_repeater($field, $value),
             'files'             => $this->sanitize_files($value),
@@ -2786,6 +2831,7 @@ class Metabox
             'range'          => floatval($value),
             'color'          => sanitize_hex_color($value) ?: '',
             'datepicker'     => sanitize_text_field($value),
+            'icon'           => sanitize_key($value),
             default          => sanitize_text_field($value),
         };
     }
