@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core\Media;
 
+use TAW\Core\Icons\Lucide;
 use TAW\Helpers\Framework;
 use TAW\Support\Alpine;
 
@@ -479,20 +480,56 @@ class MediaFolders
         if (self::isListMode()) {
             return;
         }
+        $icon = static fn (string $name, string $class = ''): string => Lucide::render($name, ['class' => 'taw-icon ' . $class]);
         ?>
         <template id="taw-media-sidebar-template">
-        <div id="taw-media-sidebar" class="taw-media-sidebar" x-data="tawMediaSidebar" x-init="init()">
-            <button type="button" class="button" @click="createFolder(0)">
-                <?php esc_html_e('+ New Folder', 'taw-theme'); ?>
-            </button>
-            <ul class="taw-folders-tree" aria-busy="true">
+        <div id="taw-media-sidebar" class="taw-media-sidebar" :class="{ 'is-collapsed': sidebarCollapsed }" x-data="tawMediaSidebar" x-init="init()">
+            <div class="taw-media-sidebar__header">
+                <span class="taw-media-sidebar__title" x-show="!sidebarCollapsed"><?php esc_html_e('Folders', 'taw-theme'); ?></span>
+                <button type="button" class="taw-media-sidebar__icon-btn" @click="toggleSidebar()" :title="sidebarCollapsed ? '<?php echo esc_js(__('Expand', 'taw-theme')); ?>' : '<?php echo esc_js(__('Collapse', 'taw-theme')); ?>'">
+                    <span x-show="!sidebarCollapsed"><?php echo $icon('panel-left-close'); ?></span>
+                    <span x-show="sidebarCollapsed" x-cloak><?php echo $icon('panel-left-open'); ?></span>
+                </button>
+            </div>
+
+            <div class="taw-media-sidebar__toolbar" x-show="!sidebarCollapsed">
+                <button type="button" class="taw-media-sidebar__btn taw-media-sidebar__btn--primary" @click="createFolder(typeof selectedFolderId === 'number' ? selectedFolderId : 0)">
+                    <?php echo $icon('folder-plus'); ?>
+                    <?php esc_html_e('New Folder', 'taw-theme'); ?>
+                </button>
+                <button type="button" class="taw-media-sidebar__btn" :disabled="!canRename" @click="renameSelected()" title="<?php esc_attr_e('Rename', 'taw-theme'); ?>">
+                    <?php echo $icon('pencil'); ?>
+                </button>
+                <button type="button" class="taw-media-sidebar__btn" :disabled="!canDelete" @click="deleteSelected()" title="<?php esc_attr_e('Delete', 'taw-theme'); ?>">
+                    <?php echo $icon('trash-2'); ?>
+                </button>
+                <div class="taw-media-sidebar__menu">
+                    <button type="button" class="taw-media-sidebar__icon-btn" @click="menuOpen = !menuOpen" @click.outside="menuOpen = false" title="<?php esc_attr_e('More', 'taw-theme'); ?>">
+                        <?php echo $icon('ellipsis-vertical'); ?>
+                    </button>
+                    <div class="taw-media-sidebar__dropdown" x-show="menuOpen" x-cloak>
+                        <button type="button" @click="expandAll(); menuOpen = false">
+                            <?php echo $icon('unfold-vertical'); ?>
+                            <?php esc_html_e('Expand all', 'taw-theme'); ?>
+                        </button>
+                        <button type="button" @click="showFolderIds = !showFolderIds; menuOpen = false">
+                            <?php echo $icon('hash'); ?>
+                            <span x-text="showFolderIds ? '<?php echo esc_js(__('Hide folder IDs', 'taw-theme')); ?>' : '<?php echo esc_js(__('Display folder IDs', 'taw-theme')); ?>'"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <ul class="taw-folders-tree" aria-busy="true" x-show="!sidebarCollapsed">
                 <li class="taw-folders-tree__node" :class="{ 'is-selected': selectedFolderId === null }" @click="selectFolder(null)">
                     <div class="taw-folders-tree__row">
+                        <?php echo $icon('folder-tree'); ?>
                         <span class="taw-folders-tree__name"><?php esc_html_e('All Files', 'taw-theme'); ?></span>
                     </div>
                 </li>
                 <li class="taw-folders-tree__node" :class="{ 'is-selected': selectedFolderId === 'unfiled' }" @click="selectFolder('unfiled')">
                     <div class="taw-folders-tree__row">
+                        <?php echo $icon('folder-x'); ?>
                         <span class="taw-folders-tree__name"><?php esc_html_e('Unfiled', 'taw-theme'); ?></span>
                     </div>
                 </li>
@@ -509,12 +546,20 @@ class MediaFolders
                         @drop.prevent="onFolderDrop($event, node.id)"
                     >
                         <div class="taw-folders-tree__row">
+                            <button
+                                type="button"
+                                class="taw-folders-tree__toggle"
+                                :class="{ 'is-invisible': !node.hasChildren }"
+                                @click.stop="toggleExpanded(node.id)"
+                            >
+                                <span x-show="!isCollapsed(node.id)"><?php echo $icon('chevron-down'); ?></span>
+                                <span x-show="isCollapsed(node.id)" x-cloak><?php echo $icon('chevron-right'); ?></span>
+                            </button>
+                            <span x-show="selectedFolderId === node.id"><?php echo $icon('folder-open'); ?></span>
+                            <span x-show="selectedFolderId !== node.id"><?php echo $icon('folder'); ?></span>
                             <span class="taw-folders-tree__name" x-text="node.name"></span>
-                            <span class="taw-folders-tree__actions">
-                                <button type="button" class="taw-folders-tree__add" title="<?php esc_attr_e('Add subfolder', 'taw-theme'); ?>" @click.stop="createFolder(node.id)">+</button>
-                                <button type="button" class="taw-folders-tree__rename" title="<?php esc_attr_e('Rename', 'taw-theme'); ?>" @click.stop="renameFolder(node.id, node.name)">&#9998;</button>
-                                <button type="button" class="taw-folders-tree__delete" title="<?php esc_attr_e('Delete', 'taw-theme'); ?>" @click.stop="deleteFolder(node.id)">&times;</button>
-                            </span>
+                            <span class="taw-folders-tree__id" x-show="showFolderIds" x-text="'#' + node.id"></span>
+                            <span class="taw-folders-tree__count" x-text="node.count"></span>
                         </div>
                     </li>
                 </template>

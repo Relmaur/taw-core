@@ -16,11 +16,137 @@
   border: 1px solid #dcdcde;
   border-radius: 4px;
   padding: 0.75rem;
+  transition: width 0.15s ease;
 }
 
-.taw-media-sidebar > .button {
-  width: 100%;
+.taw-media-sidebar.is-collapsed {
+  width: auto;
+  padding: 0.75rem 0.5rem;
+}
+
+.taw-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ── Header (title + collapse toggle) ──────────────────────────────── */
+
+.taw-media-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   margin-bottom: 0.5rem;
+}
+
+.taw-media-sidebar__title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #646970;
+}
+
+.taw-media-sidebar__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #646970;
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.taw-media-sidebar__icon-btn:hover {
+  background: #f0f0f1;
+  color: #2271b1;
+}
+
+/* ── Toolbar (New Folder / Rename / Delete / overflow menu) ────────── */
+
+.taw-media-sidebar__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.taw-media-sidebar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid #dcdcde;
+  background: #f6f7f7;
+  color: #2c3338;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0.4rem 0.5rem;
+  border-radius: 4px;
+}
+
+.taw-media-sidebar__btn:hover:not(:disabled) {
+  background: #f0f0f1;
+  border-color: #8c8f94;
+}
+
+.taw-media-sidebar__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.taw-media-sidebar__btn--primary {
+  flex: 1;
+  background: #2271b1;
+  border-color: #2271b1;
+  color: #fff;
+}
+
+.taw-media-sidebar__btn--primary:hover:not(:disabled) {
+  background: #135e96;
+  border-color: #135e96;
+}
+
+.taw-media-sidebar__menu {
+  position: relative;
+}
+
+.taw-media-sidebar__dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  margin-top: 0.25rem;
+  min-width: 180px;
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  padding: 0.25rem;
+}
+
+.taw-media-sidebar__dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #2c3338;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  padding: 0.45rem 0.5rem;
+  border-radius: 3px;
+}
+
+.taw-media-sidebar__dropdown button:hover {
+  background: #f0f0f1;
 }
 
 /* Class names below intentionally match folders.css so the sidebar's tree
@@ -48,15 +174,16 @@
   color: #fff;
 }
 
-.taw-media-sidebar .taw-folders-tree__node.is-selected > .taw-folders-tree__row .taw-folders-tree__actions button {
+.taw-media-sidebar .taw-folders-tree__node.is-selected > .taw-folders-tree__row .taw-icon,
+.taw-media-sidebar .taw-folders-tree__node.is-selected > .taw-folders-tree__row .taw-folders-tree__count,
+.taw-media-sidebar .taw-folders-tree__node.is-selected > .taw-folders-tree__row .taw-folders-tree__id {
   color: #fff;
 }
 
 .taw-media-sidebar .taw-folders-tree__row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.4rem;
   padding: 0.35rem 0.5rem;
   border-radius: 4px;
   cursor: pointer;
@@ -66,25 +193,41 @@
   background: #f0f0f1;
 }
 
+.taw-media-sidebar .taw-folders-tree__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #646970;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.taw-media-sidebar .taw-folders-tree__toggle.is-invisible {
+  visibility: hidden;
+}
+
 .taw-media-sidebar .taw-folders-tree__name {
+  flex: 1;
   font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.taw-media-sidebar .taw-folders-tree__actions {
-  display: flex;
-  gap: 0.15rem;
+.taw-media-sidebar .taw-folders-tree__id {
+  font-size: 11px;
+  color: #8c8f94;
   flex-shrink: 0;
 }
 
-.taw-media-sidebar .taw-folders-tree__actions button {
-  border: none;
-  background: transparent;
-  cursor: pointer;
+.taw-media-sidebar .taw-folders-tree__count {
+  font-size: 11px;
   color: #646970;
-  font-size: 13px;
-  line-height: 1;
-  padding: 0.15rem 0.3rem;
+  background: #f0f0f1;
+  border-radius: 10px;
+  padding: 0.1rem 0.45rem;
+  flex-shrink: 0;
 }

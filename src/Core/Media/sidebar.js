@@ -98,9 +98,54 @@
         folders: [],
         flatFolders: [],
         selectedFolderId: null, // null | 'unfiled' | number — matches folders.js's convention
+        sidebarCollapsed: false,
+        menuOpen: false,
+        showFolderIds: false,
+        collapsedIds: [], // folder ids whose children are hidden in the tree
+
+        get canRename() {
+            return typeof this.selectedFolderId === 'number';
+        },
+
+        get canDelete() {
+            return typeof this.selectedFolderId === 'number';
+        },
 
         init() {
+            try {
+                this.sidebarCollapsed = window.localStorage.getItem('tawMediaSidebarCollapsed') === '1';
+            } catch (e) {
+                // localStorage unavailable (private browsing, etc.) — default stays false.
+            }
+
             this.fetchFolders().then(() => this.syncFromUrl());
+        },
+
+        toggleSidebar() {
+            this.sidebarCollapsed = !this.sidebarCollapsed;
+
+            try {
+                window.localStorage.setItem('tawMediaSidebarCollapsed', this.sidebarCollapsed ? '1' : '0');
+            } catch (e) {
+                // Not persisted this session, but the toggle itself still works.
+            }
+        },
+
+        renameSelected() {
+            if (!this.canRename) {
+                return;
+            }
+
+            var node = this.folders.find((f) => f.id === this.selectedFolderId);
+            this.renameFolder(this.selectedFolderId, node ? node.name : '');
+        },
+
+        deleteSelected() {
+            if (!this.canDelete) {
+                return;
+            }
+
+            this.deleteFolder(this.selectedFolderId);
         },
 
         fetchFolders() {
@@ -115,12 +160,36 @@
             return this.folders.filter((f) => (f.parent || 0) === parentId);
         },
 
+        isCollapsed(id) {
+            return this.collapsedIds.indexOf(id) !== -1;
+        },
+
+        toggleExpanded(id) {
+            var idx = this.collapsedIds.indexOf(id);
+            if (idx === -1) {
+                this.collapsedIds.push(id);
+            } else {
+                this.collapsedIds.splice(idx, 1);
+            }
+
+            this.flattenTree();
+        },
+
+        expandAll() {
+            this.collapsedIds = [];
+            this.flattenTree();
+        },
+
         flattenTree() {
             var result = [];
             var walk = (parentId, depth) => {
                 this.childrenOf(parentId).forEach((node) => {
-                    result.push({ id: node.id, name: node.name, depth: depth });
-                    walk(node.id, depth + 1);
+                    var hasChildren = this.childrenOf(node.id).length > 0;
+                    result.push({ id: node.id, name: node.name, count: node.count, depth: depth, hasChildren: hasChildren });
+
+                    if (hasChildren && !this.isCollapsed(node.id)) {
+                        walk(node.id, depth + 1);
+                    }
                 });
             };
 
