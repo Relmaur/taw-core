@@ -9,7 +9,7 @@ use TAW\Core\Media\MediaFolders;
 use TAW\Tests\TestCase;
 
 /**
- * Media Folders is built entirely on a single hierarchical taxonomy
+ * TAW Media is built entirely on a single hierarchical taxonomy
  * (taw_media_folder) registered on 'attachment' with show_in_rest => true
  * — that flag is what gives folders.js its wp/v2/taw_media_folder and
  * wp/v2/media?taw_media_folder= REST support for free, with no custom

@@ -8,12 +8,12 @@ use TAW\Core\Icons\Lucide;
 use TAW\Helpers\Framework;
 use TAW\Support\Alpine;
 
-if (!defined('ABSPATH')) {
+if (!defined('ABSPATH')) { 
     exit;
 }
 
 /**
- * Opt-in nestable Media Library folders.
+ * Opt-in nestable Media Library folders ("TAW Media").
  *
  * Model: a single hierarchical taxonomy (taw_media_folder) registered on
  * 'attachment', with show_in_rest => true. That one flag is what gives us,
@@ -23,16 +23,19 @@ if (!defined('ABSPATH')) {
  *   - a taw_media_folder param on wp/v2/media, for listing/filtering and
  *     for reassigning a file's folder (PATCH wp/v2/media/<id>)
  * No custom REST endpoint class is needed here — see folders.js, which
- * talks to those two built-in routes directly.
+ * talks to those two built-in routes directly (plus wp/v2/media's own
+ * multipart upload support for the dedicated screen's drag-and-drop upload).
  *
- * Two admin surfaces:
- *   1. A dedicated "Media -> Folders" screen (own markup + folders.js): a
- *      folder tree (create/rename/delete/drag-to-reparent) and a
- *      drag-and-drop attachment grid. 100% our own code — no WordPress
- *      core Backbone/Grid-view internals are touched.
+ * Three admin surfaces:
+ *   1. A dedicated "Media -> TAW Media" screen (own markup + folders.js): a
+ *      full Alpine.js app — folder tree, breadcrumb, folder cards, direct
+ *      file upload, multi-select + bulk move/delete. 100% our own code —
+ *      no WordPress core Backbone/Grid-view internals are touched.
  *   2. Lighter integration into the classic Media Library List view:
  *      a folder filter dropdown, a "Folder" column, and a "Move to
  *      folder..." bulk action.
+ *   3. A FileBird-style sidebar bolted onto the default Media Library Grid
+ *      view (upload.php's thumbnail grid).
  *
  * Usage:
  *   // In the theme's inc/customizations.php, before Theme::boot():
@@ -45,13 +48,13 @@ class MediaFolders
     private const CAPABILITY = 'upload_files';
 
     /**
-     * Whether Media Folders has been explicitly enabled for this theme.
+     * Whether TAW Media has been explicitly enabled for this theme.
      * Must call MediaFolders::enable() in customizations.php to activate.
      */
     private static bool $enabled = false;
 
     /**
-     * Opt-in to Media Folders.
+     * Opt-in to TAW Media.
      * Call this in the theme's customizations.php before Theme::boot().
      */
     public static function enable(): void
@@ -60,7 +63,7 @@ class MediaFolders
     }
 
     /**
-     * Whether Media Folders has been enabled.
+     * Whether TAW Media has been enabled.
      */
     public static function isEnabled(): bool
     {
@@ -68,7 +71,7 @@ class MediaFolders
     }
 
     /**
-     * Boot Media Folders.
+     * Boot TAW Media.
      * No-op unless enable() was called first.
      */
     public static function init(): void
@@ -90,7 +93,7 @@ class MediaFolders
         add_filter('handle_bulk_actions-upload', [self::class, 'handleBulkMoveAction'], 10, 3);
         add_action('admin_notices', [self::class, 'renderBulkMoveNotice']);
 
-        // Lets the Folders screen's "Unfiled" pseudo-folder query
+        // Lets the TAW Media screen's "Unfiled" pseudo-folder query
         // wp/v2/media?taw_unfiled=1 without a dedicated REST endpoint.
         add_filter('rest_attachment_query', [self::class, 'filterRestAttachmentQuery'], 10, 2);
 
@@ -104,7 +107,7 @@ class MediaFolders
      * Register the hierarchical folder taxonomy on attachments.
      *
      * show_ui is deliberately false — the default WP taxonomy metabox
-     * doesn't fit the attachment edit screen well; the Folders screen and
+     * doesn't fit the attachment edit screen well; the TAW Media screen and
      * List-view integration below are the real UI.
      */
     public static function registerTaxonomy(): void
@@ -137,14 +140,14 @@ class MediaFolders
     }
 
     /**
-     * Add the "Media -> Folders" submenu page.
+     * Add the "Media -> TAW Media" submenu page.
      */
     public static function registerFoldersPage(): void
     {
         add_submenu_page(
             'upload.php',
-            __('Folders', 'taw-theme'),
-            __('Folders', 'taw-theme'),
+            __('TAW Media', 'taw-theme'),
+            __('TAW Media', 'taw-theme'),
             self::CAPABILITY,
             'taw-media-folders',
             [self::class, 'renderFoldersPage']
@@ -152,7 +155,7 @@ class MediaFolders
     }
 
     /**
-     * Enqueue folders.js/folders.css on the Folders screen and on the
+     * Enqueue folders.js/folders.css on the TAW Media screen and on the
      * classic Media Library list screen (which only needs the filter
      * dropdown / bulk-move toggle piece of the script).
      */
@@ -161,6 +164,8 @@ class MediaFolders
         if ($hook !== 'media_page_taw-media-folders' && $hook !== 'upload.php') {
             return;
         }
+
+        Alpine::enqueue();
 
         $dir = Framework::path('src/Core/Media/');
         $url = Framework::url('src/Core/Media/');
@@ -175,22 +180,25 @@ class MediaFolders
         wp_enqueue_script(
             'taw-media-folders',
             $url . 'folders.js',
-            [],
+            ['alpinejs'],
             filemtime($dir . 'folders.js'),
             true
         );
 
+        $icon = static fn (string $name, string $class = ''): string => Lucide::render($name, ['class' => $class]);
+
         wp_localize_script('taw-media-folders', 'tawMediaFolders', [
-            'restUrl'    => rest_url('wp/v2/'),
-            'nonce'      => wp_create_nonce('wp_rest'),
-            'taxonomy'   => self::TAXONOMY,
-            'screen'     => $hook === 'media_page_taw-media-folders' ? 'folders' : 'list',
-            // Rendered once here (rather than have sidebar.js build SVG
-            // strings itself) so the Grid-view's injected folder cards and
-            // breadcrumb use the same Lucide icon set as everything else in
-            // this file.
-            'folderIcon' => Lucide::render('folder', ['class' => 'taw-folder-card__icon-svg']),
-            'homeIcon'   => Lucide::render('house', ['class' => 'taw-breadcrumb__icon']),
+            'restUrl'      => rest_url('wp/v2/'),
+            'nonce'        => wp_create_nonce('wp_rest'),
+            'taxonomy'     => self::TAXONOMY,
+            'screen'       => $hook === 'media_page_taw-media-folders' ? 'folders' : 'list',
+            // Rendered once here (rather than have the JS build SVG strings
+            // itself) so every screen's folder cards/breadcrumb/icons use
+            // the same Lucide icon set.
+            'folderIcon'   => $icon('folder', 'taw-folder-card__icon-svg'),
+            'homeIcon'     => $icon('house', 'taw-breadcrumb__icon'),
+            'fileIcon'     => $icon('image', 'taw-folders-grid__icon-svg'),
+            'uploadIcon'   => $icon('upload-cloud', 'taw-icon'),
         ]);
     }
 
@@ -269,10 +277,10 @@ class MediaFolders
     /**
      * Build a tax_query clause for a folder selector value, accepted in any
      * of three shapes so the same taw_media_folder param works from every
-     * caller: the classic List-view dropdown (term slug), the Grid-view
-     * sidebar (numeric term ID or the literal 'unfiled'), and the AJAX/
-     * Backbone bridge (same shapes as the sidebar, since the sidebar is
-     * what sets them).
+     * caller: the classic List-view dropdown (term slug), the TAW Media
+     * screen / Grid-view sidebar (numeric term ID or the literal 'unfiled'),
+     * and the AJAX/Backbone bridge (same shapes as the sidebar, since the
+     * sidebar is what sets them).
      *
      * @return array<int, array<string, mixed>>|null
      */
@@ -396,7 +404,8 @@ class MediaFolders
 
     /**
      * Lets wp/v2/media?taw_unfiled=1 return attachments with no folder
-     * term assigned, powering the Folders screen's "Unfiled" pseudo-node.
+     * term assigned, powering the "Unfiled" pseudo-folder on both the TAW
+     * Media screen and the Grid-view sidebar.
      *
      * @param array<string, mixed> $args
      */
@@ -462,11 +471,10 @@ class MediaFolders
 
     /**
      * Enqueue the Grid-view sidebar's own assets — separate from
-     * enqueueAssets() so that method's Folders-screen/List-mode gate stays
-     * unambiguous. Alpine.js is declared as a script dependency (enqueued
-     * elsewhere, see Metabox::enqueue_admin_assets()) alongside
-     * taw-media-folders so sidebar.js can read the tawMediaFolders global
-     * folders.js already localizes, with no second wp_localize_script call.
+     * enqueueAssets() so that method's TAW Media screen/List-mode gate
+     * stays unambiguous. Alpine.js is enqueued by both this and
+     * enqueueAssets() (Alpine::enqueue() is idempotent — wp_enqueue_script
+     * no-ops on an already-registered handle).
      */
     public static function enqueueGridSidebarAssets(string $hook): void
     {
@@ -619,27 +627,190 @@ class MediaFolders
     }
 
     /**
-     * Render the "Media -> Folders" admin page shell. folders.js does the
-     * rest (fetching/rendering the tree and attachment grid).
+     * Render the "Media -> TAW Media" admin page shell — a full Alpine.js
+     * app (folders.js registers 'tawFoldersApp'). Deliberately not wrapped
+     * in an inert <template> the way renderGridSidebarContainer() is: this
+     * markup lives on its own dedicated page (not injected next to a
+     * pre-existing wp.media Backbone app), so there's no equivalent
+     * ordering race to worry about — folders.js is enqueued with 'alpinejs'
+     * as a hard dependency, guaranteeing it runs after Alpine's own script,
+     * same as every other Alpine component in this codebase
+     * (Metabox/OptionsPage/Icons) except the Grid-view sidebar specifically.
      */
     public static function renderFoldersPage(): void
     {
+        $icon = static fn (string $name, string $class = ''): string => Lucide::render($name, ['class' => 'taw-icon ' . $class]);
     ?>
         <div class="wrap">
-            <h1><?php esc_html_e('Media Folders', 'taw-theme'); ?></h1>
-            <div id="taw-folders-app" class="taw-folders-app">
-                <div class="taw-folders-app__tree">
-                    <button type="button" class="button" id="taw-folders-new-root">
-                        <?php esc_html_e('+ New Folder', 'taw-theme'); ?>
-                    </button>
-                    <ul id="taw-folders-tree" class="taw-folders-tree" aria-busy="true"></ul>
+            <h1><?php esc_html_e('TAW Media', 'taw-theme'); ?></h1>
+            <div id="taw-folders-app" class="taw-folders-app" x-data="tawFoldersApp" x-init="init()">
+                <div class="taw-folders-app__tree" :class="{ 'is-collapsed': sidebarCollapsed }">
+                    <div class="taw-media-sidebar__header">
+                        <span class="taw-media-sidebar__title" x-show="!sidebarCollapsed"><?php esc_html_e('Folders', 'taw-theme'); ?></span>
+                        <button type="button" class="taw-media-sidebar__icon-btn" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? '<?php echo esc_js(__('Expand', 'taw-theme')); ?>' : '<?php echo esc_js(__('Collapse', 'taw-theme')); ?>'">
+                            <span x-show="!sidebarCollapsed"><?php echo $icon('panel-left-close'); ?></span>
+                            <span x-show="sidebarCollapsed" x-cloak><?php echo $icon('panel-left-open'); ?></span>
+                        </button>
+                    </div>
+
+                    <div class="taw-media-sidebar__toolbar" x-show="!sidebarCollapsed">
+                        <button type="button" class="taw-media-sidebar__btn taw-media-sidebar__btn--primary" @click="createFolder(typeof selectedFolderId === 'number' ? selectedFolderId : 0)">
+                            <?php echo $icon('folder-plus'); ?>
+                            <?php esc_html_e('New Folder', 'taw-theme'); ?>
+                        </button>
+                        <button type="button" class="taw-media-sidebar__btn" :disabled="!canRename" @click="renameSelected()" title="<?php esc_attr_e('Rename', 'taw-theme'); ?>">
+                            <?php echo $icon('pencil'); ?>
+                        </button>
+                        <button type="button" class="taw-media-sidebar__btn" :disabled="!canDelete" @click="deleteSelected()" title="<?php esc_attr_e('Delete', 'taw-theme'); ?>">
+                            <?php echo $icon('trash-2'); ?>
+                        </button>
+                        <div class="taw-media-sidebar__menu">
+                            <button type="button" class="taw-media-sidebar__icon-btn" @click="menuOpen = !menuOpen" @click.outside="menuOpen = false" title="<?php esc_attr_e('More', 'taw-theme'); ?>">
+                                <?php echo $icon('ellipsis-vertical'); ?>
+                            </button>
+                            <div class="taw-media-sidebar__dropdown" x-show="menuOpen" x-cloak>
+                                <button type="button" @click="expandAll(); menuOpen = false">
+                                    <?php echo $icon('unfold-vertical'); ?>
+                                    <?php esc_html_e('Expand all', 'taw-theme'); ?>
+                                </button>
+                                <button type="button" @click="showFolderIds = !showFolderIds; menuOpen = false">
+                                    <?php echo $icon('hash'); ?>
+                                    <span x-text="showFolderIds ? '<?php echo esc_js(__('Hide folder IDs', 'taw-theme')); ?>' : '<?php echo esc_js(__('Display folder IDs', 'taw-theme')); ?>'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <ul class="taw-folders-tree" x-show="!sidebarCollapsed">
+                        <div class="default-trees">
+                            <li class="taw-folders-tree__node" :class="{ 'is-selected': selectedFolderId === null }" @click="selectFolder(null)">
+                                <div class="taw-folders-tree__row">
+                                    <?php echo $icon('folder-tree'); ?>
+                                    <span class="taw-folders-tree__name"><?php esc_html_e('All Files', 'taw-theme'); ?></span>
+                                </div>
+                            </li>
+                            <li
+                                class="taw-folders-tree__node"
+                                :class="{ 'is-selected': selectedFolderId === 'unfiled' }"
+                                @click="selectFolder('unfiled')"
+                                @dragover.prevent="onFolderDragOver($event)"
+                                @dragleave="onFolderDragLeave($event)"
+                                @drop.prevent="onFolderDrop($event, 'unfiled')">
+                                <div class="taw-folders-tree__row">
+                                    <?php echo $icon('folder-x'); ?>
+                                    <span class="taw-folders-tree__name"><?php esc_html_e('Unfiled', 'taw-theme'); ?></span>
+                                </div>
+                            </li>
+                        </div>
+                        <template x-for="node in flatFolders" :key="node.id">
+                            <li
+                                class="taw-folders-tree__node"
+                                :class="{ 'is-selected': selectedFolderId === node.id }"
+                                :style="'padding-left: ' + (node.depth * 12) + 'px'"
+                                draggable="true"
+                                @click="selectFolder(node.id)"
+                                @dragstart="onFolderDragStart($event, node.id)"
+                                @dragover.prevent="onFolderDragOver($event)"
+                                @dragleave="onFolderDragLeave($event)"
+                                @drop.prevent="onFolderDrop($event, node.id)">
+                                <div class="taw-folders-tree__row">
+                                    <button
+                                        type="button"
+                                        class="taw-folders-tree__toggle"
+                                        :class="{ 'is-invisible': !node.hasChildren }"
+                                        @click.stop="toggleExpanded(node.id)">
+                                        <span x-show="!isCollapsed(node.id)"><?php echo $icon('chevron-down'); ?></span>
+                                        <span x-show="isCollapsed(node.id)" x-cloak><?php echo $icon('chevron-right'); ?></span>
+                                    </button>
+                                    <span x-show="selectedFolderId === node.id" class="folder-icon folder-open"><?php echo $icon('folder-open'); ?></span>
+                                    <span x-show="selectedFolderId !== node.id" class="folder-icon folder-closed"><?php echo $icon('folder'); ?></span>
+                                    <span class="taw-folders-tree__name" x-text="node.name"></span>
+                                    <span class="taw-folders-tree__id" x-show="showFolderIds" x-text="'#' + node.id"></span>
+                                    <span class="taw-folders-tree__count" x-text="node.count"></span>
+                                </div>
+                            </li>
+                        </template>
+                    </ul>
                 </div>
-                <div class="taw-folders-app__grid">
-                    <h2 id="taw-folders-grid-title"><?php esc_html_e('Select a folder', 'taw-theme'); ?></h2>
-                    <div id="taw-folders-grid" class="taw-folders-grid"></div>
-                    <button type="button" class="button" id="taw-folders-load-more" style="display:none;">
+
+                <div class="taw-folders-app__grid" @dragover.prevent="onDropzoneDragOver($event)" @dragleave="onDropzoneDragLeave($event)" @drop.prevent="onDropzoneDrop($event)" :class="{ 'is-dropzone-active': isDraggingFiles }">
+                    <div class="taw-media-breadcrumb" x-show="breadcrumb.length">
+                        <a href="#" class="taw-media-breadcrumb__link" @click.prevent="selectFolder(null)">
+                            <?php echo $icon('house', 'taw-breadcrumb__icon'); ?>
+                            <span><?php esc_html_e('All Files', 'taw-theme'); ?></span>
+                        </a>
+                        <template x-for="(crumb, index) in breadcrumb" :key="crumb.id">
+                            <span>
+                                <span class="taw-media-breadcrumb__sep">/</span>
+                                <a href="#" class="taw-media-breadcrumb__link" x-show="index < breadcrumb.length - 1" @click.prevent="selectFolder(crumb.id)" x-text="crumb.name"></a>
+                                <span class="taw-media-breadcrumb__current" x-show="index === breadcrumb.length - 1" x-text="crumb.name"></span>
+                            </span>
+                        </template>
+                    </div>
+
+                    <h2 id="taw-folders-grid-title" x-show="!breadcrumb.length" x-text="selectedFolderId === 'unfiled' ? '<?php echo esc_js(__('Unfiled', 'taw-theme')); ?>' : '<?php echo esc_js(__('All Files', 'taw-theme')); ?>'"></h2>
+
+                    <div class="taw-folder-cards" x-show="folderCards.length">
+                        <template x-for="folder in folderCards" :key="folder.id">
+                            <div
+                                class="taw-folder-card"
+                                @click="selectFolder(folder.id)"
+                                @dragover.prevent="onFolderDragOver($event)"
+                                @dragleave="onFolderDragLeave($event)"
+                                @drop.prevent="onFolderDrop($event, folder.id)">
+                                <span class="taw-folder-card__icon"><?php echo $icon('folder'); ?></span>
+                                <span class="taw-folder-card__name" x-text="folder.name"></span>
+                                <span class="taw-folder-card__count" x-text="folder.count"></span>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="taw-folders-toolbar">
+                        <button type="button" class="taw-media-sidebar__btn taw-media-sidebar__btn--primary" @click="$refs.fileInput.click()">
+                            <?php echo $icon('upload-cloud'); ?>
+                            <?php esc_html_e('Upload Files', 'taw-theme'); ?>
+                        </button>
+                        <input type="file" multiple hidden x-ref="fileInput" @change="onFileInputChange($event)">
+                        <template x-if="hasSelection">
+                            <div class="taw-folders-toolbar__selection">
+                                <span x-text="selectedAttachments.length + ' <?php echo esc_js(__('selected', 'taw-theme')); ?>'"></span>
+                                <button type="button" class="taw-media-sidebar__btn" @click="bulkDelete()">
+                                    <?php echo $icon('trash-2'); ?>
+                                    <?php esc_html_e('Delete', 'taw-theme'); ?>
+                                </button>
+                                <button type="button" class="taw-media-sidebar__btn" @click="clearSelection()">
+                                    <?php esc_html_e('Clear', 'taw-theme'); ?>
+                                </button>
+                            </div>
+                        </template>
+                        <span class="taw-folders-toolbar__uploading" x-show="uploading" x-text="uploadProgress ? ('<?php echo esc_js(__('Uploading', 'taw-theme')); ?> ' + uploadProgress.done + '/' + uploadProgress.total) : ''"></span>
+                    </div>
+
+                    <div id="taw-folders-grid" class="taw-folders-grid">
+                        <template x-for="media in gridItems" :key="media.id">
+                            <div
+                                class="taw-folders-grid__item"
+                                :class="{ 'is-selected': isAttachmentSelected(media.id) }"
+                                draggable="true"
+                                :title="media.title"
+                                @click="toggleAttachmentSelected(media.id)"
+                                @dragstart="onAttachmentDragStart($event, media.id)">
+                                <img x-show="media.thumb" :src="media.thumb" alt="">
+                                <span x-show="!media.thumb"><?php echo $icon('image', 'taw-folders-grid__icon-svg'); ?></span>
+                                <span class="taw-folders-grid__name" x-text="media.title"></span>
+                                <span class="taw-folders-grid__check" x-show="isAttachmentSelected(media.id)"><?php echo $icon('check'); ?></span>
+                            </div>
+                        </template>
+                    </div>
+                    <p class="taw-folders-grid__empty" x-show="!gridLoading && !gridItems.length"><?php esc_html_e('No files in this folder.', 'taw-theme'); ?></p>
+                    <button type="button" class="button" id="taw-folders-load-more" x-show="hasMore" @click="loadMoreGrid()">
                         <?php esc_html_e('Load more', 'taw-theme'); ?>
                     </button>
+
+                    <div class="taw-folders-dropzone-overlay" x-show="isDraggingFiles" x-cloak>
+                        <?php echo $icon('upload-cloud', 'taw-folders-dropzone-overlay__icon'); ?>
+                        <span><?php esc_html_e('Drop to upload here', 'taw-theme'); ?></span>
+                    </div>
                 </div>
             </div>
         </div>

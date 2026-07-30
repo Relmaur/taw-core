@@ -58,7 +58,7 @@ class Theme
      *   8. SEO meta (meta title/description/social image — stands down if an SEO plugin is active)
      *   9. SEO structured data (JSON-LD Organization/WebSite/Article/BreadcrumbList — stands down if an SEO plugin is active)
      *  10. Lucide icon picker (opt-in — no-op unless Lucide::enable() was called)
-     *  11. Media Folders (opt-in — no-op unless MediaFolders::enable() was called)
+     *  11. TAW Media (opt-in — no-op unless MediaFolders::enable() was called)
      */
     public static function boot(): void
     {
@@ -127,9 +127,9 @@ class Theme
         // 'icon' Metabox/OptionsPage field type and its wp-admin picker.
         Lucide::init();
 
-        // ── 11. Media Folders ────────────────────────────────────────────────
+        // ── 11. TAW Media ─────────────────────────────────────────────────────
         // Opt-in only — no-op unless MediaFolders::enable() was called.
-        // Nestable Media Library folders: a dedicated Media -> Folders
+        // Nestable Media Library folders: a dedicated Media -> TAW Media
         // screen plus a filter/column/bulk-action on the classic List view.
         MediaFolders::init();
     }

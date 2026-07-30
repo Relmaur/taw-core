@@ -687,12 +687,12 @@ foreach ($menu->items() as $item) {
 
 ---
 
-## Media Folders
+## TAW Media
 
 Nestable Media Library folders, built on a single hierarchical taxonomy (`taw_media_folder`) registered on `attachment` with `show_in_rest => true`. That one flag is what gives the admin UI, for free, from WordPress core itself — no custom REST endpoint exists for this feature:
 
 - full folder (term) CRUD, including re-nesting via `parent`, at `wp/v2/taw_media_folder`
-- a `taw_media_folder` param on the existing `wp/v2/media` route, for filtering and for reassigning a file's folder
+- a `taw_media_folder` param on the existing `wp/v2/media` route, for filtering and for reassigning a file's folder, and the same route's own multipart upload support for direct-to-folder uploads
 
 **Opt-in**, same pattern as everything else here:
 
@@ -704,9 +704,9 @@ TAW\Core\Media\MediaFolders::enable();
 
 Three admin surfaces:
 
-- **Media → Folders** — a dedicated screen: a folder tree (create/rename/delete, drag-and-drop to re-nest) and a drag-and-drop attachment grid, including an "Unfiled" pseudo-folder for attachments with no folder assigned. Entirely our own markup/JS/REST calls — no WordPress core Grid-view (Backbone) internals are touched here.
+- **Media → TAW Media** — a dedicated, full Alpine.js app: a folder tree (create/rename/delete/drag-to-reparent), a breadcrumb, folder cards for navigating into subfolders from the grid pane, direct drag-and-drop file upload straight into the currently open folder, and multi-select with bulk move/delete. Including an "Unfiled" pseudo-folder for attachments with no folder assigned. Entirely our own markup/JS/REST calls — no WordPress core Grid-view (Backbone) internals are touched here.
 - The classic Media Library **List view** (`upload.php?mode=list`) — a folder filter dropdown, a "Folder" column, and a "Move to folder…" bulk action, for anyone who prefers browsing there.
-- The default Media Library **Grid view** (`upload.php`) — a FileBird-style sidebar (Alpine.js) with the same folder tree and full CRUD, bolted onto WordPress core's own thumbnail grid. Clicking a folder filters the grid live, via an `ajax_query_attachments_args` filter plus a narrow JS bridge that sets props on `wp.media`'s existing Backbone query object (`wp.media.frame.state().get('library').props`) — the same technique folder plugins like FileBird use, not a Backbone *view* override. Selecting a folder here stays in sync with the List view's dropdown filter (and vice versa) via the same `taw_media_folder` query param, so switching view modes doesn't lose your place. Thumbnails in the grid (single or multi-selected) are draggable directly onto a folder row to file them — a `dragstart`/drop-target bridge on top of WP core's own Backbone attachment views, not a fork of them — and internal drags are prevented from triggering WP core's own "drop files to upload" overlay (which otherwise fires on any drag reaching it, regardless of what's being dragged).
+- The default Media Library **Grid view** (`upload.php`) — a FileBird-style sidebar (Alpine.js) with the same folder tree and full CRUD, bolted onto WordPress core's own thumbnail grid. Clicking a folder filters the grid live, via an `ajax_query_attachments_args` filter plus a narrow JS bridge that sets props on `wp.media`'s existing Backbone query object (`wp.media.frame.state().get('library').props`) — the same technique folder plugins like FileBird use, not a Backbone *view* override. Selecting a folder here stays in sync with the List view's dropdown filter (and vice versa) via the same `taw_media_folder` query param, so switching view modes doesn't lose your place. Thumbnails in the grid (single or multi-selected) are draggable directly onto a folder row or folder card to file them — a `dragstart`/drop-target bridge on top of WP core's own Backbone attachment views, not a fork of them — and internal drags are prevented from triggering WP core's own "drop files to upload" overlay (which otherwise fires on any drag reaching it, regardless of what's being dragged).
 
 A folder's place in the tree is its only "category" — one folder per attachment (`wp_set_object_terms()`), no separate tagging layer.
 

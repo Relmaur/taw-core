@@ -1,14 +1,15 @@
 /**
- * Media Folders — admin UI.
+ * TAW Media — admin UI.
  *
  * Two independent pieces gated by which DOM anchors are present, since this
- * one file is enqueued both on the dedicated "Media -> Folders" screen and
+ * one file is enqueued both on the dedicated "Media -> TAW Media" screen and
  * on the classic Media Library list screen (see MediaFolders::enqueueAssets()):
  *
- *   1. #taw-folders-app  — the Folders screen: a folder tree (create/
- *      rename/delete/drag-to-reparent) and a drag-and-drop attachment grid.
- *      Talks directly to WordPress's own REST routes (wp/v2/taw_media_folder,
- *      wp/v2/media) — no custom REST endpoint exists for this feature.
+ *   1. #taw-folders-app  — the TAW Media screen: an Alpine.js app (folder
+ *      tree, breadcrumb, folder cards, direct file upload, multi-select +
+ *      bulk move/delete). Talks directly to WordPress's own REST routes
+ *      (wp/v2/taw_media_folder, wp/v2/media) — no custom REST endpoint
+ *      exists for this feature.
  *   2. #taw-folder-filter — the classic List view: shows/hides the "move to
  *      folder" target dropdown when the "Move to folder…" bulk action is chosen.
  */
@@ -56,74 +57,147 @@
         syncVisibility();
     }
 
-    // ── Piece 1: the Folders screen ───────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+        initListViewBulkMoveToggle();
+    });
 
-    function initFoldersApp() {
-        var app = document.getElementById('taw-folders-app');
-        if (!app) {
-            return;
-        }
+    // ── Piece 1: the TAW Media screen (Alpine.js) ────────────────────────
+    //
+    // A self-contained Alpine component — deliberately not sharing code
+    // with sidebar.js's tawMediaSidebar (folder CRUD/tree logic is *ported*,
+    // not shared, matching this project's existing precedent for the same
+    // reason: two Alpine.data() registrations don't compose well through a
+    // shared mixin for a two-consumer case, and the two screens' grid
+    // concerns are genuinely different — this one owns its own REST-driven
+    // attachment grid instead of bridging to wp.media's Backbone collection).
 
-        var treeEl = document.getElementById('taw-folders-tree');
-        var gridEl = document.getElementById('taw-folders-grid');
-        var gridTitleEl = document.getElementById('taw-folders-grid-title');
-        var loadMoreBtn = document.getElementById('taw-folders-load-more');
-        var newRootBtn = document.getElementById('taw-folders-new-root');
+    Alpine.data('tawFoldersApp', () => ({
+        folders: [],
+        flatFolders: [],
+        selectedFolderId: null, // null | 'unfiled' | number
+        sidebarCollapsed: false,
+        menuOpen: false,
+        showFolderIds: false,
+        collapsedIds: [],
 
-        var folders = []; // flat list from the REST API
-        var selectedFolderId = null; // number, or 'unfiled'
-        var gridPage = 1;
+        gridItems: [],
+        gridPage: 1,
+        hasMore: false,
+        gridLoading: false,
+        selectedAttachments: [],
+        isDraggingFiles: false,
+        uploading: false,
+        uploadProgress: null, // { done, total } while uploading, else null
 
-        // ---- Folder tree ----
+        get canRename() {
+            return typeof this.selectedFolderId === 'number';
+        },
 
-        function fetchFolders() {
+        get canDelete() {
+            return typeof this.selectedFolderId === 'number';
+        },
+
+        get hasSelection() {
+            return this.selectedAttachments.length > 0;
+        },
+
+        // Root-first ancestor chain for the current folder (last entry is
+        // the folder itself) — only meaningful for a real numeric folder,
+        // not 'All Files'/'Unfiled'.
+        get breadcrumb() {
+            return typeof this.selectedFolderId === 'number' ? this.ancestorsOf(this.selectedFolderId) : [];
+        },
+
+        // Direct children of the current folder, shown as cards in the
+        // grid pane for one-click navigation — same idea as sidebar.js's
+        // Grid-view folder cards.
+        get folderCards() {
+            return typeof this.selectedFolderId === 'number' ? this.childrenOf(this.selectedFolderId) : [];
+        },
+
+        init() {
+            this.fetchFolders().then(() => this.loadGrid(null, 1, false));
+        },
+
+        fetchFolders() {
             return restFetch(tawMediaFolders.taxonomy + '?per_page=100&orderby=name&order=asc&context=edit')
-                .then(function (terms) {
-                    folders = terms;
-                    renderTree();
+                .then((terms) => {
+                    this.folders = terms;
+                    this.flattenTree();
                 });
-        }
+        },
 
-        function childrenOf(parentId) {
-            return folders.filter(function (f) { return (f.parent || 0) === parentId; });
-        }
+        childrenOf(parentId) {
+            return this.folders.filter((f) => (f.parent || 0) === parentId);
+        },
 
-        function renderTreeNodes(parentId) {
-            return childrenOf(parentId).map(function (node) {
-                var kids = childrenOf(node.id);
-                var childrenHtml = kids.length ? '<ul>' + renderTreeNodes(node.id) + '</ul>' : '';
-                var selected = selectedFolderId === node.id ? ' is-selected' : '';
+        ancestorsOf(folderId) {
+            var chain = [];
+            var node = this.folders.find((f) => f.id === folderId);
 
-                return (
-                    '<li class="taw-folders-tree__node' + selected + '" data-id="' + node.id + '" draggable="true">' +
-                        '<div class="taw-folders-tree__row">' +
-                            '<span class="taw-folders-tree__name">' + escapeHtml(node.name) + '</span>' +
-                            '<span class="taw-folders-tree__actions">' +
-                                '<button type="button" class="taw-folders-tree__add" title="Add subfolder">+</button>' +
-                                '<button type="button" class="taw-folders-tree__rename" title="Rename">&#9998;</button>' +
-                                '<button type="button" class="taw-folders-tree__delete" title="Delete">&times;</button>' +
-                            '</span>' +
-                        '</div>' +
-                        childrenHtml +
-                    '</li>'
-                );
-            }).join('');
-        }
+            while (node) {
+                chain.unshift({ id: node.id, name: node.name });
+                node = node.parent ? this.folders.find((f) => f.id === node.parent) : null;
+            }
 
-        function renderTree() {
-            var unfiledSelected = selectedFolderId === 'unfiled' ? ' is-selected' : '';
+            return chain;
+        },
 
-            treeEl.removeAttribute('aria-busy');
-            treeEl.innerHTML =
-                '<li class="taw-folders-tree__node taw-folders-tree__node--unfiled' + unfiledSelected + '" data-id="unfiled">' +
-                    '<div class="taw-folders-tree__row">' +
-                        '<span class="taw-folders-tree__name">Unfiled</span>' +
-                    '</div>' +
-                '</li>' +
-                renderTreeNodes(0);
-        }
+        isCollapsed(id) {
+            return this.collapsedIds.indexOf(id) !== -1;
+        },
 
-        function createFolder(parentId) {
+        toggleExpanded(id) {
+            var idx = this.collapsedIds.indexOf(id);
+            if (idx === -1) {
+                this.collapsedIds.push(id);
+            } else {
+                this.collapsedIds.splice(idx, 1);
+            }
+
+            this.flattenTree();
+        },
+
+        expandAll() {
+            this.collapsedIds = [];
+            this.flattenTree();
+        },
+
+        flattenTree() {
+            var result = [];
+            var walk = (parentId, depth) => {
+                this.childrenOf(parentId).forEach((node) => {
+                    var hasChildren = this.childrenOf(node.id).length > 0;
+                    result.push({ id: node.id, name: node.name, count: node.count, depth: depth, hasChildren: hasChildren });
+
+                    if (hasChildren && !this.isCollapsed(node.id)) {
+                        walk(node.id, depth + 1);
+                    }
+                });
+            };
+
+            walk(0, 0);
+            this.flatFolders = result;
+        },
+
+        renameSelected() {
+            if (!this.canRename) {
+                return;
+            }
+
+            var node = this.folders.find((f) => f.id === this.selectedFolderId);
+            this.renameFolder(this.selectedFolderId, node ? node.name : '');
+        },
+
+        deleteSelected() {
+            if (!this.canDelete) {
+                return;
+            }
+
+            this.deleteFolder(this.selectedFolderId);
+        },
+
+        createFolder(parentId) {
             var name = window.prompt('Folder name:');
             if (!name) {
                 return;
@@ -133,10 +207,10 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: name, parent: parentId || 0 }),
-            }).then(fetchFolders);
-        }
+            }).then(() => this.fetchFolders());
+        },
 
-        function renameFolder(id, currentName) {
+        renameFolder(id, currentName) {
             var name = window.prompt('Rename folder:', currentName);
             if (!name || name === currentName) {
                 return;
@@ -146,37 +220,35 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: name }),
-            }).then(fetchFolders);
-        }
+            }).then(() => this.fetchFolders());
+        },
 
-        function deleteFolder(id) {
+        deleteFolder(id) {
             if (!window.confirm('Delete this folder? Files inside it will become Unfiled.')) {
                 return;
             }
 
-            restFetch(tawMediaFolders.taxonomy + '/' + id, { method: 'DELETE' }).then(function () {
-                if (selectedFolderId === id) {
-                    selectedFolderId = null;
-                    gridEl.innerHTML = '';
-                    gridTitleEl.textContent = 'Select a folder';
+            restFetch(tawMediaFolders.taxonomy + '/' + id, { method: 'DELETE' }).then(() => {
+                if (this.selectedFolderId === id) {
+                    this.selectFolder(null);
                 }
-                fetchFolders();
+                this.fetchFolders();
             });
-        }
+        },
 
-        function isDescendant(candidateId, ofId) {
-            var node = folders.find(function (f) { return f.id === candidateId; });
+        isDescendant(candidateId, ofId) {
+            var node = this.folders.find((f) => f.id === candidateId);
             while (node && node.parent) {
                 if (node.parent === ofId) {
                     return true;
                 }
-                node = folders.find(function (f) { return f.id === node.parent; });
+                node = this.folders.find((f) => f.id === node.parent);
             }
             return false;
-        }
+        },
 
-        function reparentFolder(id, newParentId) {
-            if (id === newParentId || isDescendant(newParentId, id)) {
+        reparentFolder(id, newParentId) {
+            if (id === newParentId || this.isDescendant(newParentId, id)) {
                 return;
             }
 
@@ -184,176 +256,216 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ parent: newParentId }),
-            }).then(fetchFolders);
-        }
+            }).then(() => this.fetchFolders());
+        },
 
-        treeEl.addEventListener('click', function (e) {
-            var node = e.target.closest('.taw-folders-tree__node');
-            if (!node) {
+        onFolderDragStart(event, id) {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('application/x-taw-folder', String(id));
+        },
+
+        onFolderDragOver(event) {
+            event.currentTarget.classList.add('is-dragover');
+        },
+
+        onFolderDragLeave(event) {
+            event.currentTarget.classList.remove('is-dragover');
+        },
+
+        onFolderDrop(event, targetId) {
+            event.currentTarget.classList.remove('is-dragover');
+
+            var draggedAttachments = event.dataTransfer.getData('application/x-taw-attachments');
+            if (draggedAttachments) {
+                this.moveAttachmentsToFolder(JSON.parse(draggedAttachments), targetId);
                 return;
             }
 
-            var id = node.getAttribute('data-id');
-
-            if (e.target.closest('.taw-folders-tree__add')) {
-                createFolder(parseInt(id, 10));
-                return;
-            }
-
-            if (e.target.closest('.taw-folders-tree__rename')) {
-                var nameEl = node.querySelector(':scope > .taw-folders-tree__row .taw-folders-tree__name');
-                renameFolder(parseInt(id, 10), nameEl ? nameEl.textContent : '');
-                return;
-            }
-
-            if (e.target.closest('.taw-folders-tree__delete')) {
-                deleteFolder(parseInt(id, 10));
-                return;
-            }
-
-            if (e.target.closest('.taw-folders-tree__row')) {
-                selectedFolderId = id === 'unfiled' ? 'unfiled' : parseInt(id, 10);
-                renderTree();
-                loadGrid(selectedFolderId, 1, false);
-            }
-        });
-
-        treeEl.addEventListener('dragstart', function (e) {
-            var node = e.target.closest('.taw-folders-tree__node');
-            if (node && node.getAttribute('data-id') !== 'unfiled') {
-                e.dataTransfer.setData('application/x-taw-folder', node.getAttribute('data-id'));
-            }
-        });
-
-        treeEl.addEventListener('dragover', function (e) {
-            var node = e.target.closest('.taw-folders-tree__node');
-            if (node) {
-                e.preventDefault();
-                node.classList.add('is-dragover');
-            }
-        });
-
-        treeEl.addEventListener('dragleave', function (e) {
-            var node = e.target.closest('.taw-folders-tree__node');
-            if (node) {
-                node.classList.remove('is-dragover');
-            }
-        });
-
-        treeEl.addEventListener('drop', function (e) {
-            var node = e.target.closest('.taw-folders-tree__node');
-            if (!node) {
-                return;
-            }
-
-            e.preventDefault();
-            node.classList.remove('is-dragover');
-
-            var targetId = node.getAttribute('data-id');
-
-            var draggedAttachmentId = e.dataTransfer.getData('application/x-taw-attachment');
-            if (draggedAttachmentId) {
-                moveAttachmentToFolder(parseInt(draggedAttachmentId, 10), targetId);
-                return;
-            }
-
-            var draggedFolderId = e.dataTransfer.getData('application/x-taw-folder');
+            var draggedFolderId = event.dataTransfer.getData('application/x-taw-folder');
             if (draggedFolderId && targetId !== 'unfiled') {
-                reparentFolder(parseInt(draggedFolderId, 10), parseInt(targetId, 10));
+                this.reparentFolder(parseInt(draggedFolderId, 10), targetId);
             }
-        });
+        },
 
-        newRootBtn.addEventListener('click', function () {
-            createFolder(0);
-        });
+        selectFolder(value) {
+            this.selectedFolderId = value;
+            this.selectedAttachments = [];
+            this.loadGrid(value, 1, false);
+        },
 
         // ---- Attachment grid ----
 
-        function thumbUrl(media) {
+        thumbUrl(media) {
             if (media.media_type === 'image' && media.media_details && media.media_details.sizes && media.media_details.sizes.thumbnail) {
                 return media.media_details.sizes.thumbnail.source_url;
             }
             return '';
-        }
+        },
 
-        function renderGridItems(items) {
-            return items.map(function (media) {
-                var thumb = thumbUrl(media);
-                var visual = thumb
-                    ? '<img src="' + thumb + '" alt="">'
-                    : '<span class="taw-folders-grid__icon dashicons dashicons-media-default"></span>';
-
-                return (
-                    '<div class="taw-folders-grid__item" draggable="true" data-id="' + media.id + '" title="' + escapeHtml(media.title.rendered) + '">' +
-                        visual +
-                        '<span class="taw-folders-grid__name">' + escapeHtml(media.title.rendered) + '</span>' +
-                    '</div>'
-                );
-            }).join('');
-        }
-
-        function loadGrid(folderId, page, append) {
-            gridTitleEl.textContent = folderId === 'unfiled' ? 'Unfiled' : (folders.find(function (f) { return f.id === folderId; }) || {}).name || '';
-            gridPage = page;
+        loadGrid(folderId, page, append) {
+            this.gridLoading = true;
+            this.gridPage = page;
 
             var query = folderId === 'unfiled'
                 ? 'taw_unfiled=1'
-                : tawMediaFolders.taxonomy + '=' + folderId;
+                : (folderId === null ? '' : tawMediaFolders.taxonomy + '=' + folderId);
 
-            restFetch('media?' + query + '&per_page=60&page=' + page).then(function (items) {
-                if (!append) {
-                    gridEl.innerHTML = '';
-                }
+            restFetch('media?' + (query ? query + '&' : '') + 'per_page=60&page=' + page).then((items) => {
+                var mapped = items.map((media) => ({
+                    id: media.id,
+                    title: media.title.rendered,
+                    thumb: this.thumbUrl(media),
+                }));
 
-                if (!items.length && !append) {
-                    gridEl.innerHTML = '<p class="taw-folders-grid__empty">No files in this folder.</p>';
-                    loadMoreBtn.style.display = 'none';
-                    return;
-                }
-
-                gridEl.insertAdjacentHTML('beforeend', renderGridItems(items));
-                loadMoreBtn.style.display = items.length === 60 ? '' : 'none';
-            }).catch(function () {
-                loadMoreBtn.style.display = 'none';
+                this.gridItems = append ? this.gridItems.concat(mapped) : mapped;
+                this.hasMore = items.length === 60;
+                this.gridLoading = false;
+            }).catch(() => {
+                this.gridLoading = false;
+                this.hasMore = false;
             });
-        }
+        },
 
-        function moveAttachmentToFolder(attachmentId, folderId) {
-            var payload = folderId === 'unfiled'
-                ? { [tawMediaFolders.taxonomy]: [] }
-                : { [tawMediaFolders.taxonomy]: [parseInt(folderId, 10)] };
+        loadMoreGrid() {
+            this.loadGrid(this.selectedFolderId, this.gridPage + 1, true);
+        },
 
-            restFetch('media/' + attachmentId, {
+        // ---- multi-select + bulk actions ----
+
+        toggleAttachmentSelected(id) {
+            var idx = this.selectedAttachments.indexOf(id);
+            if (idx === -1) {
+                this.selectedAttachments.push(id);
+            } else {
+                this.selectedAttachments.splice(idx, 1);
+            }
+        },
+
+        isAttachmentSelected(id) {
+            return this.selectedAttachments.indexOf(id) !== -1;
+        },
+
+        clearSelection() {
+            this.selectedAttachments = [];
+        },
+
+        bulkDelete() {
+            if (!this.selectedAttachments.length) {
+                return;
+            }
+
+            if (!window.confirm('Delete ' + this.selectedAttachments.length + ' selected file(s)? This cannot be undone.')) {
+                return;
+            }
+
+            Promise.all(this.selectedAttachments.map((id) => restFetch('media/' + id, {
+                method: 'DELETE',
+            }))).then(() => {
+                this.selectedAttachments = [];
+                this.fetchFolders();
+                this.loadGrid(this.selectedFolderId, 1, false);
+            });
+        },
+
+        moveAttachmentsToFolder(ids, targetId) {
+            var term = targetId === 'unfiled' ? [] : [targetId];
+
+            Promise.all(ids.map((id) => restFetch('media/' + id, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            }).then(function () {
-                if (selectedFolderId !== null) {
-                    loadGrid(selectedFolderId, 1, false);
-                }
+                body: JSON.stringify({ [tawMediaFolders.taxonomy]: term }),
+            }))).then(() => {
+                this.selectedAttachments = [];
+                this.fetchFolders();
+                this.loadGrid(this.selectedFolderId, 1, false);
             });
-        }
+        },
 
-        gridEl.addEventListener('dragstart', function (e) {
-            var item = e.target.closest('.taw-folders-grid__item');
-            if (item) {
-                e.dataTransfer.setData('application/x-taw-attachment', item.getAttribute('data-id'));
+        onAttachmentDragStart(event, id) {
+            var ids = this.isAttachmentSelected(id) && this.selectedAttachments.length > 1
+                ? this.selectedAttachments
+                : [id];
+
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('application/x-taw-attachments', JSON.stringify(ids));
+        },
+
+        // ---- direct OS file upload ----
+
+        onDropzoneDragOver(event) {
+            // Only react to a real file drag (not our own attachment/folder
+            // drags, which also fire dragover as they pass over this pane).
+            if (event.dataTransfer.types.indexOf('Files') !== -1) {
+                this.isDraggingFiles = true;
             }
-        });
+        },
 
-        loadMoreBtn.addEventListener('click', function () {
-            if (selectedFolderId !== null) {
-                loadGrid(selectedFolderId, gridPage + 1, true);
+        onDropzoneDragLeave() {
+            this.isDraggingFiles = false;
+        },
+
+        onDropzoneDrop(event) {
+            this.isDraggingFiles = false;
+
+            if (event.dataTransfer.files && event.dataTransfer.files.length) {
+                this.uploadFiles(event.dataTransfer.files);
             }
-        });
+        },
 
-        fetchFolders();
-    }
+        onFileInputChange(event) {
+            if (event.target.files && event.target.files.length) {
+                this.uploadFiles(event.target.files);
+                event.target.value = '';
+            }
+        },
 
-    document.addEventListener('DOMContentLoaded', function () {
-        initListViewBulkMoveToggle();
-        initFoldersApp();
-    });
+        uploadFiles(fileList) {
+            var files = Array.prototype.slice.call(fileList);
+            var folderId = this.selectedFolderId;
+
+            this.uploading = true;
+            this.uploadProgress = { done: 0, total: files.length };
+
+            var uploadOne = (file) => {
+                var formData = new FormData();
+                formData.append('file', file, file.name);
+
+                if (typeof folderId === 'number') {
+                    formData.append(tawMediaFolders.taxonomy + '[]', String(folderId));
+                }
+
+                return fetch(tawMediaFolders.restUrl + 'media', {
+                    method: 'POST',
+                    headers: { 'X-WP-Nonce': tawMediaFolders.nonce },
+                    body: formData,
+                }).then((response) => {
+                    if (!response.ok) {
+                        throw new Error('Upload failed: ' + response.status);
+                    }
+                    return response.json();
+                }).then(() => {
+                    this.uploadProgress.done++;
+                });
+            };
+
+            // Sequential rather than Promise.all — keeps progress reporting
+            // simple/accurate and avoids hitting the server with every file
+            // in a batch at once.
+            var finish = () => {
+                this.uploading = false;
+                this.uploadProgress = null;
+                this.fetchFolders();
+                this.loadGrid(this.selectedFolderId, 1, false);
+            };
+
+            files.reduce((promise, file) => promise.then(() => uploadOne(file)), Promise.resolve())
+                .then(finish)
+                .catch(() => {
+                    window.alert('One or more files failed to upload.');
+                    finish();
+                });
+        },
+    }));
 
     // Exposed so sidebar.js (the Grid-view sidebar) can reuse the same
     // nonce/URL/error handling instead of a second fetch wrapper.

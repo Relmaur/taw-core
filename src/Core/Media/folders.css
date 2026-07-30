@@ -1,3 +1,9 @@
+.taw-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
 .taw-folders-app {
   display: grid;
   grid-template-columns: 280px 1fr;
@@ -12,11 +18,131 @@
   border-radius: 4px;
   padding: 0.75rem;
 
-  #taw-folders-new-root {
-    width: 100%;
-    margin-bottom: 0.5rem;
+  &.is-collapsed {
+    width: auto;
+    padding: 0.75rem 0.5rem;
   }
 }
+
+/* ── Sidebar header + toolbar (New Folder / Rename / Delete / overflow) ── */
+
+.taw-media-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.taw-media-sidebar__title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #646970;
+}
+
+.taw-media-sidebar__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #646970;
+  cursor: pointer;
+  padding: 0.3rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+
+  &:hover {
+    background: #f0f0f1;
+    color: #2271b1;
+  }
+}
+
+.taw-media-sidebar__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.taw-media-sidebar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid #dcdcde;
+  background: #f6f7f7;
+  color: #2c3338;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0.4rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background: #f0f0f1;
+    border-color: #8c8f94;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &--primary {
+    flex: 1;
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+
+    &:hover:not(:disabled) {
+      background: #135e96;
+      border-color: #135e96;
+    }
+  }
+}
+
+.taw-media-sidebar__menu {
+  position: relative;
+}
+
+.taw-media-sidebar__dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  margin-top: 0.25rem;
+  min-width: 180px;
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  padding: 0.25rem;
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: #2c3338;
+    cursor: pointer;
+    font-size: 12px;
+    text-align: left;
+    padding: 0.45rem 0.5rem;
+    border-radius: 3px;
+
+    &:hover {
+      background: #f0f0f1;
+    }
+  }
+}
+
+/* ── Tree ────────────────────────────────────────────────────────────── */
 
 .taw-folders-tree .default-trees {
   margin-bottom: 1rem;
@@ -47,29 +173,20 @@
     background: #2271b1;
     color: #fff;
 
-    .taw-folders-tree__actions button {
-      color: #fff;
+    .taw-folders-tree__count {
+      color: #000;
     }
   }
 
   span.folder-icon .taw-icon {
     position: relative;
   }
-
-  /* span.folder-open .taw-icon {
-    top: 1px;
-  }
-
-  span.folder-closed .taw-icon {
-    top: 2px;
-  } */
 }
 
 .taw-folders-tree__row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.4rem;
   padding: 0.35rem 0.5rem;
   border-radius: 4px;
   cursor: pointer;
@@ -79,34 +196,178 @@
   }
 }
 
+.taw-folders-tree__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #646970;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+
+  svg {
+    position: relative;
+  }
+
+  &.is-invisible {
+    visibility: hidden;
+  }
+}
+
 .taw-folders-tree__name {
+  flex: 1;
   font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.taw-folders-tree__actions {
-  display: flex;
-  gap: 0.15rem;
+.taw-folders-tree__id {
+  font-size: 11px;
+  color: #8c8f94;
   flex-shrink: 0;
-
-  button {
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    color: #646970;
-    font-size: 13px;
-    line-height: 1;
-    padding: 0.15rem 0.3rem;
-  }
 }
+
+.taw-folders-tree__count {
+  font-size: 11px;
+  color: #646970;
+  background: #f0f0f1;
+  border-radius: 4px;
+  padding: 0.1rem 0.45rem;
+  flex-shrink: 0;
+}
+
+/* ── Grid pane: breadcrumb + folder cards + toolbar + attachment grid ── */
 
 .taw-folders-app__grid {
   background: #fff;
   border: 1px solid #dcdcde;
   border-radius: 4px;
   padding: 0.75rem;
+  position: relative;
+
+  &.is-dropzone-active {
+    outline: 2px dashed #2271b1;
+    outline-offset: -2px;
+  }
+}
+
+.taw-media-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 13px;
+  color: #646970;
+  margin-bottom: 0.75rem;
+}
+
+.taw-media-breadcrumb__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #2271b1;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.taw-breadcrumb__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.taw-media-breadcrumb__sep {
+  color: #c3c4c7;
+}
+
+.taw-media-breadcrumb__current {
+  color: #1d2327;
+  font-weight: 600;
+}
+
+.taw-folder-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.taw-folder-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 180px;
+  padding: 0.6rem 0.75rem;
+  background: #f6f7f7;
+  border: 1px solid #dcdcde;
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:hover {
+    background: #f0f0f1;
+    border-color: #8c8f94;
+  }
+
+  &.is-dragover {
+    outline: 2px dashed #2271b1;
+    outline-offset: -2px;
+  }
+}
+
+.taw-folder-card__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+
+  svg {
+    width: 28px;
+    height: 28px;
+    color: #8c8f94;
+  }
+}
+
+.taw-folder-card__name {
+  flex: 1;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taw-folder-card__count {
+  font-size: 11px;
+  color: #646970;
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 10px;
+  padding: 0.1rem 0.5rem;
+  flex-shrink: 0;
+}
+
+.taw-folders-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.taw-folders-toolbar__selection {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 12px;
+  color: #646970;
+}
+
+.taw-folders-toolbar__uploading {
+  font-size: 12px;
+  color: #646970;
+  margin-left: auto;
 }
 
 .taw-folders-grid {
@@ -117,6 +378,7 @@
 }
 
 .taw-folders-grid__item {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -124,7 +386,7 @@
   padding: 0.5rem;
   border: 1px solid #dcdcde;
   border-radius: 4px;
-  cursor: grab;
+  cursor: pointer;
   text-align: center;
 
   img {
@@ -137,15 +399,18 @@
   &:hover {
     border-color: #2271b1;
   }
+
+  &.is-selected {
+    border-color: #2271b1;
+    box-shadow: inset 0 0 0 1px #2271b1;
+  }
 }
 
-.taw-folders-grid__icon {
+.taw-folders-grid__icon-svg {
   width: 100%;
   aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
+  padding: 24%;
+  box-sizing: border-box;
   color: #a7aaad;
   background: #f6f7f7;
   border-radius: 3px;
@@ -159,6 +424,25 @@
   max-width: 100%;
 }
 
+.taw-folders-grid__check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: #2271b1;
+  color: #fff;
+  border-radius: 50%;
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+}
+
 .taw-folders-grid__empty {
   color: #888;
   padding: 2rem 0;
@@ -167,4 +451,26 @@
 
 #taw-folders-load-more {
   margin-top: 0.75rem;
+}
+
+.taw-folders-dropzone-overlay {
+  position: absolute;
+  inset: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgba(34, 113, 177, 0.06);
+  border: 2px dashed #2271b1;
+  border-radius: 4px;
+  color: #2271b1;
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.taw-folders-dropzone-overlay__icon {
+  width: 40px;
+  height: 40px;
 }
