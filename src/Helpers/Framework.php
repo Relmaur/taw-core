@@ -83,7 +83,20 @@ class Framework
     public static function url(string $relativePath = ''): string
     {
         $absPath   = self::path($relativePath);
-        $themePath = get_template_directory();
+
+        // realpath() matters here: self::path() is built from __DIR__, which
+        // PHP resolves to this file's *real* location — following any
+        // symlink in the chain. get_template_directory() does no such
+        // resolution; it's a plain string built from WordPress's own
+        // constants. Whenever the theme directory is reached through a
+        // symlink (a supported, documented setup for this package — see
+        // taw-theme's AGENTS.md on machine-specific real/symlink direction),
+        // those two paths diverge textually even though they point at the
+        // same files, and the str_replace() below would silently match
+        // nothing — leaving the raw filesystem path concatenated onto a
+        // URL. Resolving both sides through realpath() keeps them
+        // comparable regardless of which side (if either) is a symlink.
+        $themePath = realpath(get_template_directory()) ?: get_template_directory();
 
         // Strip the theme path prefix to get a theme-relative path
         // e.g., /var/www/.../themes/my-theme/vendor/taw/core/assets/admin.css
