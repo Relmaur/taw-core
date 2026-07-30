@@ -313,10 +313,16 @@ class SubmissionsHandler
             delete_option(self::WEBHOOK_SECRET);
         }
 
-        // Per-form overrides — one row per currently-registered form.
-        $formUrls      = (array) ($_POST['taw_form_webhook_url'] ?? []);
-        $formSecrets   = (array) ($_POST['taw_form_webhook_secret'] ?? []);
-        $clearSecretOf = (array) ($_POST['taw_clear_form_webhook_secret'] ?? []);
+        // Per-form overrides — one row per currently-registered form. These
+        // use their own field-name prefix (distinct from self::WEBHOOK_URL /
+        // self::WEBHOOK_SECRET above) precisely to avoid colliding with the
+        // sitewide default field: two <input> elements sharing the same base
+        // name — one scalar, one array-notation — make PHP's request-body
+        // parser coerce the whole $_POST entry into an array, clobbering the
+        // scalar value and crashing the trim() call above with a TypeError.
+        $formUrls      = (array) ($_POST['taw_per_form_webhook_url'] ?? []);
+        $formSecrets   = (array) ($_POST['taw_per_form_webhook_secret'] ?? []);
+        $clearSecretOf = (array) ($_POST['taw_clear_per_form_webhook_secret'] ?? []);
 
         foreach (array_keys(Form::getAll()) as $formId) {
             update_option(
@@ -424,20 +430,20 @@ class SubmissionsHandler
                                     <td><code><?php echo esc_html($formId); ?></code></td>
                                     <td>
                                         <input type="url"
-                                            name="taw_form_webhook_url[<?php echo esc_attr($formId); ?>]"
+                                            name="taw_per_form_webhook_url[<?php echo esc_attr($formId); ?>]"
                                             value="<?php echo esc_attr($formUrl); ?>"
                                             class="regular-text"
                                             placeholder="Uses default above">
                                     </td>
                                     <td>
                                         <input type="password"
-                                            name="taw_form_webhook_secret[<?php echo esc_attr($formId); ?>]"
+                                            name="taw_per_form_webhook_secret[<?php echo esc_attr($formId); ?>]"
                                             value="" class="regular-text"
                                             placeholder="<?php echo $formHasSecret ? 'Leave blank to keep current' : 'Optional'; ?>"
                                             autocomplete="off">
                                         <?php if ($formHasSecret): ?>
                                             <label style="display:block;margin-top:4px;font-weight:normal;">
-                                                <input type="checkbox" name="taw_clear_form_webhook_secret[<?php echo esc_attr($formId); ?>]" value="1">
+                                                <input type="checkbox" name="taw_clear_per_form_webhook_secret[<?php echo esc_attr($formId); ?>]" value="1">
                                                 Remove stored secret
                                             </label>
                                         <?php endif; ?>
