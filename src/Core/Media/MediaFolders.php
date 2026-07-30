@@ -81,7 +81,14 @@ class MediaFolders
         }
 
         add_action('init', [self::class, 'registerTaxonomy']);
-        add_action('admin_menu', [self::class, 'registerFoldersPage']);
+
+        // WIP — temporarily disabled. The dedicated "Media -> TAW Media"
+        // screen (renderFoldersPage(), folders.js's tawFoldersApp) still
+        // needs more polish; the Grid-view sidebar already covers everyday
+        // folder organization. Re-enable this add_action once it's ready to
+        // ship. enqueueAssets() below stays active regardless — it also
+        // covers the classic List view's bulk-move toggle.
+        // add_action('admin_menu', [self::class, 'registerFoldersPage']);
         add_action('admin_enqueue_scripts', [self::class, 'enqueueAssets']);
 
         // Classic List view integration.

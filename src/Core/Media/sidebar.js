@@ -76,6 +76,47 @@
 
         initAttachmentDragSource(grid);
         initDragOverlaySuppression(flex);
+        initAutoAssignUploadsToFolder();
+    }
+
+    // Uploading a file via WP core's own Grid-view dropzone while a real
+    // folder is open should file it there immediately, rather than leaving
+    // it Unfiled until manually moved. wp.Uploader.queue is a stable global
+    // Backbone collection (not per-view) that every uploaded attachment
+    // model passes through — WP core's own upload handler
+    // (wp-plupload.js's FileUploaded binding) merges the server response
+    // into the model and sets uploading:false once the upload completes,
+    // which is exactly the 'change:uploading' event this listens for.
+    function initAutoAssignUploadsToFolder() {
+        if (!(window.wp && wp.Uploader && wp.Uploader.queue)) {
+            return;
+        }
+
+        wp.Uploader.queue.on('change:uploading', function (attachment) {
+            if (attachment.get('uploading')) {
+                return;
+            }
+
+            var sidebarEl = document.getElementById('taw-media-sidebar');
+            if (!sidebarEl || !window.Alpine) {
+                return;
+            }
+
+            var data = window.Alpine.$data(sidebarEl);
+            var folderId = data.selectedFolderId;
+
+            if (typeof folderId !== 'number') {
+                return;
+            }
+
+            restFetch('media/' + attachment.get('id'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [tawMediaFolders.taxonomy]: [folderId] }),
+            }).then(function () {
+                data.fetchFolders();
+            });
+        });
     }
 
     // wp.media's Grid attachments aren't draggable by default (unlike the
