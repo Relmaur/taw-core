@@ -24,20 +24,26 @@
         return window.tawRestFetch(path, options);
     }
 
-    function repositionSidebar() {
+    // The sidebar's markup ships inside an inert <template> (see
+    // MediaFolders::renderGridSidebarContainer()) specifically so Alpine
+    // never sees x-data="tawMediaSidebar" until *we* insert it into the
+    // live DOM — by which point Alpine.data('tawMediaSidebar', ...) below
+    // has already registered. Alpine's built-in MutationObserver picks up
+    // the freshly-inserted node regardless of whether Alpine.start() has
+    // already run, so there's no race to win here.
+    function mountSidebar() {
         var grid = document.getElementById('wp-media-grid');
-        var sidebar = document.getElementById('taw-media-sidebar');
+        var template = document.getElementById('taw-media-sidebar-template');
 
-        if (!grid || !sidebar || !grid.parentNode) {
+        if (!grid || !template || !grid.parentNode) {
             return;
         }
 
         var flex = document.createElement('div');
         flex.id = 'taw-media-grid-flex';
         grid.parentNode.insertBefore(flex, grid);
-        flex.appendChild(sidebar);
+        flex.appendChild(template.content.cloneNode(true));
         flex.appendChild(grid);
-        sidebar.style.display = '';
     }
 
     function applyFolderToBackbone(value) {
@@ -232,6 +238,6 @@
     });
 
     jQuery(function () {
-        repositionSidebar();
+        mountSidebar();
     });
 })();

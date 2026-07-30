@@ -452,13 +452,27 @@ class MediaFolders
     }
 
     /**
-     * Render the Grid-view sidebar's static shell. Detached at the tail of
-     * <body> (admin_footer-upload.php) — sidebar.js repositions this exact
-     * node next to #wp-media-grid rather than us guessing at a WP-core
-     * insertion point. Alpine's x-for below iterates a client-flattened,
-     * depth-annotated folder array (sidebar.js), since Alpine has no
-     * recursive-template primitive comparable to folders.js's own
-     * childrenOf()/renderTreeNodes() recursion.
+     * Render the Grid-view sidebar's static shell, wrapped in an inert
+     * <template> — a <template> element's content is parsed but never
+     * becomes part of the live document (no scripts run, no Alpine x-data
+     * initializes), which is deliberate: Alpine's own bundle queues
+     * Alpine.start() via queueMicrotask() the instant it executes, and the
+     * HTML spec runs a microtask checkpoint after every classic <script>
+     * finishes — before the next sibling script runs. If this markup were
+     * live in the initial HTML, Alpine could scan and fail on
+     * x-data="tawMediaSidebar" before sidebar.js's own script (which
+     * registers that component) ever got a chance to run. Keeping it
+     * inert and having sidebar.js clone this template's content into the
+     * live DOM itself — strictly after registering the component —
+     * sidesteps that race entirely: Alpine's built-in MutationObserver
+     * (the same mechanism that lets it handle dynamically-inserted,
+     * AJAX-loaded content) picks up the freshly-inserted node regardless
+     * of whether Alpine.start() already ran.
+     *
+     * Alpine's x-for below iterates a client-flattened, depth-annotated
+     * folder array (sidebar.js), since Alpine has no recursive-template
+     * primitive comparable to folders.js's own childrenOf()/
+     * renderTreeNodes() recursion.
      */
     public static function renderGridSidebarContainer(): void
     {
@@ -466,7 +480,8 @@ class MediaFolders
             return;
         }
         ?>
-        <div id="taw-media-sidebar" class="taw-media-sidebar" style="display:none;" x-data="tawMediaSidebar" x-init="init()">
+        <template id="taw-media-sidebar-template">
+        <div id="taw-media-sidebar" class="taw-media-sidebar" x-data="tawMediaSidebar" x-init="init()">
             <button type="button" class="button" @click="createFolder(0)">
                 <?php esc_html_e('+ New Folder', 'taw-theme'); ?>
             </button>
@@ -505,6 +520,7 @@ class MediaFolders
                 </template>
             </ul>
         </div>
+        </template>
         <?php
     }
 
