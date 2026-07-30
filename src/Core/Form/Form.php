@@ -1039,8 +1039,21 @@ class Form
         (function () {
             'use strict';
 
-            var form = document.querySelector('[data-taw-form="<?php echo $formId; ?>"]');
-            if (!form) return;
+            // Not document.querySelector('[data-taw-form="..."]') — that only
+            // ever matches the FIRST element with this id, and the same form
+            // can legitimately appear more than once on one page (e.g. the
+            // same block used in a header and a footer). Every extra instance
+            // would render its own <script>, but all of them would find and
+            // bind to that same first form — leaving every instance after
+            // the first with no submit handler at all, so submitting one
+            // falls through to the browser's native POST straight to
+            // admin-ajax.php, landing on the raw JSON response instead of
+            // showing the inline success message. This script always
+            // immediately follows its own <form>, so referencing that
+            // sibling directly is unambiguous regardless of how many
+            // instances of this form exist on the page.
+            var form = document.currentScript.previousElementSibling;
+            if (!form || !form.matches('[data-taw-form="<?php echo $formId; ?>"]')) return;
 
             var submitBtn  = form.querySelector('[data-taw-submit]');
             var spinner    = form.querySelector('[data-taw-spinner]');
