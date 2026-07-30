@@ -527,7 +527,14 @@ class MediaFolders
                         <span class="taw-folders-tree__name"><?php esc_html_e('All Files', 'taw-theme'); ?></span>
                     </div>
                 </li>
-                <li class="taw-folders-tree__node" :class="{ 'is-selected': selectedFolderId === 'unfiled' }" @click="selectFolder('unfiled')">
+                <li
+                    class="taw-folders-tree__node"
+                    :class="{ 'is-selected': selectedFolderId === 'unfiled' }"
+                    @click="selectFolder('unfiled')"
+                    @dragover.prevent="onFolderDragOver($event)"
+                    @dragleave="onFolderDragLeave($event)"
+                    @drop.prevent="onFolderDrop($event, 'unfiled')"
+                >
                     <div class="taw-folders-tree__row">
                         <?php echo $icon('folder-x'); ?>
                         <span class="taw-folders-tree__name"><?php esc_html_e('Unfiled', 'taw-theme'); ?></span>
@@ -555,8 +562,8 @@ class MediaFolders
                                 <span x-show="!isCollapsed(node.id)"><?php echo $icon('chevron-down'); ?></span>
                                 <span x-show="isCollapsed(node.id)" x-cloak><?php echo $icon('chevron-right'); ?></span>
                             </button>
-                            <span x-show="selectedFolderId === node.id"><?php echo $icon('folder-open'); ?></span>
-                            <span x-show="selectedFolderId !== node.id"><?php echo $icon('folder'); ?></span>
+                            <span x-show="selectedFolderId === node.id" class="folder-icon folder-open"><?php echo $icon('folder-open'); ?></span>
+                            <span x-show="selectedFolderId !== node.id" class="folder-icon folder-closed"><?php echo $icon('folder'); ?></span>
                             <span class="taw-folders-tree__name" x-text="node.name"></span>
                             <span class="taw-folders-tree__id" x-show="showFolderIds" x-text="'#' + node.id"></span>
                             <span class="taw-folders-tree__count" x-text="node.count"></span>

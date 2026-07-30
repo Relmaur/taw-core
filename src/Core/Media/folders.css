@@ -44,6 +44,18 @@
     .taw-folders-tree__actions button {
       color: #fff;
     }
+
+    span.folder-icon .taw-icon {
+      position: relative;
+    }
+
+    span.folder-open .taw-icon {
+      top: 2px;
+    }
+
+    span.folder-closed .taw-icon {
+      top: 3px;
+    }
   }
 }
 

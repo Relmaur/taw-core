@@ -24,6 +24,11 @@
         return window.tawRestFetch(path, options);
     }
 
+    // Tracks whether the drag in progress is one of ours (a folder row or a
+    // grid attachment), as opposed to a real OS file drag — see
+    // initDragOverlaySuppression() below for why this matters.
+    var isInternalDrag = false;
+
     // The sidebar's markup ships inside an inert <template> (see
     // MediaFolders::renderGridSidebarContainer()) specifically so Alpine
     // never sees x-data="tawMediaSidebar" until *we* insert it into the
@@ -44,6 +49,78 @@
         grid.parentNode.insertBefore(flex, grid);
         flex.appendChild(template.content.cloneNode(true));
         flex.appendChild(grid);
+
+        initAttachmentDragSource(grid);
+        initDragOverlaySuppression(flex);
+    }
+
+    // wp.media's Grid attachments aren't draggable by default (unlike the
+    // gallery-edit modal's jQuery-UI-sortable grid) — Backbone re-renders
+    // .attachment nodes on every scroll/filter, so a MutationObserver (rather
+    // than a one-off querySelectorAll) is needed to keep marking new ones.
+    function markAttachmentsDraggable(grid) {
+        var items = grid.querySelectorAll('.attachment:not([draggable])');
+        for (var i = 0; i < items.length; i++) {
+            items[i].setAttribute('draggable', 'true');
+        }
+    }
+
+    function attachmentIdsForDrag(startId) {
+        try {
+            var selection = wp.media.frame.state().get('selection');
+            if (selection && selection.length > 1 && selection.get(startId)) {
+                return selection.map(function (model) { return model.id; });
+            }
+        } catch (e) {
+            // wp.media not ready, or nothing selected — drag just the one item.
+        }
+
+        return [startId];
+    }
+
+    function initAttachmentDragSource(grid) {
+        markAttachmentsDraggable(grid);
+
+        new MutationObserver(function () {
+            markAttachmentsDraggable(grid);
+        }).observe(grid, { childList: true, subtree: true });
+
+        grid.addEventListener('dragstart', function (event) {
+            var item = event.target.closest('.attachment');
+            var id = item && parseInt(item.getAttribute('data-id'), 10);
+
+            if (!id) {
+                return;
+            }
+
+            isInternalDrag = true;
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('application/x-taw-attachments', JSON.stringify(attachmentIdsForDrag(id)));
+        });
+    }
+
+    // WP core's own Grid-view upload dropzone shows a "drop files to upload"
+    // overlay on *any* dragenter that reaches it — it doesn't check
+    // dataTransfer.types — so dragging a folder row or a grid attachment
+    // (neither of which carry Files) triggers it too unless we stop that
+    // bubbling ourselves. Stopping it here, on the flex wrapper that's a
+    // shared ancestor of both the grid and the sidebar, still lets each
+    // event reach our own row-level handlers first (bubble order visits the
+    // target before this ancestor) and leaves real OS file drags over the
+    // grid completely alone, since we only stop propagation while
+    // isInternalDrag is true.
+    function initDragOverlaySuppression(flex) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (type) {
+            flex.addEventListener(type, function (event) {
+                if (isInternalDrag) {
+                    event.stopPropagation();
+                }
+            });
+        });
+
+        flex.addEventListener('dragend', function () {
+            isInternalDrag = false;
+        });
     }
 
     function applyFolderToBackbone(value) {
@@ -270,6 +347,8 @@
         },
 
         onFolderDragStart(event, id) {
+            isInternalDrag = true;
+            event.dataTransfer.effectAllowed = 'move';
             event.dataTransfer.setData('application/x-taw-folder', String(id));
         },
 
@@ -283,10 +362,30 @@
 
         onFolderDrop(event, targetId) {
             event.currentTarget.classList.remove('is-dragover');
+
+            var draggedAttachments = event.dataTransfer.getData('application/x-taw-attachments');
+            if (draggedAttachments) {
+                this.moveAttachmentsToFolder(JSON.parse(draggedAttachments), targetId);
+                return;
+            }
+
             var draggedFolderId = event.dataTransfer.getData('application/x-taw-folder');
-            if (draggedFolderId) {
+            if (draggedFolderId && targetId !== 'unfiled') {
                 this.reparentFolder(parseInt(draggedFolderId, 10), targetId);
             }
+        },
+
+        moveAttachmentsToFolder(ids, targetId) {
+            var term = targetId === 'unfiled' ? [] : [targetId];
+
+            Promise.all(ids.map((id) => restFetch('media/' + id, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ [tawMediaFolders.taxonomy]: term }),
+            }))).then(() => {
+                this.fetchFolders();
+                applyFolderToBackbone(this.selectedFolderId);
+            });
         },
 
         selectFolder(value) {

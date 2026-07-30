@@ -9,6 +9,10 @@
   min-width: 0;
 }
 
+#taw-media-grid-flex #wp-media-grid .attachment[draggable="true"] {
+  cursor: grab;
+}
+
 .taw-media-sidebar {
   width: 260px;
   flex-shrink: 0;
