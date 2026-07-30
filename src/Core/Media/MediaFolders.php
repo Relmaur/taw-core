@@ -48,6 +48,16 @@ class MediaFolders
     private const CAPABILITY = 'upload_files';
 
     /**
+     * Postmeta key holding a flat, queryable byte count for each attachment
+     * — WP core only stores file size nested inside the serialized
+     * '_wp_attachment_metadata' array, which SQL can't ORDER BY. Populated
+     * on upload (storeFilesizeMeta()) and backfilled once for pre-existing
+     * attachments the first time a "sort by size" query runs
+     * (ensureFilesizeBackfill()).
+     */
+    private const FILESIZE_META_KEY = '_taw_media_filesize';
+
+    /**
      * Whether TAW Media has been explicitly enabled for this theme.
      * Must call MediaFolders::enable() in customizations.php to activate.
      */
@@ -108,6 +118,10 @@ class MediaFolders
         add_action('admin_enqueue_scripts', [self::class, 'enqueueGridSidebarAssets']);
         add_action('admin_footer-upload.php', [self::class, 'renderGridSidebarContainer']);
         add_filter('ajax_query_attachments_args', [self::class, 'filterAjaxQueryAttachmentsArgs']);
+
+        // Powers the sidebar's "Largest/Smallest first" file sort — WP core
+        // has no queryable file-size field, so we maintain our own.
+        add_action('add_attachment', [self::class, 'storeFilesizeMeta']);
     }
 
     /**
@@ -442,6 +456,10 @@ class MediaFolders
      */
     public static function filterAjaxQueryAttachmentsArgs(array $query): array
     {
+        if (($query['meta_key'] ?? '') === self::FILESIZE_META_KEY) {
+            self::ensureFilesizeBackfill();
+        }
+
         $folder = $query[self::TAXONOMY] ?? '';
 
         // Must come off $query regardless of $folder's value: WP_Query::
@@ -464,6 +482,45 @@ class MediaFolders
         $query['tax_query'] = $taxQuery;
 
         return $query;
+    }
+
+    public static function storeFilesizeMeta(int $attachment_id): void
+    {
+        $file = get_attached_file($attachment_id);
+
+        if ($file && file_exists($file)) {
+            update_post_meta($attachment_id, self::FILESIZE_META_KEY, filesize($file));
+        }
+    }
+
+    /**
+     * One-time backfill for attachments uploaded before this feature
+     * existed. Guarded by an option flag so it only ever runs once — after
+     * that, every attachment gets its filesize meta at upload time via
+     * storeFilesizeMeta().
+     */
+    private static function ensureFilesizeBackfill(): void
+    {
+        if (get_option('taw_media_filesize_backfilled')) {
+            return;
+        }
+
+        $ids = get_posts([
+            'post_type'      => 'attachment',
+            'post_status'    => 'inherit',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'meta_query'     => [[
+                'key'     => self::FILESIZE_META_KEY,
+                'compare' => 'NOT EXISTS',
+            ]],
+        ]);
+
+        foreach ($ids as $id) {
+            self::storeFilesizeMeta((int) $id);
+        }
+
+        update_option('taw_media_filesize_backfilled', 1, false);
     }
 
     /**
@@ -576,6 +633,16 @@ class MediaFolders
                             </button>
                         </div>
                     </div>
+                </div>
+
+                <div class="taw-media-sidebar__sort" x-show="!sidebarCollapsed">
+                    <label class="screen-reader-text" for="taw-folder-sort"><?php esc_html_e('Sort folders', 'taw-theme'); ?></label>
+                    <select id="taw-folder-sort" x-model="folderSortValue" @change="onFolderSortChange()">
+                        <option value="name-asc"><?php esc_html_e('Name (A–Z)', 'taw-theme'); ?></option>
+                        <option value="name-desc"><?php esc_html_e('Name (Z–A)', 'taw-theme'); ?></option>
+                        <option value="date-desc"><?php esc_html_e('Newest first', 'taw-theme'); ?></option>
+                        <option value="date-asc"><?php esc_html_e('Oldest first', 'taw-theme'); ?></option>
+                    </select>
                 </div>
 
                 <ul class="taw-folders-tree" aria-busy="true" x-show="!sidebarCollapsed">

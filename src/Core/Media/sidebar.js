@@ -38,6 +38,37 @@
     var currentFolderChildren = [];
     var currentBreadcrumb = [];
 
+    // Sort preferences persist per-browser (not per-user account), same
+    // storage tier as the sidebar's collapsed/expanded state below.
+    var FOLDER_SORT_STORAGE_KEY = 'tawMediaFolderSort';
+    var FILE_SORT_STORAGE_KEY = 'tawMediaFileSort';
+
+    // wp/v2/<taxonomy> forwards 'orderby'/'order' straight to get_terms() —
+    // terms have no creation-date field, so 'id' (monotonically increasing
+    // with creation) stands in for it under the "Newest/Oldest first" labels.
+    var FOLDER_SORT_OPTIONS = {
+        'name-asc': { orderby: 'name', order: 'asc' },
+        'name-desc': { orderby: 'name', order: 'desc' },
+        'date-desc': { orderby: 'id', order: 'desc' },
+        'date-asc': { orderby: 'id', order: 'asc' },
+    };
+
+    // Applied directly as wp.media Backbone query props (see
+    // applyFileSortToBackbone below) — WP core's query-attachments handler
+    // already understands 'orderby'/'order'/'meta_key' as plain WP_Query
+    // args, so no server-side filter is needed for this half of sorting
+    // (unlike folder filtering, which does need filterAjaxQueryAttachmentsArgs
+    // on the PHP side because of the taxonomy auto-detection quirk).
+    var FILE_SORT_OPTIONS = {
+        'date-desc': { orderby: 'date', order: 'DESC' },
+        'date-asc': { orderby: 'date', order: 'ASC' },
+        'name-asc': { orderby: 'title', order: 'ASC' },
+        'name-desc': { orderby: 'title', order: 'DESC' },
+        // Must match MediaFolders::FILESIZE_META_KEY on the PHP side.
+        'size-desc': { orderby: 'meta_value_num', order: 'DESC', meta_key: '_taw_media_filesize' },
+        'size-asc': { orderby: 'meta_value_num', order: 'ASC', meta_key: '_taw_media_filesize' },
+    };
+
     function escapeHtml(value) {
         return String(value).replace(/[&<>"']/g, function (ch) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
@@ -158,10 +189,26 @@
         overlay = document.createElement('div');
         overlay.className = 'taw-grid-overlay';
         overlay.innerHTML =
-            '<div class="taw-media-breadcrumb"></div>' +
+            '<div class="taw-media-toolbar">' +
+                '<div class="taw-media-breadcrumb"></div>' +
+                '<select class="taw-media-sort" id="taw-media-file-sort">' +
+                    '<option value="date-desc">Newest first</option>' +
+                    '<option value="date-asc">Oldest first</option>' +
+                    '<option value="name-asc">Name (A–Z)</option>' +
+                    '<option value="name-desc">Name (Z–A)</option>' +
+                    '<option value="size-desc">Largest first</option>' +
+                    '<option value="size-asc">Smallest first</option>' +
+                '</select>' +
+            '</div>' +
             '<div class="taw-folder-cards"></div>';
 
         list.parentNode.insertBefore(overlay, list);
+
+        var sortSelect = overlay.querySelector('#taw-media-file-sort');
+        sortSelect.value = readStoredFileSort();
+        sortSelect.addEventListener('change', function (event) {
+            applyFileSortFromGrid(event.target.value);
+        });
 
         return overlay;
     }
@@ -396,6 +443,47 @@
         library.props.set({ taw_media_folder: value === null ? '' : String(value) });
     }
 
+    // Mirrors applyFolderToBackbone but for the file-sort control — a
+    // separate props key set, independent of which folder is open.
+    function applyFileSortToBackbone(value) {
+        if (!(window.wp && wp.media && wp.media.frame && wp.media.frame.state)) {
+            return;
+        }
+
+        var state = wp.media.frame.state();
+        var library = state && state.get('library');
+
+        if (!library || !library.props) {
+            return;
+        }
+
+        var sort = FILE_SORT_OPTIONS[value] || FILE_SORT_OPTIONS['date-desc'];
+        library.props.set({ orderby: sort.orderby, order: sort.order });
+
+        // Explicitly unset rather than set '' — an empty meta_key still gets
+        // sent as a query arg and breaks the ORDER BY clause server-side.
+        if (sort.meta_key) {
+            library.props.set({ meta_key: sort.meta_key });
+        } else {
+            library.props.unset('meta_key');
+        }
+    }
+
+    function readStoredFileSort() {
+        try {
+            return window.localStorage.getItem(FILE_SORT_STORAGE_KEY) || 'date-desc';
+        } catch (e) {
+            return 'date-desc';
+        }
+    }
+
+    function applyFileSortFromGrid(value) {
+        var sidebarEl = document.getElementById('taw-media-sidebar');
+        if (sidebarEl && window.Alpine) {
+            window.Alpine.$data(sidebarEl).setFileSort(value);
+        }
+    }
+
     // Forces the Grid's Backbone query to re-fetch the *same* filter it
     // already has. props.set() (above) only fires a 'change' event — the
     // thing wp.media's Attachments collection actually listens for to
@@ -461,6 +549,8 @@
         menuOpen: false,
         showFolderIds: false,
         collapsedIds: [], // folder ids whose children are hidden in the tree
+        folderSortValue: 'name-asc',
+        fileSortValue: 'date-desc',
 
         get canRename() {
             return typeof this.selectedFolderId === 'number';
@@ -473,11 +563,48 @@
         init() {
             try {
                 this.sidebarCollapsed = window.localStorage.getItem('tawMediaSidebarCollapsed') === '1';
+                this.folderSortValue = window.localStorage.getItem(FOLDER_SORT_STORAGE_KEY) || 'name-asc';
+                this.fileSortValue = readStoredFileSort();
             } catch (e) {
-                // localStorage unavailable (private browsing, etc.) — default stays false.
+                // localStorage unavailable (private browsing, etc.) — defaults stand.
             }
 
-            this.fetchFolders().then(() => this.syncFromUrl());
+            this.fetchFolders().then(() => {
+                this.syncFromUrl();
+
+                // Applied here rather than synchronously above: wp.media.frame
+                // may not exist yet at the instant init() runs, but reliably
+                // does by the time this fetch's round trip completes. The
+                // explicit refreshGridQuery() forces the remembered sort to
+                // actually take effect on first load, since props.set() alone
+                // only re-queries on a *change* from WP core's own default
+                // ('date'/'DESC') — a no-op when the remembered value matches it.
+                applyFileSortToBackbone(this.fileSortValue);
+                refreshGridQuery();
+            });
+        },
+
+        onFolderSortChange() {
+            try {
+                window.localStorage.setItem(FOLDER_SORT_STORAGE_KEY, this.folderSortValue);
+            } catch (e) {
+                // Not persisted this session, but the sort itself still applies.
+            }
+
+            this.fetchFolders();
+        },
+
+        setFileSort(value) {
+            this.fileSortValue = value;
+
+            try {
+                window.localStorage.setItem(FILE_SORT_STORAGE_KEY, value);
+            } catch (e) {
+                // Not persisted this session, but the sort itself still applies.
+            }
+
+            applyFileSortToBackbone(value);
+            refreshGridQuery();
         },
 
         toggleSidebar() {
@@ -508,7 +635,9 @@
         },
 
         fetchFolders() {
-            return restFetch(tawMediaFolders.taxonomy + '?per_page=100&orderby=name&order=asc&context=edit')
+            var sort = FOLDER_SORT_OPTIONS[this.folderSortValue] || FOLDER_SORT_OPTIONS['name-asc'];
+
+            return restFetch(tawMediaFolders.taxonomy + '?per_page=100&orderby=' + sort.orderby + '&order=' + sort.order + '&context=edit')
                 .then((terms) => {
                     this.folders = terms;
                     this.flattenTree();
