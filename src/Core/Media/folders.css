@@ -20,7 +20,7 @@
 
 .taw-folders-tree .default-trees {
   margin-bottom: 1rem;
-  padding-bottom: 1rem;
+  padding-bottom: 0.5em;
   border-bottom: 1px solid #dcdcde;
 }
 
@@ -56,13 +56,13 @@
     position: relative;
   }
 
-  span.folder-open .taw-icon {
-    top: 2px;
+  /* span.folder-open .taw-icon {
+    top: 1px;
   }
 
   span.folder-closed .taw-icon {
-    top: 3px;
-  }
+    top: 2px;
+  } */
 }
 
 .taw-folders-tree__row {

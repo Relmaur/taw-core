@@ -12,32 +12,108 @@
   cursor: grab;
 }
 
-#taw-media-grid-flex #wp-media-grid .taw-folder-tile {
+/* ── Grid-view overlay: breadcrumb + folder cards, sits above the photo
+   grid rather than mixed into it — its own markup throughout, not WP
+   core's .attachment/.thumbnail, so it isn't subject to that layout's
+   float/percentage-width/img-specific-centering quirks. ─────────────── */
+
+#taw-media-grid-flex #wp-media-grid .taw-grid-overlay {
+  margin-bottom: 1rem;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-media-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 13px;
+  color: #646970;
+  margin-bottom: 0.75rem;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-media-breadcrumb__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #2271b1;
+  text-decoration: none;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-media-breadcrumb__link:hover {
+  text-decoration: underline;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-breadcrumb__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-media-breadcrumb__sep {
+  color: #c3c4c7;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-media-breadcrumb__current {
+  color: #1d2327;
+  font-weight: 600;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-folder-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-folder-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 180px;
+  padding: 0.6rem 0.75rem;
+  background: #f6f7f7;
+  border: 1px solid #dcdcde;
+  border-radius: 6px;
   cursor: pointer;
 }
 
-#taw-media-grid-flex #wp-media-grid .taw-folder-tile .thumbnail {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f6f7f7;
+#taw-media-grid-flex #wp-media-grid .taw-folder-card:hover,
+#taw-media-grid-flex #wp-media-grid .taw-folder-card:focus {
+  background: #f0f0f1;
+  border-color: #8c8f94;
 }
 
-#taw-media-grid-flex #wp-media-grid .taw-folder-tile .taw-folder-tile-icon {
-  width: 64px;
-  height: 64px;
+#taw-media-grid-flex #wp-media-grid .taw-folder-card.is-dragover {
+  outline: 2px dashed #2271b1;
+  outline-offset: -2px;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-folder-card__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-folder-card__icon-svg {
+  width: 28px;
+  height: 28px;
   color: #8c8f94;
 }
 
-#taw-media-grid-flex
-  #wp-media-grid
-  .taw-folder-tile:hover
-  .taw-folder-tile-icon,
-#taw-media-grid-flex
-  #wp-media-grid
-  .taw-folder-tile:focus
-  .taw-folder-tile-icon {
-  color: #2271b1;
+#taw-media-grid-flex #wp-media-grid .taw-folder-card__name {
+  flex: 1;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-folder-card__count {
+  font-size: 11px;
+  color: #646970;
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 10px;
+  padding: 0.1rem 0.5rem;
+  flex-shrink: 0;
 }
 
 .taw-media-sidebar {
@@ -54,6 +130,7 @@
   padding-right: 1.5rem;
   margin-right: 1.5rem;
   border-right: 1px solid #dcdcde;
+  position: relative;
 }
 
 .taw-media-sidebar.is-collapsed {
@@ -61,6 +138,7 @@
   padding: 0.75rem 0.5rem;
 }
 
+span:has(.taw-icon),
 .taw-icon {
   width: 16px;
   height: 16px;
@@ -75,6 +153,14 @@
   justify-content: space-between;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
+}
+
+.taw-media-sidebar__header button {
+  position: absolute;
+  right: 0;
+  transform: translateX(50%);
+  top: 1rem;
+  background: #fff;
 }
 
 .taw-media-sidebar__title {
@@ -258,6 +344,10 @@
   flex-shrink: 0;
 }
 
+.taw-media-sidebar .taw-folders-tree__toggle svg {
+  position: relative;
+}
+
 .taw-media-sidebar .taw-folders-tree__toggle.is-invisible {
   visibility: hidden;
 }
@@ -280,7 +370,7 @@
   font-size: 11px;
   color: #646970;
   background: #f0f0f1;
-  border-radius: 10px;
+  border-radius: 4px;
   padding: 0.1rem 0.45rem;
   flex-shrink: 0;
 }

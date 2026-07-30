@@ -29,12 +29,27 @@
     // initDragOverlaySuppression() below for why this matters.
     var isInternalDrag = false;
 
-    // Grid-view subfolder tiles: which child folders (of the currently
-    // selected folder) should currently be showing as tiles in the grid,
-    // and the grid node to sync them into. Module-level (like
-    // isInternalDrag) so both plain DOM code and Alpine methods share them.
+    // Grid-view folder cards + breadcrumb: which child folders (of the
+    // currently selected folder) should show as cards, and the breadcrumb
+    // trail leading to the current selection ([{id, name}, ...], root-first,
+    // last entry is the current folder). Module-level (like isInternalDrag)
+    // so both plain DOM code and Alpine methods share them.
     var currentGrid = null;
     var currentFolderChildren = [];
+    var currentBreadcrumb = [];
+
+    function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (ch) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+        });
+    }
+
+    function selectFolderFromGrid(id) {
+        var sidebarEl = document.getElementById('taw-media-sidebar');
+        if (sidebarEl && window.Alpine) {
+            window.Alpine.$data(sidebarEl).selectFolder(id);
+        }
+    }
 
     // The sidebar's markup ships inside an inert <template> (see
     // MediaFolders::renderGridSidebarContainer()) specifically so Alpine
@@ -67,91 +82,176 @@
     // gallery-edit modal's jQuery-UI-sortable grid) — Backbone re-renders
     // .attachment nodes on every scroll/filter, so a MutationObserver (rather
     // than a one-off querySelectorAll) is needed to keep marking new ones.
-    // Folder tiles (.taw-folder-tile) are excluded — they're our own
-    // injected nodes, not real attachments, and aren't meant to be dragged.
     function markAttachmentsDraggable(grid) {
-        var items = grid.querySelectorAll('.attachment:not([draggable]):not(.taw-folder-tile)');
+        var items = grid.querySelectorAll('.attachment:not([draggable])');
         for (var i = 0; i < items.length; i++) {
             items[i].setAttribute('draggable', 'true');
         }
     }
 
-    // Injects the current folder's direct subfolders as plain (non-Backbone)
-    // <li class="attachment"> tiles at the start of the grid, so browsing a
-    // folder with children lets you navigate into them from the grid itself
-    // — not just the sidebar tree. wp.media fully re-renders ul.attachments
-    // on every reset (e.g. every folder switch), which would wipe these out,
-    // so this is re-run from the same MutationObserver that keeps attachments
-    // marked draggable, rather than injected once and left alone.
-    function syncFolderTiles() {
-        if (!currentGrid) {
+    // Ensures a <div class="taw-grid-overlay"> (breadcrumb + folder cards)
+    // sits directly above ul.attachments, as a sibling inside its parent —
+    // created once and left alone otherwise, since wp.media only ever
+    // replaces ul.attachments's own children, never touches its parent's
+    // other children.
+    function ensureGridOverlay(grid) {
+        var list = grid.querySelector('ul.attachments');
+        if (!list || !list.parentNode) {
+            return null;
+        }
+
+        var overlay = list.parentNode.querySelector(':scope > .taw-grid-overlay');
+        if (overlay) {
+            return overlay;
+        }
+
+        overlay = document.createElement('div');
+        overlay.className = 'taw-grid-overlay';
+        overlay.innerHTML =
+            '<div class="taw-media-breadcrumb"></div>' +
+            '<div class="taw-folder-cards"></div>';
+
+        list.parentNode.insertBefore(overlay, list);
+
+        return overlay;
+    }
+
+    function renderBreadcrumb(overlay) {
+        var el = overlay.querySelector('.taw-media-breadcrumb');
+        var signature = currentBreadcrumb.map(function (crumb) { return crumb.id; }).join(',');
+
+        // Bail out once already correct — rebuilding on every mutation would
+        // itself mutate the DOM and re-trigger the observer watching it.
+        if (el.dataset.signature === signature) {
+            return;
+        }
+        el.dataset.signature = signature;
+
+        if (!currentBreadcrumb.length) {
+            el.innerHTML = '';
+            el.style.display = 'none';
             return;
         }
 
-        var list = currentGrid.querySelector('ul.attachments');
-        if (!list) {
-            return;
-        }
+        el.style.display = '';
 
-        var existing = list.querySelectorAll(':scope > .taw-folder-tile');
-        var existingIds = Array.prototype.map.call(existing, function (el) {
-            return el.getAttribute('data-folder-id');
+        var parts = [
+            '<a href="#" class="taw-media-breadcrumb__link" data-folder-id="">' +
+                tawMediaFolders.homeIcon +
+                '<span>All Files</span>' +
+            '</a>',
+        ];
+
+        currentBreadcrumb.forEach(function (crumb, index) {
+            parts.push('<span class="taw-media-breadcrumb__sep">/</span>');
+
+            if (index === currentBreadcrumb.length - 1) {
+                parts.push('<span class="taw-media-breadcrumb__current">' + escapeHtml(crumb.name) + '</span>');
+            } else {
+                parts.push(
+                    '<a href="#" class="taw-media-breadcrumb__link" data-folder-id="' + crumb.id + '">' +
+                        escapeHtml(crumb.name) +
+                    '</a>'
+                );
+            }
         });
-        var desiredIds = currentFolderChildren.map(function (folder) {
-            return String(folder.id);
+
+        el.innerHTML = parts.join('');
+
+        el.querySelectorAll('a[data-folder-id]').forEach(function (link) {
+            link.addEventListener('click', function (event) {
+                event.preventDefault();
+                var raw = event.currentTarget.getAttribute('data-folder-id');
+                selectFolderFromGrid(raw === '' ? null : parseInt(raw, 10));
+            });
         });
+    }
+
+    function renderFolderCards(overlay) {
+        var el = overlay.querySelector('.taw-folder-cards');
+
+        var existingIds = Array.prototype.map.call(el.children, function (card) {
+            return card.getAttribute('data-folder-id');
+        });
+        var desiredIds = currentFolderChildren.map(function (folder) { return String(folder.id); });
 
         var inSync = existingIds.length === desiredIds.length
             && existingIds.every(function (id, i) { return id === desiredIds[i]; });
 
-        // Bail out once already correct — re-inserting on every mutation
-        // would itself mutate the DOM and re-trigger the observer watching it.
         if (inSync) {
             return;
         }
 
-        for (var i = 0; i < existing.length; i++) {
-            existing[i].remove();
-        }
+        el.innerHTML = '';
+        el.style.display = currentFolderChildren.length ? '' : 'none';
 
-        if (!currentFolderChildren.length) {
+        currentFolderChildren.forEach(function (folder) {
+            var card = document.createElement('div');
+            card.className = 'taw-folder-card';
+            card.tabIndex = 0;
+            card.setAttribute('role', 'button');
+            card.setAttribute('data-folder-id', String(folder.id));
+            card.innerHTML =
+                '<span class="taw-folder-card__icon">' + tawMediaFolders.folderIcon + '</span>' +
+                '<span class="taw-folder-card__name">' + escapeHtml(folder.name) + '</span>' +
+                '<span class="taw-folder-card__count">' + (folder.count || 0) + '</span>';
+
+            card.addEventListener('click', function () {
+                selectFolderFromGrid(folder.id);
+            });
+            card.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    selectFolderFromGrid(folder.id);
+                }
+            });
+
+            // Lets a real grid attachment be dropped straight onto a
+            // subfolder card, same REST move as dropping on the sidebar —
+            // isInternalDrag (set on the attachment's dragstart) already
+            // keeps WP's own upload-dropzone overlay suppressed for this.
+            card.addEventListener('dragover', function (event) {
+                event.preventDefault();
+                card.classList.add('is-dragover');
+            });
+            card.addEventListener('dragleave', function () {
+                card.classList.remove('is-dragover');
+            });
+            card.addEventListener('drop', function (event) {
+                event.preventDefault();
+                card.classList.remove('is-dragover');
+
+                var attachmentsJson = event.dataTransfer.getData('application/x-taw-attachments');
+                if (!attachmentsJson) {
+                    return;
+                }
+
+                var sidebarEl = document.getElementById('taw-media-sidebar');
+                if (sidebarEl && window.Alpine) {
+                    window.Alpine.$data(sidebarEl).moveAttachmentsToFolder(JSON.parse(attachmentsJson), folder.id);
+                }
+            });
+
+            el.appendChild(card);
+        });
+    }
+
+    // Re-run from the same MutationObserver that keeps attachments marked
+    // draggable: wp.media fully re-renders ul.attachments's children on
+    // every reset (e.g. every folder switch), so the overlay's content has
+    // to be kept in sync the same way rather than injected once.
+    function syncGridOverlays() {
+        if (!currentGrid) {
             return;
         }
 
-        var fragment = document.createDocumentFragment();
-        currentFolderChildren.forEach(function (folder) {
-            var li = document.createElement('li');
-            li.className = 'attachment taw-folder-tile';
-            li.tabIndex = 0;
-            li.setAttribute('role', 'button');
-            li.setAttribute('data-folder-id', String(folder.id));
-            // No .filename child, so WP core's own
-            // .attachment:not(:has(.filename))::after rule renders this as
-            // the same name-overlay real thumbnails get, for free.
-            li.setAttribute('aria-label', folder.name);
-            li.innerHTML =
-                '<div class="attachment-preview taw-folder-tile__preview">' +
-                    '<div class="thumbnail"><div class="centered">' + tawMediaFolders.folderIcon + '</div></div>' +
-                '</div>';
+        var overlay = ensureGridOverlay(currentGrid);
+        if (!overlay) {
+            return;
+        }
 
-            li.addEventListener('click', function (event) {
-                var id = parseInt(event.currentTarget.getAttribute('data-folder-id'), 10);
-                var sidebarEl = document.getElementById('taw-media-sidebar');
-                if (sidebarEl && window.Alpine) {
-                    window.Alpine.$data(sidebarEl).selectFolder(id);
-                }
-            });
-            li.addEventListener('keydown', function (event) {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    event.currentTarget.click();
-                }
-            });
-
-            fragment.appendChild(li);
-        });
-
-        list.insertBefore(fragment, list.firstChild);
+        renderBreadcrumb(overlay);
+        renderFolderCards(overlay);
     }
 
     function attachmentIdsForDrag(startId) {
@@ -172,7 +272,7 @@
 
         new MutationObserver(function () {
             markAttachmentsDraggable(grid);
-            syncFolderTiles();
+            syncGridOverlays();
         }).observe(grid, { childList: true, subtree: true });
 
         grid.addEventListener('dragstart', function (event) {
@@ -334,19 +434,37 @@
                 });
         },
 
-        // Keeps the Grid-view's injected subfolder tiles (syncFolderTiles(),
-        // module-level above) matching the currently selected folder's
-        // direct children — called after anything that could change either
-        // (selecting a folder, or a CRUD op while one is selected).
+        // Keeps the Grid-view's injected folder cards + breadcrumb
+        // (syncGridOverlays(), module-level above) matching the currently
+        // selected folder's direct children and ancestor chain — called
+        // after anything that could change either (selecting a folder, or a
+        // CRUD op while one is selected).
         updateFolderTiles() {
             currentFolderChildren = typeof this.selectedFolderId === 'number'
                 ? this.childrenOf(this.selectedFolderId)
                 : [];
-            syncFolderTiles();
+            currentBreadcrumb = typeof this.selectedFolderId === 'number'
+                ? this.ancestorsOf(this.selectedFolderId)
+                : [];
+            syncGridOverlays();
         },
 
         childrenOf(parentId) {
             return this.folders.filter((f) => (f.parent || 0) === parentId);
+        },
+
+        // Root-first ancestor chain for a folder, including the folder
+        // itself as the last entry — e.g. Clientes > Lorem Ipsum > Lorem.
+        ancestorsOf(folderId) {
+            var chain = [];
+            var node = this.folders.find((f) => f.id === folderId);
+
+            while (node) {
+                chain.unshift({ id: node.id, name: node.name });
+                node = node.parent ? this.folders.find((f) => f.id === node.parent) : null;
+            }
+
+            return chain;
         },
 
         isCollapsed(id) {

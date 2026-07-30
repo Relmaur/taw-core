@@ -29,10 +29,24 @@ final class MediaFoldersAjaxQueryTest extends TestCase
         $result = MediaFolders::filterAjaxQueryAttachmentsArgs([MediaFolders::TAXONOMY => '42']);
 
         $this->assertSame([[
-            'taxonomy' => MediaFolders::TAXONOMY,
-            'field'    => 'term_id',
-            'terms'    => 42,
+            'taxonomy'         => MediaFolders::TAXONOMY,
+            'field'            => 'term_id',
+            'terms'            => 42,
+            'include_children' => false,
         ]], $result['tax_query']);
+    }
+
+    public function test_removes_raw_taxonomy_key_to_avoid_wp_querys_own_auto_tax_query(): void
+    {
+        // WP_Query::parse_tax_query() auto-detects any top-level key matching
+        // a registered taxonomy's query_var and adds its own (slug-based)
+        // tax_query clause from it — since this value is a numeric term ID,
+        // leaving the raw key in place would make that auto-added clause
+        // always fail to match, silently zeroing every result. See
+        // filterAjaxQueryAttachmentsArgs()'s own comment for the full story.
+        $result = MediaFolders::filterAjaxQueryAttachmentsArgs([MediaFolders::TAXONOMY => '42']);
+
+        $this->assertArrayNotHasKey(MediaFolders::TAXONOMY, $result);
     }
 
     public function test_adds_not_exists_tax_query_for_unfiled(): void
@@ -55,6 +69,7 @@ final class MediaFoldersAjaxQueryTest extends TestCase
 
         $this->assertSame('slug', $result[0]['field']);
         $this->assertSame('blog', $result[0]['terms']);
+        $this->assertFalse($result[0]['include_children']);
     }
 
     public function test_build_tax_query_for_folder_returns_null_for_empty(): void

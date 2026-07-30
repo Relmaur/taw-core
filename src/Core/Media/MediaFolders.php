@@ -185,10 +185,12 @@ class MediaFolders
             'nonce'      => wp_create_nonce('wp_rest'),
             'taxonomy'   => self::TAXONOMY,
             'screen'     => $hook === 'media_page_taw-media-folders' ? 'folders' : 'list',
-            // Rendered once here (rather than have sidebar.js build an SVG
-            // string itself) so the Grid-view's injected subfolder tiles
-            // use the same Lucide icon set as everything else in this file.
-            'folderIcon' => Lucide::render('folder', ['class' => 'taw-folder-tile-icon']),
+            // Rendered once here (rather than have sidebar.js build SVG
+            // strings itself) so the Grid-view's injected folder cards and
+            // breadcrumb use the same Lucide icon set as everything else in
+            // this file.
+            'folderIcon' => Lucide::render('folder', ['class' => 'taw-folder-card__icon-svg']),
+            'homeIcon'   => Lucide::render('house', ['class' => 'taw-breadcrumb__icon']),
         ]);
     }
 
@@ -289,16 +291,24 @@ class MediaFolders
 
         if (is_numeric($folder)) {
             return [[
-                'taxonomy' => self::TAXONOMY,
-                'field'    => 'term_id',
-                'terms'    => (int) $folder,
+                'taxonomy'         => self::TAXONOMY,
+                'field'            => 'term_id',
+                'terms'            => (int) $folder,
+                // WP_Query defaults tax_query to include descendant terms
+                // for hierarchical taxonomies — without this, opening a
+                // folder also shows every subfolder's files mixed in.
+                // Subfolders get their own tile/card to navigate into
+                // instead; a folder view should only ever show what's
+                // directly inside it.
+                'include_children' => false,
             ]];
         }
 
         return [[
-            'taxonomy' => self::TAXONOMY,
-            'field'    => 'slug',
-            'terms'    => (string) $folder,
+            'taxonomy'         => self::TAXONOMY,
+            'field'            => 'slug',
+            'terms'            => (string) $folder,
+            'include_children' => false,
         ]];
     }
 
