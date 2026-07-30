@@ -120,6 +120,13 @@ class MediaFolders
             'show_admin_column' => false,
             'show_in_rest'      => true,
             'rest_base'         => self::TAXONOMY,
+            // WP core's default count callback only counts attachments that
+            // are 'publish' status (or whose parent post is) — standalone
+            // Media Library uploads are 'inherit' with no parent, so they'd
+            // never be counted and every folder badge would read 0 no
+            // matter what's actually assigned. This counts relationships
+            // directly, with no post-status filtering.
+            'update_count_callback' => '_update_generic_term_count',
             'capabilities'      => [
                 'manage_terms' => self::CAPABILITY,
                 'edit_terms'   => self::CAPABILITY,

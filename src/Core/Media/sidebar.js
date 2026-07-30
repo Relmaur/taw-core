@@ -96,6 +96,16 @@
             isInternalDrag = true;
             event.dataTransfer.effectAllowed = 'move';
             event.dataTransfer.setData('application/x-taw-attachments', JSON.stringify(attachmentIdsForDrag(id)));
+
+            // WP core's grid items are float:left with percentage widths —
+            // the browser's automatic drag-ghost snapshot can visually bleed
+            // into an adjacent floated sibling on that layout. Setting an
+            // explicit drag image (just the thumbnail) sidesteps that
+            // entirely instead of depending on the browser's own capture.
+            var thumb = item.querySelector('.thumbnail img');
+            if (thumb) {
+                event.dataTransfer.setDragImage(thumb, thumb.offsetWidth / 2, thumb.offsetHeight / 2);
+            }
         });
     }
 

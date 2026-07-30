@@ -48,14 +48,14 @@
     span.folder-icon .taw-icon {
       position: relative;
     }
+  }
 
-    span.folder-open .taw-icon {
-      top: 2px;
-    }
+  span.folder-open .taw-icon {
+    top: 2px;
+  }
 
-    span.folder-closed .taw-icon {
-      top: 3px;
-    }
+  span.folder-closed .taw-icon {
+    top: 3px;
   }
 }
 
