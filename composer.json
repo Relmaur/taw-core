@@ -25,6 +25,11 @@
     "suggest": {
         "emailit/emailit-php": "Required for EmailConfig::useEmailit() — route all wp_mail() through the Emailit REST API"
     },
+    "config": {
+        "platform": {
+            "php": "8.2"
+        }
+    },
     "scripts": {
         "phpstan": "phpstan analyse --memory-limit=-1",
         "test": "phpunit"
