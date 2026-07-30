@@ -170,13 +170,20 @@
     function renderFolderCards(overlay) {
         var el = overlay.querySelector('.taw-folder-cards');
 
-        var existingIds = Array.prototype.map.call(el.children, function (card) {
-            return card.getAttribute('data-folder-id');
+        // Signature includes each folder's count, not just its id — moving
+        // a file into/out of a subfolder that's already showing as a card
+        // doesn't change *which* folders are shown, only their counts, and
+        // an id-only comparison here would treat that as "nothing to
+        // update" and leave the stale count on screen.
+        var existing = Array.prototype.map.call(el.children, function (card) {
+            return card.getAttribute('data-folder-id') + ':' + card.getAttribute('data-folder-count');
         });
-        var desiredIds = currentFolderChildren.map(function (folder) { return String(folder.id); });
+        var desired = currentFolderChildren.map(function (folder) {
+            return folder.id + ':' + (folder.count || 0);
+        });
 
-        var inSync = existingIds.length === desiredIds.length
-            && existingIds.every(function (id, i) { return id === desiredIds[i]; });
+        var inSync = existing.length === desired.length
+            && existing.every(function (entry, i) { return entry === desired[i]; });
 
         if (inSync) {
             return;
@@ -191,6 +198,7 @@
             card.tabIndex = 0;
             card.setAttribute('role', 'button');
             card.setAttribute('data-folder-id', String(folder.id));
+            card.setAttribute('data-folder-count', String(folder.count || 0));
             card.innerHTML =
                 '<span class="taw-folder-card__icon">' + tawMediaFolders.folderIcon + '</span>' +
                 '<span class="taw-folder-card__name">' + escapeHtml(folder.name) + '</span>' +
