@@ -13,6 +13,28 @@
   cursor: grab;
 }
 
+#taw-media-grid-flex #wp-media-grid .taw-folder-tile {
+  cursor: pointer;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-folder-tile .thumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f6f7f7;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-folder-tile .taw-folder-tile-icon {
+  width: 64px;
+  height: 64px;
+  color: #8c8f94;
+}
+
+#taw-media-grid-flex #wp-media-grid .taw-folder-tile:hover .taw-folder-tile-icon,
+#taw-media-grid-flex #wp-media-grid .taw-folder-tile:focus .taw-folder-tile-icon {
+  color: #2271b1;
+}
+
 .taw-media-sidebar {
   width: 260px;
   flex-shrink: 0;
@@ -21,6 +43,9 @@
   border-radius: 4px;
   padding: 0.75rem;
   transition: width 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .taw-media-sidebar.is-collapsed {
@@ -168,19 +193,32 @@
   border-radius: 4px;
 }
 
-.taw-media-sidebar .taw-folders-tree__node.is-dragover > .taw-folders-tree__row {
+.taw-media-sidebar
+  .taw-folders-tree__node.is-dragover
+  > .taw-folders-tree__row {
   outline: 2px dashed #2271b1;
   outline-offset: -2px;
 }
 
-.taw-media-sidebar .taw-folders-tree__node.is-selected > .taw-folders-tree__row {
+.taw-media-sidebar
+  .taw-folders-tree__node.is-selected
+  > .taw-folders-tree__row {
   background: #2271b1;
   color: #fff;
 }
 
-.taw-media-sidebar .taw-folders-tree__node.is-selected > .taw-folders-tree__row .taw-icon,
-.taw-media-sidebar .taw-folders-tree__node.is-selected > .taw-folders-tree__row .taw-folders-tree__count,
-.taw-media-sidebar .taw-folders-tree__node.is-selected > .taw-folders-tree__row .taw-folders-tree__id {
+.taw-media-sidebar
+  .taw-folders-tree__node.is-selected
+  > .taw-folders-tree__row
+  .taw-icon,
+.taw-media-sidebar
+  .taw-folders-tree__node.is-selected
+  > .taw-folders-tree__row
+  .taw-folders-tree__count,
+.taw-media-sidebar
+  .taw-folders-tree__node.is-selected
+  > .taw-folders-tree__row
+  .taw-folders-tree__id {
   color: #fff;
 }
 

@@ -181,10 +181,14 @@ class MediaFolders
         );
 
         wp_localize_script('taw-media-folders', 'tawMediaFolders', [
-            'restUrl'   => rest_url('wp/v2/'),
-            'nonce'     => wp_create_nonce('wp_rest'),
-            'taxonomy'  => self::TAXONOMY,
-            'screen'    => $hook === 'media_page_taw-media-folders' ? 'folders' : 'list',
+            'restUrl'    => rest_url('wp/v2/'),
+            'nonce'      => wp_create_nonce('wp_rest'),
+            'taxonomy'   => self::TAXONOMY,
+            'screen'     => $hook === 'media_page_taw-media-folders' ? 'folders' : 'list',
+            // Rendered once here (rather than have sidebar.js build an SVG
+            // string itself) so the Grid-view's injected subfolder tiles
+            // use the same Lucide icon set as everything else in this file.
+            'folderIcon' => Lucide::render('folder', ['class' => 'taw-folder-tile-icon']),
         ]);
     }
 
@@ -247,6 +251,17 @@ class MediaFolders
         }
 
         $query->set('tax_query', $taxQuery);
+
+        // WP_Query::parse_tax_query() auto-detects any top-level query var
+        // matching a registered taxonomy's query_var (self::TAXONOMY
+        // resolves truthy on admin requests) and adds its OWN slug-based
+        // tax_query clause from it, AND-combined with ours. Harmless here
+        // only because the List view's dropdown already sends a slug, which
+        // happens to match — clearing it removes the reliance on that
+        // coincidence (see filterAjaxQueryAttachmentsArgs(), where the same
+        // auto-detection makes every Grid-view folder selection return zero
+        // results, since it sends a numeric term ID instead).
+        $query->set(self::TAXONOMY, '');
     }
 
     /**
@@ -402,6 +417,17 @@ class MediaFolders
     public static function filterAjaxQueryAttachmentsArgs(array $query): array
     {
         $folder = $query[self::TAXONOMY] ?? '';
+
+        // Must come off $query regardless of $folder's value: WP_Query::
+        // parse_tax_query() auto-detects any top-level key matching a
+        // registered taxonomy's query_var (self::TAXONOMY resolves truthy
+        // on admin requests, which includes admin-ajax.php) and adds its
+        // OWN tax_query clause from it, by 'field' => 'slug' — since the
+        // sidebar sends a numeric term ID (or 'unfiled') here, not a slug,
+        // that auto-generated clause never matches anything, and being
+        // AND-combined with our own explicit tax_query below, silently
+        // makes every folder selection return zero results.
+        unset($query[self::TAXONOMY]);
 
         $taxQuery = self::buildTaxQueryForFolder($folder);
 

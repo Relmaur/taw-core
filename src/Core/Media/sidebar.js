@@ -29,6 +29,13 @@
     // initDragOverlaySuppression() below for why this matters.
     var isInternalDrag = false;
 
+    // Grid-view subfolder tiles: which child folders (of the currently
+    // selected folder) should currently be showing as tiles in the grid,
+    // and the grid node to sync them into. Module-level (like
+    // isInternalDrag) so both plain DOM code and Alpine methods share them.
+    var currentGrid = null;
+    var currentFolderChildren = [];
+
     // The sidebar's markup ships inside an inert <template> (see
     // MediaFolders::renderGridSidebarContainer()) specifically so Alpine
     // never sees x-data="tawMediaSidebar" until *we* insert it into the
@@ -50,6 +57,8 @@
         flex.appendChild(template.content.cloneNode(true));
         flex.appendChild(grid);
 
+        currentGrid = grid;
+
         initAttachmentDragSource(grid);
         initDragOverlaySuppression(flex);
     }
@@ -58,11 +67,91 @@
     // gallery-edit modal's jQuery-UI-sortable grid) — Backbone re-renders
     // .attachment nodes on every scroll/filter, so a MutationObserver (rather
     // than a one-off querySelectorAll) is needed to keep marking new ones.
+    // Folder tiles (.taw-folder-tile) are excluded — they're our own
+    // injected nodes, not real attachments, and aren't meant to be dragged.
     function markAttachmentsDraggable(grid) {
-        var items = grid.querySelectorAll('.attachment:not([draggable])');
+        var items = grid.querySelectorAll('.attachment:not([draggable]):not(.taw-folder-tile)');
         for (var i = 0; i < items.length; i++) {
             items[i].setAttribute('draggable', 'true');
         }
+    }
+
+    // Injects the current folder's direct subfolders as plain (non-Backbone)
+    // <li class="attachment"> tiles at the start of the grid, so browsing a
+    // folder with children lets you navigate into them from the grid itself
+    // — not just the sidebar tree. wp.media fully re-renders ul.attachments
+    // on every reset (e.g. every folder switch), which would wipe these out,
+    // so this is re-run from the same MutationObserver that keeps attachments
+    // marked draggable, rather than injected once and left alone.
+    function syncFolderTiles() {
+        if (!currentGrid) {
+            return;
+        }
+
+        var list = currentGrid.querySelector('ul.attachments');
+        if (!list) {
+            return;
+        }
+
+        var existing = list.querySelectorAll(':scope > .taw-folder-tile');
+        var existingIds = Array.prototype.map.call(existing, function (el) {
+            return el.getAttribute('data-folder-id');
+        });
+        var desiredIds = currentFolderChildren.map(function (folder) {
+            return String(folder.id);
+        });
+
+        var inSync = existingIds.length === desiredIds.length
+            && existingIds.every(function (id, i) { return id === desiredIds[i]; });
+
+        // Bail out once already correct — re-inserting on every mutation
+        // would itself mutate the DOM and re-trigger the observer watching it.
+        if (inSync) {
+            return;
+        }
+
+        for (var i = 0; i < existing.length; i++) {
+            existing[i].remove();
+        }
+
+        if (!currentFolderChildren.length) {
+            return;
+        }
+
+        var fragment = document.createDocumentFragment();
+        currentFolderChildren.forEach(function (folder) {
+            var li = document.createElement('li');
+            li.className = 'attachment taw-folder-tile';
+            li.tabIndex = 0;
+            li.setAttribute('role', 'button');
+            li.setAttribute('data-folder-id', String(folder.id));
+            // No .filename child, so WP core's own
+            // .attachment:not(:has(.filename))::after rule renders this as
+            // the same name-overlay real thumbnails get, for free.
+            li.setAttribute('aria-label', folder.name);
+            li.innerHTML =
+                '<div class="attachment-preview taw-folder-tile__preview">' +
+                    '<div class="thumbnail"><div class="centered">' + tawMediaFolders.folderIcon + '</div></div>' +
+                '</div>';
+
+            li.addEventListener('click', function (event) {
+                var id = parseInt(event.currentTarget.getAttribute('data-folder-id'), 10);
+                var sidebarEl = document.getElementById('taw-media-sidebar');
+                if (sidebarEl && window.Alpine) {
+                    window.Alpine.$data(sidebarEl).selectFolder(id);
+                }
+            });
+            li.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    event.currentTarget.click();
+                }
+            });
+
+            fragment.appendChild(li);
+        });
+
+        list.insertBefore(fragment, list.firstChild);
     }
 
     function attachmentIdsForDrag(startId) {
@@ -83,6 +172,7 @@
 
         new MutationObserver(function () {
             markAttachmentsDraggable(grid);
+            syncFolderTiles();
         }).observe(grid, { childList: true, subtree: true });
 
         grid.addEventListener('dragstart', function (event) {
@@ -240,7 +330,19 @@
                 .then((terms) => {
                     this.folders = terms;
                     this.flattenTree();
+                    this.updateFolderTiles();
                 });
+        },
+
+        // Keeps the Grid-view's injected subfolder tiles (syncFolderTiles(),
+        // module-level above) matching the currently selected folder's
+        // direct children — called after anything that could change either
+        // (selecting a folder, or a CRUD op while one is selected).
+        updateFolderTiles() {
+            currentFolderChildren = typeof this.selectedFolderId === 'number'
+                ? this.childrenOf(this.selectedFolderId)
+                : [];
+            syncFolderTiles();
         },
 
         childrenOf(parentId) {
@@ -402,6 +504,7 @@
             this.selectedFolderId = value;
             applyFolderToBackbone(value);
             this.syncModeSwitchLink(value);
+            this.updateFolderTiles();
         },
 
         syncModeSwitchLink(value) {
@@ -427,6 +530,7 @@
 
             this.selectedFolderId = resolved;
             applyFolderToBackbone(resolved);
+            this.updateFolderTiles();
         },
     }));
 
