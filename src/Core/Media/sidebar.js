@@ -115,6 +115,15 @@
                 body: JSON.stringify({ [tawMediaFolders.taxonomy]: [folderId] }),
             }).then(function () {
                 data.fetchFolders();
+                // Not just fetchFolders() — WP core's own dropzone already
+                // added the new attachment to the visible collection before
+                // it had a folder term, so the current (filtered) view may
+                // have since dropped it again. refreshGridQuery() forces the
+                // same unconditional re-fetch used after drag-and-drop
+                // moves, same reasoning: Backbone's own change-detection
+                // won't retrigger this on its own since nothing about the
+                // *selected folder* changed, only the file's assignment.
+                refreshGridQuery();
             });
         });
     }

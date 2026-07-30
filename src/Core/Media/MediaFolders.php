@@ -543,7 +543,7 @@ class MediaFolders
         <template id="taw-media-sidebar-template">
             <div id="taw-media-sidebar" class="taw-media-sidebar" :class="{ 'is-collapsed': sidebarCollapsed }" x-data="tawMediaSidebar" x-init="init()">
                 <div class="taw-media-sidebar__header">
-                    <span class="taw-media-sidebar__title" x-show="!sidebarCollapsed"><?php esc_html_e('Folders', 'taw-theme'); ?></span>
+                    <span class="taw-media-sidebar__title" x-show="!sidebarCollapsed"><?php esc_html_e('TAW Media', 'taw-theme'); ?></span>
                     <button type="button" class="taw-media-sidebar__icon-btn" @click="toggleSidebar()" :title="sidebarCollapsed ? '<?php echo esc_js(__('Expand', 'taw-theme')); ?>' : '<?php echo esc_js(__('Collapse', 'taw-theme')); ?>'">
                         <span x-show="!sidebarCollapsed"><?php echo $icon('panel-left-close'); ?></span>
                         <span x-show="sidebarCollapsed" x-cloak><?php echo $icon('panel-left-open'); ?></span>

@@ -129,13 +129,16 @@
   border: none;
   padding-right: 1.5rem;
   margin-right: 1.5rem;
-  border-right: 1px solid #dcdcde;
+  margin-top: 1.5rem;
+  border: 1px solid #dcdcde;
   position: relative;
+  background: #fbfbfb;
 }
 
 .taw-media-sidebar.is-collapsed {
   width: auto;
-  padding: 0.75rem 0.5rem;
+  padding: 0;
+  border: 0;
 }
 
 span:has(.taw-icon),
@@ -161,6 +164,7 @@ span:has(.taw-icon),
   transform: translateX(50%);
   top: 1rem;
   background: #fff;
+  border: 1px solid #dcdcde;
 }
 
 .taw-media-sidebar__title {
