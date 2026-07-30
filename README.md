@@ -556,6 +556,37 @@ Every successful submission is saved as a `taw_submission` CPT entry (WP Admin �
 
 ---
 
+## Email
+
+`TAW\Support\EmailConfig::useEmailit()` routes **all** `wp_mail()` calls — form submissions, password resets, WooCommerce order emails, anything else in WordPress that goes through `wp_mail()` — through [Emailit](https://emailit.com)'s API instead of the site's default mail transport (usually PHP's `mail()`, which is unreliable for deliverability on most hosts).
+
+**Opt-in per site**, gated on a `defined('EMAILIT_API_KEY')` check — a true no-op on any site that doesn't define the constant:
+
+```php
+// In the theme's inc/customizations.php, before Theme::boot():
+use TAW\Support\EmailConfig;
+
+if (defined('EMAILIT_API_KEY')) {
+    EmailConfig::useEmailit(
+        apiKey:   EMAILIT_API_KEY,
+        from:     defined('EMAILIT_FROM_EMAIL') ? EMAILIT_FROM_EMAIL : get_bloginfo('admin_email'),
+        fromName: defined('EMAILIT_FROM_NAME') ? EMAILIT_FROM_NAME : '',
+    );
+}
+```
+
+Requires the official SDK (not bundled by default — this is a paid, per-client add-on, not every site needs it):
+
+```bash
+composer require emailit/emailit-php
+```
+
+`EMAILIT_API_KEY` (and optionally `EMAILIT_FROM_EMAIL` / `EMAILIT_FROM_NAME`) belong in that site's `wp-config.php` as constants — they're site-specific secrets, never commit them into the theme repo.
+
+If the SDK isn't installed, the API key is empty, or the Emailit API call throws for any reason, `EmailConfig` falls back to normal `wp_mail()` transparently (logging the failure via `error_log()`) rather than silently dropping the email.
+
+---
+
 ## Visual Editor
 
 Inline admin editing on the frontend. **Opt-in** — must be explicitly enabled per theme:
@@ -895,6 +926,7 @@ Dump::log($value);
 | `szepeviktor/phpstan-wordpress ^2.0` _(dev)_ | WordPress core stubs for PHPStan |
 | `phpunit/phpunit ^11` _(dev)_ | Unit test runner |
 | `brain/monkey ^2.7` _(dev)_ | Mocks individual WP functions for unit tests, no real WordPress install needed |
+| `emailit/emailit-php` _(optional, suggested)_ | Powers `EmailConfig::useEmailit()` (see § "Email") — only needed on sites that opt into it |
 
 **Alpine.js** (every admin-side interactive widget: Metabox fields, Options Page, the Icon picker, Media Folders) is vendored at `assets/vendor/alpine.min.js` (pinned version, currently 3.15.12) and enqueued via `TAW\Support\Alpine::enqueue()` — not loaded from a CDN. `taw/core` is installed on arbitrary client sites, some offline or behind restrictive CSPs, so a CDN dependency for a required admin script isn't safe to assume.
 

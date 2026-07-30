@@ -11,15 +11,21 @@ if (!defined('ABSPATH')) {
 /**
  * EmailConfig — configure the outbound email transport for the framework.
  *
- * Usage in functions.php:
+ * Usage in the theme's inc/customizations.php, before Theme::boot():
  *
  *   use TAW\Support\EmailConfig;
  *
- *   EmailConfig::useEmailit(
- *       apiKey:   defined('EMAILIT_API_KEY') ? EMAILIT_API_KEY : '',
- *       from:     'hello@example.com',
- *       fromName: 'My Site',
- *   );
+ *   if (defined('EMAILIT_API_KEY')) {
+ *       EmailConfig::useEmailit(
+ *           apiKey:   EMAILIT_API_KEY,
+ *           from:     defined('EMAILIT_FROM_EMAIL') ? EMAILIT_FROM_EMAIL : get_bloginfo('admin_email'),
+ *           fromName: defined('EMAILIT_FROM_NAME') ? EMAILIT_FROM_NAME : '',
+ *       );
+ *   }
+ *
+ * The `defined('EMAILIT_API_KEY')` guard keeps this a true per-site opt-in:
+ * only sites whose wp-config.php defines the constant (a site-specific
+ * secret — never commit it) activate Emailit at all.
  *
  * Requires the official PHP SDK:
  *   composer require emailit/emailit-php
