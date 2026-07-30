@@ -148,12 +148,17 @@ class SubmissionsHandler
      * =================================================================== */
 
     /**
-     * @param string $formId  Form identifier.
-     * @param array  $fields  Field config array from the form config.
-     * @param array  $data    Sanitized field_id → value map.
-     * @return int|false      Created post ID or false on failure.
+     * @param string $formId        Form identifier.
+     * @param array  $fields        Field config array from the form config.
+     * @param array  $data          Sanitized field_id → value map.
+     * @param array  $webhookConfig Optional per-form code-level default, e.g.
+     *                              ['url' => '...', 'secret' => '...'] from
+     *                              the form's own 'webhook' config key.
+     *                              Overridden by an admin-configured per-form
+     *                              webhook if one is set — see fireWebhook().
+     * @return int|false            Created post ID or false on failure.
      */
-    public static function saveSubmission(string $formId, array $fields, array $data): int|false
+    public static function saveSubmission(string $formId, array $fields, array $data, array $webhookConfig = []): int|false
     {
         $name    = $data['name'] ?? $data['email'] ?? 'Anonymous';
         $subject = $data['subject'] ?? $formId;
@@ -179,7 +184,7 @@ class SubmissionsHandler
         update_post_meta($postId, '_taw_submission_data', $metaData);
         update_post_meta($postId, '_taw_user_ip', self::getUserIp());
 
-        self::fireWebhook($postId, $formId, $data);
+        self::fireWebhook($postId, $formId, $data, $webhookConfig);
 
         return $postId;
     }
@@ -188,9 +193,42 @@ class SubmissionsHandler
      * Webhook
      * =================================================================== */
 
-    private static function fireWebhook(int $postId, string $formId, array $data): void
+    /**
+     * Resolves the webhook URL to fire for a given form, in precedence
+     * order: an admin-configured per-form override (Settings → Form
+     * Webhook) > the form's own code-level 'webhook' config default >
+     * the site-wide default webhook (fallback for any form with neither).
+     */
+    private static function resolveWebhookUrl(string $formId, array $webhookConfig): string
     {
-        $url = get_option(self::WEBHOOK_URL, '');
+        return get_option(self::urlOptionKey($formId), '')
+            ?: ($webhookConfig['url'] ?? '')
+            ?: get_option(self::WEBHOOK_URL, '');
+    }
+
+    /**
+     * Same precedence as resolveWebhookUrl(), for the HMAC signing secret.
+     */
+    private static function resolveWebhookSecret(string $formId, array $webhookConfig): string
+    {
+        return get_option(self::secretOptionKey($formId), '')
+            ?: ($webhookConfig['secret'] ?? '')
+            ?: get_option(self::WEBHOOK_SECRET, '');
+    }
+
+    private static function urlOptionKey(string $formId): string
+    {
+        return self::WEBHOOK_URL . '_' . sanitize_key($formId);
+    }
+
+    private static function secretOptionKey(string $formId): string
+    {
+        return self::WEBHOOK_SECRET . '_' . sanitize_key($formId);
+    }
+
+    private static function fireWebhook(int $postId, string $formId, array $data, array $webhookConfig = []): void
+    {
+        $url = self::resolveWebhookUrl($formId, $webhookConfig);
 
         if (empty($url)) {
             update_post_meta($postId, '_taw_webhook_status', 'skipped');
@@ -209,7 +247,7 @@ class SubmissionsHandler
 
         $headers = ['Content-Type' => 'application/json'];
 
-        $secret = get_option(self::WEBHOOK_SECRET, '');
+        $secret = self::resolveWebhookSecret($formId, $webhookConfig);
         if (!empty($secret)) {
             $headers['X-TAW-Signature'] = hash_hmac('sha256', wp_json_encode($payload), $secret);
         }
@@ -275,6 +313,28 @@ class SubmissionsHandler
             delete_option(self::WEBHOOK_SECRET);
         }
 
+        // Per-form overrides — one row per currently-registered form.
+        $formUrls      = (array) ($_POST['taw_form_webhook_url'] ?? []);
+        $formSecrets   = (array) ($_POST['taw_form_webhook_secret'] ?? []);
+        $clearSecretOf = (array) ($_POST['taw_clear_form_webhook_secret'] ?? []);
+
+        foreach (array_keys(Form::getAll()) as $formId) {
+            update_option(
+                self::urlOptionKey($formId),
+                esc_url_raw(trim($formUrls[$formId] ?? '')),
+                false
+            );
+
+            $formSecret = sanitize_text_field(trim($formSecrets[$formId] ?? ''));
+            if (!empty($formSecret)) {
+                update_option(self::secretOptionKey($formId), $formSecret, false);
+            }
+
+            if (!empty($clearSecretOf[$formId])) {
+                delete_option(self::secretOptionKey($formId));
+            }
+        }
+
         add_settings_error(self::PAGE_SLUG, 'settings_updated', 'Webhook settings saved.', 'updated');
     }
 
@@ -282,16 +342,21 @@ class SubmissionsHandler
     {
         $url       = get_option(self::WEBHOOK_URL, '');
         $hasSecret = !empty(get_option(self::WEBHOOK_SECRET, ''));
+        $forms     = Form::getAll();
         ?>
         <div class="wrap">
             <h1>Form Webhook Settings</h1>
             <p class="description" style="max-width:640px;">
-                Every form submission fires a <strong>JSON POST</strong> to the URL below.
-                Connect to <strong>n8n</strong>, Zapier, Make, or any automation platform.
+                Every form submission fires a <strong>JSON POST</strong>. Configure a webhook
+                for a specific form below, or set a default that any form without its own
+                webhook falls back to. Connect to <strong>n8n</strong>, Zapier, Make, or any
+                automation platform.
             </p>
 
-            <form method="post" action="" style="max-width:640px;">
+            <form method="post" action="" style="max-width:760px;">
                 <?php wp_nonce_field(self::NONCE_ACTION, 'taw_webhook_settings_nonce'); ?>
+
+                <h2>Default Webhook <span class="description" style="font-weight:normal;">(fallback for any form below with no override)</span></h2>
                 <table class="form-table" role="presentation">
                     <tr>
                         <th><label for="<?php echo self::WEBHOOK_URL; ?>">Webhook URL</label></th>
@@ -301,7 +366,7 @@ class SubmissionsHandler
                                 value="<?php echo esc_attr($url); ?>"
                                 class="regular-text"
                                 placeholder="https://n8n.example.com/webhook/abc123">
-                            <p class="description">Leave empty to disable.</p>
+                            <p class="description">Leave empty to disable the default.</p>
                         </td>
                     </tr>
                     <tr>
@@ -333,6 +398,56 @@ class SubmissionsHandler
                         </td>
                     </tr>
                 </table>
+
+                <?php if (!empty($forms)): ?>
+                    <h2>Per-Form Webhooks</h2>
+                    <p class="description" style="max-width:640px;margin-bottom:1em;">
+                        Overrides the default above for that form only. A form can also set a
+                        code-level default via its <code>webhook</code> config key — an override
+                        entered here always takes precedence over that.
+                    </p>
+                    <table class="widefat striped" style="max-width:760px;">
+                        <thead>
+                            <tr>
+                                <th style="width:140px;">Form ID</th>
+                                <th>Webhook URL</th>
+                                <th>Signing Secret</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($forms as $formId => $form): ?>
+                                <?php
+                                $formUrl       = get_option(self::urlOptionKey($formId), '');
+                                $formHasSecret = !empty(get_option(self::secretOptionKey($formId), ''));
+                                ?>
+                                <tr>
+                                    <td><code><?php echo esc_html($formId); ?></code></td>
+                                    <td>
+                                        <input type="url"
+                                            name="taw_form_webhook_url[<?php echo esc_attr($formId); ?>]"
+                                            value="<?php echo esc_attr($formUrl); ?>"
+                                            class="regular-text"
+                                            placeholder="Uses default above">
+                                    </td>
+                                    <td>
+                                        <input type="password"
+                                            name="taw_form_webhook_secret[<?php echo esc_attr($formId); ?>]"
+                                            value="" class="regular-text"
+                                            placeholder="<?php echo $formHasSecret ? 'Leave blank to keep current' : 'Optional'; ?>"
+                                            autocomplete="off">
+                                        <?php if ($formHasSecret): ?>
+                                            <label style="display:block;margin-top:4px;font-weight:normal;">
+                                                <input type="checkbox" name="taw_clear_form_webhook_secret[<?php echo esc_attr($formId); ?>]" value="1">
+                                                Remove stored secret
+                                            </label>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+
                 <?php submit_button('Save Webhook Settings'); ?>
             </form>
 

@@ -554,6 +554,21 @@ Form::register([
 
 Every successful submission is saved as a `taw_submission` CPT entry (WP Admin → Submissions). A webhook at **Settings → Form Webhook** forwards submissions as signed JSON POST (HMAC-SHA256).
 
+**Per-form webhooks**, in precedence order:
+
+1. An admin-configured override for that specific form, set in the **Per-Form Webhooks** table on the **Settings → Form Webhook** page (one row per form registered via `Form::register()`).
+2. A code-level default set on the form itself, via its `webhook` config key:
+   ```php
+   Form::register([
+       'id'      => 'contact',
+       'webhook' => ['url' => 'https://n8n.example.com/webhook/contact', 'secret' => 'optional-hmac-secret'],
+       'fields'  => [...],
+   ]);
+   ```
+3. The **Default Webhook** configured at the top of the same settings page — the site-wide fallback for any form with neither of the above.
+
+A form with none of the three configured simply doesn't fire a webhook (submission is still saved to the CPT either way).
+
 ---
 
 ## Email

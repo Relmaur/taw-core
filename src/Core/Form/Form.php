@@ -350,7 +350,7 @@ class Form
         }
 
         // Save first — guaranteed record regardless of email outcome.
-        SubmissionsHandler::saveSubmission($this->id, $inputFields, $data);
+        SubmissionsHandler::saveSubmission($this->id, $inputFields, $data, $this->config['webhook'] ?? []);
 
         $sent = $this->sendEmail($data);
         if (!$sent) {
