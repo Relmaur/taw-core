@@ -627,7 +627,10 @@
                 return;
             }
 
-            restFetch(tawMediaFolders.taxonomy + '/' + id, { method: 'DELETE' }).then(() => {
+            // WP's REST terms controller has no concept of trashing a term —
+            // force=true is required, or it 501s with "Terms do not support
+            // trashing."
+            restFetch(tawMediaFolders.taxonomy + '/' + id + '?force=true', { method: 'DELETE' }).then(() => {
                 if (this.selectedFolderId === id) {
                     this.selectFolder(null);
                 }

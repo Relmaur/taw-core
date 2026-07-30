@@ -251,7 +251,10 @@
                 return;
             }
 
-            restFetch(tawMediaFolders.taxonomy + '/' + id, { method: 'DELETE' }).then(() => {
+            // WP's REST terms controller has no concept of trashing a term —
+            // force=true is required, or it 501s with "Terms do not support
+            // trashing."
+            restFetch(tawMediaFolders.taxonomy + '/' + id + '?force=true', { method: 'DELETE' }).then(() => {
                 if (this.selectedFolderId === id) {
                     this.selectFolder(null);
                 }
@@ -381,7 +384,11 @@
                 return;
             }
 
-            Promise.all(this.selectedAttachments.map((id) => restFetch('media/' + id, {
+            // Attachments only support REST trashing when MEDIA_TRASH is
+            // enabled (off by default) — force=true always permanently
+            // deletes instead, matching this button's own "cannot be
+            // undone" confirmation text.
+            Promise.all(this.selectedAttachments.map((id) => restFetch('media/' + id + '?force=true', {
                 method: 'DELETE',
             }))).then(() => {
                 this.selectedAttachments = [];
