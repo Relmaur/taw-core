@@ -27,6 +27,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.75rem;
+  padding-top: 0.25rem;
 }
 
 #taw-media-grid-flex #wp-media-grid .taw-media-toolbar .taw-media-breadcrumb {
