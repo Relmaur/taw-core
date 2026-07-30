@@ -37,5 +37,19 @@ class Alpine
             filemtime($dir . 'alpine.min.js'),
             true
         );
+
+        // Alpine's own bundle calls queueMicrotask(() => Alpine.start())
+        // the moment it executes. The HTML spec runs a microtask checkpoint
+        // immediately after each classic <script> finishes — before the
+        // next sibling script even runs — so any script enqueued to load
+        // after this one (e.g. a component registering itself via
+        // Alpine.data() inside an alpine:init listener) loses the race:
+        // Alpine has already scanned the DOM and found nothing registered.
+        // 'defer' delays Alpine's actual execution until after the document
+        // is fully parsed, which is exactly what Alpine's own docs
+        // recommend for the CDN build (<script defer src="...">) — every
+        // dependent script still runs immediately at its own position,
+        // ahead of Alpine's now-deferred run.
+        wp_script_add_data('alpinejs', 'strategy', 'defer');
     }
 }
