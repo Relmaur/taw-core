@@ -359,14 +359,28 @@
         renderFolderCards(overlay);
     }
 
-    function attachmentIdsForDrag(startId) {
-        try {
-            var selection = wp.media.frame.state().get('selection');
-            if (selection && selection.length > 1 && selection.get(startId)) {
-                return selection.map(function (model) { return model.id; });
+    // Reads WP core's own '.selected' class (toggled in lockstep with its
+    // Backbone selection — see wp.media.view.Attachment.prototype.select/
+    // deselect in wp-includes/js/media-views.js) rather than introspecting
+    // wp.media's Backbone `selection` collection directly. The Grid's own
+    // jQuery UI Sortable (enabled by default for the standalone Grid state,
+    // for its unrelated menu-order drag-to-reorder feature) attaches its own
+    // mousedown-based drag handling to the same .attachments list our native
+    // HTML5 drag also listens on — reading the DOM class sidesteps any
+    // uncertainty about which of those two drag systems' state
+    // (`wp.media.frame.state().get('selection')` vs the class actually
+    // rendered) is authoritative at the moment our own dragstart fires.
+    function attachmentIdsForDrag(startId, grid) {
+        var selected = grid.querySelectorAll('.attachment.selected');
+
+        if (selected.length > 1) {
+            var ids = Array.prototype.map.call(selected, function (el) {
+                return parseInt(el.getAttribute('data-id'), 10);
+            });
+
+            if (ids.indexOf(startId) !== -1) {
+                return ids;
             }
-        } catch (e) {
-            // wp.media not ready, or nothing selected — drag just the one item.
         }
 
         return [startId];
@@ -390,7 +404,7 @@
 
             isInternalDrag = true;
             event.dataTransfer.effectAllowed = 'move';
-            event.dataTransfer.setData('application/x-taw-attachments', JSON.stringify(attachmentIdsForDrag(id)));
+            event.dataTransfer.setData('application/x-taw-attachments', JSON.stringify(attachmentIdsForDrag(id, grid)));
 
             // WP core's grid items are float:left with percentage widths —
             // the browser's automatic drag-ghost snapshot can visually bleed
