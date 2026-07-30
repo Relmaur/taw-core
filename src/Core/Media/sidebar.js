@@ -386,6 +386,30 @@
         return [startId];
     }
 
+    // Composites a count badge onto a clone of the dragged thumbnail, purely
+    // as an element for setDragImage() to snapshot — appended far off-screen,
+    // then removed on the next tick once the browser has captured it (the
+    // capture happens synchronously as the dragstart handler returns, so
+    // removal can't happen inline). Only used for multi-item drags; a
+    // single-item drag still uses the live thumbnail directly, unchanged.
+    function buildMultiDragImage(thumb, count) {
+        var wrapper = document.createElement('div');
+        wrapper.className = 'taw-drag-image';
+        wrapper.style.width = thumb.offsetWidth + 'px';
+        wrapper.style.height = thumb.offsetHeight + 'px';
+
+        wrapper.appendChild(thumb.cloneNode(true));
+
+        var badge = document.createElement('span');
+        badge.className = 'taw-drag-image__badge';
+        badge.textContent = String(count);
+        wrapper.appendChild(badge);
+
+        document.body.appendChild(wrapper);
+
+        return wrapper;
+    }
+
     function initAttachmentDragSource(grid) {
         markAttachmentsDraggable(grid);
 
@@ -402,9 +426,11 @@
                 return;
             }
 
+            var ids = attachmentIdsForDrag(id, grid);
+
             isInternalDrag = true;
             event.dataTransfer.effectAllowed = 'move';
-            event.dataTransfer.setData('application/x-taw-attachments', JSON.stringify(attachmentIdsForDrag(id, grid)));
+            event.dataTransfer.setData('application/x-taw-attachments', JSON.stringify(ids));
 
             // WP core's grid items are float:left with percentage widths —
             // the browser's automatic drag-ghost snapshot can visually bleed
@@ -412,7 +438,17 @@
             // explicit drag image (just the thumbnail) sidesteps that
             // entirely instead of depending on the browser's own capture.
             var thumb = item.querySelector('.thumbnail img');
-            if (thumb) {
+            if (!thumb) {
+                return;
+            }
+
+            if (ids.length > 1) {
+                var dragImage = buildMultiDragImage(thumb, ids.length);
+                event.dataTransfer.setDragImage(dragImage, dragImage.offsetWidth / 2, dragImage.offsetHeight / 2);
+                setTimeout(function () {
+                    dragImage.remove();
+                }, 0);
+            } else {
                 event.dataTransfer.setDragImage(thumb, thumb.offsetWidth / 2, thumb.offsetHeight / 2);
             }
         });
@@ -520,6 +556,46 @@
         if (library && typeof library._requery === 'function') {
             library._requery();
         }
+    }
+
+    // Flicker-free alternative to refreshGridQuery() for the drag-to-move
+    // case. _requery() always mirrors to a brand-new Query collection (see
+    // wp.media.model.Attachments.prototype._requery /
+    // wp.media.model.Query.get in wp-includes/js/media-models.js — Query.get
+    // never actually returns a cached instance, despite appearances), and
+    // mirror() resets the visible collection to empty before the new query's
+    // results arrive — visibly clearing and repopulating the whole grid even
+    // though, after a single move, at most a few items actually left it.
+    // Removing just the moved models directly from the live `library`
+    // collection instead fires a granular Backbone 'remove' per model, which
+    // wp.media.view.Attachments handles by removing only that one DOM node
+    // (see its `collection.on('remove', ...)` binding) — no flicker.
+    //
+    // Only correct to do when a folder filter is actually active: viewing
+    // "All Files" doesn't filter by folder at all, so a move never changes
+    // what belongs there, and removing would incorrectly hide the file.
+    function removeAttachmentsFromView(ids, selectedFolderId) {
+        if (selectedFolderId === null) {
+            return;
+        }
+
+        if (!(window.wp && wp.media && wp.media.frame && wp.media.frame.state)) {
+            return;
+        }
+
+        var state = wp.media.frame.state();
+        var library = state && state.get('library');
+
+        if (!library) {
+            return;
+        }
+
+        ids.forEach(function (id) {
+            var model = library.get(id);
+            if (model) {
+                library.remove(model);
+            }
+        });
     }
 
     function findModeSwitchLink() {
@@ -846,9 +922,12 @@
                 // folder being viewed hasn't changed, so that call would be
                 // a same-value no-op Backbone silently ignores. This move
                 // can still change what belongs in the currently-viewed
-                // folder (the file just left it, or just arrived in it), so
-                // the grid needs an unconditional re-fetch regardless.
-                refreshGridQuery();
+                // folder (the file just left it), so the grid still needs
+                // updating — but removeAttachmentsFromView() does that by
+                // removing just the moved models directly, rather than
+                // refreshGridQuery()'s full re-fetch (which visibly flickers
+                // the whole grid — see its own comment for why).
+                removeAttachmentsFromView(ids, this.selectedFolderId);
             });
         },
 
