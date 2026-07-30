@@ -628,14 +628,21 @@ class MediaFolders
 
     /**
      * Render the "Media -> TAW Media" admin page shell — a full Alpine.js
-     * app (folders.js registers 'tawFoldersApp'). Deliberately not wrapped
-     * in an inert <template> the way renderGridSidebarContainer() is: this
-     * markup lives on its own dedicated page (not injected next to a
-     * pre-existing wp.media Backbone app), so there's no equivalent
-     * ordering race to worry about — folders.js is enqueued with 'alpinejs'
-     * as a hard dependency, guaranteeing it runs after Alpine's own script,
-     * same as every other Alpine component in this codebase
-     * (Metabox/OptionsPage/Icons) except the Grid-view sidebar specifically.
+     * app (folders.js registers 'tawFoldersApp'). Wrapped in an inert
+     * <template>, same reason and mechanism as renderGridSidebarContainer()
+     * uses for the Grid-view sidebar: folders.js being a hard WP script
+     * dependent of 'alpinejs' guarantees it *registers* the component before
+     * alpine.min.js's queued Alpine.start() runs, but doesn't help if this
+     * markup is *live* in the initial HTML — Alpine's initial DOM scan (via
+     * that queued microtask, which fires right after alpine.min.js's own
+     * script tag, before folders.js's tag even executes) would encounter
+     * x-data="tawFoldersApp" before it's registered, and since the node was
+     * already present at scan time (not inserted afterward), Alpine's
+     * MutationObserver never gets a re-insertion event to retry it — a
+     * permanent "tawFoldersApp is not defined" rather than a transient one.
+     * Keeping the markup inert and cloning it into the DOM from folders.js
+     * itself (strictly after Alpine.data() registers, same file, sequential
+     * execution) sidesteps that entirely.
      */
     public static function renderFoldersPage(): void
     {
@@ -643,6 +650,8 @@ class MediaFolders
     ?>
         <div class="wrap">
             <h1><?php esc_html_e('TAW Media', 'taw-theme'); ?></h1>
+            <div id="taw-folders-app-mount"></div>
+            <template id="taw-folders-app-template">
             <div id="taw-folders-app" class="taw-folders-app" x-data="tawFoldersApp" x-init="init()">
                 <div class="taw-folders-app__tree" :class="{ 'is-collapsed': sidebarCollapsed }">
                     <div class="taw-media-sidebar__header">
@@ -813,6 +822,7 @@ class MediaFolders
                     </div>
                 </div>
             </div>
+            </template>
         </div>
 <?php
     }

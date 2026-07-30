@@ -57,8 +57,31 @@
         syncVisibility();
     }
 
+    // The TAW Media screen's markup ships inside an inert <template> (see
+    // MediaFolders::renderFoldersPage()) for the same reason the Grid-view
+    // sidebar's does: Alpine's initial DOM scan fires via a microtask
+    // queued by alpine.min.js's own script — right after that script tag,
+    // before this one even runs — so live x-data="tawFoldersApp" markup in
+    // the initial HTML would be scanned before Alpine.data() below ever
+    // registers it, and (unlike a transient race) never gets retried, since
+    // Alpine's MutationObserver only fires for *new* insertions, not nodes
+    // already present at scan time. Cloning this template's content in
+    // ourselves, from inside this same script, guarantees the insertion
+    // happens strictly after Alpine.data() has already run.
+    function mountFoldersApp() {
+        var mount = document.getElementById('taw-folders-app-mount');
+        var template = document.getElementById('taw-folders-app-template');
+
+        if (!mount || !template) {
+            return;
+        }
+
+        mount.appendChild(template.content.cloneNode(true));
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         initListViewBulkMoveToggle();
+        mountFoldersApp();
     });
 
     // ── Piece 1: the TAW Media screen (Alpine.js) ────────────────────────
