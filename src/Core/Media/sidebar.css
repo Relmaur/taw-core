@@ -1,0 +1,90 @@
+#taw-media-grid-flex {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+#taw-media-grid-flex #wp-media-grid {
+  flex: 1;
+  min-width: 0;
+}
+
+.taw-media-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 4px;
+  padding: 0.75rem;
+}
+
+.taw-media-sidebar > .button {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+/* Class names below intentionally match folders.css so the sidebar's tree
+   reads as the same visual language as the dedicated Folders screen — kept
+   as an independent stylesheet since the two style handles aren't
+   guaranteed to load in a fixed relative order. */
+
+.taw-media-sidebar .taw-folders-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.taw-media-sidebar .taw-folders-tree__node {
+  border-radius: 4px;
+}
+
+.taw-media-sidebar .taw-folders-tree__node.is-dragover > .taw-folders-tree__row {
+  outline: 2px dashed #2271b1;
+  outline-offset: -2px;
+}
+
+.taw-media-sidebar .taw-folders-tree__node.is-selected > .taw-folders-tree__row {
+  background: #2271b1;
+  color: #fff;
+}
+
+.taw-media-sidebar .taw-folders-tree__node.is-selected > .taw-folders-tree__row .taw-folders-tree__actions button {
+  color: #fff;
+}
+
+.taw-media-sidebar .taw-folders-tree__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.taw-media-sidebar .taw-folders-tree__row:hover {
+  background: #f0f0f1;
+}
+
+.taw-media-sidebar .taw-folders-tree__name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taw-media-sidebar .taw-folders-tree__actions {
+  display: flex;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.taw-media-sidebar .taw-folders-tree__actions button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #646970;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0.15rem 0.3rem;
+}

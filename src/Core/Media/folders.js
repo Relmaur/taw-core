@@ -354,4 +354,8 @@
         initListViewBulkMoveToggle();
         initFoldersApp();
     });
+
+    // Exposed so sidebar.js (the Grid-view sidebar) can reuse the same
+    // nonce/URL/error handling instead of a second fetch wrapper.
+    window.tawRestFetch = restFetch;
 })();

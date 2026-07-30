@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\Media;
 
 use TAW\Helpers\Framework;
+use TAW\Support\Alpine;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -91,6 +92,11 @@ class MediaFolders
         // Lets the Folders screen's "Unfiled" pseudo-folder query
         // wp/v2/media?taw_unfiled=1 without a dedicated REST endpoint.
         add_filter('rest_attachment_query', [self::class, 'filterRestAttachmentQuery'], 10, 2);
+
+        // Grid-view sidebar (upload.php's default thumbnail view).
+        add_action('admin_enqueue_scripts', [self::class, 'enqueueGridSidebarAssets']);
+        add_action('admin_footer-upload.php', [self::class, 'renderGridSidebarContainer']);
+        add_filter('ajax_query_attachments_args', [self::class, 'filterAjaxQueryAttachmentsArgs']);
     }
 
     /**
@@ -226,15 +232,51 @@ class MediaFolders
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only filter param, not a form submission
         $folder = isset($_GET[self::TAXONOMY]) ? sanitize_text_field(wp_unslash($_GET[self::TAXONOMY])) : '';
 
-        if ($folder === '') {
+        $taxQuery = self::buildTaxQueryForFolder($folder);
+
+        if ($taxQuery === null) {
             return;
         }
 
-        $query->set('tax_query', [[
+        $query->set('tax_query', $taxQuery);
+    }
+
+    /**
+     * Build a tax_query clause for a folder selector value, accepted in any
+     * of three shapes so the same taw_media_folder param works from every
+     * caller: the classic List-view dropdown (term slug), the Grid-view
+     * sidebar (numeric term ID or the literal 'unfiled'), and the AJAX/
+     * Backbone bridge (same shapes as the sidebar, since the sidebar is
+     * what sets them).
+     *
+     * @return array<int, array<string, mixed>>|null
+     */
+    private static function buildTaxQueryForFolder(mixed $folder): ?array
+    {
+        if ($folder === null || $folder === '') {
+            return null;
+        }
+
+        if ($folder === 'unfiled') {
+            return [[
+                'taxonomy' => self::TAXONOMY,
+                'operator' => 'NOT EXISTS',
+            ]];
+        }
+
+        if (is_numeric($folder)) {
+            return [[
+                'taxonomy' => self::TAXONOMY,
+                'field'    => 'term_id',
+                'terms'    => (int) $folder,
+            ]];
+        }
+
+        return [[
             'taxonomy' => self::TAXONOMY,
             'field'    => 'slug',
-            'terms'    => $folder,
-        ]]);
+            'terms'    => (string) $folder,
+        ]];
     }
 
     /**
@@ -337,6 +379,133 @@ class MediaFolders
         ]];
 
         return $args;
+    }
+
+    /**
+     * Filters wp.media Grid view's Backbone query (admin-ajax action
+     * query-attachments) the same way applyFolderFilterQuery() filters the
+     * classic List view's WP_Query — the sidebar's JS bridge sets a
+     * taw_media_folder prop on the Backbone library collection, which WP
+     * core merges straight into $query before this filter runs.
+     *
+     * @param array<string, mixed> $query
+     * @return array<string, mixed>
+     */
+    public static function filterAjaxQueryAttachmentsArgs(array $query): array
+    {
+        $folder = $query[self::TAXONOMY] ?? '';
+
+        $taxQuery = self::buildTaxQueryForFolder($folder);
+
+        if ($taxQuery === null) {
+            return $query;
+        }
+
+        $query['tax_query'] = $taxQuery;
+
+        return $query;
+    }
+
+    /**
+     * Whether the classic List view (as opposed to the default Grid view)
+     * is active on upload.php.
+     */
+    private static function isListMode(): bool
+    {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view-mode param, not a form submission
+        return isset($_GET['mode']) && sanitize_text_field(wp_unslash($_GET['mode'])) === 'list';
+    }
+
+    /**
+     * Enqueue the Grid-view sidebar's own assets — separate from
+     * enqueueAssets() so that method's Folders-screen/List-mode gate stays
+     * unambiguous. Alpine.js is declared as a script dependency (enqueued
+     * elsewhere, see Metabox::enqueue_admin_assets()) alongside
+     * taw-media-folders so sidebar.js can read the tawMediaFolders global
+     * folders.js already localizes, with no second wp_localize_script call.
+     */
+    public static function enqueueGridSidebarAssets(string $hook): void
+    {
+        if ($hook !== 'upload.php' || self::isListMode()) {
+            return;
+        }
+
+        Alpine::enqueue();
+
+        $dir = Framework::path('src/Core/Media/');
+        $url = Framework::url('src/Core/Media/');
+
+        wp_enqueue_style(
+            'taw-media-sidebar',
+            $url . 'sidebar.css',
+            ['taw-media-folders'],
+            filemtime($dir . 'sidebar.css')
+        );
+
+        wp_enqueue_script(
+            'taw-media-sidebar',
+            $url . 'sidebar.js',
+            ['alpinejs', 'taw-media-folders'],
+            filemtime($dir . 'sidebar.js'),
+            true
+        );
+    }
+
+    /**
+     * Render the Grid-view sidebar's static shell. Detached at the tail of
+     * <body> (admin_footer-upload.php) — sidebar.js repositions this exact
+     * node next to #wp-media-grid rather than us guessing at a WP-core
+     * insertion point. Alpine's x-for below iterates a client-flattened,
+     * depth-annotated folder array (sidebar.js), since Alpine has no
+     * recursive-template primitive comparable to folders.js's own
+     * childrenOf()/renderTreeNodes() recursion.
+     */
+    public static function renderGridSidebarContainer(): void
+    {
+        if (self::isListMode()) {
+            return;
+        }
+        ?>
+        <div id="taw-media-sidebar" class="taw-media-sidebar" style="display:none;" x-data="tawMediaSidebar" x-init="init()">
+            <button type="button" class="button" @click="createFolder(0)">
+                <?php esc_html_e('+ New Folder', 'taw-theme'); ?>
+            </button>
+            <ul class="taw-folders-tree" aria-busy="true">
+                <li class="taw-folders-tree__node" :class="{ 'is-selected': selectedFolderId === null }" @click="selectFolder(null)">
+                    <div class="taw-folders-tree__row">
+                        <span class="taw-folders-tree__name"><?php esc_html_e('All Files', 'taw-theme'); ?></span>
+                    </div>
+                </li>
+                <li class="taw-folders-tree__node" :class="{ 'is-selected': selectedFolderId === 'unfiled' }" @click="selectFolder('unfiled')">
+                    <div class="taw-folders-tree__row">
+                        <span class="taw-folders-tree__name"><?php esc_html_e('Unfiled', 'taw-theme'); ?></span>
+                    </div>
+                </li>
+                <template x-for="node in flatFolders" :key="node.id">
+                    <li
+                        class="taw-folders-tree__node"
+                        :class="{ 'is-selected': selectedFolderId === node.id }"
+                        :style="'padding-left: ' + (node.depth * 12) + 'px'"
+                        draggable="true"
+                        @click="selectFolder(node.id)"
+                        @dragstart="onFolderDragStart($event, node.id)"
+                        @dragover.prevent="onFolderDragOver($event)"
+                        @dragleave="onFolderDragLeave($event)"
+                        @drop.prevent="onFolderDrop($event, node.id)"
+                    >
+                        <div class="taw-folders-tree__row">
+                            <span class="taw-folders-tree__name" x-text="node.name"></span>
+                            <span class="taw-folders-tree__actions">
+                                <button type="button" class="taw-folders-tree__add" title="<?php esc_attr_e('Add subfolder', 'taw-theme'); ?>" @click.stop="createFolder(node.id)">+</button>
+                                <button type="button" class="taw-folders-tree__rename" title="<?php esc_attr_e('Rename', 'taw-theme'); ?>" @click.stop="renameFolder(node.id, node.name)">&#9998;</button>
+                                <button type="button" class="taw-folders-tree__delete" title="<?php esc_attr_e('Delete', 'taw-theme'); ?>" @click.stop="deleteFolder(node.id)">&times;</button>
+                            </span>
+                        </div>
+                    </li>
+                </template>
+            </ul>
+        </div>
+        <?php
     }
 
     /**

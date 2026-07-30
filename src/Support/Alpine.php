@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+namespace TAW\Support;
+
+use TAW\Helpers\Framework;
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * Registers the 'alpinejs' script handle every wp-admin Alpine component in
+ * this package depends on (Metabox, OptionsPage, Icons picker, Media
+ * Folders' Grid sidebar). Vendored as a static asset rather than loaded
+ * from a CDN — taw/core is installed on arbitrary client sites, some
+ * offline/behind restrictive CSPs/in regions where a CDN may be blocked or
+ * slow, so every admin screen using Alpine inherited that fragility.
+ *
+ * wp_enqueue_script() is idempotent per handle, so calling this from
+ * multiple independent admin_enqueue_scripts callbacks (Metabox and
+ * OptionsPage both need it; Media Folders' Grid sidebar runs on upload.php,
+ * a screen neither of those touches) is safe — no guard needed here.
+ */
+class Alpine
+{
+    public static function enqueue(): void
+    {
+        $dir = Framework::path('assets/vendor/');
+        $url = Framework::url('assets/vendor/');
+
+        wp_enqueue_script(
+            'alpinejs',
+            $url . 'alpine.min.js',
+            [],
+            filemtime($dir . 'alpine.min.js'),
+            true
+        );
+    }
+}

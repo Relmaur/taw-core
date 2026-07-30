@@ -6,6 +6,7 @@ namespace TAW\Core\OptionsPage;
 
 use TAW\Core\Metabox\Metabox;
 use TAW\Helpers\Framework;
+use TAW\Support\Alpine;
 
 /**
  * Configuration-driven Options Page.
@@ -64,13 +65,7 @@ class OptionsPage
             return;
         }
 
-        wp_enqueue_script(
-            'alpinejs',
-            'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js',
-            [],
-            '3.0',
-            true
-        );
+        Alpine::enqueue();
 
         wp_enqueue_style(
             'taw-metaboxes',

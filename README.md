@@ -702,10 +702,11 @@ TAW\Core\Media\MediaFolders::enable();
 
 `taw-theme`'s own `inc/customizations.php` scaffold calls this by default, so it ships active on every new taw-theme site — remove the line there if a given site doesn't need it. Folder management needs only the `upload_files` capability, not `manage_options`.
 
-Two admin surfaces:
+Three admin surfaces:
 
-- **Media → Folders** — a dedicated screen: a folder tree (create/rename/delete, drag-and-drop to re-nest) and a drag-and-drop attachment grid, including an "Unfiled" pseudo-folder for attachments with no folder assigned. Entirely our own markup/JS/REST calls — no WordPress core Grid-view (Backbone) internals are touched, deliberately, since patching those would be fragile across WP core versions.
+- **Media → Folders** — a dedicated screen: a folder tree (create/rename/delete, drag-and-drop to re-nest) and a drag-and-drop attachment grid, including an "Unfiled" pseudo-folder for attachments with no folder assigned. Entirely our own markup/JS/REST calls — no WordPress core Grid-view (Backbone) internals are touched here.
 - The classic Media Library **List view** (`upload.php?mode=list`) — a folder filter dropdown, a "Folder" column, and a "Move to folder…" bulk action, for anyone who prefers browsing there.
+- The default Media Library **Grid view** (`upload.php`) — a FileBird-style sidebar (Alpine.js) with the same folder tree and full CRUD, bolted onto WordPress core's own thumbnail grid. Clicking a folder filters the grid live, via an `ajax_query_attachments_args` filter plus a narrow JS bridge that sets props on `wp.media`'s existing Backbone query object (`wp.media.frame.state().get('library').props`) — the same technique folder plugins like FileBird use, not a Backbone *view* override. Selecting a folder here stays in sync with the List view's dropdown filter (and vice versa) via the same `taw_media_folder` query param, so switching view modes doesn't lose your place.
 
 A folder's place in the tree is its only "category" — one folder per attachment (`wp_set_object_terms()`), no separate tagging layer.
 
@@ -894,6 +895,8 @@ Dump::log($value);
 | `szepeviktor/phpstan-wordpress ^2.0` _(dev)_ | WordPress core stubs for PHPStan |
 | `phpunit/phpunit ^11` _(dev)_ | Unit test runner |
 | `brain/monkey ^2.7` _(dev)_ | Mocks individual WP functions for unit tests, no real WordPress install needed |
+
+**Alpine.js** (every admin-side interactive widget: Metabox fields, Options Page, the Icon picker, Media Folders) is vendored at `assets/vendor/alpine.min.js` (pinned version, currently 3.15.12) and enqueued via `TAW\Support\Alpine::enqueue()` — not loaded from a CDN. `taw/core` is installed on arbitrary client sites, some offline or behind restrictive CSPs, so a CDN dependency for a required admin script isn't safe to assume.
 
 ## Static Analysis
 

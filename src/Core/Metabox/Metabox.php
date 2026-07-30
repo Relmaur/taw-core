@@ -6,6 +6,7 @@ namespace TAW\Core\Metabox;
 
 use TAW\Core\Icons\Lucide;
 use TAW\Helpers\Framework;
+use TAW\Support\Alpine;
 
 /**
  * Native WordPress Metabox Framework
@@ -605,13 +606,7 @@ class Metabox
             return;
         }
 
-        wp_enqueue_script(
-            'alpinejs',
-            'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js',
-            [],
-            '3.0',
-            true
-        );
+        Alpine::enqueue();
 
         wp_enqueue_style(
             'taw-metaboxes',
