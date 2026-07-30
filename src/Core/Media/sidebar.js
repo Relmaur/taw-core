@@ -338,6 +338,30 @@
         library.props.set({ taw_media_folder: value === null ? '' : String(value) });
     }
 
+    // Forces the Grid's Backbone query to re-fetch the *same* filter it
+    // already has. props.set() (above) only fires a 'change' event — the
+    // thing wp.media's Attachments collection actually listens for to
+    // re-query — when the new value differs from the current one. Moving a
+    // file while still viewing its (unchanged) source or destination folder
+    // sets the identical value again, so no 'change' event fires and the
+    // grid silently keeps showing stale results until a hard reload.
+    // _requery() (wp.media's own collection method, called internally
+    // whenever that 'change' event does fire) sidesteps the diffing
+    // entirely, so it works regardless of whether the value nominally
+    // changed.
+    function refreshGridQuery() {
+        if (!(window.wp && wp.media && wp.media.frame && wp.media.frame.state)) {
+            return;
+        }
+
+        var state = wp.media.frame.state();
+        var library = state && state.get('library');
+
+        if (library && typeof library._requery === 'function') {
+            library._requery();
+        }
+    }
+
     function findModeSwitchLink() {
         return document.querySelector('.view-switch .view-list a');
     }
@@ -614,7 +638,13 @@
                 body: JSON.stringify({ [tawMediaFolders.taxonomy]: term }),
             }))).then(() => {
                 this.fetchFolders();
-                applyFolderToBackbone(this.selectedFolderId);
+                // Not applyFolderToBackbone(this.selectedFolderId) — the
+                // folder being viewed hasn't changed, so that call would be
+                // a same-value no-op Backbone silently ignores. This move
+                // can still change what belongs in the currently-viewed
+                // folder (the file just left it, or just arrived in it), so
+                // the grid needs an unconditional re-fetch regardless.
+                refreshGridQuery();
             });
         },
 
