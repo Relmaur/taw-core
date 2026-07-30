@@ -18,6 +18,12 @@
   }
 }
 
+.taw-folders-tree .default-trees {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #dcdcde;
+}
+
 .taw-folders-tree,
 .taw-folders-tree ul {
   list-style: none;
@@ -44,10 +50,10 @@
     .taw-folders-tree__actions button {
       color: #fff;
     }
+  }
 
-    span.folder-icon .taw-icon {
-      position: relative;
-    }
+  span.folder-icon .taw-icon {
+    position: relative;
   }
 
   span.folder-open .taw-icon {

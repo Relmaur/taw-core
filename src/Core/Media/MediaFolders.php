@@ -211,7 +211,7 @@ class MediaFolders
 
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only filter param, not a form submission
         $selected = isset($_GET[self::TAXONOMY]) ? sanitize_text_field(wp_unslash($_GET[self::TAXONOMY])) : '';
-        ?>
+?>
         <select name="<?php echo esc_attr(self::TAXONOMY); ?>" id="taw-folder-filter">
             <option value=""><?php esc_html_e('All folders', 'taw-theme'); ?></option>
             <?php foreach ($terms as $term): ?>
@@ -229,7 +229,7 @@ class MediaFolders
                 </option>
             <?php endforeach; ?>
         </select>
-        <?php
+    <?php
     }
 
     /**
@@ -513,100 +513,99 @@ class MediaFolders
         if (self::isListMode()) {
             return;
         }
-        $icon = static fn (string $name, string $class = ''): string => Lucide::render($name, ['class' => 'taw-icon ' . $class]);
-        ?>
+        $icon = static fn(string $name, string $class = ''): string => Lucide::render($name, ['class' => 'taw-icon ' . $class]);
+    ?>
         <template id="taw-media-sidebar-template">
-        <div id="taw-media-sidebar" class="taw-media-sidebar" :class="{ 'is-collapsed': sidebarCollapsed }" x-data="tawMediaSidebar" x-init="init()">
-            <div class="taw-media-sidebar__header">
-                <span class="taw-media-sidebar__title" x-show="!sidebarCollapsed"><?php esc_html_e('Folders', 'taw-theme'); ?></span>
-                <button type="button" class="taw-media-sidebar__icon-btn" @click="toggleSidebar()" :title="sidebarCollapsed ? '<?php echo esc_js(__('Expand', 'taw-theme')); ?>' : '<?php echo esc_js(__('Collapse', 'taw-theme')); ?>'">
-                    <span x-show="!sidebarCollapsed"><?php echo $icon('panel-left-close'); ?></span>
-                    <span x-show="sidebarCollapsed" x-cloak><?php echo $icon('panel-left-open'); ?></span>
-                </button>
-            </div>
-
-            <div class="taw-media-sidebar__toolbar" x-show="!sidebarCollapsed">
-                <button type="button" class="taw-media-sidebar__btn taw-media-sidebar__btn--primary" @click="createFolder(typeof selectedFolderId === 'number' ? selectedFolderId : 0)">
-                    <?php echo $icon('folder-plus'); ?>
-                    <?php esc_html_e('New Folder', 'taw-theme'); ?>
-                </button>
-                <button type="button" class="taw-media-sidebar__btn" :disabled="!canRename" @click="renameSelected()" title="<?php esc_attr_e('Rename', 'taw-theme'); ?>">
-                    <?php echo $icon('pencil'); ?>
-                </button>
-                <button type="button" class="taw-media-sidebar__btn" :disabled="!canDelete" @click="deleteSelected()" title="<?php esc_attr_e('Delete', 'taw-theme'); ?>">
-                    <?php echo $icon('trash-2'); ?>
-                </button>
-                <div class="taw-media-sidebar__menu">
-                    <button type="button" class="taw-media-sidebar__icon-btn" @click="menuOpen = !menuOpen" @click.outside="menuOpen = false" title="<?php esc_attr_e('More', 'taw-theme'); ?>">
-                        <?php echo $icon('ellipsis-vertical'); ?>
+            <div id="taw-media-sidebar" class="taw-media-sidebar" :class="{ 'is-collapsed': sidebarCollapsed }" x-data="tawMediaSidebar" x-init="init()">
+                <div class="taw-media-sidebar__header">
+                    <span class="taw-media-sidebar__title" x-show="!sidebarCollapsed"><?php esc_html_e('Folders', 'taw-theme'); ?></span>
+                    <button type="button" class="taw-media-sidebar__icon-btn" @click="toggleSidebar()" :title="sidebarCollapsed ? '<?php echo esc_js(__('Expand', 'taw-theme')); ?>' : '<?php echo esc_js(__('Collapse', 'taw-theme')); ?>'">
+                        <span x-show="!sidebarCollapsed"><?php echo $icon('panel-left-close'); ?></span>
+                        <span x-show="sidebarCollapsed" x-cloak><?php echo $icon('panel-left-open'); ?></span>
                     </button>
-                    <div class="taw-media-sidebar__dropdown" x-show="menuOpen" x-cloak>
-                        <button type="button" @click="expandAll(); menuOpen = false">
-                            <?php echo $icon('unfold-vertical'); ?>
-                            <?php esc_html_e('Expand all', 'taw-theme'); ?>
+                </div>
+
+                <div class="taw-media-sidebar__toolbar" x-show="!sidebarCollapsed">
+                    <button type="button" class="taw-media-sidebar__btn taw-media-sidebar__btn--primary" @click="createFolder(typeof selectedFolderId === 'number' ? selectedFolderId : 0)">
+                        <?php echo $icon('folder-plus'); ?>
+                        <?php esc_html_e('New Folder', 'taw-theme'); ?>
+                    </button>
+                    <button type="button" class="taw-media-sidebar__btn" :disabled="!canRename" @click="renameSelected()" title="<?php esc_attr_e('Rename', 'taw-theme'); ?>">
+                        <?php echo $icon('pencil'); ?>
+                    </button>
+                    <button type="button" class="taw-media-sidebar__btn" :disabled="!canDelete" @click="deleteSelected()" title="<?php esc_attr_e('Delete', 'taw-theme'); ?>">
+                        <?php echo $icon('trash-2'); ?>
+                    </button>
+                    <div class="taw-media-sidebar__menu">
+                        <button type="button" class="taw-media-sidebar__icon-btn" @click="menuOpen = !menuOpen" @click.outside="menuOpen = false" title="<?php esc_attr_e('More', 'taw-theme'); ?>">
+                            <?php echo $icon('ellipsis-vertical'); ?>
                         </button>
-                        <button type="button" @click="showFolderIds = !showFolderIds; menuOpen = false">
-                            <?php echo $icon('hash'); ?>
-                            <span x-text="showFolderIds ? '<?php echo esc_js(__('Hide folder IDs', 'taw-theme')); ?>' : '<?php echo esc_js(__('Display folder IDs', 'taw-theme')); ?>'"></span>
-                        </button>
+                        <div class="taw-media-sidebar__dropdown" x-show="menuOpen" x-cloak>
+                            <button type="button" @click="expandAll(); menuOpen = false">
+                                <?php echo $icon('unfold-vertical'); ?>
+                                <?php esc_html_e('Expand all', 'taw-theme'); ?>
+                            </button>
+                            <button type="button" @click="showFolderIds = !showFolderIds; menuOpen = false">
+                                <?php echo $icon('hash'); ?>
+                                <span x-text="showFolderIds ? '<?php echo esc_js(__('Hide folder IDs', 'taw-theme')); ?>' : '<?php echo esc_js(__('Display folder IDs', 'taw-theme')); ?>'"></span>
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <ul class="taw-folders-tree" aria-busy="true" x-show="!sidebarCollapsed">
-                <li class="taw-folders-tree__node" :class="{ 'is-selected': selectedFolderId === null }" @click="selectFolder(null)">
-                    <div class="taw-folders-tree__row">
-                        <?php echo $icon('folder-tree'); ?>
-                        <span class="taw-folders-tree__name"><?php esc_html_e('All Files', 'taw-theme'); ?></span>
+                <ul class="taw-folders-tree" aria-busy="true" x-show="!sidebarCollapsed">
+                    <div class="default-trees">
+                        <li class="taw-folders-tree__node" :class="{ 'is-selected': selectedFolderId === null }" @click="selectFolder(null)">
+                            <div class="taw-folders-tree__row">
+                                <?php echo $icon('folder-tree'); ?>
+                                <span class="taw-folders-tree__name"><?php esc_html_e('All Files', 'taw-theme'); ?></span>
+                            </div>
+                        </li>
+                        <li
+                            class="taw-folders-tree__node"
+                            :class="{ 'is-selected': selectedFolderId === 'unfiled' }"
+                            @click="selectFolder('unfiled')"
+                            @dragover.prevent="onFolderDragOver($event)"
+                            @dragleave="onFolderDragLeave($event)"
+                            @drop.prevent="onFolderDrop($event, 'unfiled')">
+                            <div class="taw-folders-tree__row">
+                                <?php echo $icon('folder-x'); ?>
+                                <span class="taw-folders-tree__name"><?php esc_html_e('Unfiled', 'taw-theme'); ?></span>
+                            </div>
+                        </li>
                     </div>
-                </li>
-                <li
-                    class="taw-folders-tree__node"
-                    :class="{ 'is-selected': selectedFolderId === 'unfiled' }"
-                    @click="selectFolder('unfiled')"
-                    @dragover.prevent="onFolderDragOver($event)"
-                    @dragleave="onFolderDragLeave($event)"
-                    @drop.prevent="onFolderDrop($event, 'unfiled')"
-                >
-                    <div class="taw-folders-tree__row">
-                        <?php echo $icon('folder-x'); ?>
-                        <span class="taw-folders-tree__name"><?php esc_html_e('Unfiled', 'taw-theme'); ?></span>
-                    </div>
-                </li>
-                <template x-for="node in flatFolders" :key="node.id">
-                    <li
-                        class="taw-folders-tree__node"
-                        :class="{ 'is-selected': selectedFolderId === node.id }"
-                        :style="'padding-left: ' + (node.depth * 12) + 'px'"
-                        draggable="true"
-                        @click="selectFolder(node.id)"
-                        @dragstart="onFolderDragStart($event, node.id)"
-                        @dragover.prevent="onFolderDragOver($event)"
-                        @dragleave="onFolderDragLeave($event)"
-                        @drop.prevent="onFolderDrop($event, node.id)"
-                    >
-                        <div class="taw-folders-tree__row">
-                            <button
-                                type="button"
-                                class="taw-folders-tree__toggle"
-                                :class="{ 'is-invisible': !node.hasChildren }"
-                                @click.stop="toggleExpanded(node.id)"
-                            >
-                                <span x-show="!isCollapsed(node.id)"><?php echo $icon('chevron-down'); ?></span>
-                                <span x-show="isCollapsed(node.id)" x-cloak><?php echo $icon('chevron-right'); ?></span>
-                            </button>
-                            <span x-show="selectedFolderId === node.id" class="folder-icon folder-open"><?php echo $icon('folder-open'); ?></span>
-                            <span x-show="selectedFolderId !== node.id" class="folder-icon folder-closed"><?php echo $icon('folder'); ?></span>
-                            <span class="taw-folders-tree__name" x-text="node.name"></span>
-                            <span class="taw-folders-tree__id" x-show="showFolderIds" x-text="'#' + node.id"></span>
-                            <span class="taw-folders-tree__count" x-text="node.count"></span>
-                        </div>
-                    </li>
-                </template>
-            </ul>
-        </div>
+                    <template x-for="node in flatFolders" :key="node.id">
+                        <li
+                            class="taw-folders-tree__node"
+                            :class="{ 'is-selected': selectedFolderId === node.id }"
+                            :style="'padding-left: ' + (node.depth * 12) + 'px'"
+                            draggable="true"
+                            @click="selectFolder(node.id)"
+                            @dragstart="onFolderDragStart($event, node.id)"
+                            @dragover.prevent="onFolderDragOver($event)"
+                            @dragleave="onFolderDragLeave($event)"
+                            @drop.prevent="onFolderDrop($event, node.id)">
+                            <div class="taw-folders-tree__row">
+                                <button
+                                    type="button"
+                                    class="taw-folders-tree__toggle"
+                                    :class="{ 'is-invisible': !node.hasChildren }"
+                                    @click.stop="toggleExpanded(node.id)">
+                                    <span x-show="!isCollapsed(node.id)"><?php echo $icon('chevron-down'); ?></span>
+                                    <span x-show="isCollapsed(node.id)" x-cloak><?php echo $icon('chevron-right'); ?></span>
+                                </button>
+                                <span x-show="selectedFolderId === node.id" class="folder-icon folder-open"><?php echo $icon('folder-open'); ?></span>
+                                <span x-show="selectedFolderId !== node.id" class="folder-icon folder-closed"><?php echo $icon('folder'); ?></span>
+                                <span class="taw-folders-tree__name" x-text="node.name"></span>
+                                <span class="taw-folders-tree__id" x-show="showFolderIds" x-text="'#' + node.id"></span>
+                                <span class="taw-folders-tree__count" x-text="node.count"></span>
+                            </div>
+                        </li>
+                    </template>
+                </ul>
+            </div>
         </template>
-        <?php
+    <?php
     }
 
     /**
@@ -615,7 +614,7 @@ class MediaFolders
      */
     public static function renderFoldersPage(): void
     {
-        ?>
+    ?>
         <div class="wrap">
             <h1><?php esc_html_e('Media Folders', 'taw-theme'); ?></h1>
             <div id="taw-folders-app" class="taw-folders-app">
@@ -634,6 +633,6 @@ class MediaFolders
                 </div>
             </div>
         </div>
-        <?php
+<?php
     }
 }

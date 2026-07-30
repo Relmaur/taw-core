@@ -1,6 +1,5 @@
 #taw-media-grid-flex {
   display: flex;
-  gap: 1.5rem;
   align-items: flex-start;
 }
 
@@ -30,22 +29,31 @@
   color: #8c8f94;
 }
 
-#taw-media-grid-flex #wp-media-grid .taw-folder-tile:hover .taw-folder-tile-icon,
-#taw-media-grid-flex #wp-media-grid .taw-folder-tile:focus .taw-folder-tile-icon {
+#taw-media-grid-flex
+  #wp-media-grid
+  .taw-folder-tile:hover
+  .taw-folder-tile-icon,
+#taw-media-grid-flex
+  #wp-media-grid
+  .taw-folder-tile:focus
+  .taw-folder-tile-icon {
   color: #2271b1;
 }
 
 .taw-media-sidebar {
   width: 260px;
   flex-shrink: 0;
-  background: #fff;
-  border: 1px solid #dcdcde;
   border-radius: 4px;
   padding: 0.75rem;
   transition: width 0.15s ease;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  background: transparent;
+  border: none;
+  padding-right: 1.5rem;
+  margin-right: 1.5rem;
+  border-right: 1px solid #dcdcde;
 }
 
 .taw-media-sidebar.is-collapsed {
@@ -214,12 +222,15 @@
 .taw-media-sidebar
   .taw-folders-tree__node.is-selected
   > .taw-folders-tree__row
-  .taw-folders-tree__count,
+  .taw-folders-tree__id {
+  color: #fff;
+}
+
 .taw-media-sidebar
   .taw-folders-tree__node.is-selected
   > .taw-folders-tree__row
-  .taw-folders-tree__id {
-  color: #fff;
+  .taw-folders-tree__count {
+  color: #000;
 }
 
 .taw-media-sidebar .taw-folders-tree__row {
