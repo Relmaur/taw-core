@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace TAW\Core\Theme;
 
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * Github-based Theme Updater.
  * 

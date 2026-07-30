@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace TAW\Core\Form;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * Fixed-window rate limiter backed by WordPress transients — no external
  * cache dependency (Redis/Memcached), works on any host.

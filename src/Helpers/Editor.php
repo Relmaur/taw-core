@@ -7,6 +7,11 @@ namespace TAW\Helpers;
 use TAW\Core\Editor\VisualEditor;
 use TAW\Core\Metabox\Metabox;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 class Editor
 {
 

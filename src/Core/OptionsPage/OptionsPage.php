@@ -8,6 +8,11 @@ use TAW\Core\Metabox\Metabox;
 use TAW\Helpers\Framework;
 use TAW\Support\Alpine;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * Configuration-driven Options Page.
  *

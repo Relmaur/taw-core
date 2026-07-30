@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace TAW\Core\Menu;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 class MenuItem
 {
 

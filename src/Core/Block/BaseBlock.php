@@ -7,6 +7,11 @@ namespace TAW\Core\Block;
 use TAW\Helpers\Framework;
 use TAW\Support\ViteLoader;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 abstract class BaseBlock
 {
     protected string $id;

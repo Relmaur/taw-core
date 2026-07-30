@@ -6,6 +6,11 @@ namespace TAW\Core\Block;
 
 use TAW\Core\Block\BaseBlock;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 abstract class Block extends BaseBlock
 {
     /**

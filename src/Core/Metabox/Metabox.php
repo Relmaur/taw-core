@@ -8,6 +8,11 @@ use TAW\Core\Icons\Lucide;
 use TAW\Helpers\Framework;
 use TAW\Support\Alpine;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * Native WordPress Metabox Framework
  *

@@ -7,6 +7,11 @@ namespace TAW\Core\Icons;
 use TAW\Core\Rest\IconsEndpoint;
 use TAW\Helpers\Framework;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * Opt-in Lucide icon system (https://lucide.dev).
  *

@@ -6,6 +6,11 @@ namespace TAW\Core\Menu;
 
 use TAW\Core\Menu\MenuItem;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 class Menu
 {
     /** @var MenuItem[] */

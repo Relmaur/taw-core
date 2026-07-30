@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace TAW\Helpers;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * SVG Helper
  *
@@ -89,6 +94,15 @@ class Svg
     /**
      * Sanitize an SVG file immediately after it is uploaded.
      *
+     * wp_handle_upload() has already moved the file to its final, publicly
+     * servable location in the uploads directory by the time this filter
+     * runs — so on any failure to positively confirm the file is clean
+     * (unreadable, or sanitize() rejects it — enshrined/svg-sanitize
+     * returns false on any XML parse failure), the file is deleted outright
+     * and the upload rejected. Silently leaving an unsanitized file on disk
+     * "for now" would mean it stays servable at its uploads URL indefinitely,
+     * which is exactly the SVG-XSS attack this sanitization exists to stop.
+     *
      * @internal Used by register().
      */
     public static function sanitizeOnUpload(array $upload): array
@@ -97,19 +111,18 @@ class Svg
             return $upload;
         }
 
-        $raw = file_get_contents($upload['file']);
+        $raw   = file_get_contents($upload['file']);
+        $clean = $raw !== false ? self::sanitize($raw) : '';
 
-        if ($raw === false) {
+        if ($clean !== '') {
+            file_put_contents($upload['file'], $clean);
             return $upload;
         }
 
-        $clean = self::sanitize($raw);
+        // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- best-effort cleanup, upload is being rejected regardless
+        @unlink($upload['file']);
 
-        if ($clean) {
-            file_put_contents($upload['file'], $clean);
-        }
-
-        return $upload;
+        return ['error' => __('This SVG file could not be safely sanitized and was rejected.', 'taw-theme')];
     }
 
     /**
@@ -262,7 +275,19 @@ class Svg
         $sanitizer = new \enshrined\svgSanitize\Sanitizer();
         $sanitizer->minify(false);
 
-        return $sanitizer->sanitize($svg) ?: '';
+        try {
+            // enshrined/svg-sanitize throws (rather than returning false) for
+            // some malformed inputs — e.g. a well-formed XML document with no
+            // <svg> root throws a LogicException ("Got 0 svg elements,
+            // expected exactly one") instead of failing gracefully. Every
+            // caller here (sanitizeOnUpload(), inline(), dimensions()) treats
+            // an empty-string return as "reject/skip this file" — an
+            // uncaught exception must converge to that same outcome instead
+            // of fataling the request.
+            return $sanitizer->sanitize($svg) ?: '';
+        } catch (\Throwable $e) {
+            return '';
+        }
     }
 
     // -------------------------------------------------------------------------

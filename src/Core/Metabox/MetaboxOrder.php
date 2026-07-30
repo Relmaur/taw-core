@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace TAW\Core\Metabox;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * Forces a fixed, non-draggable metabox order on the post-edit screen.
  *

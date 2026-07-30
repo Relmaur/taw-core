@@ -6,6 +6,11 @@ namespace TAW\Support;
 
 use TAW\Helpers\Framework;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * ViteLoader — OOP asset pipeline for Vite-powered WordPress themes.
  *

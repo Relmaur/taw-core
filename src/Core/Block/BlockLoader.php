@@ -7,6 +7,11 @@ namespace TAW\Core\Block;
 use TAW\Core\Block\BaseBlock;
 use TAW\Core\Block\BlockRegistry;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 class BlockLoader
 {
 

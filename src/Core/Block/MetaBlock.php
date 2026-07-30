@@ -7,6 +7,11 @@ namespace TAW\Core\Block;
 use TAW\Core\Editor\VisualEditor;
 use TAW\Core\Metabox\Metabox;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 abstract class MetaBlock extends BaseBlock
 {
     protected string $variation = '';

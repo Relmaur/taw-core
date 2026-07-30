@@ -7,6 +7,11 @@ namespace TAW\Core\Editor;
 use TAW\Core\Block\BlockRegistry;
 use TAW\Helpers\Framework;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 class VisualEditor
 {
     /**

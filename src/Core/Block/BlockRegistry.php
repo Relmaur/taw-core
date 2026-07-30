@@ -6,6 +6,11 @@ namespace TAW\Core\Block;
 
 use TAW\Core\Block\MetaBlock;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 class BlockRegistry
 {
     /** @var array<string, MetaBlock> */

@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace TAW\Core\Form;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * Cloudflare Turnstile integration — opt-in bot verification for individual
  * forms (`Form::register(['turnstile' => true, ...])`).

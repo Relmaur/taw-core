@@ -21,6 +21,11 @@ use TAW\Helpers\Svg;
 use TAW\Support\Performance;
 use TAW\Support\ViteLoader;
 
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * Theme — the single entry point for wiring TAW Core into a WordPress theme.
  *
