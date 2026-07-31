@@ -567,6 +567,21 @@ class Form
         return wp_mail($to, $subject, $body, $headers);
     }
 
+    /**
+     * Every {{variable}} placeholder here — both {{all_fields}} and each
+     * individual {{field_id}} — is HTML-escaped via esc_html() before it
+     * reaches MailTemplate::compile(), which interpolates values directly
+     * into an HTML email body (Content-Type: text/html) with no escaping
+     * of its own. Fields are already plain-text-sanitized upstream
+     * (sanitize_text_field()), so esc_html() only ever neutralizes HTML
+     * metacharacters (<, >, &, quotes) in submitted content — it never
+     * strips legitimate data. This applies even to placeholders a template
+     * uses inside an attribute (e.g. a mailto: href built from an email
+     * field): HTML-entity-encoding is the correct encoding for attribute
+     * values too, not just element text. There is intentionally no raw,
+     * unescaped variant of these placeholders — a template that needs a
+     * truly raw value has to source it another way.
+     */
     private function sendWithTemplate(array $formData): bool
     {
         $emailConfig = $this->config['email'];
@@ -580,8 +595,8 @@ class Form
         foreach ($this->getInputFields() as $field) {
             $label                       = $field['label'] ?? $field['id'];
             $value                       = $formData[$field['id']] ?? '-';
-            $replacements[$field['id']] = $value;
-            $allFields                  .= "<p><strong>{$label}:</strong> {$value}</p>";
+            $replacements[$field['id']] = esc_html($value);
+            $allFields                  .= '<p><strong>' . esc_html($label) . ':</strong> ' . esc_html($value) . '</p>';
         }
         $replacements['all_fields'] = $allFields;
 
@@ -604,7 +619,7 @@ class Form
             }
 
             if ($clientEmail) {
-                $shared['client_name'] = $formData['name'] ?? '';
+                $shared['client_name'] = esc_html($formData['name'] ?? '');
 
                 (new Mailer())
                     ->to($clientEmail)
