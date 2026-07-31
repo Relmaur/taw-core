@@ -318,20 +318,51 @@ class ViteLoader
     /**
      * Parse and cache the Vite production manifest.
      *
-     * Checks the WP object cache first (RAM), then falls back to disk.
-     * The result is stored for 24 hours — deploy hooks should flush
-     * the object cache on each deploy to pick up new asset hashes.
+     * Checks the WP object cache first (RAM), then falls back to disk. The
+     * cache key includes the manifest file's own mtime, so a new deploy
+     * (which necessarily rewrites manifest.json with a new mtime) always
+     * misses whatever the previous deploy cached — a stale entry can't
+     * survive a rebuild, structurally, rather than relying on a deploy hook
+     * remembering to flush the object cache. A real incident on a real
+     * client site is what this fixes: a site with a persistent object cache
+     * (Redis/Memcached) served a previous build's hashed asset filenames —
+     * both genuinely 404ing on disk — for as long as the old fixed-key,
+     * time-based-TTL cache entry lived, because nothing had invalidated it
+     * after the deploy that rotated the hashes.
      *
      * @return array<string, mixed>
      */
     public static function getManifest(): array
     {
-        $manifest = wp_cache_get(self::MANIFEST_CACHE_KEY, self::MANIFEST_CACHE_GROUP);
+        $path = self::manifestPath();
+
+        if ($path === null) {
+            return [];
+        }
+
+        $cache_key = self::MANIFEST_CACHE_KEY . '_' . filemtime($path);
+
+        $manifest = wp_cache_get($cache_key, self::MANIFEST_CACHE_GROUP);
 
         if (false !== $manifest) {
             return $manifest;
         }
 
+        $manifest = json_decode(file_get_contents($path), true) ?? [];
+
+        wp_cache_set($cache_key, $manifest, self::MANIFEST_CACHE_GROUP, HOUR_IN_SECONDS * 24);
+
+        return $manifest;
+    }
+
+    /**
+     * Locate the manifest file on disk, checking every dist-directory
+     * convention this class supports.
+     *
+     * @return string|null  Absolute path to manifest.json, or null if none exists.
+     */
+    private static function manifestPath(): ?string
+    {
         // Vite 5+ writes to dist/.vite/manifest.json; older versions use dist/manifest.json
         $candidates = [
             Framework::themePath('dist/.vite/manifest.json'),
@@ -340,17 +371,13 @@ class ViteLoader
             Framework::themePath('public/build/manifest.json'),
         ];
 
-        $manifest = [];
         foreach ($candidates as $path) {
             if (file_exists($path)) {
-                $manifest = json_decode(file_get_contents($path), true) ?? [];
-                break;
+                return $path;
             }
         }
 
-        wp_cache_set(self::MANIFEST_CACHE_KEY, $manifest, self::MANIFEST_CACHE_GROUP, HOUR_IN_SECONDS * 24);
-
-        return $manifest;
+        return null;
     }
 
     /**

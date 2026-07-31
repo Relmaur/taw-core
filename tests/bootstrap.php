@@ -23,4 +23,11 @@ if (!defined('ABSPATH')) {
     define('ABSPATH', '/tmp/');
 }
 
+// Real WP core time constants referenced directly (not via a mockable
+// function) by some src/ code — e.g. ViteLoader::getManifest()'s
+// wp_cache_set() TTL. Only defined here as they're needed.
+if (!defined('HOUR_IN_SECONDS')) {
+    define('HOUR_IN_SECONDS', 3600);
+}
+
 require __DIR__ . '/../vendor/autoload.php';
