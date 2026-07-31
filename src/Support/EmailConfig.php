@@ -63,6 +63,12 @@ class EmailConfig
      * Return non-null to short-circuit wp_mail (we handled it).
      * Return null to fall through to wp_mail (SDK missing or API failed).
      *
+     * HTML messages are sent as proper multipart/alternative — both `html`
+     * and a `text` part (derived via wp_strip_all_tags()) go to the API
+     * together, never `html` alone. A missing plain-text alternative is a
+     * real (if small) spam-filter signal, and Emailit's API accepts both
+     * params independently rather than treating them as mutually exclusive.
+     *
      * @param mixed $return  Existing filter return value (null by default).
      * @param array $atts    wp_mail argument array: to, subject, message, headers, attachments.
      * @return mixed
@@ -103,7 +109,7 @@ class EmailConfig
                 'to'      => $to,
                 'subject' => $subject,
                 'html'    => $isHtml ? $message : null,
-                'text'    => $isHtml ? null : $message,
+                'text'    => $isHtml ? wp_strip_all_tags($message, true) : $message,
             ], fn($v) => $v !== null));
 
             return true;
