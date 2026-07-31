@@ -73,7 +73,7 @@ class EmailConfig
             return null;
         }
 
-        if (!class_exists(\Emailit\Client::class)) {
+        if (!class_exists(\Emailit\EmailitClient::class)) {
             // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
             error_log('[TAW EmailConfig] emailit/emailit-php is not installed. Run: composer require emailit/emailit-php');
             return null;
@@ -97,7 +97,7 @@ class EmailConfig
             : self::$fromEmail;
 
         try {
-            $client = new \Emailit\Client(self::$emailitApiKey);
+            $client = new \Emailit\EmailitClient(self::$emailitApiKey);
             $client->emails()->send(array_filter([
                 'from'    => $from,
                 'to'      => $to,
