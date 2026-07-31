@@ -204,4 +204,56 @@ final class SubmissionsHandlerWebhookTest extends TestCase
 
         $_POST = [];
     }
+
+    /**
+     * fireWebhook() itself — covers the page_url payload key (which page
+     * the form was submitted from, since the same form can be embedded on
+     * many different pages) and the taw_form_webhook_payload filter that
+     * lets a specific site inject or override anything else before the
+     * request goes out.
+     */
+    public function test_fire_webhook_includes_page_url_and_applies_payload_filter(): void
+    {
+        $capturedBody = null;
+
+        Functions\when('current_time')->justReturn('2026-01-01T00:00:00+00:00');
+        Functions\when('home_url')->justReturn('https://example.com');
+        Functions\when('wp_json_encode')->alias(fn(mixed $v) => json_encode($v));
+        Functions\when('update_post_meta')->justReturn(true);
+        Functions\when('is_wp_error')->justReturn(false);
+        Functions\when('wp_remote_retrieve_response_code')->justReturn(200);
+
+        // Simulates a site's own customizations.php injecting a routing key
+        // derived from page_url — exactly the n8n-routing use case this
+        // filter exists for.
+        Functions\when('apply_filters')->alias(function (string $hook, mixed $payload, mixed ...$args) {
+            if ($hook === 'taw_form_webhook_payload') {
+                $payload['destination'] = str_contains($payload['page_url'], '/financiera/')
+                    ? 'financiera-sheet'
+                    : 'contact-sheet';
+            }
+            return $payload;
+        });
+
+        Functions\when('wp_remote_post')->alias(function (string $url, array $args) use (&$capturedBody) {
+            $capturedBody = json_decode($args['body'], true);
+            return [];
+        });
+
+        $this->options[SubmissionsHandler::WEBHOOK_URL] = 'https://n8n.example.com/webhook/abc';
+
+        $this->callMethod(
+            $this->handler(),
+            'fireWebhook',
+            1,
+            'financiera_contact',
+            ['name' => 'Jane'],
+            [],
+            'https://example.com/financiera/page-1'
+        );
+
+        $this->assertNotNull($capturedBody);
+        $this->assertSame('https://example.com/financiera/page-1', $capturedBody['page_url']);
+        $this->assertSame('financiera-sheet', $capturedBody['destination']);
+    }
 }

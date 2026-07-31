@@ -569,6 +569,42 @@ Every successful submission is saved as a `taw_submission` CPT entry (WP Admin �
 
 A form with none of the three configured simply doesn't fire a webhook (submission is still saved to the CPT either way).
 
+**Payload shape:**
+
+```json
+{
+    "event":        "new_submission",
+    "form_id":      "contact",
+    "post_id":      142,
+    "submitted_at": "2026-02-07T12:30:00+00:00",
+    "site_url":     "https://example.com",
+    "page_url":     "https://example.com/contact",
+    "ip":           "203.0.113.42",
+    "data":         { "name": "Jane Doe", "email": "jane@example.com", "message": "Hello!" }
+}
+```
+
+`page_url` is the full URL of the page the form was actually submitted from, captured server-side at render time (not read from the request's `Referer` header, which browsers and privacy tools can strip) — the same registered form is often embedded on several different pages, and this is what lets a downstream automation tell those submissions apart without needing a separate `form_id` per page.
+
+**Customizing the payload** — a `taw_form_webhook_payload` filter runs on the payload right before it's sent (and before the HMAC signature is computed over it), letting a specific site add or override anything the default shape doesn't cover, without touching `taw-core` itself:
+
+```php
+// In the theme's inc/customizations.php:
+add_filter('taw_form_webhook_payload', function (array $payload, string $formId, int $postId, array $data) {
+    // Route the same form's submissions to different n8n destinations
+    // depending on which section of the site they came from.
+    $path = wp_parse_url($payload['page_url'], PHP_URL_PATH) ?? '';
+
+    if (str_contains($path, '/financiera/')) {
+        $payload['destination'] = 'financiera-sheet';
+    } elseif (str_contains($path, '/fideicomisos/')) {
+        $payload['destination'] = 'fideicomisos-sheet';
+    }
+
+    return $payload;
+}, 10, 4);
+```
+
 ---
 
 ## Email

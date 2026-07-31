@@ -349,8 +349,12 @@ class Form
             wp_send_json_error(['errors' => $errors]);
         }
 
+        $pageUrl = isset($_POST['taw_form_page_url'])
+            ? esc_url_raw(wp_unslash($_POST['taw_form_page_url']))
+            : '';
+
         // Save first — guaranteed record regardless of email outcome.
-        SubmissionsHandler::saveSubmission($this->id, $inputFields, $data, $this->config['webhook'] ?? []);
+        SubmissionsHandler::saveSubmission($this->id, $inputFields, $data, $this->config['webhook'] ?? [], $pageUrl);
 
         $sent = $this->sendEmail($data);
         if (!$sent) {
@@ -621,6 +625,20 @@ class Form
      * Rendering
      * ---------------------------------------------------------------------- */
 
+    /**
+     * The full URL of the page currently being rendered, built from the
+     * actual request rather than get_permalink() — forms can be embedded
+     * outside The Loop (headers, footers, sidebars) where a global $post
+     * isn't reliably available, and this needs to work in every context.
+     */
+    private static function currentPageUrl(): string
+    {
+        $host = $_SERVER['HTTP_HOST'] ?? (string) wp_parse_url(home_url(), PHP_URL_HOST);
+        $uri  = $_SERVER['REQUEST_URI'] ?? '/';
+
+        return (is_ssl() ? 'https://' : 'http://') . $host . $uri;
+    }
+
     public function render(): void
     {
         $formId      = esc_attr($this->id);
@@ -637,6 +655,14 @@ class Form
         wp_nonce_field($this->id . '_action', $this->id . '_nonce');
         echo '<input type="hidden" name="action" value="taw_form_' . $formId . '">';
         echo '<input type="hidden" name="taw_form_id" value="' . $formId . '">';
+
+        // Captured server-side at render time (not read from the submission
+        // request's Referer header, which browsers/privacy tools can strip
+        // or omit) — the same form can be embedded on many different pages,
+        // and downstream automations (an n8n webhook routing submissions to
+        // different spreadsheets by page/section, for example) need to know
+        // which one this particular submission came from.
+        echo '<input type="hidden" name="taw_form_page_url" value="' . esc_attr(self::currentPageUrl()) . '">';
 
         // Honeypot — hidden from real users, filled by bots.
         echo '<div style="display:none;" aria-hidden="true">';

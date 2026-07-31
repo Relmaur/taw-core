@@ -133,6 +133,7 @@ class SubmissionsHandler
         $webhookStatus = get_post_meta($post->ID, '_taw_webhook_status', true) ?: 'Not configured';
         $webhookError  = get_post_meta($post->ID, '_taw_webhook_error', true);
         $userIp        = get_post_meta($post->ID, '_taw_user_ip', true);
+        $pageUrl       = get_post_meta($post->ID, '_taw_page_url', true);
 
         echo '<div style="margin-top:15px;border-top:1px solid #ddd;padding:10px;color:#666;font-size:11px;">';
         echo '<strong>Webhook Status:</strong> ' . esc_html($webhookStatus);
@@ -140,6 +141,9 @@ class SubmissionsHandler
             echo ' <span style="color:#dc3232;">(' . esc_html($webhookError) . ')</span>';
         }
         echo '<br><strong>User IP:</strong> ' . esc_html($userIp);
+        if ($pageUrl) {
+            echo '<br><strong>Page URL:</strong> ' . esc_html($pageUrl);
+        }
         echo '</div>';
     }
 
@@ -156,9 +160,12 @@ class SubmissionsHandler
      *                              the form's own 'webhook' config key.
      *                              Overridden by an admin-configured per-form
      *                              webhook if one is set — see fireWebhook().
+     * @param string $pageUrl       The full URL of the page the form was
+     *                              submitted from (captured server-side at
+     *                              render time — see Form::currentPageUrl()).
      * @return int|false            Created post ID or false on failure.
      */
-    public static function saveSubmission(string $formId, array $fields, array $data, array $webhookConfig = []): int|false
+    public static function saveSubmission(string $formId, array $fields, array $data, array $webhookConfig = [], string $pageUrl = ''): int|false
     {
         $name    = $data['name'] ?? $data['email'] ?? 'Anonymous';
         $subject = $data['subject'] ?? $formId;
@@ -183,8 +190,9 @@ class SubmissionsHandler
         update_post_meta($postId, '_taw_form_id', $formId);
         update_post_meta($postId, '_taw_submission_data', $metaData);
         update_post_meta($postId, '_taw_user_ip', self::getUserIp());
+        update_post_meta($postId, '_taw_page_url', $pageUrl);
 
-        self::fireWebhook($postId, $formId, $data, $webhookConfig);
+        self::fireWebhook($postId, $formId, $data, $webhookConfig, $pageUrl);
 
         return $postId;
     }
@@ -226,7 +234,7 @@ class SubmissionsHandler
         return self::WEBHOOK_SECRET . '_' . sanitize_key($formId);
     }
 
-    private static function fireWebhook(int $postId, string $formId, array $data, array $webhookConfig = []): void
+    private static function fireWebhook(int $postId, string $formId, array $data, array $webhookConfig = [], string $pageUrl = ''): void
     {
         $url = self::resolveWebhookUrl($formId, $webhookConfig);
 
@@ -241,9 +249,29 @@ class SubmissionsHandler
             'post_id'      => $postId,
             'submitted_at' => current_time('c'),
             'site_url'     => home_url(),
+            'page_url'     => $pageUrl,
             'ip'           => self::getUserIp(),
             'data'         => $data,
         ];
+
+        /**
+         * Filters the webhook payload for a form submission before it's sent.
+         *
+         * Lets a specific taw-theme site tailor its own webhook payload —
+         * adding a computed routing key, UTM params, anything the default
+         * shape doesn't cover — without touching taw-core itself. Runs
+         * before the HMAC signature is computed, so the signature always
+         * covers exactly what's actually sent.
+         *
+         * @param array<string, mixed> $payload The default payload (event,
+         *                                       form_id, post_id,
+         *                                       submitted_at, site_url,
+         *                                       page_url, ip, data).
+         * @param string               $formId  The submitting form's id.
+         * @param int                  $postId  The taw_submission CPT post ID.
+         * @param array<string, mixed> $data    Sanitized field_id => value map.
+         */
+        $payload = apply_filters('taw_form_webhook_payload', $payload, $formId, $postId, $data);
 
         $headers = ['Content-Type' => 'application/json'];
 
@@ -465,6 +493,7 @@ class SubmissionsHandler
   "post_id": 142,
   "submitted_at": "2026-02-07T12:30:00+00:00",
   "site_url": "https://example.com",
+  "page_url": "https://example.com/contact",
   "ip": "203.0.113.42",
   "data": {
     "name": "Jane Doe",
