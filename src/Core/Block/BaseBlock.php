@@ -119,6 +119,13 @@ abstract class BaseBlock
      *                        Falls back to a sync <link> if wp_head has already completed.
      *  - $critical = false → async <link media="print" onload> via wp_head hook (priority 50)
      *                        when called before/during wp_head, or inline when called after.
+     *
+     * Also enqueues any CSS a script.js entry pulls in via `import '...css'`
+     * (e.g. a third-party library's stylesheet). Vite's dev server injects
+     * that CSS itself, but a production build extracts it into its own file
+     * and records it on the *script's* manifest entry ($manifest[$js_key]['css']),
+     * not the block's dedicated style.scss/style.css entry — so it has to be
+     * read and enqueued separately from $style_key.
      */
     private function enqueueProdAssets(string $relative_dir, string $assetId): void
     {
@@ -131,41 +138,7 @@ abstract class BaseBlock
         $head_done = did_action('wp_head') > 0;
 
         if ($style_key) {
-            $url      = ViteLoader::distUrl($manifest[$style_key]['file']);
-            $css_path = Framework::themePath(ViteLoader::distDir() . '/' . $manifest[$style_key]['file']);
-
-            if ($this->critical) {
-                if ($head_done) {
-                    // wp_head already fired — best-effort sync <link> in body
-                    printf('<link rel="stylesheet" href="%s">' . "\n", esc_url($url));
-                } else {
-                    // Always schedule via wp_head hook so the <style> is guaranteed
-                    // to land inside <head> no matter when enqueueAssets() was called.
-                    // Priority 11 runs right after wp_enqueue_scripts (10), before the
-                    // async <link> tags (50), and well before </head>.
-                    add_action('wp_head', static function () use ($css_path, $assetId): void {
-                        ViteLoader::inlineCssFile($css_path, 'block-' . $assetId);
-                    }, 11);
-                }
-            } elseif ($head_done) {
-                // Non-critical, after head (below-fold render) — async, no noscript needed
-                printf(
-                    '<link rel="stylesheet" href="%s" media="print" onload="this.media=\'all\'">' . "\n",
-                    esc_url($url)
-                );
-            } else {
-                // Non-critical, inside head — schedule async output via late wp_head hook
-                add_action('wp_head', static function () use ($url): void {
-                    printf(
-                        '<link rel="stylesheet" href="%s" media="print" onload="this.media=\'all\'">' . "\n",
-                        esc_url($url)
-                    );
-                    printf(
-                        '<noscript><link rel="stylesheet" href="%s"></noscript>' . "\n",
-                        esc_url($url)
-                    );
-                }, 50);
-            }
+            $this->enqueueCssFile($manifest[$style_key]['file'], $assetId, $head_done);
         }
 
         if (isset($manifest[$js_key])) {
@@ -173,6 +146,56 @@ abstract class BaseBlock
             wp_enqueue_script($handle, ViteLoader::distUrl($manifest[$js_key]['file']), [], null, false);
             ViteLoader::$moduleHandles[] = $handle;
             wp_script_add_data($handle, 'group', 0);
+
+            foreach ($manifest[$js_key]['css'] ?? [] as $index => $css_file) {
+                $css_id = $index === 0 ? $assetId . '-script' : $assetId . '-script-' . $index;
+                $this->enqueueCssFile($css_file, $css_id, $head_done);
+            }
+        }
+    }
+
+    /**
+     * Emit a single manifest-resolved CSS file, respecting the same
+     * critical/non-critical inline-vs-async logic documented on
+     * enqueueProdAssets(). Shared by the block's own style.scss/style.css
+     * and any CSS a script.js entry carries as a Rollup side-output.
+     */
+    private function enqueueCssFile(string $file, string $styleId, bool $head_done): void
+    {
+        $url      = ViteLoader::distUrl($file);
+        $css_path = Framework::themePath(ViteLoader::distDir() . '/' . $file);
+
+        if ($this->critical) {
+            if ($head_done) {
+                // wp_head already fired — best-effort sync <link> in body
+                printf('<link rel="stylesheet" href="%s">' . "\n", esc_url($url));
+            } else {
+                // Always schedule via wp_head hook so the <style> is guaranteed
+                // to land inside <head> no matter when enqueueAssets() was called.
+                // Priority 11 runs right after wp_enqueue_scripts (10), before the
+                // async <link> tags (50), and well before </head>.
+                add_action('wp_head', static function () use ($css_path, $styleId): void {
+                    ViteLoader::inlineCssFile($css_path, 'block-' . $styleId);
+                }, 11);
+            }
+        } elseif ($head_done) {
+            // Non-critical, after head (below-fold render) — async, no noscript needed
+            printf(
+                '<link rel="stylesheet" href="%s" media="print" onload="this.media=\'all\'">' . "\n",
+                esc_url($url)
+            );
+        } else {
+            // Non-critical, inside head — schedule async output via late wp_head hook
+            add_action('wp_head', static function () use ($url): void {
+                printf(
+                    '<link rel="stylesheet" href="%s" media="print" onload="this.media=\'all\'">' . "\n",
+                    esc_url($url)
+                );
+                printf(
+                    '<noscript><link rel="stylesheet" href="%s"></noscript>' . "\n",
+                    esc_url($url)
+                );
+            }, 50);
         }
     }
 
