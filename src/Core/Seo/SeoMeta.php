@@ -60,6 +60,10 @@ final class SeoMeta
             add_action('wp_head', [$this, 'renderHeadTags'], 1);
             add_filter('document_title_parts', [$this, 'filterDocumentTitle']);
             add_filter('wp_robots', [$this, 'filterRobots']);
+            // renderHeadTags() prints its own canonical above; core's
+            // rel_canonical() is also hooked to wp_head (default priority
+            // 10) and would otherwise print a duplicate.
+            remove_action('wp_head', 'rel_canonical');
         }
     }
 
@@ -394,9 +398,17 @@ final class SeoMeta
 
         $isPost = get_post_type($postId) === 'post';
 
+        // A static front page is still is_singular() (it's a Page), so it
+        // never reaches resolveContext()'s dedicated is_front_page()/is_home()
+        // branch below — without this, a placeholder post_title (e.g. an
+        // internal "Index" title never meant to be public-facing) leaks
+        // straight into og:title/twitter:title, the same gap core's own
+        // wp_get_document_title() already closes for the real <title> tag.
+        $isFrontPage = is_front_page();
+
         return [
-            'title' => self::metaTitle($postId) ?: get_the_title($postId),
-            'description' => self::metaDescription($postId),
+            'title' => self::metaTitle($postId) ?: ($isFrontPage ? get_bloginfo('name') : get_the_title($postId)),
+            'description' => self::metaDescription($postId) ?: ($isFrontPage ? get_bloginfo('description') : ''),
             'url' => (string) (wp_get_canonical_url($postId) ?: get_permalink($postId)),
             'og_type' => $isPost ? 'article' : 'website',
             'image_id' => self::ogImageId($postId) ?: (int) get_post_thumbnail_id($postId),
