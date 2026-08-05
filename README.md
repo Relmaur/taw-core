@@ -347,6 +347,8 @@ Dev mode detection: connects to the dev server host:port (default `localhost:517
 
 **Hot-file convention (optional but recommended):** have the theme's `vite.config.js` write the dev server's actual URL to `dist/hot` or `public/build/hot` on startup and delete it on shutdown (Laravel Vite plugin-style). `ViteLoader` reads this to resolve the correct host:port before probing — this matters if the dev server ever binds a non-default port. Without a hot file, `ViteLoader` falls back to the hardcoded default (`localhost:5173`).
 
+**Optimizer-exclusion hardening:** every module `<script>` tag (plus its `modulepreload`/`preload` `<link>`s) and every Vite-extracted stylesheet `<link>` carries `data-no-optimize="1" data-cfasync="false" data-no-defer="1" data-no-minify="1"` — standard exclusion signals WP Rocket, Autoptimize, Perfmatters, and LiteSpeed Cache all document and honor when they hook WordPress's own `script_loader_tag`/`style_loader_tag` filters. Vite's output is already minified, hashed, and (for JS) split into ES modules requiring exact, un-mangled execution order — nothing a generic optimizer does to it is safe. **This does not help against a tool that rewrites the raw HTML output buffer directly instead of hooking those filters** — e.g. a host-side CDN-rehosting feature — that class of tool needs its own exclusion-list configuration in its own admin UI regardless; see `taw-theme`'s `AGENTS.md` "Vite Integration" section for a real incident (WPMUdev Hummingbird) this doesn't cover.
+
 ```php
 use TAW\Support\ViteLoader;
 

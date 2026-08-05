@@ -55,6 +55,35 @@ class ViteLoader
      */
     public static array $moduleHandles = [];
 
+    /**
+     * Tracks every style handle registered from Vite-extracted CSS so the
+     * style_loader_tag filter can add the same optimizer-exclusion
+     * attributes to exactly those <link> tags — see OPTIMIZER_EXCLUSION_ATTRS.
+     *
+     * @var string[]
+     */
+    public static array $styleHandles = [];
+
+    /**
+     * Standard exclusion signals WP Rocket, Autoptimize, Perfmatters, and
+     * LiteSpeed Cache all document and honor when they hook WordPress's own
+     * enqueue/tag filters — tells any optimizer playing by those rules to
+     * leave Vite's already-minified, hashed, dependency-ordered output
+     * alone. Applied to every module script, its preload/modulepreload
+     * tags, and every Vite-extracted stylesheet.
+     *
+     * Doesn't help against a tool that rewrites the raw HTML output buffer
+     * directly instead of hooking WordPress's filters — a real incident:
+     * WPMUdev Hummingbird CDN-rehosted a client site's entry bundle
+     * cross-origin with no CORS support, hard-failing the whole ES module
+     * silently (Alpine.js and all core init never ran, zero visible page
+     * errors). That class of tool needs its own exclusion-list
+     * configuration in its own admin UI regardless — no marker on the tag
+     * itself can prevent it. See taw-theme's AGENTS.md "Vite Integration"
+     * section for the full incident writeup.
+     */
+    private const OPTIMIZER_EXCLUSION_ATTRS = ' data-no-optimize="1" data-cfasync="false" data-no-defer="1" data-no-minify="1"';
+
     // ── Boot ───────────────────────────────────────────────────────────────
 
     /**
@@ -81,6 +110,7 @@ class ViteLoader
 
         add_action('wp_head', [self::class, 'preloadAssets'], 2);
         add_filter('script_loader_tag', [self::class, 'addModuleType'], 10, 3);
+        add_filter('style_loader_tag', [self::class, 'addStyleExclusionAttrs'], 10, 2);
 
         // Output [x-cloak] as an inline rule at the very top of <head> so
         // Alpine-cloaked elements (mobile drawers, overlays) are never visible
@@ -152,6 +182,7 @@ class ViteLoader
         foreach ($css_urls as $i => $url) {
             $handle = $i === 0 ? 'theme-app-style' : 'theme-app-style-' . $i;
             wp_register_style($handle, $url, [], null);
+            self::$styleHandles[] = $handle;
             wp_enqueue_style($handle);
         }
 
@@ -493,6 +524,7 @@ class ViteLoader
             foreach ($entry['css'] as $index => $css_file) {
                 $style_handle = $index === 0 ? $handle . '-style' : $handle . '-style-' . $index;
                 wp_register_style($style_handle, Framework::themeUrl($dist . '/' . $css_file));
+                self::$styleHandles[] = $style_handle;
 
                 if ($enqueue) {
                     wp_enqueue_style($style_handle);
@@ -532,9 +564,9 @@ class ViteLoader
             $preloaded[$url] = true;
 
             if ($type === 'module') {
-                printf('<link rel="modulepreload" href="%s">' . "\n", esc_url($url));
+                printf('<link rel="modulepreload" href="%s"%s>' . "\n", esc_url($url), self::OPTIMIZER_EXCLUSION_ATTRS);
             } else {
-                printf('<link rel="preload" href="%s" as="%s">' . "\n", esc_url($url), esc_attr($type));
+                printf('<link rel="preload" href="%s" as="%s"%s>' . "\n", esc_url($url), esc_attr($type), self::OPTIMIZER_EXCLUSION_ATTRS);
             }
         };
 
@@ -583,17 +615,36 @@ class ViteLoader
     // ── script_loader_tag filter ───────────────────────────────────────────
 
     /**
-     * Add type="module" to every script handle registered as an ES module.
+     * Add type="module" to every script handle registered as an ES module,
+     * plus OPTIMIZER_EXCLUSION_ATTRS so third-party JS optimizers that hook
+     * this same filter leave the tag alone.
      *
      * Hooked to script_loader_tag at priority 10 by init().
      */
     public static function addModuleType(string $tag, string $handle, string $src): string
     {
         if (in_array($handle, self::$moduleHandles, true)) {
-            return '<script type="module" src="' . esc_url($src) . '"></script>' . "\n";
+            return '<script type="module" src="' . esc_url($src) . '"' . self::OPTIMIZER_EXCLUSION_ATTRS . '></script>' . "\n";
         }
 
         return $tag;
+    }
+
+    /**
+     * Add OPTIMIZER_EXCLUSION_ATTRS to every <link> tag for a style handle
+     * registered from Vite-extracted CSS (see $styleHandles) — Vite's CSS
+     * output is already minified and hashed; there's no legitimate reason
+     * for a caching/optimization plugin to touch it further.
+     *
+     * Hooked to style_loader_tag at priority 10 by init().
+     */
+    public static function addStyleExclusionAttrs(string $tag, string $handle): string
+    {
+        if (!in_array($handle, self::$styleHandles, true)) {
+            return $tag;
+        }
+
+        return str_replace('<link ', '<link' . self::OPTIMIZER_EXCLUSION_ATTRS . ' ', $tag);
     }
 
     // ── Utility helpers ────────────────────────────────────────────────────

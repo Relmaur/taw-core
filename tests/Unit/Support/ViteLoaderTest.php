@@ -41,6 +41,13 @@ final class ViteLoaderTest extends TestCase
         @mkdir($this->themeDir . '/public/build', 0777, true);
 
         Functions\when('get_template_directory')->justReturn($this->themeDir);
+
+        // Both static handle-tracking arrays persist across tests in the
+        // same process (they're populated by real enqueue calls, not reset
+        // per-request in production) — reset here so one test's tracked
+        // handles can't leak into another's assertions.
+        ViteLoader::$moduleHandles = [];
+        ViteLoader::$styleHandles = [];
     }
 
     protected function tearDown(): void
@@ -171,6 +178,103 @@ final class ViteLoaderTest extends TestCase
         );
 
         @unlink($manifestPath);
+    }
+
+    /**
+     * Regression coverage for the optimizer-exclusion hardening added after
+     * a real production incident: WPMUdev Hummingbird CDN-rehosted a client
+     * site's entry bundle cross-origin with no CORS support, hard-failing
+     * the ES module silently. These markers (data-no-optimize etc.) are
+     * honored by plugins that hook WordPress's normal enqueue/tag filters
+     * (WP Rocket, Autoptimize, Perfmatters, LiteSpeed Cache) — they don't
+     * help against a tool rewriting the raw HTML buffer directly (that
+     * needs manual exclusion-list configuration regardless), but every
+     * plugin playing by WordPress's rules should see them.
+     */
+    public function test_add_module_type_appends_optimizer_exclusion_attrs_for_a_tracked_handle(): void
+    {
+        Functions\when('esc_url')->returnArg();
+        ViteLoader::$moduleHandles = ['theme-app'];
+
+        $tag = ViteLoader::addModuleType('<script src="app.js"></script>', 'theme-app', 'https://example.test/app.js');
+
+        $this->assertStringContainsString('type="module"', $tag);
+        $this->assertStringContainsString('data-no-optimize="1"', $tag);
+        $this->assertStringContainsString('data-cfasync="false"', $tag);
+        $this->assertStringContainsString('data-no-defer="1"', $tag);
+        $this->assertStringContainsString('data-no-minify="1"', $tag);
+    }
+
+    public function test_add_module_type_leaves_untracked_handles_untouched(): void
+    {
+        ViteLoader::$moduleHandles = ['theme-app'];
+
+        $original = '<script src="jquery.js"></script>';
+        $tag = ViteLoader::addModuleType($original, 'jquery', 'https://example.test/jquery.js');
+
+        $this->assertSame($original, $tag);
+    }
+
+    public function test_add_style_exclusion_attrs_appends_markers_for_a_tracked_handle(): void
+    {
+        ViteLoader::$styleHandles = ['theme-app-style'];
+
+        $tag = ViteLoader::addStyleExclusionAttrs(
+            "<link rel='stylesheet' id='theme-app-style-css' href='https://example.test/app.css' media='all' />\n",
+            'theme-app-style'
+        );
+
+        $this->assertStringContainsString('data-no-optimize="1"', $tag);
+        $this->assertStringContainsString('data-cfasync="false"', $tag);
+        $this->assertStringContainsString('data-no-defer="1"', $tag);
+        $this->assertStringContainsString('data-no-minify="1"', $tag);
+        // The original tag content (handle, href, media) must survive —
+        // this filter only inserts attributes, never rebuilds the tag.
+        $this->assertStringContainsString("href='https://example.test/app.css'", $tag);
+    }
+
+    public function test_add_style_exclusion_attrs_leaves_untracked_handles_untouched(): void
+    {
+        ViteLoader::$styleHandles = ['theme-app-style'];
+
+        $original = "<link rel='stylesheet' id='some-plugin-style-css' href='https://example.test/plugin.css' media='all' />\n";
+        $tag = ViteLoader::addStyleExclusionAttrs($original, 'some-plugin-style');
+
+        $this->assertSame($original, $tag);
+    }
+
+    #[RunInSeparateProcess]
+    public function test_preload_assets_include_optimizer_exclusion_attrs(): void
+    {
+        Functions\when('wp_cache_get')->justReturn(false);
+        Functions\when('wp_cache_set')->justReturn(true);
+        Functions\when('esc_url')->returnArg();
+        Functions\when('esc_attr')->returnArg();
+        Functions\when('get_template_directory_uri')->justReturn('https://example.test');
+
+        file_put_contents($this->themeDir . '/public/build/manifest.json', json_encode([
+            'resources/js/app.js' => [
+                'file' => 'assets/app-HASH.js',
+                'isEntry' => true,
+                'css' => ['assets/app-HASH.css'],
+            ],
+        ]));
+
+        ViteLoader::$moduleHandles = ['theme-app'];
+
+        ob_start();
+        ViteLoader::preloadAssets();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('rel="modulepreload"', $output);
+        $this->assertStringContainsString('rel="preload"', $output);
+        $this->assertSame(
+            2,
+            substr_count($output, 'data-no-optimize="1"'),
+            'Both the modulepreload and preload tags must carry the exclusion attrs.'
+        );
+
+        @unlink($this->themeDir . '/public/build/manifest.json');
     }
 
     /**
