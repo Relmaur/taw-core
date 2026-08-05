@@ -192,7 +192,7 @@ new Metabox([
 | `datepicker` | jQuery UI; stored as date string; `date_format`, `min_date`, `max_date` |
 | `icon` | Lucide icon picker; stores icon name — **opt-in**, requires `Lucide::enable()` (see [Icon System](#icon-system)) |
 
-All fields accept: `id`, `label`, `description`, `placeholder`, `default`, `required`, `width` (%).
+All fields accept: `id`, `label`, `description`, `placeholder`, `default`, `required`, `width` (%), `readonly` (see [Readonly Fields](#readonly-fields)).
 
 ### Tabs
 
@@ -236,6 +236,26 @@ Repeater data is JSON; survives WordPress's `wp_unslash()` in `update_post_meta(
 $value = Metabox::get($post_id, 'field_id');
 $rows  = json_decode(Metabox::get($post_id, 'team'), true); // repeater
 ```
+
+### Readonly Fields
+
+Set `'readonly' => true` on any field whose value is authoritatively written by something other than the wp-admin form — an external sync pipeline, a computed value, etc. — so the metabox stops implying it's editable there:
+
+```php
+['id' => 'case_client', 'label' => 'Client', 'type' => 'text', 'readonly' => true],
+```
+
+Renders as plain, non-interactive text (no `<input>`) instead of an editable control. This is enforced on both ends:
+
+- **Render:** no form control is printed, so there's nothing for devtools to re-enable and submit.
+- **Save:** `readonly` fields are skipped entirely in `save()` — a forged `$_POST` key is ignored regardless of what the rendered markup looked like.
+
+`readonly` composes with the other field types rather than being one itself:
+
+- On a `group` field, it propagates to every sub-field.
+- On a `repeater` field, it disables Add/Remove/reorder for the whole row list (not just the sub-field values) and propagates `readonly` to every sub-field — a synced list whose *membership* can still be edited would be just as misleading as an editable input. A `readonly` sub-field inside an otherwise-editable repeater is also supported and enforced per-row.
+
+Not currently enforced by `TAW\Core\Rest\VisualEditorEndpoint` or the `fields:set`/`seo:inject` CLI commands — those are separate write paths (see [CLI](#cli)) and don't consult this flag yet.
 
 ### Conditional Fields
 

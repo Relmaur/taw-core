@@ -121,6 +121,50 @@ div[id*="taw_"] .postbox-header h2.hndle:has(img) {
   opacity: 0.75;
 }
 
+/* ---- Readonly / presentational fields ---- */
+
+.taw-readonly-field {
+  background: #f0f0f1;
+  border-radius: 4px;
+  padding: 0.5rem 0.7rem;
+  min-height: 1.5em;
+  line-height: 1.5;
+  color: #3c434a;
+}
+
+.taw-readonly-field .taw-readonly-empty {
+  color: #8c8f94;
+  font-style: italic;
+}
+
+.taw-readonly-field .taw-readonly-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  vertical-align: middle;
+  margin-right: 0.4em;
+}
+
+.taw-readonly-field .taw-readonly-image {
+  max-width: 200px;
+  height: auto;
+  display: block;
+  border: 1px solid #ddd;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+/* A readonly repeater keeps its row list visible but non-editable —
+   the drag handle has no add/remove counterpart to style against
+   ([disabled] already covers the Add/Remove buttons), so it's dimmed here. */
+.taw-repeater[data-readonly="1"] .taw-repeater-row-drag {
+  opacity: 0.15;
+  cursor: default;
+  pointer-events: none;
+}
+
 .taw-toggle {
   position: relative;
   display: inline-block;
@@ -500,6 +544,12 @@ div[id*="taw_"] .postbox-header h2.hndle:has(img) {
 
 .taw-repeater-row-remove:hover {
   color: #b32d2e;
+}
+
+.taw-repeater-row-remove[disabled] {
+  opacity: 0.2;
+  cursor: not-allowed;
+  color: inherit;
 }
 
 .taw-repeater-row-content {

@@ -1408,6 +1408,7 @@ class Metabox
                         }
                         var max = parseInt($repeater.data('max'), 10) || 0;
                         var min = parseInt($repeater.data('min'), 10) || 0;
+                        var isReadonly = $repeater.data('readonly') === 1;
 
                         // Each repeater has its own placeholder (e.g. __TAWRPT__taw_outer__)
                         // so nested repeater templates are never corrupted by the outer replace.
@@ -1436,20 +1437,22 @@ class Metabox
                                 var $row = $(this);
                                 var $tab = $('<button type="button" class="taw-repeater-tab">');
                                 $tab.append('<span class="taw-repeater-tab-label">#' + (i + 1) + '</span>');
-                                var $x = $('<span class="taw-repeater-tab-remove" title="Remove">&times;</span>');
-                                $x.on('click', function(e) {
-                                    e.stopPropagation();
-                                    var count = $rows.children('.taw-repeater-row').length;
-                                    if (min > 0 && count <= min) return;
-                                    $row.remove();
-                                    var newCount = $rows.children('.taw-repeater-row').length;
-                                    var newActive = Math.min(activeTabIndex, Math.max(0, newCount - 1));
-                                    rebuildTabs();
-                                    if (newCount > 0) setActiveTab(newActive);
-                                    updateButtonState();
-                                    serialize();
-                                });
-                                $tab.append($x);
+                                if (!isReadonly) {
+                                    var $x = $('<span class="taw-repeater-tab-remove" title="Remove">&times;</span>');
+                                    $x.on('click', function(e) {
+                                        e.stopPropagation();
+                                        var count = $rows.children('.taw-repeater-row').length;
+                                        if (min > 0 && count <= min) return;
+                                        $row.remove();
+                                        var newCount = $rows.children('.taw-repeater-row').length;
+                                        var newActive = Math.min(activeTabIndex, Math.max(0, newCount - 1));
+                                        rebuildTabs();
+                                        if (newCount > 0) setActiveTab(newActive);
+                                        updateButtonState();
+                                        serialize();
+                                    });
+                                    $tab.append($x);
+                                }
                                 $tab.on('click', function() { setActiveTab(i); });
                                 $tab.insertBefore($tabNav.children('.taw-repeater-tab-add'));
                             });
@@ -1485,6 +1488,7 @@ class Metabox
                         // --- Add Row ---
 
                         $addBtn.on('click', function() {
+                            if (isReadonly) return;
                             if (max > 0 && $rows.children('.taw-repeater-row').length >= max) {
                                 return;
                             }
@@ -1513,7 +1517,7 @@ class Metabox
                         // --- Remove Row (accordion mode only; tabbed uses tab × button) ---
 
                         $rows.on('click', '.taw-repeater-row-remove', function(e) {
-                            if (isTabbed) return;
+                            if (isTabbed || isReadonly) return;
                             e.preventDefault();
                             var $row = $(this).closest('.taw-repeater-row');
                             var count = $rows.children('.taw-repeater-row').length;
@@ -1541,7 +1545,7 @@ class Metabox
 
                         // --- Sortable (accordion mode only) ---
 
-                        if (!isTabbed) {
+                        if (!isTabbed && !isReadonly) {
                             $rows.sortable({
                                 handle: '.taw-repeater-row-drag',
                                 axis: 'y',
@@ -1593,7 +1597,7 @@ class Metabox
 
                         function updateButtonState() {
                             var count = $rows.children('.taw-repeater-row').length;
-                            $addBtn.prop('disabled', max > 0 && count >= max);
+                            $addBtn.prop('disabled', isReadonly || (max > 0 && count >= max));
                         }
 
                         // --- Serialize all rows into the hidden input ---
@@ -1831,6 +1835,15 @@ class Metabox
         $type        = $field['type'] ?? 'text';
         $placeholder = $field['placeholder'] ?? '';
         $tabs  = $field['tabs'] ?? null;
+
+        // Readonly fields render as non-interactive text instead of an <input> —
+        // group/repeater are excluded here because they propagate readonly onto
+        // their sub-fields instead (see their case blocks below), preserving
+        // their own wrapper markup.
+        if (!empty($field['readonly']) && !in_array($type, ['group', 'repeater'], true)) {
+            $this->render_readonly_field($field, $value);
+            return;
+        }
 
         switch ($type) {
 
@@ -2105,6 +2118,12 @@ class Metabox
             /* ---- MARK: Group ---- */
             case 'group':
                 $group_fields = $field['fields'] ?? [];
+                if (!empty($field['readonly'])) {
+                    $group_fields = array_map(static function (array $gf) {
+                        $gf['readonly'] = true;
+                        return $gf;
+                    }, $group_fields);
+                }
                 $this->render_group($group_fields, $field_id, $post_id);
                 break;
 
@@ -2177,6 +2196,19 @@ class Metabox
                 $min_rows    = $field['min'] ?? 0;
                 $button_label = $field['button_label'] ?? __('Add Row', 'taw-theme');
                 $layout      = $field['layout'] ?? '';  // '', 'tabbed_horizontal', 'tabbed_vertical'
+                $is_readonly = !empty($field['readonly']);
+
+                // Readonly repeaters lock the whole row list — add/remove/reorder are
+                // disabled (not just each sub-field's value), since a synced list whose
+                // membership can still be edited would be just as misleading as an
+                // editable input. Sub-fields render read-only via the same propagation
+                // used for 'group' above.
+                if ($is_readonly) {
+                    $sub_fields = array_map(static function (array $sf) {
+                        $sf['readonly'] = true;
+                        return $sf;
+                    }, $sub_fields);
+                }
 
                 // $value may arrive as a PHP array when this is a nested repeater
                 // (the parent sanitize_repeater stores nested rows as decoded arrays
@@ -2197,6 +2229,7 @@ class Metabox
                     data-placeholder="<?php echo esc_attr($tpl_placeholder); ?>"
                     data-max="<?php echo intval($max_rows); ?>"
                     data-min="<?php echo intval($min_rows); ?>"
+                    data-readonly="<?php echo $is_readonly ? '1' : '0'; ?>"
                     <?php if ($layout): ?>data-layout="<?php echo esc_attr($layout); ?>"<?php endif; ?>>
 
                     <?php // Hidden input holds the serialized JSON value
@@ -2211,13 +2244,13 @@ class Metabox
                     ?>
                     <div class="taw-repeater-rows">
                         <?php foreach ($rows as $row_index => $row_data):
-                            $this->render_repeater_row($sub_fields, $field_id, $row_index, $row_data, $post_id);
+                            $this->render_repeater_row($sub_fields, $field_id, $row_index, $row_data, $post_id, $is_readonly);
                         endforeach; ?>
                     </div>
 
                     <?php // "Add Row" button
                     ?>
-                    <button type="button" class="button taw-repeater-add">
+                    <button type="button" class="button taw-repeater-add" <?php disabled($is_readonly); ?>>
                         <?php echo esc_html($button_label); ?>
                     </button>
 
@@ -2227,11 +2260,110 @@ class Metabox
                     // a nested </template> never prematurely closes the outer one.
                     ?>
                     <template class="taw-repeater-template">
-                        <?php $this->render_repeater_row($sub_fields, $field_id, $tpl_placeholder, [], $post_id); ?>
+                        <?php $this->render_repeater_row($sub_fields, $field_id, $tpl_placeholder, [], $post_id, $is_readonly); ?>
                     </template>
                 </div>
             <?php
                 break;
+        }
+    }
+
+    /**
+     * Render a `readonly` field as non-interactive markup instead of an
+     * `<input>`/`<select>`/`<textarea>`.
+     *
+     * Deliberately prints no form control at all (not a `disabled` input) —
+     * there is nothing for devtools to re-enable and submit. Server-side,
+     * save() skips readonly fields entirely regardless of what a tampered
+     * POST contains, so this is a presentation concern only.
+     *
+     * @param array<string, mixed> $field Field definition array.
+     * @param mixed                $value Current saved value.
+     * @return void
+     */
+    private function render_readonly_field(array $field, mixed $value): void
+    {
+        printf(
+            '<div class="taw-readonly-field">%s</div>',
+            $this->readonly_display_value($field, $value)
+        );
+    }
+
+    /**
+     * Format a field's current value as safe, human-readable markup for
+     * `render_readonly_field()`. Types that store an opaque ID or JSON blob
+     * (image, files, post_select, select, checkbox) are resolved to something
+     * legible rather than dumping the raw stored value.
+     *
+     * @param array<string, mixed> $field Field definition array.
+     * @param mixed                $value Current saved value.
+     * @return string Pre-escaped HTML.
+     */
+    private function readonly_display_value(array $field, mixed $value): string
+    {
+        $empty = '<span class="taw-readonly-empty">' . esc_html__('Empty', 'taw-theme') . '</span>';
+        $type  = $field['type'] ?? 'text';
+
+        switch ($type) {
+            case 'checkbox':
+                return $value === '1'
+                    ? esc_html__('Yes', 'taw-theme')
+                    : esc_html__('No', 'taw-theme');
+
+            case 'select':
+                $options = $field['options'] ?? [];
+                return $value !== '' && $value !== null
+                    ? esc_html((string) ($options[$value] ?? $value))
+                    : $empty;
+
+            case 'color':
+                if (!$value) {
+                    return $empty;
+                }
+                return sprintf(
+                    '<span class="taw-readonly-swatch" style="background:%1$s"></span>%1$s',
+                    esc_html($value)
+                );
+
+            case 'image':
+                $url = $value ? wp_get_attachment_url(absint($value)) : '';
+                return $url
+                    ? sprintf('<img src="%s" alt="" class="taw-readonly-image">', esc_url($url))
+                    : '<span class="taw-readonly-empty">' . esc_html__('No image', 'taw-theme') . '</span>';
+
+            case 'wysiwyg':
+                return $value !== '' && $value !== null ? wp_kses_post((string) $value) : $empty;
+
+            case 'post_select':
+                $multiple = !empty($field['multiple']);
+                $ids = $multiple
+                    ? (json_decode((string) $value, true) ?: [])
+                    : ($value ? [$value] : []);
+                if (!is_array($ids) || empty($ids)) {
+                    return '<span class="taw-readonly-empty">' . esc_html__('None selected', 'taw-theme') . '</span>';
+                }
+                $titles = array_map(
+                    static fn($id) => get_the_title(absint($id)) ?: ('#' . absint($id)),
+                    $ids
+                );
+                return esc_html(implode(', ', $titles));
+
+            case 'files':
+                $ids = json_decode((string) $value, true);
+                if (!is_array($ids) || empty($ids)) {
+                    return '<span class="taw-readonly-empty">' . esc_html__('No files', 'taw-theme') . '</span>';
+                }
+                $names = array_map(static function ($id) {
+                    $id  = absint($id);
+                    return get_the_title($id) ?: basename((string) wp_get_attachment_url($id));
+                }, $ids);
+                return esc_html(implode(', ', $names));
+
+            case 'textarea':
+                return $value !== '' && $value !== null ? nl2br(esc_html((string) $value)) : $empty;
+
+            default:
+                return $value !== '' && $value !== null ? esc_html((string) $value) : $empty;
         }
     }
 
@@ -2347,7 +2479,7 @@ class Metabox
      * Render a single repeater row.
      * Used both for saved rows (with data) and the template row (empty).
      */
-    private function render_repeater_row(array $sub_fields, string $field_id, int|string $index, array $row_data, ?int $post_id): void
+    private function render_repeater_row(array $sub_fields, string $field_id, int|string $index, array $row_data, ?int $post_id, bool $is_readonly = false): void
     {
         // IDs of sub-fields local to this row — used by build_conditions_expression to route
         // sibling references to rowFields[id] vs. outer-scope references to fields[prefixed_id].
@@ -2366,7 +2498,7 @@ class Metabox
                     <?php echo esc_html('#' . (is_int($index) ? $index + 1 : '')); ?>
                 </span>
                 <button type="button" class="taw-repeater-row-toggle" title="<?php esc_attr_e('Collapse', 'taw-theme'); ?>">▾</button>
-                <button type="button" class="taw-repeater-row-remove" title="<?php esc_attr_e('Remove row', 'taw-theme'); ?>">&times;</button>
+                <button type="button" class="taw-repeater-row-remove" title="<?php esc_attr_e('Remove row', 'taw-theme'); ?>" <?php disabled($is_readonly); ?>>&times;</button>
             </div>
             <div class="taw-repeater-row-content">
                 <div class="fields-container"
@@ -2498,6 +2630,16 @@ class Metabox
 
             $field_id = $this->prefix . $field['id'];
 
+            // ── Readonly fields ──────────────────────────
+            //
+            // A readonly field's POSTed value is never trusted, even if a
+            // client-side `disabled` attribute was stripped via devtools —
+            // skip it entirely and leave whatever is already stored in place.
+
+            if (!empty($field['readonly'])) {
+                continue;
+            }
+
             // ── Conditional fields ──────────────────────────
 
             if (!empty($field['conditions']) && !$this->evaluate_conditions($field['conditions'])) {
@@ -2512,6 +2654,10 @@ class Metabox
             if (($field['type'] ?? '') === 'group') {
                 $group_fields = $field['fields'] ?? [];
                 foreach ($group_fields as $group_field) {
+                    if (!empty($group_field['readonly'])) {
+                        continue;
+                    }
+
                     $group_field_id = $field_id . '_' . $group_field['id'];
                     $raw_value = $_POST[$group_field_id] ?? '';
 
@@ -2776,6 +2922,10 @@ class Metabox
                 // Only allow known sub-field keys
                 if (!isset($field_map[$key])) continue;
 
+                // A readonly sub-field is never written from POST, even if a
+                // fabricated key/value made it into the submitted JSON blob.
+                if (!empty($field_map[$key]['readonly'])) continue;
+
                 $cleaned = $this->sanitize_field($field_map[$key], $val);
 
                 // Nested repeaters: store as a decoded PHP array rather than a JSON
@@ -2845,6 +2995,13 @@ class Metabox
      */
     private function validate_field(array $field, mixed $value): true|string
     {
+        // Readonly fields are never saved from POST (see save()), so there's
+        // nothing meaningful to validate — a stale/absent submitted value
+        // should never block saving the rest of the metabox.
+        if (!empty($field['readonly'])) {
+            return true;
+        }
+
         $label = $field['label'] ?? $field['id'];
 
         // Required check
