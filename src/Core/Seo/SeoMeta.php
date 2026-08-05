@@ -53,6 +53,23 @@ final class SeoMeta
     private const YOAST_OG_IMAGE_ID_KEY = '_yoast_wpseo_opengraph-image-id';
     private const YOAST_OG_IMAGE_URL_KEY = '_yoast_wpseo_opengraph-image';
 
+    /**
+     * Option field (on Schema's "SEO Schema" settings page — see its own
+     * registerOptions()) letting a site owner override auto-detection
+     * explicitly. Exists because auto-detection is fundamentally
+     * best-effort for anything without a stable version constant — a real
+     * production site running SmartCrawl (WPMU DEV) produced simultaneous
+     * TAW + SmartCrawl output (duplicate canonical/og:title/JSON-LD)
+     * because WPMU_DEV_SITE_ID wasn't defined for that install, exactly
+     * the failure mode isSeoPluginActive()'s own comment already warned
+     * was possible. 'auto' preserves today's detection-based behavior.
+     */
+    public const OUTPUT_MODE_FIELD = 'seo_output_mode';
+
+    private const OUTPUT_MODE_AUTO = 'auto';
+    private const OUTPUT_MODE_FORCE_ON = 'force_on';
+    private const OUTPUT_MODE_FORCE_OFF = 'force_off';
+
     public function __construct()
     {
         if (!self::isSeoPluginActive()) {
@@ -73,12 +90,39 @@ final class SeoMeta
      * this class and the seo:extract/seo:inject CLI commands); RankMath
      * and SmartCrawl are detected only to stand TAW's own UI/output down,
      * not to write their meta.
+     *
+     * Checks the manual OUTPUT_MODE_FIELD override first — 'force_on'/
+     * 'force_off' bypass detection entirely, since it's inherently
+     * unreliable for plugins with no stable version constant. Only
+     * 'auto' (the default) falls through to the heuristic below.
      */
     public static function isSeoPluginActive(): bool
     {
+        $mode = self::outputMode();
+        if ($mode === self::OUTPUT_MODE_FORCE_ON) {
+            return false;
+        }
+        if ($mode === self::OUTPUT_MODE_FORCE_OFF) {
+            return true;
+        }
+
         return self::isYoastActive()
             || defined('RANK_MATH_VERSION')
             || defined('WPMU_DEV_SITE_ID'); // SmartCrawl's own detection is unreliable across versions; this is a best-effort signal, not authoritative.
+    }
+
+    /**
+     * Resolves OUTPUT_MODE_FIELD to one of the three known values,
+     * defaulting to 'auto' for an unset or corrupted option value rather
+     * than trusting whatever's stored.
+     */
+    public static function outputMode(): string
+    {
+        $mode = (string) OptionsPage::get(self::OUTPUT_MODE_FIELD, '_taw_', self::OUTPUT_MODE_AUTO);
+
+        return in_array($mode, [self::OUTPUT_MODE_AUTO, self::OUTPUT_MODE_FORCE_ON, self::OUTPUT_MODE_FORCE_OFF], true)
+            ? $mode
+            : self::OUTPUT_MODE_AUTO;
     }
 
     public static function isYoastActive(): bool

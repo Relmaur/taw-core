@@ -22,12 +22,14 @@ if (!defined('ABSPATH')) {
  * the graph during template rendering (see push()) — e.g. the FAQ block's
  * FAQPage node, built via the faqPage() helper below.
  *
- * Stands down entirely — no settings page, no output — whenever
- * SeoMeta::isSeoPluginActive() is true. Yoast/RankMath/etc. already emit
- * their own Organization/WebSite/Article/Breadcrumb schema from their own
- * settings; duplicating either the admin UI or the graph itself would
- * produce conflicting/duplicate structured data, the same failure mode
- * SeoMeta's own docblock describes for <head> tags.
+ * The settings page always registers — it's this class's home for
+ * SeoMeta::OUTPUT_MODE_FIELD, the manual override for auto-detection
+ * (see that constant's own docblock), so it has to stay reachable even
+ * when isSeoPluginActive() currently says a plugin is active. Only the
+ * actual JSON-LD *render* stands down whenever that's true — duplicating
+ * Yoast/RankMath/etc.'s own Organization/WebSite/Article/Breadcrumb
+ * schema would produce conflicting/duplicate structured data, the same
+ * failure mode SeoMeta's own docblock describes for <head> tags.
  *
  * Rendered on wp_footer (not wp_head) deliberately: JSON-LD doesn't need
  * to live in <head> for any crawler that matters, and blocks (which push
@@ -43,12 +45,11 @@ final class Schema
 
     public function __construct()
     {
-        if (SeoMeta::isSeoPluginActive()) {
-            return;
-        }
-
         add_action('init', [$this, 'registerOptions']);
-        add_action('wp_footer', [$this, 'render'], 99);
+
+        if (!SeoMeta::isSeoPluginActive()) {
+            add_action('wp_footer', [$this, 'render'], 99);
+        }
     }
 
     /**
@@ -113,6 +114,18 @@ final class Schema
             'menu_title' => __('SEO Schema', 'taw-theme'),
             'icon' => 'dashicons-networking',
             'fields' => [
+                [
+                    'id' => SeoMeta::OUTPUT_MODE_FIELD,
+                    'label' => __('SEO Output', 'taw-theme'),
+                    'type' => 'select',
+                    'options' => [
+                        'auto' => __('Automatic — detect Yoast/RankMath/SmartCrawl and stand down if one is active', 'taw-theme'),
+                        'force_on' => __("Always on — ignore detection, always use TAW's own SEO output", 'taw-theme'),
+                        'force_off' => __('Always off — defer entirely to another SEO plugin', 'taw-theme'),
+                    ],
+                    'default' => 'auto',
+                    'description' => __('Automatic detection can be unreliable for plugins with no stable version constant (e.g. some SmartCrawl installs) — this overrides it explicitly. Controls SeoMeta\'s <title>/meta/OG tags and this page\'s JSON-LD together.', 'taw-theme'),
+                ],
                 [
                     'id' => 'organization_type',
                     'label' => __('Organization Type', 'taw-theme'),

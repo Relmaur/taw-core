@@ -28,15 +28,22 @@ final class SeoMetaTest extends TestCase
     /** @var array<string, string> */
     private array $postMeta = [];
 
+    /** @var array<string, string> */
+    private array $options = [];
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->postMeta = [];
+        $this->options = [];
 
         Functions\when('add_action')->justReturn(true);
         Functions\when('add_filter')->justReturn(true);
         Functions\when('get_post_meta')->alias(
             fn (int $postId, string $key, bool $single = false) => $this->postMeta[$key] ?? ''
+        );
+        Functions\when('get_option')->alias(
+            fn (string $key, mixed $default = false) => $this->options[$key] ?? $default
         );
     }
 
@@ -143,6 +150,42 @@ final class SeoMetaTest extends TestCase
 
         $this->assertSame('Raw Post Title', $context['title']);
         $this->assertSame('', $context['description']);
+    }
+
+    public function test_output_mode_defaults_to_auto_when_unset(): void
+    {
+        $this->assertSame('auto', SeoMeta::outputMode());
+    }
+
+    public function test_output_mode_falls_back_to_auto_for_an_unrecognized_stored_value(): void
+    {
+        $this->options['_taw_seo_output_mode'] = 'not-a-real-mode';
+
+        $this->assertSame('auto', SeoMeta::outputMode());
+    }
+
+    public function test_is_seo_plugin_active_false_in_auto_mode_with_nothing_detected(): void
+    {
+        $this->assertFalse(SeoMeta::isSeoPluginActive());
+    }
+
+    /**
+     * The override that exists specifically because auto-detection failed
+     * for a real SmartCrawl install with no WPMU_DEV_SITE_ID defined —
+     * force_on/force_off must win regardless of what detection would say.
+     */
+    public function test_force_on_makes_is_seo_plugin_active_false_regardless_of_detection(): void
+    {
+        $this->options['_taw_seo_output_mode'] = 'force_on';
+
+        $this->assertFalse(SeoMeta::isSeoPluginActive());
+    }
+
+    public function test_force_off_makes_is_seo_plugin_active_true_even_with_nothing_detected(): void
+    {
+        $this->options['_taw_seo_output_mode'] = 'force_off';
+
+        $this->assertTrue(SeoMeta::isSeoPluginActive());
     }
 
     private function stubSingularContextCollaborators(string $postType, bool $isFrontPage): void

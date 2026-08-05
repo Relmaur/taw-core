@@ -67,4 +67,37 @@ final class SchemaTest extends TestCase
 
         $this->assertSame('Rich text answer.', $node['mainEntity'][0]['acceptedAnswer']['text']);
     }
+
+    /**
+     * The settings page (home of SeoMeta::OUTPUT_MODE_FIELD, the manual
+     * override for unreliable plugin auto-detection) must stay reachable
+     * even when a plugin is currently detected as active — otherwise a
+     * site owner could never flip 'force_on' to correct a false negative.
+     * Only the JSON-LD render itself should stand down.
+     */
+    public function test_constructor_registers_options_but_not_render_when_seo_plugin_active(): void
+    {
+        Functions\when('get_option')->justReturn('force_off');
+
+        Functions\expect('add_action')
+            ->once()
+            ->with('init', \Mockery::type('array'));
+
+        $this->assertInstanceOf(Schema::class, new Schema());
+    }
+
+    public function test_constructor_registers_options_and_render_when_no_seo_plugin_active(): void
+    {
+        Functions\when('get_option')->justReturn('force_on');
+
+        Functions\expect('add_action')
+            ->once()
+            ->with('init', \Mockery::type('array'));
+
+        Functions\expect('add_action')
+            ->once()
+            ->with('wp_footer', \Mockery::type('array'), 99);
+
+        $this->assertInstanceOf(Schema::class, new Schema());
+    }
 }

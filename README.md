@@ -885,10 +885,17 @@ TAW has never owned meta title/description/social image natively — every real 
 - **Yoast active** (`defined('WPSEO_VERSION')`): TAW's own metabox and all of the above output stand down entirely — Yoast already owns it, and duplicating any of it would split/duplicate SEO signal. `SeoMeta::write()` and the `seo:extract`/`seo:inject` CLI commands read and write Yoast's own meta keys (`_yoast_wpseo_title`, `_yoast_wpseo_metadesc`, `_yoast_wpseo_opengraph-image-id`) directly in this case, so an agent-driven rewrite still lands somewhere the site owner's existing Yoast UI reflects it.
 - **A different plugin active** (RankMath, SmartCrawl): detected only far enough to stand TAW's own UI/output down (avoiding duplicates) — not to write its meta. `SeoMeta::targetMetaKeys()['source']` reports `'unsupported'` in this case; `seo:inject` refuses any `seo_meta` write with a clear reason rather than guessing at that plugin's own key scheme.
 
+**Auto-detection can be wrong** — it relies on version constants (`WPSEO_VERSION`, `RANK_MATH_VERSION`, `WPMU_DEV_SITE_ID`) that aren't guaranteed to be defined by every install of every plugin; a real production site running SmartCrawl produced simultaneous TAW + SmartCrawl output (duplicate `og:title`/canonical/JSON-LD) because `WPMU_DEV_SITE_ID` wasn't defined for that particular install. `SeoMeta::OUTPUT_MODE_FIELD` (on `Schema`'s **SEO Schema** settings page, since that page always registers regardless of detection state — see below) lets a site owner override detection explicitly:
+
+- **Automatic** (default) — today's detection-based behavior.
+- **Always on** — ignore detection, TAW's own `<title>`/meta/OG/JSON-LD always render.
+- **Always off** — TAW stands down entirely, deferring to whatever plugin is actually installed.
+
 ```php
 use TAW\Core\Seo\SeoMeta;
 
-SeoMeta::isSeoPluginActive();      // true if Yoast, RankMath, or SmartCrawl is active
+SeoMeta::isSeoPluginActive();      // true if a plugin is detected active, OR the override forces it true
+SeoMeta::outputMode();             // 'auto' | 'force_on' | 'force_off' — the resolved OUTPUT_MODE_FIELD value
 SeoMeta::targetMetaKeys();         // ['source' => 'taw_native'|'yoast'|'unsupported', 'title_key' => ?string, 'description_key' => ?string]
 SeoMeta::metaTitle($postId);       // resolves from whichever store is currently authoritative
 SeoMeta::write($postId, $title, $description, $ogImageId);  // null = leave that field unchanged
@@ -896,9 +903,9 @@ SeoMeta::write($postId, $title, $description, $ogImageId);  // null = leave that
 
 ### `TAW\Core\Seo\Schema` — sitewide JSON-LD structured data
 
-Before this existed, TAW emitted zero `schema.org` structured data anywhere — the single largest gap for AI-search/GEO visibility, regardless of whether `SeoMeta`'s own tags were present. `Schema` (also wired into `Theme::boot()`, right after `SeoMeta`) mirrors the same plugin-detection stand-down: no settings page, no output, whenever `SeoMeta::isSeoPluginActive()` is true — Yoast/RankMath/etc. already emit their own Organization/WebSite/Article/Breadcrumb schema, and duplicating it would produce conflicting structured data.
+Before this existed, TAW emitted zero `schema.org` structured data anywhere — the single largest gap for AI-search/GEO visibility, regardless of whether `SeoMeta`'s own tags were present. `Schema` (also wired into `Theme::boot()`, right after `SeoMeta`) mirrors `SeoMeta`'s plugin-detection stand-down for its actual JSON-LD *output* — Yoast/RankMath/etc. already emit their own Organization/WebSite/Article/Breadcrumb schema, and duplicating it would produce conflicting structured data. The **SEO Schema** admin settings page itself always registers, regardless of detection state — see `SeoMeta::OUTPUT_MODE_FIELD` below for why.
 
-When no SEO plugin is active, it registers its own **SEO Schema** admin settings page (organization type, name, logo, phone, Twitter/X handle, and a repeater of social profile URLs feeding the `sameAs` entity signal) and renders one `<script type="application/ld+json">` per page on `wp_footer` — deliberately not `wp_head`, since blocks (which can contribute their own nodes) render in the body, after `wp_head` has already fired. The `@graph` always includes:
+When no SEO plugin is detected as active, it renders one `<script type="application/ld+json">` per page on `wp_footer` — deliberately not `wp_head`, since blocks (which can contribute their own nodes) render in the body, after `wp_head` has already fired. The **SEO Schema** page also holds organization type, name, logo, phone, Twitter/X handle, and a repeater of social profile URLs feeding the `sameAs` entity signal. The `@graph` always includes:
 
 - **Organization** (or **LocalBusiness**, if selected) — name/url/logo/telephone/`sameAs`.
 - **WebSite** — linked to the Organization node via `publisher`.
