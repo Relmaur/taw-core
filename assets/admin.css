@@ -123,6 +123,16 @@ div[id*="taw_"] .postbox-header h2.hndle:has(img) {
 
 /* ---- Readonly / presentational fields ---- */
 
+.taw-readonly-lock {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 1;
+  vertical-align: text-top;
+  color: #8c8f94;
+  cursor: help;
+}
+
 .taw-readonly-field {
   background: #f0f0f1;
   border-radius: 4px;

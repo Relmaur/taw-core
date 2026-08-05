@@ -245,7 +245,7 @@ Set `'readonly' => true` on any field whose value is authoritatively written by 
 ['id' => 'case_client', 'label' => 'Client', 'type' => 'text', 'readonly' => true],
 ```
 
-Renders as plain, non-interactive text (no `<input>`) instead of an editable control. This is enforced on both ends:
+Renders as plain, non-interactive text (no `<input>`) instead of an editable control, with a small lock icon next to the label (`title` tooltip: "Managed externally — read-only") so the intent is visible at a glance, not just on close inspection. This is enforced on both ends:
 
 - **Render:** no form control is printed, so there's nothing for devtools to re-enable and submit.
 - **Save:** `readonly` fields are skipped entirely in `save()` — a forged `$_POST` key is ignored regardless of what the rendered markup looked like.

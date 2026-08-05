@@ -1799,6 +1799,7 @@ class Metabox
                             <?php if (!empty($field['required'])): ?>
                                 <span class="taw-required">*</span>
                             <?php endif; ?>
+                            <?php $this->render_readonly_lock_icon($field); ?>
                         </label>
                         <?php $this->render_field($field, $field_id, $value, $post->ID); ?>
                     </div>
@@ -2281,6 +2282,29 @@ class Metabox
      * @param mixed                $value Current saved value.
      * @return void
      */
+    /**
+     * Print a small lock icon next to a readonly field's label.
+     *
+     * The muted, non-interactive control itself already signals "read-only"
+     * on close inspection, but a lock icon next to the label makes the
+     * "this is managed elsewhere" intent legible at a glance instead of only
+     * after a user tries to click into it.
+     *
+     * @param array<string, mixed> $field Field definition array.
+     * @return void
+     */
+    private function render_readonly_lock_icon(array $field): void
+    {
+        if (empty($field['readonly'])) {
+            return;
+        }
+
+        printf(
+            ' <span class="taw-readonly-lock dashicons dashicons-lock" title="%s" aria-hidden="true"></span>',
+            esc_attr__('Managed externally — read-only', 'taw-theme')
+        );
+    }
+
     private function render_readonly_field(array $field, mixed $value): void
     {
         printf(
@@ -2385,7 +2409,7 @@ class Metabox
             $field_id = $field_id_prefix . '_' . $field['id']; ?>
             <div class="field" style="--span: <?php echo esc_attr($field['width'] ?? '100'); ?>;">
                 <div class="field-and-label">
-                    <label for="<?php echo esc_attr($field_id); ?>" class="field-label"><?php echo esc_html($field['label'] ?? ''); ?></label>
+                    <label for="<?php echo esc_attr($field_id); ?>" class="field-label"><?php echo esc_html($field['label'] ?? ''); ?><?php $this->render_readonly_lock_icon($field); ?></label>
                     <?php
                     $value = $post_id ? get_post_meta($post_id, $field_id, true) : '';
                     $this->render_field($field, $field_id, $value, $post_id);
@@ -2459,7 +2483,7 @@ class Metabox
                             <div class="tab-field field" style="--span: <?php echo esc_attr((string) $width) ?>; <?php echo esc_attr($border); ?>">
 
                                 <div class="field-and-label">
-                                    <label for="<?php echo esc_attr($field_id); ?>" class="tab-field-label"><?php echo esc_html($label); ?></label>
+                                    <label for="<?php echo esc_attr($field_id); ?>" class="tab-field-label"><?php echo esc_html($label); ?><?php $this->render_readonly_lock_icon($field); ?></label>
                                     <?php $this->render_field($field, $field_id, $value, $post->ID); ?>
                                 </div>
 
@@ -2531,6 +2555,7 @@ class Metabox
                             <div class="field-and-label">
                                 <label class="field-label">
                                     <?php echo esc_html($sub_field['label'] ?? ''); ?>
+                                    <?php $this->render_readonly_lock_icon($sub_field); ?>
                                 </label>
                                 <?php
                                 // We render the sub-field using the SAME render_field()
