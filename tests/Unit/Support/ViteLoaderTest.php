@@ -278,6 +278,62 @@ final class ViteLoaderTest extends TestCase
     }
 
     /**
+     * Regression coverage for switching the main theme CSS bundle from a
+     * synchronous, render-blocking <link> to the same async media="print"
+     * swap already used for non-critical block CSS (BaseBlock::enqueueCssFile()).
+     * Safe now that critical.scss carries real hand-authored layout rules for
+     * the header/Hero/Button markup — before that this was deliberately
+     * render-blocking to avoid a flash of totally unstyled utility-first HTML.
+     */
+    #[RunInSeparateProcess]
+    public function test_theme_css_is_enqueued_async_with_a_noscript_fallback(): void
+    {
+        Functions\when('wp_cache_get')->justReturn(false);
+        Functions\when('wp_cache_set')->justReturn(true);
+        Functions\when('esc_url')->returnArg();
+        Functions\when('esc_attr')->returnArg();
+        Functions\when('get_template_directory_uri')->justReturn('https://example.test');
+        Functions\when('wp_enqueue_script')->justReturn(true);
+
+        $capturedWpHeadCallbacks = [];
+        Functions\when('add_action')->alias(
+            function (string $hook, callable $callback, int $priority = 10) use (&$capturedWpHeadCallbacks): bool {
+                if ($hook === 'wp_head') {
+                    $capturedWpHeadCallbacks[$priority][] = $callback;
+                }
+                return true;
+            }
+        );
+
+        file_put_contents($this->themeDir . '/public/build/manifest.json', json_encode([
+            'resources/js/app.js' => [
+                'file' => 'assets/app-HASH.js',
+                'isEntry' => true,
+                'css' => ['assets/app-HASH.css'],
+            ],
+        ]));
+
+        $ref = new \ReflectionMethod(ViteLoader::class, 'enqueueThemeAssets');
+        $ref->setAccessible(true);
+        $ref->invoke(null, 'resources/js/app.js');
+
+        $this->assertArrayHasKey(50, $capturedWpHeadCallbacks, 'CSS output must be scheduled on wp_head priority 50, matching BaseBlock non-critical CSS.');
+
+        ob_start();
+        foreach ($capturedWpHeadCallbacks[50] as $callback) {
+            $callback();
+        }
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('assets/app-HASH.css', $output);
+        $this->assertStringContainsString('media="print"', $output);
+        $this->assertStringContainsString('onload="this.media=\'all\'"', $output);
+        $this->assertStringContainsString('<noscript>', $output);
+
+        @unlink($this->themeDir . '/public/build/manifest.json');
+    }
+
+    /**
      * Starts a real PHP built-in server answering HTTP 200 to any request
      * (including GET /@vite/client) — a faithful stand-in for "a Vite dev
      * server is listening here," without depending on Vite/Node at all.

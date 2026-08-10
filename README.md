@@ -763,16 +763,55 @@ Icons are Lucide's raw `stroke="currentColor"` SVGs, so CSS/Tailwind text-color 
 use TAW\Support\Performance;
 
 Performance::configure([
-    'remove_bloat'       => true,   // Gutenberg/FSE CSS in non-block themes
-    'remove_emoji'       => true,   // ~20KB emoji detection scripts
-    'remove_meta_tags'   => true,   // generator, wlw, rsd tags
-    'preconnect_origins' => ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'],
-    'preload_fonts'      => [get_theme_file_uri('resources/fonts/Inter.woff2')],
-    'preload_images'     => [[$hero_id, 'full']],
+    'remove_bloat'               => true,   // Gutenberg/FSE CSS in non-block themes
+    'remove_emoji'               => true,   // ~20KB emoji detection scripts
+    'remove_meta_tags'           => true,   // generator, wlw, rsd tags
+    'preconnect_origins'         => ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'],
+    'preload_fonts'              => [get_theme_file_uri('resources/fonts/Inter.woff2')],
+    'preload_images'             => [[$hero_id, 'full']],
+    'font_cache_htaccess'        => true,   // root .htaccess: fonts only, Apache
+    'build_asset_cache_htaccess' => true,   // scoped .htaccess: whole dist/assets dir, Apache
+    'modern_image_formats'       => true,   // new uploads generate as AVIF/WebP, core-only
 ]);
 ```
 
 Also accepted as the `'performance'` key in `Theme::boot([...])`.
+
+### Static-asset cache headers
+
+Two independent, Apache-only `.htaccess`-injection mechanisms run once on `after_switch_theme`:
+
+- **`font_cache_htaccess`** — writes a fonts-only `Cache-Control: immutable` block into the **site root** `.htaccess`, matched by extension (`woff2|woff|ttf|otf|eot`).
+- **`build_asset_cache_htaccess`** — writes an unconditional `Cache-Control: immutable` block into a **`.htaccess` scoped to Vite's own `{dist}/assets/` directory** (JS, CSS, fonts, everything Vite emits). Scoped by directory rather than matched by extension in the root file on purpose: every file in that directory is content-hashed by Vite, so `immutable` is provably safe there — `wp-content/uploads/` images share the same extensions but are **not** hashed, so a root-level extension match would risk serving a stale image after a re-upload. This key is independent of `font_cache_htaccess`; both can run without conflict.
+
+Both no-op silently if the relevant directory/file isn't writable, and `build_asset_cache_htaccess` also no-ops if the build hasn't run yet (`npm run build`) — it simply does nothing until the directory exists, no error state.
+
+**Neither does anything on nginx** — `.htaccess` is an Apache-only mechanism, and a PHP process has no equivalent way to write nginx's own config. When `build_asset_cache_htaccess` is enabled and the site is detected running behind nginx (`$_SERVER['SERVER_SOFTWARE']`), a dismissible `wp-admin` notice shows the logged-in admin the exact block to paste into their server config, with this site's real theme/build path filled in:
+
+```nginx
+location ^~ /wp-content/themes/your-theme/public/build/assets/ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+}
+```
+
+### Modern image formats (AVIF/WebP)
+
+`modern_image_formats` hooks WordPress core's own `image_editor_output_format` filter (added 5.8 —
+not a plugin) so newly-uploaded JPEG/PNG images generate their subsizes as AVIF, falling back to
+WebP, checked at runtime via `wp_image_editor_supports()` — never assumed. Does nothing at all on a
+host whose image library (Imagick/GD) can't actually encode either format.
+
+This is a **replace**, not a dual-format generation — core has no built-in mechanism to save both
+the original format and a modern-format sibling side by side, so the resulting files simply *are*
+AVIF/WebP. `wp_get_attachment_image_src()`, `srcset`, and everything built on them — including
+`TAW\Helpers\Image::render()` — pick this up automatically with **no template changes required**.
+No `<picture>`-based fallback is needed either: AVIF/WebP support has been universal in shipping
+browsers for years.
+
+Only affects sizes generated going forward (new uploads, or a `Regenerate Thumbnails`-style
+regeneration) — existing media library files are untouched until regenerated. Animated GIFs are
+never in scope (the filter only ever sees `image/jpeg`/`image/png`).
 
 ---
 

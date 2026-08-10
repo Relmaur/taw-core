@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Support;
 
+use TAW\Helpers\Framework;
+
 /**
  * Performance — configurable WordPress optimizations.
  *
@@ -86,6 +88,51 @@ class Performance
          */
         'font_cache_htaccess' => true,
 
+        /**
+         * Inject long-lived, immutable cache headers for Vite's entire hashed
+         * build-output directory (JS, CSS, fonts, and anything else Vite emits)
+         * via a .htaccess scoped to that directory alone — not the site root.
+         *
+         * Deliberately scoped rather than matched by extension in the root
+         * .htaccess: every file Vite writes there is content-hashed, so
+         * `immutable` is provably safe for the whole directory, but
+         * wp-content/uploads/ images share the same extensions and are NOT
+         * hashed — an extension-based root rule would risk serving a stale
+         * image after a re-upload. This key is independent of
+         * `font_cache_htaccess` above (which still writes its own root-level,
+         * font-only block); on Apache both can run without conflict.
+         *
+         * No effect on nginx — .htaccess is an Apache-only mechanism. See
+         * README.md § Performance for the nginx equivalent.
+         */
+        'build_asset_cache_htaccess' => true,
+
+        /**
+         * Generate newly-uploaded JPEG/PNG image subsizes as AVIF or WebP
+         * instead of the original format, using WordPress core's own
+         * `image_editor_output_format` filter (added 5.8) — no plugin.
+         *
+         * Prefers AVIF, falls back to WebP, and does nothing at all if the
+         * host's image library (Imagick/GD) can't actually encode either —
+         * checked at runtime via `wp_image_editor_supports()`, never assumed.
+         * This is a REPLACE, not a dual-format generation: core has no
+         * built-in mechanism to save both the original and a modern-format
+         * sibling side by side, so the resulting subsizes simply ARE
+         * AVIF/WebP — `wp_get_attachment_image_src()` and everything built on
+         * it (including `TAW\Helpers\Image::render()`) picks this up
+         * automatically, no template changes needed. Safe without a
+         * fallback: AVIF/WebP support has been universal in shipping
+         * browsers for years.
+         *
+         * Only affects sizes generated going forward (new uploads, or
+         * `Regenerate Thumbnails`-style regeneration) — does not retroactively
+         * touch existing media library files.
+         *
+         * Deliberately excludes animated GIFs (never in scope — this filter
+         * only ever sees `image/jpeg` and `image/png`).
+         */
+        'modern_image_formats' => true,
+
     ];
 
     /**
@@ -122,6 +169,10 @@ class Performance
         add_action('wp_head', [self::class, 'renderImagePreloads'], 1);
         add_action('wp_head', static function () { self::$head_fired = true; }, PHP_INT_MAX);
         add_action('after_switch_theme', [self::class, 'injectFontCacheHtaccess']);
+        add_action('after_switch_theme', [self::class, 'injectBuildAssetCacheHtaccess']);
+        add_action('admin_notices', [self::class, 'maybeShowNginxCacheNotice']);
+        add_action('admin_init', [self::class, 'maybeDismissNginxCacheNotice']);
+        add_filter('image_editor_output_format', [self::class, 'preferModernImageFormat'], 10, 3);
     }
 
     /**
@@ -207,6 +258,39 @@ class Performance
         }
     }
 
+    /**
+     * $filename and $mime_type are typed nullable to match WordPress core's
+     * own actual calling convention — WP_Image_Editor::get_output_format()
+     * declares both params nullable and passes them straight through
+     * unchecked; some real subsize-generation call sites (an already-loaded
+     * Imagick object with no filename reference) genuinely pass null for
+     * $filename. Confirmed by a real fatal TypeError on a real media import
+     * before this was made nullable — strict_types=1 does not forgive a
+     * signature that's narrower than what core actually calls it with.
+     *
+     * @param array<string, string> $formats
+     * @return array<string, string>
+     * @internal
+     */
+    public static function preferModernImageFormat(array $formats, ?string $filename, ?string $mime_type): array
+    {
+        if (!self::$config['modern_image_formats']) {
+            return $formats;
+        }
+
+        if (!in_array($mime_type, ['image/jpeg', 'image/png'], true)) {
+            return $formats;
+        }
+
+        if (wp_image_editor_supports(['mime_type' => 'image/avif'])) {
+            $formats[$mime_type] = 'image/avif';
+        } elseif (wp_image_editor_supports(['mime_type' => 'image/webp'])) {
+            $formats[$mime_type] = 'image/webp';
+        }
+
+        return $formats;
+    }
+
     /** @internal */
     public static function renderImagePreloads(): void
     {
@@ -228,7 +312,19 @@ class Performance
 
         $htaccess = ABSPATH . '.htaccess';
 
-        if (!is_writable($htaccess) && !file_exists($htaccess)) {
+        // Bail only when we genuinely can't write: an existing file that
+        // isn't writable, or a not-yet-existing file whose parent directory
+        // isn't writable either (insert_with_markers() creates the file
+        // itself when it's missing, so a missing-but-creatable file must NOT
+        // bail here — the original `!is_writable && !file_exists` check did,
+        // silently skipping every fresh install with no pre-existing
+        // .htaccess, which is the common case this feature most needs to
+        // cover).
+        if (file_exists($htaccess) && !is_writable($htaccess)) {
+            return;
+        }
+
+        if (!file_exists($htaccess) && !is_writable(dirname($htaccess))) {
             return;
         }
 
@@ -247,6 +343,117 @@ class Performance
         ];
 
         insert_with_markers($htaccess, 'TAW Font Cache', $rules);
+    }
+
+    /** @internal */
+    public static function injectBuildAssetCacheHtaccess(): void
+    {
+        if (!self::$config['build_asset_cache_htaccess']) {
+            return;
+        }
+
+        if (!function_exists('insert_with_markers')) {
+            require_once ABSPATH . 'wp-admin/includes/misc.php';
+        }
+
+        $assetsDir = Framework::themePath(ViteLoader::distDir() . '/assets');
+
+        // Nothing to protect yet — e.g. the theme was activated before
+        // `npm run build` ever ran. Silently no-op; there's no error state
+        // here, just nothing to do until the directory exists.
+        if (!is_dir($assetsDir)) {
+            return;
+        }
+
+        $htaccess = $assetsDir . '/.htaccess';
+
+        if (file_exists($htaccess) && !is_writable($htaccess)) {
+            return;
+        }
+
+        if (!file_exists($htaccess) && !is_writable($assetsDir)) {
+            return;
+        }
+
+        // No FilesMatch needed: unlike the root .htaccess above, every file
+        // in this directory IS Vite's hashed output by construction — the
+        // whole directory can safely get one unconditional rule.
+        $rules = [
+            '<IfModule mod_expires.c>',
+            '    ExpiresActive On',
+            '    ExpiresDefault "access plus 1 year"',
+            '</IfModule>',
+            '<IfModule mod_headers.c>',
+            '    Header set Cache-Control "max-age=31536000, public, immutable"',
+            '</IfModule>',
+        ];
+
+        insert_with_markers($htaccess, 'TAW Build Asset Cache', $rules);
+    }
+
+    /**
+     * Warn a logged-in admin when the .htaccess-based cache headers above
+     * can't possibly do anything — nginx never reads .htaccess at all, and
+     * a PHP process has no equivalent mechanism to write nginx's own config.
+     * The only thing the framework can actually do on that stack is tell a
+     * human exactly what to paste into their server block.
+     *
+     * @internal
+     */
+    public static function maybeShowNginxCacheNotice(): void
+    {
+        if (!self::$config['build_asset_cache_htaccess']) {
+            return;
+        }
+
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        if (get_option('taw_nginx_cache_notice_dismissed')) {
+            return;
+        }
+
+        $serverSoftware = strtolower((string) ($_SERVER['SERVER_SOFTWARE'] ?? ''));
+
+        if (!str_contains($serverSoftware, 'nginx')) {
+            return;
+        }
+
+        $assetsPath = str_replace(ABSPATH, '/', Framework::themePath(ViteLoader::distDir() . '/assets'));
+        $dismissUrl = wp_nonce_url(
+            add_query_arg('taw_dismiss_nginx_cache_notice', '1'),
+            'taw_dismiss_nginx_cache_notice'
+        );
+
+        $snippet = sprintf(
+            "location ^~ %s/ {\n    expires 1y;\n    add_header Cache-Control \"public, immutable\";\n}",
+            $assetsPath
+        );
+
+        printf(
+            '<div class="notice notice-warning is-dismissible"><p><strong>TAW:</strong> %s</p><pre style="background:#f0f0f1;padding:12px;overflow:auto;">%s</pre><p><a href="%s">%s</a></p></div>',
+            esc_html__("Your build assets aren't getting cache headers — this site appears to run nginx, which doesn't read .htaccess. Add this to your nginx server block:", 'taw-theme'),
+            esc_html($snippet),
+            esc_url($dismissUrl),
+            esc_html__('Dismiss', 'taw-theme')
+        );
+    }
+
+    /** @internal */
+    public static function maybeDismissNginxCacheNotice(): void
+    {
+        if (!isset($_GET['taw_dismiss_nginx_cache_notice'])) {
+            return;
+        }
+
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        check_admin_referer('taw_dismiss_nginx_cache_notice');
+
+        update_option('taw_nginx_cache_notice_dismissed', true);
     }
 
     /** @internal */

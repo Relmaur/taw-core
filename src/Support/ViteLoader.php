@@ -163,8 +163,13 @@ class ViteLoader
         // mirroring how vite_inline_critical_css() worked in the old loader.
         self::inlineCriticalCss();
 
-        // ── Theme CSS (render-blocking, prevents FOUC with utility-first CSS) ────
-        // Collect CSS from the JS entry bundle and any standalone SCSS companion.
+        // ── Theme CSS (async — same media="print" swap as non-critical block
+        // CSS, see BaseBlock::enqueueCssFile()) ──────────────────────────────
+        // Safe to load async now that critical.scss carries real hand-authored
+        // layout rules for the header/Hero/Button above-the-fold markup (see
+        // critical.scss) — before that, this was deliberately synchronous to
+        // avoid a flash of totally unstyled utility-first HTML. Collect CSS
+        // from the JS entry bundle and any standalone SCSS companion.
         $css_urls = [];
 
         foreach ($manifest[$key]['css'] ?? [] as $css_file) {
@@ -179,12 +184,23 @@ class ViteLoader
 
         $css_urls = array_unique($css_urls);
 
-        foreach ($css_urls as $i => $url) {
-            $handle = $i === 0 ? 'theme-app-style' : 'theme-app-style-' . $i;
-            wp_register_style($handle, $url, [], null);
-            self::$styleHandles[] = $handle;
-            wp_enqueue_style($handle);
-        }
+        // Always scheduled via a late wp_head hook (priority 50, matching
+        // BaseBlock's non-critical CSS) rather than printed inline here:
+        // enqueueThemeAssets() runs on wp_enqueue_scripts, always before
+        // wp_head fires, so there's no "head already done" branch to handle
+        // the way BaseBlock needs one for assets enqueued after the fact.
+        add_action('wp_head', static function () use ($css_urls): void {
+            foreach ($css_urls as $url) {
+                printf(
+                    '<link rel="stylesheet" href="%s" media="print" onload="this.media=\'all\'">' . "\n",
+                    esc_url($url)
+                );
+                printf(
+                    '<noscript><link rel="stylesheet" href="%s"></noscript>' . "\n",
+                    esc_url($url)
+                );
+            }
+        }, 50);
 
         // ── JS bundle ──────────────────────────────────────────────────────────
         if (isset($manifest[$key]['file'])) {
