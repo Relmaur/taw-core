@@ -555,6 +555,24 @@
 
         if (library && typeof library._requery === 'function') {
             library._requery();
+
+            // _requery() (WP core, wp-includes/js/media-models.js) always
+            // swaps `library` for a brand-new Query collection on `state` —
+            // but the binding that makes newly-completed uploads
+            // auto-append to the grid (library.observe(wp.Uploader.queue))
+            // is only ever wired up once, by WP core's own Library state
+            // activate(), against the *original* collection at Grid boot.
+            // The replacement collection never gets that binding, so any
+            // upload finishing after this point would otherwise sit in
+            // wp.Uploader.queue without appearing in the grid until a hard
+            // reload. Re-observing here on the fresh collection keeps that
+            // live-append behavior working after every _requery() (init()
+            // alone triggers one on every Grid-view page load, to apply the
+            // remembered file sort).
+            var newLibrary = state.get('library');
+            if (newLibrary && typeof newLibrary.observe === 'function' && window.wp.Uploader && window.wp.Uploader.queue) {
+                newLibrary.observe(window.wp.Uploader.queue);
+            }
         }
     }
 
