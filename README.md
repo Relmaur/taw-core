@@ -665,9 +665,15 @@ Form::register([
 
 The callback's signature is `function(array $data): void` — `$data` is the same
 fully-validated, sanitized field data the CPT record and webhook payload are built from.
-**Throw to reject the submission** (any `\Throwable`, message shown to the submitter as a
-general error) rather than returning a value — there's no magic return-value contract to
-remember. A form with no `on_submit` behaves exactly as before this existed.
+**Throw a `\RuntimeException` to reject the submission** with a message shown to the submitter
+as a general error, rather than returning a value — there's no magic return-value contract to
+remember. `\RuntimeException` specifically, not any `\Throwable`: this handler runs for
+anonymous, unauthenticated submitters, so any *other* exception type is treated as unexpected
+(a bug, a DB failure, etc.) — logged server-side via `error_log()` and shown a generic message
+instead, rather than echoing a potentially internals-revealing message straight to a visitor.
+If an `image` field already uploaded a file before the callback threw, that attachment is
+automatically deleted rather than left orphaned in the Media Library. A form with no
+`on_submit` behaves exactly as before this existed.
 
 ---
 
@@ -708,7 +714,7 @@ Like `Form`'s Turnstile secret key, the password itself should live in that site
 | Key | Default | Notes |
 |---|---|---|
 | `password` | *(required)* | Empty or missing **fails closed** — the gate denies access rather than falling open, since this is access control, not a supplementary check. A `WP_DEBUG`-only notice flags the misconfiguration for developers. |
-| `id` | `substr(md5($password), 0, 12)` | Explicit scope key for the unlock cookie. The default means two `protect()` calls sharing the same password automatically share one unlock — no config needed for "this client has several protected pages." |
+| `id` | `substr(hash_hmac('sha256', $password, wp_salt('auth')), 0, 12)` | Explicit scope key for the unlock cookie. The default means two `protect()` calls sharing the same password automatically share one unlock — no config needed for "this client has several protected pages." |
 | `title` | `'Protected Page'` | Heading shown on the gate screen. |
 | `duration` | 30 days | How long the signed unlock cookie lasts once the correct password is entered. |
 
@@ -717,7 +723,28 @@ Like `Form`'s Turnstile secret key, the password itself should live in that site
 forge one by just setting a cookie manually. Password comparison uses `hash_equals()`
 (timing-safe). Gate attempts are rate-limited per-IP via the same `TAW\Core\Form\RateLimiter`
 used by `Form`. A correct submission redirects (POST/redirect/GET) rather than re-rendering,
-so a page refresh never resubmits the password.
+so a page refresh never resubmits the password. Both the gate screen and the unlocked page send
+`nocache_headers()` — without this, a full-page cache or CDN sitting in front of PHP could serve
+a cached copy of the *unlocked* page to a completely different visitor who never entered the
+password.
+
+**Known limitations, by design:**
+- **Gates template rendering only** — it does not restrict WordPress's own REST API. If the
+  underlying post's status is `publish`, its `post_content` remains readable via
+  `wp/v2/pages/{id}` (or similar) regardless of the password gate, since that's a separate code
+  path this class never touches. Irrelevant for a form-only page like the client-portal example
+  above (there's no real content in `post_content` to leak), but matters if you ever reuse this
+  to gate an actual content page — keep the post `private`/`draft`, or additionally restrict
+  REST access, if the body text itself needs to stay secret.
+- **Rate limiting is per-IP** via `SubmissionsHandler::getUserIp()`, which trusts
+  `X-Forwarded-For`/`X-Real-IP` when present. Behind a reverse proxy or CDN that sets these
+  correctly, this works as intended; on a host reachable directly (no trusted proxy in front),
+  a client can set an arbitrary `X-Forwarded-For` value per request to appear as a "new" IP each
+  time, bypassing the rate limit — so the password itself is the real defense against sustained
+  brute-forcing, not the rate limiter alone. Use a genuinely random, non-guessable password.
+- **The gate screen renders its own standalone `<html>` document**, deliberately before
+  `get_header()`/`wp_head()` — so a security plugin that adds headers (CSP, `X-Frame-Options`,
+  etc.) via those hooks won't have applied them to the gate screen itself.
 
 ---
 

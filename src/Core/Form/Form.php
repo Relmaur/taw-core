@@ -35,8 +35,10 @@ if (!defined('ABSPATH')) {
  *                       checkbox, radio, checkbox_group, image, wysiwyg
  *  - Conditional visibility with AND (default) or OR relation
  *  - Optional 'on_submit' callback — function(array $data): void, called after a
- *    successful submission is saved; throw to reject with a message shown to the
- *    submitter (see 'On Submit Callback' in the README)
+ *    successful submission is saved; throw a \RuntimeException to reject with a
+ *    message shown to the submitter — any other \Throwable is logged and shown a
+ *    generic message instead, never its own message (see 'On Submit Callback' in
+ *    the README)
  *
  * ── Single-step usage ────────────────────────────────────────────────────────
  *
@@ -381,13 +383,24 @@ class Form
         // Optional custom processing (e.g. creating a post from the submitted
         // data) — runs after the audit record above is guaranteed to exist,
         // so a failure here still leaves a trace of what was submitted.
-        // Throwing rejects the submission with the exception's message shown
-        // to the submitter, rather than a magic return-value contract.
+        // Throw a \RuntimeException to reject the submission with a message
+        // shown to the submitter — the *only* exception type whose message
+        // is ever surfaced. Anything else is treated as unexpected (a bug, a
+        // DB failure, etc.) and logged instead: this handler runs for
+        // anonymous, unauthenticated submitters (wp_ajax_nopriv_), so
+        // echoing an arbitrary exception's message back to them would risk
+        // leaking internal detail (file paths, query fragments, stack-trace-
+        // adjacent text) the same way a raw PHP error display would.
         if (isset($this->config['on_submit']) && is_callable($this->config['on_submit'])) {
             try {
                 ($this->config['on_submit'])($data);
-            } catch (\Throwable $e) {
+            } catch (\RuntimeException $e) {
+                $this->cleanupUploadedFiles($data);
                 wp_send_json_error(['general' => $e->getMessage()]);
+            } catch (\Throwable $e) {
+                error_log('[TAW Form] on_submit callback for form "' . $this->id . '" threw an unexpected ' . get_class($e) . ': ' . $e->getMessage());
+                $this->cleanupUploadedFiles($data);
+                wp_send_json_error(['general' => __('Something went wrong. Please try again.', 'taw')]);
             }
         }
 
@@ -576,6 +589,23 @@ class Form
         }
 
         return ['value' => (int) $attachmentId, 'error' => null];
+    }
+
+    /**
+     * Deletes any attachments this submission's 'image' field(s) uploaded —
+     * called when 'on_submit' rejects the submission after the upload
+     * already succeeded, so a failed submission doesn't leave a real,
+     * disk-consuming attachment permanently orphaned in the Media Library
+     * (nothing else would ever clean it up, since it was never attached to
+     * whatever on_submit failed to create).
+     */
+    private function cleanupUploadedFiles(array $data): void
+    {
+        foreach ($this->getInputFields() as $field) {
+            if (($field['type'] ?? '') === 'image' && !empty($data[$field['id']])) {
+                wp_delete_attachment((int) $data[$field['id']], true);
+            }
+        }
     }
 
     /**

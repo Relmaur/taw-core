@@ -53,7 +53,11 @@ final class PagePassword
     public static function protect(array $config): void
     {
         $password = (string) ($config['password'] ?? '');
-        $id       = (string) ($config['id'] ?? substr(md5($password), 0, 12));
+        // hash_hmac() rather than a bare md5($password) — the id ends up in
+        // a visible (if httponly) cookie *name*, and salting it with
+        // wp_salt('auth') means that name can't be attacked offline (e.g. a
+        // rainbow table) to recover anything about the password itself.
+        $id       = (string) ($config['id'] ?? substr(hash_hmac('sha256', $password, wp_salt('auth')), 0, 12));
         $duration = (int) ($config['duration'] ?? (30 * DAY_IN_SECONDS));
         $title    = (string) ($config['title'] ?? __('Protected Page', 'taw'));
 
@@ -71,6 +75,12 @@ final class PagePassword
         }
 
         if (self::isUnlocked($id)) {
+            // A full-page cache or CDN sitting in front of PHP has no other
+            // way to know this response is visitor-specific — without this,
+            // the unlocked page could get cached under its URL and served
+            // to a completely different visitor who never entered the
+            // password, silently defeating the whole gate.
+            nocache_headers();
             return;
         }
 
@@ -171,6 +181,13 @@ final class PagePassword
      */
     private static function renderGate(string $id, string $title, ?string $error): void
     {
+        // Same reasoning as the nocache_headers() call on the unlocked path
+        // above — the gate screen itself must never be cacheable either, or
+        // a stale "enter password" screen (or worse, a stale error state)
+        // could get served from cache regardless of what a given visitor
+        // has actually done.
+        nocache_headers();
+
         $nonceAction = 'taw_page_password_' . $id;
         $formCssUrl  = Framework::url('assets/form.css');
         ?>
