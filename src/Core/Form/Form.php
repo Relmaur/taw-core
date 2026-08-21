@@ -32,8 +32,11 @@ if (!defined('ABSPATH')) {
  *  - Multi-step wizard with Prev/Next navigation and step indicator
  *  - Structural field types: html, heading, divider
  *  - Input field types: text, email, url, tel, number, textarea, select, date,
- *                       checkbox, radio, checkbox_group
+ *                       checkbox, radio, checkbox_group, image, wysiwyg
  *  - Conditional visibility with AND (default) or OR relation
+ *  - Optional 'on_submit' callback — function(array $data): void, called after a
+ *    successful submission is saved; throw to reject with a message shown to the
+ *    submitter (see 'On Submit Callback' in the README)
  *
  * ── Single-step usage ────────────────────────────────────────────────────────
  *
@@ -296,8 +299,14 @@ class Form
         $inputFields = $this->getInputFields();
 
         // First pass: collect raw values so conditions can be evaluated.
+        // 'image' fields are skipped here — uploaded files live in $_FILES,
+        // not $_POST, and are handled entirely separately below.
         $raw = [];
         foreach ($inputFields as $field) {
+            if (($field['type'] ?? '') === 'image') {
+                continue;
+            }
+
             $posted = $_POST[$field['id']] ?? null;
 
             // checkbox_group arrives as an array when names use the [] suffix.
@@ -318,10 +327,23 @@ class Form
                 continue;
             }
 
+            // 'image' fields never reach the $_POST-based checks below —
+            // uploads are binary, not string data, and need their own
+            // upload/mime handling (see processImageUpload()).
+            if (($field['type'] ?? '') === 'image') {
+                $result = $this->processImageUpload($field);
+                if ($result['error'] !== null) {
+                    $errors[$fieldId] = $result['error'];
+                } else {
+                    $data[$fieldId] = $result['value'];
+                }
+                continue;
+            }
+
             $value = $raw[$fieldId];
             $label = $field['label'] ?? $fieldId;
 
-            if (!empty($field['required']) && '' === trim((string) $value)) {
+            if (!empty($field['required']) && $this->isBlank((string) $value, $field['type'] ?? 'text')) {
                 $errors[$fieldId] = $this->requiredMessage($field, $label);
                 continue;
             }
@@ -355,6 +377,19 @@ class Form
 
         // Save first — guaranteed record regardless of email outcome.
         SubmissionsHandler::saveSubmission($this->id, $inputFields, $data, $this->config['webhook'] ?? [], $pageUrl);
+
+        // Optional custom processing (e.g. creating a post from the submitted
+        // data) — runs after the audit record above is guaranteed to exist,
+        // so a failure here still leaves a trace of what was submitted.
+        // Throwing rejects the submission with the exception's message shown
+        // to the submitter, rather than a magic return-value contract.
+        if (isset($this->config['on_submit']) && is_callable($this->config['on_submit'])) {
+            try {
+                ($this->config['on_submit'])($data);
+            } catch (\Throwable $e) {
+                wp_send_json_error(['general' => $e->getMessage()]);
+            }
+        }
 
         $sent = $this->sendEmail($data);
         if (!$sent) {
@@ -459,6 +494,7 @@ class Form
         return match ($type) {
             'email'         => sanitize_email($value),
             'textarea'      => sanitize_textarea_field($value),
+            'wysiwyg'       => wp_kses_post($value),
             'url'           => esc_url_raw($value),
             'date'          => sanitize_text_field($value),
             'checkbox'      => ($value === '1') ? '1' : '0',
@@ -466,6 +502,80 @@ class Form
             'checkbox_group'=> sanitize_text_field($value), // comma-separated
             default         => sanitize_text_field($value),
         };
+    }
+
+    /**
+     * Whether a required field's raw value counts as empty. Plain string
+     * fields use a simple trim(); 'wysiwyg' fields need their tags stripped
+     * first, since TinyMCE's own "empty" state serializes as '<p>&nbsp;</p>'
+     * — a value that would otherwise pass a naive trim() check even though
+     * the editor is visually empty.
+     */
+    private function isBlank(string $value, string $type): bool
+    {
+        if ($type === 'wysiwyg') {
+            return '' === trim(wp_strip_all_tags($value));
+        }
+
+        return '' === trim($value);
+    }
+
+    /**
+     * Handles a single 'image' field's uploaded file, entirely outside the
+     * $_POST-based pipeline above — uploads live in $_FILES. Never returns
+     * both a value and an error.
+     *
+     * @return array{value: int, error: string|null}
+     */
+    private function processImageUpload(array $field): array
+    {
+        $fieldId = $field['id'];
+        $label   = $field['label'] ?? $fieldId;
+        $file    = $_FILES[$fieldId] ?? null;
+        $error   = $file['error'] ?? UPLOAD_ERR_NO_FILE;
+
+        if ($error === UPLOAD_ERR_NO_FILE) {
+            if (!empty($field['required'])) {
+                return ['value' => 0, 'error' => $this->requiredMessage($field, $label)];
+            }
+            return ['value' => 0, 'error' => null];
+        }
+
+        if ($error !== UPLOAD_ERR_OK) {
+            /* translators: %s: field label */
+            $message = $field['upload_message'] ?? sprintf(__('%s could not be uploaded. Please try a different file.', 'taw'), $label);
+            return ['value' => 0, 'error' => $message];
+        }
+
+        // admin-ajax.php (both wp_ajax_ and wp_ajax_nopriv_ contexts) does
+        // NOT auto-load these — they're admin-panel-specific includes only
+        // pulled in by wp-admin/includes/admin.php, which admin-ajax.php
+        // deliberately skips to stay lightweight.
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+
+        // 0 = unattached — the real post this belongs to (if any) doesn't
+        // exist yet at validation time; a registrant's 'on_submit' callback
+        // attaches it to whatever it creates (e.g. via set_post_thumbnail()).
+        $attachmentId = media_handle_upload($fieldId, 0);
+
+        if (is_wp_error($attachmentId)) {
+            return ['value' => 0, 'error' => $field['upload_message'] ?? $attachmentId->get_error_message()];
+        }
+
+        // media_handle_upload() only enforces WordPress's general upload
+        // mime whitelist, not that the file is specifically an image — the
+        // client-side accept="image/*" hint is trivially bypassable, so this
+        // is the authoritative check for what an 'image' field promises.
+        if (!wp_attachment_is_image($attachmentId)) {
+            wp_delete_attachment($attachmentId, true);
+            /* translators: %s: field label */
+            $message = $field['upload_message'] ?? sprintf(__('%s must be an image file.', 'taw'), $label);
+            return ['value' => 0, 'error' => $message];
+        }
+
+        return ['value' => (int) $attachmentId, 'error' => null];
     }
 
     /**
@@ -660,11 +770,23 @@ class Form
         $ajaxUrl     = esc_url(admin_url('admin-ajax.php'));
         $isMultiStep = $this->isMultiStep();
 
+        // The JS submit handler always sends the request as multipart
+        // (new FormData(form)) regardless of this attribute, but it's still
+        // correct HTML to declare it whenever an 'image' field is present.
+        $hasImageField = false;
+        foreach ($this->getInputFields() as $field) {
+            if (($field['type'] ?? '') === 'image') {
+                $hasImageField = true;
+                break;
+            }
+        }
+
         echo '<form method="post"'
             . ' action="' . $ajaxUrl . '"'
             . ' class="taw-form"'
             . ' data-taw-form="' . $formId . '"'
             . ($isMultiStep ? ' data-taw-multistep' : '')
+            . ($hasImageField ? ' enctype="multipart/form-data"' : '')
             . ' novalidate>';
 
         wp_nonce_field($this->id . '_action', $this->id . '_nonce');
@@ -993,6 +1115,28 @@ class Form
                 );
                 break;
 
+            case 'image':
+                printf(
+                    '<input type="file" id="%1$s" name="%1$s" class="%2$s" accept="image/*">',
+                    esc_attr($id),
+                    $inputClass
+                );
+                break;
+
+            case 'wysiwyg':
+                // media_buttons is off — this field type is meant for a
+                // form's own body content, not a general media-embedding
+                // surface; a form needing an image has the dedicated 'image'
+                // field type for that. Everything else uses WP's default
+                // classic-editor settings, which is what gives the built-in
+                // paste-from-Word cleanup for free.
+                wp_editor('', $id, [
+                    'textarea_name' => $id,
+                    'media_buttons' => false,
+                    'quicktags'     => true,
+                ]);
+                break;
+
             default:
                 // Covers: text, email, url, tel, number, password, and any valid HTML input type.
                 printf(
@@ -1287,6 +1431,17 @@ class Form
                 e.preventDefault();
                 clearErrors();
                 setLoading(true);
+
+                // TinyMCE ('wysiwyg' fields) only syncs its visual-editor
+                // content back into the underlying <textarea> on a *native*
+                // form submit by default — this handler preventDefault()s
+                // that and builds FormData manually instead, so without this
+                // call any wysiwyg field would submit whatever stale value
+                // the textarea had at page load (usually empty), regardless
+                // of what the editor visibly shows.
+                if (window.tinymce) {
+                    window.tinymce.triggerSave();
+                }
 
                 fetch(form.getAttribute('action'), {
                     method:      'POST',
