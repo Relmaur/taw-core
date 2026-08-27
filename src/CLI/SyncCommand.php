@@ -94,7 +94,23 @@ class SyncCommand extends Command
                 $report['errors'][] = 'Could not clone ' . self::THEME_REPO_URL . ' — check network access and that git is installed.';
             } else {
                 try {
+                    $skillsCfg = $this->skillsReconcileConfig($manifest);
+
                     foreach ($manifest['tier1'] as $entry) {
+                        if ($entry['type'] === 'skills-dir') {
+                            $plan = $this->planSkillsReconcile($entry, $clone, $skillsCfg);
+                            $entry['reconcile'] = $plan;
+                            $entry['changed'] = $plan['overwrite'] !== [] || $plan['delete'] !== [];
+
+                            if ($entry['changed'] && $apply) {
+                                $this->applySkillsReconcile($entry, $clone, $plan);
+                                $report['applied'][] = $entry['path'];
+                            }
+
+                            $report['tier1'][] = $entry;
+                            continue;
+                        }
+
                         $changed = $this->pathDiffers($entry, $clone);
                         $entry['changed'] = $changed;
 
@@ -221,7 +237,11 @@ class SyncCommand extends Command
     }
 
     /**
-     * @return array{tier1: array<int, array{path: string, type: string}>, tier2: array<int, array{path: string, type: string}>}|null
+     * @return array{
+     *     tier1: array<int, array{path: string, type: string}>,
+     *     tier2: array<int, array{path: string, type: string}>,
+     *     skillsReconcile?: array<string, mixed>
+     * }|null
      */
     private function loadManifest(): ?array
     {
@@ -321,6 +341,157 @@ class SyncCommand extends Command
     }
 
     /**
+     * @param array<string, mixed> $manifest
+     * @return array{ownerKey: string, frameworkValue: string, siteValue: string}
+     */
+    private function skillsReconcileConfig(array $manifest): array
+    {
+        $cfg = is_array($manifest['skillsReconcile'] ?? null) ? $manifest['skillsReconcile'] : [];
+
+        return [
+            'ownerKey' => is_string($cfg['ownerKey'] ?? null) ? $cfg['ownerKey'] : 'owner',
+            'frameworkValue' => is_string($cfg['frameworkValue'] ?? null) ? $cfg['frameworkValue'] : 'taw',
+            'siteValue' => is_string($cfg['siteValue'] ?? null) ? $cfg['siteValue'] : 'site',
+        ];
+    }
+
+    /**
+     * Reconcile a skills directory that is *shared* between framework-managed
+     * and site-authored skills — which it has to be, because Claude Code and
+     * the agents runtime only auto-discover skills directly under
+     * `.claude/skills/` and `.agents/skills/`. A plain `rsync -a --delete`
+     * (what a `type: dir` entry does) would wipe any skill the client wrote
+     * for itself.
+     *
+     * Rules (see resources/update-manifest.json § skillsReconcile):
+     *   - skill present in canonical  → overwrite in place (fresh copy each run)
+     *   - present only in client, `owner: site` → preserve untouched, report it
+     *   - present only in client, `owner: taw`  → delete (retired framework skill)
+     *   - present only in client, no `owner:`   → preserve, but warn (human call)
+     *
+     * @param array{path: string, type: string} $entry
+     * @param array{ownerKey: string, frameworkValue: string, siteValue: string} $cfg
+     * @return array{overwrite: list<string>, delete: list<string>, preserve: list<string>, warn: list<string>}
+     */
+    private function planSkillsReconcile(array $entry, string $cloneDir, array $cfg): array
+    {
+        $local = rtrim($this->themeDir, '/') . '/' . $entry['path'];
+        $canonical = rtrim($cloneDir, '/') . '/' . $entry['path'];
+
+        $canonicalSkills = $this->immediateSubdirs($canonical);
+        $localSkills = $this->immediateSubdirs($local);
+
+        $plan = ['overwrite' => [], 'delete' => [], 'preserve' => [], 'warn' => []];
+
+        foreach ($canonicalSkills as $name) {
+            $localSkill = $local . '/' . $name;
+            $canonicalSkill = $canonical . '/' . $name;
+
+            if (!is_dir($localSkill) || $this->treeHash($localSkill) !== $this->treeHash($canonicalSkill)) {
+                $plan['overwrite'][] = $name;
+            }
+        }
+
+        foreach ($localSkills as $name) {
+            if (in_array($name, $canonicalSkills, true)) {
+                continue;
+            }
+
+            $owner = $this->skillOwner($local . '/' . $name, $cfg['ownerKey']);
+
+            if ($owner === $cfg['siteValue']) {
+                $plan['preserve'][] = $name;
+            } elseif ($owner === $cfg['frameworkValue']) {
+                $plan['delete'][] = $name;
+            } else {
+                $plan['warn'][] = $name;
+            }
+        }
+
+        sort($plan['overwrite']);
+        sort($plan['delete']);
+        sort($plan['preserve']);
+        sort($plan['warn']);
+
+        return $plan;
+    }
+
+    /**
+     * @param array{path: string, type: string} $entry
+     * @param array{overwrite: list<string>, delete: list<string>, preserve: list<string>, warn: list<string>} $plan
+     */
+    private function applySkillsReconcile(array $entry, string $cloneDir, array $plan): void
+    {
+        $local = rtrim($this->themeDir, '/') . '/' . $entry['path'];
+        $canonical = rtrim($cloneDir, '/') . '/' . $entry['path'];
+
+        @mkdir($local, 0755, true);
+
+        foreach ($plan['overwrite'] as $name) {
+            $src = rtrim($canonical . '/' . $name, '/') . '/';
+            $dest = rtrim($local . '/' . $name, '/') . '/';
+            @mkdir($dest, 0755, true);
+            // `--delete` is safe *within* one skill folder — a skill dir is
+            // wholly framework-owned; only its parent is shared.
+            exec('rsync -a --delete ' . escapeshellarg($src) . ' ' . escapeshellarg($dest));
+        }
+
+        foreach ($plan['delete'] as $name) {
+            exec('rm -rf ' . escapeshellarg($local . '/' . $name));
+        }
+    }
+
+    /**
+     * Immediate child directory names of $dir (no dotfiles, not recursive).
+     *
+     * @return list<string>
+     */
+    private function immediateSubdirs(string $dir): array
+    {
+        if (!is_dir($dir)) {
+            return [];
+        }
+
+        $names = [];
+        foreach (scandir($dir) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            if (is_dir($dir . '/' . $entry)) {
+                $names[] = $entry;
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * Read `<ownerKey>:` from a skill's SKILL.md YAML frontmatter. Returns null
+     * when the file, the frontmatter block, or the key is missing/unreadable —
+     * the caller treats null as "unknown owner".
+     */
+    private function skillOwner(string $skillDir, string $ownerKey): ?string
+    {
+        $file = $skillDir . '/SKILL.md';
+
+        if (!is_file($file)) {
+            return null;
+        }
+
+        $contents = (string) file_get_contents($file);
+
+        if (!preg_match('/^---\r?\n(.*?)\r?\n---\r?\n/s', $contents, $m)) {
+            return null;
+        }
+
+        if (!preg_match('/^' . preg_quote($ownerKey, '/') . '\s*:\s*("?)([A-Za-z0-9_-]+)\1\s*$/m', $m[1], $om)) {
+            return null;
+        }
+
+        return $om[2];
+    }
+
+    /**
      * @param array{path: string, type: string} $entry
      */
     private function diffFile(array $entry, string $cloneDir): ?string
@@ -379,16 +550,23 @@ class SyncCommand extends Command
 
         foreach (['tier1' => 'Tier 1 (auto-sync)', 'tier2' => 'Tier 2 (review before sync)'] as $key => $label) {
             $io->section($label);
-            $changed = array_filter($report[$key], static fn(array $e): bool => !empty($e['changed']));
+            $printedSomething = false;
 
-            if (empty($changed)) {
-                $io->text('Up to date.');
-                continue;
+            foreach ($report[$key] as $entry) {
+                if (isset($entry['reconcile'])) {
+                    $printedSomething = $this->renderSkillsReconcile($io, $entry, $applied) || $printedSomething;
+                    continue;
+                }
+
+                if (!empty($entry['changed'])) {
+                    $suffix = $applied && $key === 'tier1' ? ' (applied)' : '';
+                    $io->text('- ' . $entry['path'] . $suffix);
+                    $printedSomething = true;
+                }
             }
 
-            foreach ($changed as $entry) {
-                $suffix = $applied && $key === 'tier1' ? ' (applied)' : '';
-                $io->text('- ' . $entry['path'] . $suffix);
+            if (!$printedSomething) {
+                $io->text('Up to date.');
             }
         }
 
@@ -401,5 +579,72 @@ class SyncCommand extends Command
         if ($report['clean']) {
             $io->success('Everything is up to date.');
         }
+    }
+
+    /**
+     * Render one `skills-dir` entry's reconciliation outcome. Preserved
+     * site-authored skills are always reported (even on an otherwise-clean
+     * run), so it's visible that the sync left them alone on purpose.
+     *
+     * @param array<string, mixed> $entry
+     */
+    private function renderSkillsReconcile(SymfonyStyle $io, array $entry, bool $applied): bool
+    {
+        $reconcile = $entry['reconcile'];
+        $path = (string) $entry['path'];
+
+        if (!is_array($reconcile)) {
+            return false;
+        }
+
+        $plan = [
+            'overwrite' => is_array($reconcile['overwrite'] ?? null) ? $reconcile['overwrite'] : [],
+            'delete' => is_array($reconcile['delete'] ?? null) ? $reconcile['delete'] : [],
+            'preserve' => is_array($reconcile['preserve'] ?? null) ? $reconcile['preserve'] : [],
+            'warn' => is_array($reconcile['warn'] ?? null) ? $reconcile['warn'] : [],
+        ];
+        $printed = false;
+
+        if ($plan['overwrite'] !== []) {
+            $io->text(sprintf(
+                '- %s — %s %d framework skill(s): %s',
+                $path,
+                $applied ? 'refreshed' : 'will refresh',
+                count($plan['overwrite']),
+                implode(', ', $plan['overwrite'])
+            ));
+            $printed = true;
+        }
+
+        if ($plan['delete'] !== []) {
+            $io->text(sprintf(
+                '- %s — %s retired framework skill(s) [owner: taw, no longer in canonical]: %s',
+                $path,
+                $applied ? 'removed' : 'will remove',
+                implode(', ', $plan['delete'])
+            ));
+            $printed = true;
+        }
+
+        if ($plan['preserve'] !== []) {
+            $io->text(sprintf(
+                '- %s — preserved site-authored skill(s) [owner: site]: %s',
+                $path,
+                implode(', ', $plan['preserve'])
+            ));
+            $printed = true;
+        }
+
+        if ($plan['warn'] !== []) {
+            $io->warning(sprintf(
+                "%s: skill(s) not in the canonical scaffold and with no `owner:` marker — left untouched, decide by hand: %s\n"
+                . "Add `owner: site` to the SKILL.md frontmatter to keep it silently, or delete the folder if it's a retired framework skill.",
+                $path,
+                implode(', ', $plan['warn'])
+            ));
+            $printed = true;
+        }
+
+        return $printed;
     }
 }

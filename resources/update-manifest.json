@@ -2,8 +2,8 @@
     "$comment": "Single source of truth for which taw-theme paths are framework-owned and safe to sync into a client project. Read by both the update-theme Claude Code skill and TAW\\CLI\\SyncCommand (php bin/taw sync) — keep them pointed at this file rather than hardcoding the lists twice. Tier 1 is always overwritten without confirmation; Tier 2 is diffed and requires human review before being applied; anything not listed is never read or touched.",
     "tier1": [
         { "path": "functions.php", "type": "file" },
-        { "path": ".claude/skills/", "type": "dir" },
-        { "path": ".agents/skills/", "type": "dir" },
+        { "path": ".claude/skills/", "type": "skills-dir" },
+        { "path": ".agents/skills/", "type": "skills-dir" },
         { "path": "bin/", "type": "dir" },
         { "path": ".github/workflows/ci.yml", "type": "file" },
         { "path": ".github/workflows/framework-sync.yml", "type": "file" },
@@ -22,5 +22,11 @@
         { "path": "phpstan.neon", "type": "file" },
         { "path": "phpunit.xml", "type": "file" }
     ],
-    "$never": "tests/Unit/ is deliberately never listed here, in either tier, and must never become a 'dir' entry — it holds each client project's own block tests (tests/Unit/Blocks/{Name}Test.php), content this manifest doesn't own. A 'dir' entry syncs via 'rsync -a --delete', which would silently delete every client-authored test not present in the canonical repo. Only the harness itself (tests/bootstrap.php, tests/TestCase.php, phpunit.xml) is framework-owned; individual test files are not."
+    "skillsReconcile": {
+        "$comment": "How `type: skills-dir` entries are synced. Claude Code and the agents runtime only auto-discover skills in `.claude/skills/` and `.agents/skills/`, so framework-managed and site-authored skills have to share the same directory — a plain `rsync -a --delete` (what `type: dir` does) would destroy any skill the client authored for itself. Instead the sync reconciles per skill subdirectory: every skill present in the canonical taw-theme repo is overwritten in place (fresh canonical copy, every run); a skill subdirectory present in the client but NOT in canonical is resolved by reading the `owner:` key in its SKILL.md YAML frontmatter — `owner: taw` means it is a framework skill that has been retired upstream, so it is DELETED; `owner: site` means the client authored it, so it is PRESERVED untouched and reported; no `owner:` key (or an unreadable SKILL.md) is treated as unknown — PRESERVED but reported with a warning so a human can decide. Every canonical framework skill carries `owner: taw` in its frontmatter, which is also what makes framework vs site skills greppable in a client's tree (`grep -rl 'owner: taw' .claude/skills`).",
+        "ownerKey": "owner",
+        "frameworkValue": "taw",
+        "siteValue": "site"
+    },
+    "$never": "tests/Unit/ is deliberately never listed here, in either tier, and must never become a 'dir' entry — it holds each client project's own block tests (tests/Unit/Blocks/{Name}Test.php), content this manifest doesn't own. A 'dir' entry syncs via 'rsync -a --delete', which would silently delete every client-authored test not present in the canonical repo. Only the harness itself (tests/bootstrap.php, tests/TestCase.php, phpunit.xml) is framework-owned; individual test files are not. The same hazard for .claude/skills/ and .agents/skills/ (client sites legitimately author their own skills) is handled by 'type: skills-dir' + the skillsReconcile rules above, not by omitting them."
 }
