@@ -18,7 +18,6 @@ use TAW\Core\Rest\VisualEditorEndpoint;
 use TAW\Core\Seo\Schema;
 use TAW\Core\Seo\SeoMeta;
 use TAW\Helpers\Svg;
-use TAW\Hub\HubIntegration;
 use TAW\Support\Performance;
 use TAW\Support\ViteLoader;
 
@@ -138,14 +137,6 @@ class Theme
         // Nestable Media Library folders: a dedicated Media -> TAW Media
         // screen plus a filter/column/bulk-action on the classic List view.
         MediaFolders::init();
-
-        // ── 12. Management Hub integration ───────────────────────────────────
-        // Opt-in only — no-op unless TAW_HUB_ENABLED is defined truthy in
-        // wp-config.php (a security boundary: switched on by server config,
-        // not theme code). Registers the wp-json/taw-hub/v1 routes that let a
-        // central Hub run telemetry, asset deployment, config sync, and cache
-        // invalidation against this site. See src/Hub/README.md.
-        HubIntegration::init();
     }
 
     /**

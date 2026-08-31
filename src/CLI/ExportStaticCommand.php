@@ -190,7 +190,7 @@ class ExportStaticCommand extends Command
                 $outDir . '/' . $themeRelPath . '/' . $viteDir
             );
 
-        $uploadsSrc    = wp_get_upload_dir()['basedir'] ?? '';
+        $uploadsSrc    = wp_get_upload_dir()['basedir'];
         $uploadsCopied = $uploadsSrc !== '' && $this->copyIfExists($uploadsSrc, $outDir . '/wp-content/uploads');
 
         // --- Report ---

@@ -21,8 +21,7 @@
         "szepeviktor/phpstan-wordpress": "^2.0",
         "phpunit/phpunit": "^11",
         "brain/monkey": "^2.6",
-        "emailit/emailit-php": "^2.0",
-        "php-stubs/wp-cli-stubs": "^2.12"
+        "emailit/emailit-php": "^2.0"
     },
     "suggest": {
         "emailit/emailit-php": "Required for EmailConfig::useEmailit() — route all wp_mail() through the Emailit REST API"

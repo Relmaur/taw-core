@@ -59,12 +59,6 @@ src/
 │   ├── Editor/         # Frontend visual editor shell
 │   ├── Rest/           # REST API endpoints
 │   └── Menu/           # WordPress menu OOP wrappers
-├── Hub/                # Management Hub integration (opt-in via TAW_HUB_ENABLED)
-│   ├── Security/       # HMAC/Ed25519 request verification, enrolment, audit sink
-│   ├── Telemetry/      # environment / block / asset inventory collectors
-│   ├── Assets/         # zip-slip-safe payload extraction + atomic deploy/rollback
-│   ├── Orchestration/  # the fixed action allow-list, command dispatcher, audit log
-│   └── Api/            # taw-hub/v1 routes + the WP_REST_Request auth adapter
 ├── Support/
 │   ├── ViteLoader.php  # Vite asset pipeline
 │   ├── Performance.php # WordPress bloat removal and preloads
@@ -835,8 +829,6 @@ Annotations give the editor a direct DOM reference, making live updates exact an
 
 Cross-origin access to these routes (and to `admin-ajax.php?action=taw_form_*`) is opt-in and off by default — see [Static Export & Headless CORS](#static-export--headless-cors).
 
-The `wp-json/taw-hub/v1/` namespace (HMAC/Ed25519-authenticated, registered only when `TAW_HUB_ENABLED` is set) is documented separately — see [Management Hub Integration](#management-hub-integration).
-
 ---
 
 ## SVG Support
@@ -979,67 +971,6 @@ Three admin surfaces:
 - The default Media Library **Grid view** (`upload.php`) — a FileBird-style sidebar (Alpine.js) with the same folder tree and full CRUD, bolted onto WordPress core's own thumbnail grid. Clicking a folder filters the grid live, via an `ajax_query_attachments_args` filter plus a narrow JS bridge that sets props on `wp.media`'s existing Backbone query object (`wp.media.frame.state().get('library').props`) — the same technique folder plugins like FileBird use, not a Backbone *view* override. Selecting a folder here stays in sync with the List view's dropdown filter (and vice versa) via the same `taw_media_folder` query param, so switching view modes doesn't lose your place. Thumbnails in the grid (single or multi-selected) are draggable directly onto a folder row or folder card to file them — a `dragstart`/drop-target bridge on top of WP core's own Backbone attachment views, not a fork of them — and internal drags are prevented from triggering WP core's own "drop files to upload" overlay (which otherwise fires on any drag reaching it, regardless of what's being dragged). Two independent sort controls, each remembered per-browser (`localStorage`): the folder tree sorts by name or creation order (oldest/newest), and the file grid sorts by name, upload date, or file size (largest/smallest) — file-size sorting reads a dedicated `_taw_media_filesize` postmeta value (backfilled once for pre-existing attachments the first time it's used, since WP core only stores file size nested inside a serialized metadata array that SQL can't `ORDER BY`).
 
 A folder's place in the tree is its only "category" — one folder per attachment (`wp_set_object_terms()`), no separate tagging layer.
-
----
-
-## Management Hub Integration
-
-An authenticated, headless receiver that lets a central management Hub run telemetry, deploy Vite build assets, sync block configuration, and invalidate caches against this site over `wp-json/taw-hub/v1/`. Wired into `Theme::boot()` as the last subsystem.
-
-**Opt-in — but by server config, not theme code.** There is no `enable()` call: the Hub is a security boundary, so it's switched on only in `wp-config.php`.
-
-```php
-define('TAW_HUB_ENABLED', true);
-define('TAW_HUB_ENROLMENT_TOKEN', '…one-time random string…');   // burned after the first successful handshake
-define('TAW_HUB_SECRET', '…32+ random bytes…');                  // seals this site's own key (falls back to SECURE_AUTH_KEY)
-
-// Optional — hard-code a trusted key instead of (or alongside) enrolment:
-define('TAW_HUB_KEYS', json_encode([
-    'hub-prod' => [
-        'secret'       => '…64+ hex chars…',        // HMAC-SHA256, or:
-        'public_key'   => '…base64 Ed25519 pubkey…',
-        'capabilities' => ['hub:read', 'hub:deploy', 'hub:config', 'hub:maintenance'],
-    ],
-]));
-```
-
-When `TAW_HUB_ENABLED` is absent the integration is completely inert — no routes registered, no hooks added.
-
-### Request authentication
-
-Every request (except `/handshake`) carries `X-TAW-Hub-{Scheme,Key-Id,Timestamp,Nonce,Signature}`. The signature is HMAC-SHA256 (`hmac-sha256`, hex) or Ed25519 (`ed25519`, base64) over a frozen `v1` canonical string — `v1\n{METHOD}\n{route}\n{sha256-hex(body)}\n{timestamp}\n{nonce}`. A ±60s timestamp drift is enforced and every nonce is single-use (WP-transient replay cache). Keys come from `TAW_HUB_KEYS` and/or runtime enrolment.
-
-`POST /handshake` trades a valid single-use `TAW_HUB_ENROLMENT_TOKEN` (checked with `hash_equals`) plus the Hub's Ed25519 public key for a stored credential; granted capabilities are the intersection of what the Hub requests and `hub:read|deploy|config|maintenance` (`*` is never grantable this way). Enrolled keys hold public keys only and live in the `taw_hub_enrolled_keys` option.
-
-### Routes
-
-| Method | Endpoint | Capability | Purpose |
-|--------|----------|-----------|---------|
-| `GET`  | `/taw-hub/v1/health` | `hub:read` | environment report (PHP/MySQL/WP versions, ext-sodium, object cache, disk) |
-| `GET`  | `/taw-hub/v1/telemetry/{environment\|blocks\|assets\|full}` | `hub:read` | block inventory + hash, Vite manifest state + hash |
-| `POST` | `/taw-hub/v1/handshake` | — (enrolment token) | Ed25519 pairing, single-use |
-| `GET`  | `/taw-hub/v1/command/actions` | `hub:read` | the action allow-list + each action's capability |
-| `POST` | `/taw-hub/v1/command` `{action, args}` | route: `hub:read`, then the action's own | the single dispatch path |
-| `POST` | `/taw-hub/v1/cache/flush` `{scopes[]}` | `hub:maintenance` | `wp_cache_flush` / `opcache_reset` / `flush_rewrite_rules` |
-| `PUT`  | `/taw-hub/v1/config/blocks` `{config, mode, expected_version}` | `hub:config` | writes `taw_hub_block_config`, optimistic-concurrency |
-| `GET`  | `/taw-hub/v1/audit` `?limit=&since=` | `hub:read` | the audit trail |
-
-There is **no arbitrary-command endpoint**. `/command` resolves against a fixed registry — `report-telemetry`, `flush-caches`, `sync-blocks`, `deploy-assets`, `rollback-assets` — and re-checks the caller's capability against the specific action even after the route guard passes. Asset deploy/rollback go through `/command` so there's one audited path.
-
-Pushed archives are extracted entry-by-entry (never `ZipArchive::extractTo()`): path-traversal, symlink entries, a non-allow-listed extension (`php` is not on the list), and per-file / total / compression-ratio limits are all rejected. A deploy stages into a same-filesystem sibling of the build directory, validates the Vite manifest against the extracted files, then swaps by atomic `rename()`, keeping one rollback generation.
-
-Every authorization decision and every dispatched action is written to a `{$wpdb->prefix}taw_hub_audit` table (created on `admin_init` behind a version gate; the in-memory store is the fallback).
-
-### `wp taw hub` (WP-CLI)
-
-Registered only when the integration is enabled and WP-CLI is loaded. Runs through the *same* action registry as `/command` — terminal parity with the Hub over the bounded action set, never an open-ended command.
-
-```bash
-wp taw hub actions                                              # list the invocable actions
-wp taw hub run flush-caches --args='{"scopes":["object","rewrites"]}'
-wp taw hub run report-telemetry
-wp taw hub status                                               # enabled? enrolment used? trusted key count
-```
 
 ---
 
