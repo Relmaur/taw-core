@@ -4,10 +4,29 @@
 "Management Hub" that orchestrates many TAW sites (telemetry, asset deployment, block
 config sync, cache invalidation). This namespace is the receiver side only.
 
-**Status: Phases 1–3c done.** `Security/`, `Telemetry/`, the read-only + enrolment REST
-routes, and the `Assets/` deployment pipeline are implemented and unit-tested. No route
-calls `Assets/` yet (that's 3d), and nothing is wired into `Theme::boot()` — the
-integration stays inert until Phase 4.
+**Status: Phase 3 complete.** The whole receiver — `Security/`, `Telemetry/`, `Assets/`,
+`Orchestration/`, and every `taw-hub/v1` route — is implemented and unit-tested (247
+tests). Nothing is wired into `Theme::boot()` yet: `HubRoutes::register()` and
+`HubServices::boot()` exist but aren't called. Phase 4 flips the switch.
+
+### Routes (`wp-json/taw-hub/v1/`)
+
+| Route | Method | Route guard | Notes |
+|---|---|---|---|
+| `/health` | GET | `hub:read` | environment report |
+| `/telemetry/{environment\|blocks\|assets\|full}` | GET | `hub:read` | |
+| `/handshake` | POST | — (enrolment token in body) | single-use pairing |
+| `/command/actions` | GET | `hub:read` | the allow-list + each action's capability |
+| `/command` `{action,args}` | POST | `hub:read` route guard, **then the action's own capability** | the one dispatch path |
+| `/cache/flush` `{scopes[]}` | POST | `hub:maintenance` | → `flush-caches` action |
+| `/config/blocks` `{config,mode,expected_version}` | PUT | `hub:config` | → `sync-blocks` action |
+| `/audit` `?limit=&since=` | GET | `hub:read` | |
+
+Asset deploy/rollback go through `/command` (`deploy-assets` / `rollback-assets`) so
+there is exactly one dispatch + audit path. **There is no arbitrary-exec action** —
+`ActionRegistry` is the complete list (`report-telemetry`, `flush-caches`, `sync-blocks`,
+`deploy-assets`, `rollback-assets`), each gated by its own `hub:*` capability, re-checked
+in `CommandDispatcher` against the specific action even after the route guard passed.
 
 ### Asset deployment safety (`Assets/`)
 
@@ -120,8 +139,8 @@ Capabilities are coarse action groups, not WP caps. `*` = break-glass, grants ev
 | 3a | `HubConfig` (opt-in flag + drift tunable); `Telemetry/` — `EnvironmentReport`, `BlockInventory`, `AssetInventory`, `TelemetrySnapshot` | **done, tested** |
 | 3b | `Security/EnrolmentService` + KeyStore/SiteSigner/EnrolmentLedger seams; `Api/` — `RestRequestAdapter`, `HubRoutes` (`/health`, `/telemetry/*`, `/handshake`) | **done, tested** |
 | 3c | `Assets/` — `PayloadExtractor` (per-entry: traversal / symlink / ext-allowlist / size + zip-bomb limits), `ViteManifestValidator`, `DeploymentTransaction` (stage → validate → atomic rename swap → keep 1 rollback) | **done, tested** |
-| 3d | `Orchestration/` — `Contracts/Action`, `ActionRegistry` (the allow-list), `Actions/*`, persistent `AuditLog` (custom table); `/config/blocks`, `/cache/flush`, `/command` | not started |
-| 4 | `HubIntegration::enable()/init()`, wired into `Theme::boot()` as subsystem #12; CLI commands (`wp taw sync-blocks`, `wp taw deploy-assets`, `taw hub:enrol`) | not started |
+| 3d | `Orchestration/` — `Contracts/Action`, `ActionRegistry` (the allow-list), `Actions/*`, `AuditLog` + `AuditStore` (wpdb / array) + `AuditSchema`; `Api/CommandDispatcher`; routes `/command`, `/command/actions`, `/cache/flush`, `/config/blocks`, `/audit` | **done, tested** |
+| 4 | `HubIntegration::enable()/init()` + `HubServices::boot()` wired into `Theme::boot()` as subsystem #12; activation hook → `AuditSchema::ensureTable()`; CLI commands (`wp taw sync-blocks`, `wp taw deploy-assets`, `taw hub:enrol`) | not started |
 
 Full endpoint map and module tree: see the Phase 1 architecture notes (also mirrored into
 taw-docs when Phase 3 lands).
