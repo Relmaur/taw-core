@@ -16,14 +16,16 @@ if (!defined('ABSPATH')) {
  *
  *   define('TAW_HUB_KEYS', json_encode([
  *       'hub-prod' => [
- *           'secret'       => '…64+ hex chars…',
+ *           'secret'       => '…64+ hex chars…',           // HMAC-SHA256
+ *           'public_key'   => '…base64 Ed25519 pubkey…',   // optional, either or both
  *           'capabilities' => ['hub:read', 'hub:deploy', 'hub:config', 'hub:maintenance'],
  *       ],
  *   ]));
  *
- * Malformed entries (missing/empty secret, non-array spec, non-string key id)
- * are skipped silently rather than throwing — a single bad entry must not lock
- * the whole integration out.
+ * An entry needs at least one of `secret` / `public_key` to be kept. Malformed
+ * entries (no usable material, non-array spec, non-string key id) are skipped
+ * silently rather than throwing — a single bad entry must not lock the whole
+ * integration out.
  */
 final class KeyRing
 {
@@ -65,7 +67,12 @@ final class KeyRing
             }
 
             $secret = $spec['secret'] ?? null;
-            if (!is_string($secret) || $secret === '') {
+            $secret = is_string($secret) && $secret !== '' ? $secret : null;
+
+            $publicKey = $spec['public_key'] ?? null;
+            $publicKey = is_string($publicKey) && $publicKey !== '' ? $publicKey : null;
+
+            if ($secret === null && $publicKey === null) {
                 continue;
             }
 
@@ -78,7 +85,7 @@ final class KeyRing
                 }
             }
 
-            $keys[$keyId] = new HubKey($keyId, $secret, $capabilities);
+            $keys[$keyId] = new HubKey($keyId, $secret, $capabilities, $publicKey);
         }
 
         return new self($keys);

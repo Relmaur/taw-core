@@ -9,6 +9,7 @@ use TAW\Hub\Security\HmacRequestVerifier;
 use TAW\Hub\Security\HubKey;
 use TAW\Hub\Security\InboundRequest;
 use TAW\Hub\Security\KeyRing;
+use TAW\Hub\Security\SignaturePreflight;
 use TAW\Hub\Security\VerificationException;
 use TAW\Tests\TestCase;
 
@@ -50,7 +51,8 @@ final class HmacRequestVerifierTest extends TestCase
             self::KEY_ID => new HubKey(self::KEY_ID, self::SECRET, ['hub:read', 'hub:deploy']),
         ]);
 
-        $this->verifier = new HmacRequestVerifier($ring, $this->nonces, 60, fn (): int => self::NOW);
+        $preflight = new SignaturePreflight($ring, $this->nonces, 60, fn (): int => self::NOW);
+        $this->verifier = new HmacRequestVerifier($preflight);
     }
 
     public function test_a_correctly_signed_request_resolves_to_its_key_identity(): void

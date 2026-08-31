@@ -4,7 +4,8 @@
 "Management Hub" that orchestrates many TAW sites (telemetry, asset deployment, block
 config sync, cache invalidation). This namespace is the receiver side only.
 
-**Status: Phase 1 in progress.** `Security/` is implemented and unit-tested. Nothing is
+**Status: Phases 1–2 done.** The full `Security/` layer (HMAC + Ed25519 verification,
+scheme routing, auth middleware, audit sink) is implemented and unit-tested. Nothing is
 wired into `Theme::boot()` yet — the integration is inert until that lands (Phase 4).
 
 ---
@@ -89,23 +90,37 @@ Capabilities are coarse action groups, not WP caps. `*` = break-glass, grants ev
 | Phase | Scope | State |
 |---|---|---|
 | 1 | `Security/` — HMAC verify, canonical string, key ring, nonce store | **done, tested** |
-| 2 | `Security/Ed25519Verifier` + `EnrolmentService` (asymmetric handshake / TOFU) | not started |
-| 2 | `Security/HubAuthMiddleware` — `permission_callback` factory, capability gating, audit hook | not started |
-| 3 | `Api/` — `taw-hub/v1` routes; `Telemetry/` collectors; `Assets/` (zip-slip-safe extract + atomic swap + rollback); `Orchestration/` action registry + audit log | not started |
+| 2 | `Security/` — Ed25519 verifier, scheme router, auth middleware + audit sink | **done, tested** |
+| 3 | `Security/EnrolmentService` (Ed25519 handshake / TOFU key registration — pairs with the `/handshake` route); `Api/` — `taw-hub/v1` routes; `Telemetry/` collectors; `Assets/` (zip-slip-safe extract + atomic swap + rollback); `Orchestration/` action registry + persistent audit log | not started |
 | 4 | `HubIntegration::enable()/init()`, wired into `Theme::boot()` as subsystem #12; CLI commands (`wp taw sync-blocks`, `wp taw deploy-assets`, `taw hub:enrol`) | not started |
 
 Full endpoint map and module tree: see the Phase 1 architecture notes (also mirrored into
 taw-docs when Phase 3 lands).
 
+### Signature encoding by scheme
+
+| Scheme (`X-TAW-Hub-Scheme`) | `X-TAW-Hub-Signature` | Enrolled material (`TAW_HUB_KEYS`) |
+|---|---|---|
+| `hmac-sha256` (default) | 64-char hex of HMAC-SHA256 | `secret` |
+| `ed25519` | base64 (standard or URL-safe) of the 64-byte detached signature | `public_key` (base64, 32 bytes) |
+
+A key may carry `secret`, `public_key`, or both. `SchemeRouter` picks the verifier from the
+header; each verifier also re-checks the scheme (defense in depth).
+
 ---
 
 ## Files in `Security/`
 
-- `Contracts/RequestVerifier`, `Contracts/NonceStore` — the two seams
+- `Contracts/RequestVerifier`, `Contracts/NonceStore`, `Contracts/AuditSink` — the seams
 - `InboundRequest` — framework-agnostic request DTO (`::fromRestRequest()` adapter)
 - `CanonicalRequest` — the frozen signing-string builder
-- `HmacRequestVerifier` — checks run cheapest-first, nonce spent only after signature passes
-- `KeyRing` / `HubKey` — trusted credentials from `TAW_HUB_KEYS`
+- `SignaturePreflight` — every non-crypto check, shared by both verifiers; nonce spent via `spend()`
+- `HmacRequestVerifier` / `Ed25519Verifier` — the crypto step + nonce burn only
+- `SchemeRouter` — dispatches to a verifier by `X-TAW-Hub-Scheme` (`::standard()` wires both)
+- `KeyRing` / `HubKey` — trusted credentials from `TAW_HUB_KEYS` (`secret` and/or `public_key`)
 - `HubIdentity` — resolved caller + `can(capability)`
+- `HubAuthMiddleware` — enabled-check → verify → capability gate → audit; returns `AuthOutcome`
+- `AuthOutcome` — maps to 200 / 404 (disabled) / 401 / 403 for the REST layer
+- `ErrorLogAuditSink` — default `[TAW Hub]` error-log audit; Phase 3 adds a persistent one
 - `TransientNonceStore` — replay cache over WP transients
 - `VerificationException` — carries a stable `reason()` slug

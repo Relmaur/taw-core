@@ -69,6 +69,40 @@ final class KeyRingTest extends TestCase
         $this->assertSame(['hub:read'], $ring->find('hub-prod')?->capabilities());
     }
 
+    public function test_a_public_key_only_entry_is_kept(): void
+    {
+        $ring = KeyRing::fromArray([
+            'hub-asym' => ['public_key' => 'Zm9vYmFyMzJieXRlcw==', 'capabilities' => ['hub:read']],
+        ]);
+
+        $key = $ring->find('hub-asym');
+
+        $this->assertInstanceOf(HubKey::class, $key);
+        $this->assertNull($key->secret());
+        $this->assertSame('Zm9vYmFyMzJieXRlcw==', $key->publicKey());
+    }
+
+    public function test_a_key_can_carry_both_a_secret_and_a_public_key(): void
+    {
+        $key = KeyRing::fromArray([
+            'hub-both' => ['secret' => 's3cr3t', 'public_key' => 'cHVibGljLWtleQ=='],
+        ])->find('hub-both');
+
+        $this->assertSame('s3cr3t', $key?->secret());
+        $this->assertSame('cHVibGljLWtleQ==', $key?->publicKey());
+    }
+
+    public function test_an_entry_with_neither_secret_nor_public_key_is_skipped(): void
+    {
+        $ring = KeyRing::fromArray([
+            'useless' => ['capabilities' => ['hub:read']],
+            'blank'   => ['secret' => '', 'public_key' => ''],
+        ]);
+
+        $this->assertNull($ring->find('useless'));
+        $this->assertNull($ring->find('blank'));
+    }
+
     public function test_an_empty_ring_reports_itself_empty(): void
     {
         $this->assertTrue(KeyRing::fromArray([])->isEmpty());
