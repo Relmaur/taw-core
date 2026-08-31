@@ -10,6 +10,11 @@ parameters:
     parallel:
         maximumNumberOfProcesses: 2
 
+    # WP-CLI isn't part of WordPress core — its symbols come from a separate
+    # stub package, needed for src/Hub/Cli.
+    scanFiles:
+        - vendor/php-stubs/wp-cli-stubs/wp-cli-stubs.php
+
     excludePaths:
         - vendor/
 

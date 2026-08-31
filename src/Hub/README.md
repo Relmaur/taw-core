@@ -4,10 +4,10 @@
 "Management Hub" that orchestrates many TAW sites (telemetry, asset deployment, block
 config sync, cache invalidation). This namespace is the receiver side only.
 
-**Status: Phase 3 complete.** The whole receiver — `Security/`, `Telemetry/`, `Assets/`,
-`Orchestration/`, and every `taw-hub/v1` route — is implemented and unit-tested (247
-tests). Nothing is wired into `Theme::boot()` yet: `HubRoutes::register()` and
-`HubServices::boot()` exist but aren't called. Phase 4 flips the switch.
+**Status: complete (Phases 1–4).** The whole receiver — `Security/`, `Telemetry/`,
+`Assets/`, `Orchestration/`, every `taw-hub/v1` route, `wp taw hub …` CLI — is
+implemented, unit-tested (248 tests), and wired into `Theme::boot()` as subsystem #12.
+It stays completely inert unless `TAW_HUB_ENABLED` is defined truthy in `wp-config.php`.
 
 ### Routes (`wp-json/taw-hub/v1/`)
 
@@ -140,7 +140,7 @@ Capabilities are coarse action groups, not WP caps. `*` = break-glass, grants ev
 | 3b | `Security/EnrolmentService` + KeyStore/SiteSigner/EnrolmentLedger seams; `Api/` — `RestRequestAdapter`, `HubRoutes` (`/health`, `/telemetry/*`, `/handshake`) | **done, tested** |
 | 3c | `Assets/` — `PayloadExtractor` (per-entry: traversal / symlink / ext-allowlist / size + zip-bomb limits), `ViteManifestValidator`, `DeploymentTransaction` (stage → validate → atomic rename swap → keep 1 rollback) | **done, tested** |
 | 3d | `Orchestration/` — `Contracts/Action`, `ActionRegistry` (the allow-list), `Actions/*`, `AuditLog` + `AuditStore` (wpdb / array) + `AuditSchema`; `Api/CommandDispatcher`; routes `/command`, `/command/actions`, `/cache/flush`, `/config/blocks`, `/audit` | **done, tested** |
-| 4 | `HubIntegration::enable()/init()` + `HubServices::boot()` wired into `Theme::boot()` as subsystem #12; activation hook → `AuditSchema::ensureTable()`; CLI commands (`wp taw sync-blocks`, `wp taw deploy-assets`, `taw hub:enrol`) | not started |
+| 4 | `HubIntegration::init()` wired into `Theme::boot()` #12 (gated on `HubConfig::enabled()`); `admin_init` version-gated `AuditSchema::ensureTable()`; `wp taw hub {actions,run,status}` CLI over the same `CommandDispatcher` | **done, tested** |
 
 Full endpoint map and module tree: see the Phase 1 architecture notes (also mirrored into
 taw-docs when Phase 3 lands).
