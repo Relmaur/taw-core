@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Hub\Security;
 
+use TAW\Hub\Security\Contracts\KeyStore;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -37,21 +39,33 @@ final class KeyRing
     }
 
     /**
-     * Build from the `TAW_HUB_KEYS` constant. Returns an empty ring (which
-     * rejects everything) when the constant is absent or unparseable.
+     * Build from the `TAW_HUB_KEYS` constant, optionally merged with keys a
+     * {@see KeyStore} registered at enrolment time. Constant entries win on an
+     * id collision — an operator-set credential outranks a self-registered one.
+     * Returns an empty ring (which rejects everything) when neither source has
+     * a usable key.
      */
-    public static function fromEnvironment(): self
+    public static function fromEnvironment(?KeyStore $store = null): self
     {
-        $json = defined('TAW_HUB_KEYS') ? constant('TAW_HUB_KEYS') : '';
+        $raw = [];
 
-        if (is_string($json) && $json !== '') {
-            $decoded = json_decode($json, true);
-            if (is_array($decoded)) {
-                return self::fromArray($decoded);
+        if ($store !== null) {
+            foreach ($store->all() as $keyId => $spec) {
+                $raw[$keyId] = $spec;
             }
         }
 
-        return new self([]);
+        $json = defined('TAW_HUB_KEYS') ? constant('TAW_HUB_KEYS') : '';
+        if (is_string($json) && $json !== '') {
+            $decoded = json_decode($json, true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $keyId => $spec) {
+                    $raw[$keyId] = $spec;
+                }
+            }
+        }
+
+        return self::fromArray($raw);
     }
 
     /**

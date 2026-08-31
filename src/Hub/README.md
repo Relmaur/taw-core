@@ -4,10 +4,24 @@
 "Management Hub" that orchestrates many TAW sites (telemetry, asset deployment, block
 config sync, cache invalidation). This namespace is the receiver side only.
 
-**Status: Phases 1–2 + 3a done.** The full `Security/` layer (HMAC + Ed25519 verification,
-scheme routing, auth middleware, audit sink), `HubConfig`, and the `Telemetry/` collectors
-are implemented and unit-tested. No REST routes yet, and nothing is wired into
-`Theme::boot()` — the integration is inert until Phase 4.
+**Status: Phases 1–3b done.** `Security/` (HMAC + Ed25519 verification, scheme routing,
+auth middleware, audit sink, enrolment), `Telemetry/`, and the read-only + enrolment REST
+routes (`Api/HubRoutes`) are implemented and unit-tested. `HubRoutes` is not yet called
+from `Theme::boot()` — the integration stays inert until Phase 4.
+
+### Enrolment / `wp-config.php`
+
+```php
+define('TAW_HUB_ENABLED', true);
+define('TAW_HUB_ENROLMENT_TOKEN', '…one-time random string…');  // burned after first handshake
+define('TAW_HUB_SECRET', '…32+ random bytes…');                 // seals the site's own key (else SECURE_AUTH_KEY)
+// TAW_HUB_KEYS is optional once enrolment is used — enrolled keys live in the
+// taw_hub_enrolled_keys option (Ed25519 public keys only, no secrets).
+```
+
+`POST /handshake` `{ enrolment_token, hub_public_key (base64), requested_capabilities[] }`
+→ `{ key_id, site_public_key, accepted_capabilities[] }`. Single-use; capabilities are
+intersected with `hub:read|deploy|config|maintenance` (`*` is never grantable by handshake).
 
 ---
 
@@ -93,7 +107,7 @@ Capabilities are coarse action groups, not WP caps. `*` = break-glass, grants ev
 | 1 | `Security/` — HMAC verify, canonical string, key ring, nonce store | **done, tested** |
 | 2 | `Security/` — Ed25519 verifier, scheme router, auth middleware + audit sink | **done, tested** |
 | 3a | `HubConfig` (opt-in flag + drift tunable); `Telemetry/` — `EnvironmentReport`, `BlockInventory`, `AssetInventory`, `TelemetrySnapshot` | **done, tested** |
-| 3b | `Security/EnrolmentService` (Ed25519 handshake / TOFU key registration — pairs with `/handshake`); `Api/` — `taw-hub/v1` routes + `WP_REST_Request` adapter for `HubAuthMiddleware` (`/health`, `/telemetry/*`, `/handshake`) | not started |
+| 3b | `Security/EnrolmentService` + KeyStore/SiteSigner/EnrolmentLedger seams; `Api/` — `RestRequestAdapter`, `HubRoutes` (`/health`, `/telemetry/*`, `/handshake`) | **done, tested** |
 | 3c | `Assets/` — `PayloadExtractor` (zip-slip-safe), `ViteManifestValidator`, `DeploymentTransaction` (stage → validate → atomic swap → keep 1 rollback); `/assets/deploy`, `/assets/rollback` | not started |
 | 3d | `Orchestration/` — `Contracts/Action`, `ActionRegistry` (the allow-list), `Actions/*`, persistent `AuditLog` (custom table); `/config/blocks`, `/cache/flush`, `/command` | not started |
 | 4 | `HubIntegration::enable()/init()`, wired into `Theme::boot()` as subsystem #12; CLI commands (`wp taw sync-blocks`, `wp taw deploy-assets`, `taw hub:enrol`) | not started |
