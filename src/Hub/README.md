@@ -4,9 +4,10 @@
 "Management Hub" that orchestrates many TAW sites (telemetry, asset deployment, block
 config sync, cache invalidation). This namespace is the receiver side only.
 
-**Status: Phases 1–2 done.** The full `Security/` layer (HMAC + Ed25519 verification,
-scheme routing, auth middleware, audit sink) is implemented and unit-tested. Nothing is
-wired into `Theme::boot()` yet — the integration is inert until that lands (Phase 4).
+**Status: Phases 1–2 + 3a done.** The full `Security/` layer (HMAC + Ed25519 verification,
+scheme routing, auth middleware, audit sink), `HubConfig`, and the `Telemetry/` collectors
+are implemented and unit-tested. No REST routes yet, and nothing is wired into
+`Theme::boot()` — the integration is inert until Phase 4.
 
 ---
 
@@ -91,7 +92,10 @@ Capabilities are coarse action groups, not WP caps. `*` = break-glass, grants ev
 |---|---|---|
 | 1 | `Security/` — HMAC verify, canonical string, key ring, nonce store | **done, tested** |
 | 2 | `Security/` — Ed25519 verifier, scheme router, auth middleware + audit sink | **done, tested** |
-| 3 | `Security/EnrolmentService` (Ed25519 handshake / TOFU key registration — pairs with the `/handshake` route); `Api/` — `taw-hub/v1` routes; `Telemetry/` collectors; `Assets/` (zip-slip-safe extract + atomic swap + rollback); `Orchestration/` action registry + persistent audit log | not started |
+| 3a | `HubConfig` (opt-in flag + drift tunable); `Telemetry/` — `EnvironmentReport`, `BlockInventory`, `AssetInventory`, `TelemetrySnapshot` | **done, tested** |
+| 3b | `Security/EnrolmentService` (Ed25519 handshake / TOFU key registration — pairs with `/handshake`); `Api/` — `taw-hub/v1` routes + `WP_REST_Request` adapter for `HubAuthMiddleware` (`/health`, `/telemetry/*`, `/handshake`) | not started |
+| 3c | `Assets/` — `PayloadExtractor` (zip-slip-safe), `ViteManifestValidator`, `DeploymentTransaction` (stage → validate → atomic swap → keep 1 rollback); `/assets/deploy`, `/assets/rollback` | not started |
+| 3d | `Orchestration/` — `Contracts/Action`, `ActionRegistry` (the allow-list), `Actions/*`, persistent `AuditLog` (custom table); `/config/blocks`, `/cache/flush`, `/command` | not started |
 | 4 | `HubIntegration::enable()/init()`, wired into `Theme::boot()` as subsystem #12; CLI commands (`wp taw sync-blocks`, `wp taw deploy-assets`, `taw hub:enrol`) | not started |
 
 Full endpoint map and module tree: see the Phase 1 architecture notes (also mirrored into
