@@ -4,10 +4,21 @@
 "Management Hub" that orchestrates many TAW sites (telemetry, asset deployment, block
 config sync, cache invalidation). This namespace is the receiver side only.
 
-**Status: Phases 1–3b done.** `Security/` (HMAC + Ed25519 verification, scheme routing,
-auth middleware, audit sink, enrolment), `Telemetry/`, and the read-only + enrolment REST
-routes (`Api/HubRoutes`) are implemented and unit-tested. `HubRoutes` is not yet called
-from `Theme::boot()` — the integration stays inert until Phase 4.
+**Status: Phases 1–3c done.** `Security/`, `Telemetry/`, the read-only + enrolment REST
+routes, and the `Assets/` deployment pipeline are implemented and unit-tested. No route
+calls `Assets/` yet (that's 3d), and nothing is wired into `Theme::boot()` — the
+integration stays inert until Phase 4.
+
+### Asset deployment safety (`Assets/`)
+
+`PayloadExtractor` never calls `ZipArchive::extractTo()`. Every entry is checked: no `..`
+/ absolute / backslash / NUL, resolved path must stay inside the destination, no symlink
+entries, extension must be on the allow-list (`js css map json svg png … woff2 …` — **no
+`php`**), and per-file / total / compression-ratio limits ({@see Assets\ExtractionLimits},
+defaults 25 MB / 150 MB / 200×). `DeploymentTransaction` stages into a dot-prefixed sibling
+of the build dir (same filesystem → `rename()` is atomic), validates the Vite manifest
+against the extracted file set, then swaps: live build → `.taw-hub-rollback-<id>`, staging
+→ live. One rollback generation is kept.
 
 ### Enrolment / `wp-config.php`
 
@@ -108,7 +119,7 @@ Capabilities are coarse action groups, not WP caps. `*` = break-glass, grants ev
 | 2 | `Security/` — Ed25519 verifier, scheme router, auth middleware + audit sink | **done, tested** |
 | 3a | `HubConfig` (opt-in flag + drift tunable); `Telemetry/` — `EnvironmentReport`, `BlockInventory`, `AssetInventory`, `TelemetrySnapshot` | **done, tested** |
 | 3b | `Security/EnrolmentService` + KeyStore/SiteSigner/EnrolmentLedger seams; `Api/` — `RestRequestAdapter`, `HubRoutes` (`/health`, `/telemetry/*`, `/handshake`) | **done, tested** |
-| 3c | `Assets/` — `PayloadExtractor` (zip-slip-safe), `ViteManifestValidator`, `DeploymentTransaction` (stage → validate → atomic swap → keep 1 rollback); `/assets/deploy`, `/assets/rollback` | not started |
+| 3c | `Assets/` — `PayloadExtractor` (per-entry: traversal / symlink / ext-allowlist / size + zip-bomb limits), `ViteManifestValidator`, `DeploymentTransaction` (stage → validate → atomic rename swap → keep 1 rollback) | **done, tested** |
 | 3d | `Orchestration/` — `Contracts/Action`, `ActionRegistry` (the allow-list), `Actions/*`, persistent `AuditLog` (custom table); `/config/blocks`, `/cache/flush`, `/command` | not started |
 | 4 | `HubIntegration::enable()/init()`, wired into `Theme::boot()` as subsystem #12; CLI commands (`wp taw sync-blocks`, `wp taw deploy-assets`, `taw hub:enrol`) | not started |
 
