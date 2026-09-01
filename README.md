@@ -991,9 +991,12 @@ php bin/taw seo:extract 42 --output=.taw/seo-dump.json         # copy audit: ext
 php bin/taw seo:inject 42 --input=.taw/seo-optimized.json      # copy audit: write rewrites back
 php bin/taw wp post list --post_type=page                      # WP-CLI passthrough, socket/--path auto-resolved (see below)
 php bin/taw icons:sync                                          # re-vendor the Lucide icon set (see Icon System)
+php bin/taw hub:install --activate                              # install the taw-hub-companion fleet-management plugin (see below)
 ```
 
 `make:block` generates the block folder, PHP class, template file, and Vite entry points.
+
+`hub:install` fetches [`taw-hub-companion`](https://github.com/Relmaur/taw-hub-companion) into `wp-content/plugins/` (git clone; `--update` to pull latest, `--activate` to also `wp plugin activate` it). That plugin is the signed `wp-json/taw-hub/v1/` receiver the [TAW Hub](https://github.com/Relmaur/taw-hub) control hub talks to — telemetry, framework syncs, allow-listed `bin/taw` runs. It is **not** bundled with the theme on purpose: only sites that join a managed fleet need it, and it's a security boundary with its own release cadence. The command only fetches the code and prints the remaining (deliberate) steps — adding `TAW_HUB_PUBLIC_KEY` to `wp-config.php` and registering the site's key with the Hub; the `hub-connect` skill orchestrates those interactively. Until `TAW_HUB_PUBLIC_KEY` is defined the plugin is inert.
 
 `fields:get`/`fields:set` are the read/write halves of the same primitive `VisualEditorEndpoint` uses for its REST-driven saves — they resolve a field's type from the live `Metabox` registry, then dispatch to the matching type-aware getter/sanitizer (`Metabox::get_repeater()`, `sanitizeRepeaterRows()`, etc.), so a repeater, `post_select`, or `files` field is read/written in exactly the shape the admin form itself would produce, with the same sanitization rules (XSS-stripping, ID coercion, JSON re-encoding). `fields:set` takes `--file=path.json` for repeater/array-shaped values, to sidestep shell JSON-quoting, and `--dry-run` to preview the sanitized result without writing. Both commands boot WordPress, like `inspect` — field configs and post data only exist once WordPress is loaded, so they walk up from the theme directory to find `wp-load.php` via the shared `TAW\CLI\WpLoader` helper.
 
