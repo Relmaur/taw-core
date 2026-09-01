@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Support;
 
+use TAW\Core\Log\Logger;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -80,8 +82,11 @@ class EmailConfig
         }
 
         if (!class_exists(\Emailit\EmailitClient::class)) {
-            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-            error_log('[TAW EmailConfig] emailit/emailit-php is not installed. Run: composer require emailit/emailit-php');
+            Logger::warning(
+                'mail.emailit_package_missing',
+                'EmailConfig::useEmailit() is active but emailit/emailit-php is not installed — falling back to wp_mail().',
+                ['suggestion' => 'composer require emailit/emailit-php'],
+            );
             return null;
         }
 
@@ -114,8 +119,11 @@ class EmailConfig
 
             return true;
         } catch (\Throwable $e) {
-            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-            error_log('[TAW EmailConfig] Emailit send failed: ' . $e->getMessage() . ' — falling back to wp_mail().');
+            Logger::error(
+                'mail.emailit_send_failed',
+                'Emailit send failed — falling back to wp_mail().',
+                ['exception' => get_class($e), 'error' => $e->getMessage()],
+            );
             return null;
         }
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core\Form;
 
+use TAW\Core\Log\Logger;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -79,7 +80,9 @@ final class Turnstile
         ]);
 
         if (is_wp_error($response)) {
-            error_log('[TAW Form] Turnstile verification request failed: ' . $response->get_error_message());
+            Logger::warning('form.turnstile_request_failed', 'Turnstile verification request failed.', [
+                'error' => $response->get_error_message(),
+            ]);
             return false;
         }
 

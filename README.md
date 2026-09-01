@@ -831,6 +831,37 @@ Cross-origin access to these routes (and to `admin-ajax.php?action=taw_form_*`) 
 
 ---
 
+## Logging
+
+`TAW\Core\Log\Logger` is the framework's structured log facade — a single, queryable replacement for the ad-hoc `error_log('[TAW …] …')` calls the codebase used to scatter around. It's always on, no `enable()` call.
+
+```php
+use TAW\Core\Log\Logger;
+
+Logger::error('mail.emailit_send_failed', 'Emailit send failed — falling back to wp_mail().', [
+    'exception' => $e::class,
+    'error'     => $e->getMessage(),
+]);
+
+// Level helpers: debug() info() notice() warning() error() critical()
+// (PSR-3 minus alert/emergency). Logger::log($level, $code, $message, $context) is the generic form.
+```
+
+Every entry carries **both** a human sentence (`message`) and a machine-stable, dot-namespaced `code` (`subsystem.event` — `form.email_delivery_failed`, `svg.sanitizer_library_missing`, …) plus a `context` array of the concrete values. The `code` is the contract an AI agent or the [TAW Hub](https://github.com/Relmaur/taw-hub) filters on; treat shipped codes as stable, add new ones freely.
+
+**Two sinks by default:**
+
+| Sink | Destination | For |
+|---|---|---|
+| `ErrorLogSink` | PHP `error_log()` — one line: `[TAW] [ERROR] mail.emailit_send_failed: … {"context":"json"}` | humans; whatever already tails the error log |
+| `JsonlFileSink` | `wp-content/taw-logs/taw.log.jsonl` — one JSON object per line, size-rotated (~5 MB × 3) | machines: `bin/taw log:tail`, and the `taw-hub-companion` `/logs` route |
+
+The log directory sits in `wp-content/` (not the public `uploads/`) and is seeded with a deny-all `.htaccess` + `index.php` on first write. Two filters: `taw_core_log_sinks` (swap/add destinations) and `taw_core_log_entry` (enrich every entry — e.g. tag it with a site id — without `taw/core` knowing what's listening). `Logger::setSinks()` overrides them outright, mainly for tests.
+
+`TAW\Core\Log\LogReader` reads the JSONL file back (level / `code`-prefix / `since` filters); it's the shared building block behind `bin/taw log:tail` and the Hub route.
+
+---
+
 ## SVG Support
 
 ```php
@@ -992,6 +1023,7 @@ php bin/taw seo:inject 42 --input=.taw/seo-optimized.json      # copy audit: wri
 php bin/taw wp post list --post_type=page                      # WP-CLI passthrough, socket/--path auto-resolved (see below)
 php bin/taw icons:sync                                          # re-vendor the Lucide icon set (see Icon System)
 php bin/taw hub:install --activate                              # install the taw-hub-companion fleet-management plugin (see below)
+php bin/taw log:tail --level=error --limit=100                  # read back the structured log (see Logging)
 ```
 
 `make:block` generates the block folder, PHP class, template file, and Vite entry points.
@@ -1009,6 +1041,8 @@ The two skills directories (`.claude/skills/`, `.agents/skills/`) are Tier 1 but
 `seo:extract`/`seo:inject` are the read/write halves of a copy-and-SEO audit loop — see below.
 
 `wp` is a thin passthrough to WordPress's own official CLI (the real `wp` binary, found on `PATH` via `Symfony\Component\Process\ExecutableFinder`) — every argument after `wp` is forwarded exactly as given, unparsed. Resolves two things that otherwise need manual, hand-typed configuration every time under Local by Flywheel: `--path` (the WordPress root, via the same `WpLoader::locate()` logic every other WP-booting command here uses) and the per-site MySQL socket (`WpLoader::resolveLocalSocket()` — Local runs a separate MySQL instance per site on its own Unix socket, not the system default `mysqli.default_socket`/`pdo_mysql.default_socket` PHP CLI otherwise uses, so a bare `wp` command run from an ordinary terminal fails with a DB connection error even though the site works fine in the browser). A no-op wrapper everywhere this doesn't apply (real hosting, CI, DDEV, Herd) — it still resolves `--path` and runs `wp` normally, just without the extra `-d` flags.
+
+`log:tail` prints the most recent entries from `wp-content/taw-logs/taw.log.jsonl` (the file `TAW\Core\Log\JsonlFileSink` writes) — `--level=`, `--code=` (prefix match), `--since=` (ISO-8601), `--limit=` (default 50), `--json` for raw output to pipe. Resolves `wp-content` from `wp-load.php` via `WpLoader` like the other WP-adjacent commands; it does not boot WordPress. See [Logging](#logging).
 
 `icons:sync` re-vendors the Lucide icon set this package ships (see [Icon System](#icon-system)) — shallow-clones `lucide-icons/lucide`, copies every icon SVG into `resources/icons/lucide/`, and rebuilds `resources/icons/lucide-index.json`. Doesn't boot WordPress or touch a consuming theme; only run it here, in `taw-core` itself, when Lucide ships new icons.
 

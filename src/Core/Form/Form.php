@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core\Form;
 
+use TAW\Core\Log\Logger;
 use TAW\Core\Mail\Mailer;
 use TAW\Helpers\Framework;
 
@@ -398,7 +399,11 @@ class Form
                 $this->cleanupUploadedFiles($data);
                 wp_send_json_error(['general' => $e->getMessage()]);
             } catch (\Throwable $e) {
-                error_log('[TAW Form] on_submit callback for form "' . $this->id . '" threw an unexpected ' . get_class($e) . ': ' . $e->getMessage());
+                Logger::error(
+                    'form.on_submit_callback_threw',
+                    sprintf('on_submit callback for form "%s" threw an unexpected %s.', $this->id, get_class($e)),
+                    ['form_id' => $this->id, 'exception' => get_class($e), 'error' => $e->getMessage()],
+                );
                 $this->cleanupUploadedFiles($data);
                 wp_send_json_error(['general' => __('Something went wrong. Please try again.', 'taw')]);
             }
@@ -406,7 +411,11 @@ class Form
 
         $sent = $this->sendEmail($data);
         if (!$sent) {
-            error_log('[TAW Form] Email delivery failed for form "' . $this->id . '" — submission was saved to the database.');
+            Logger::error(
+                'form.email_delivery_failed',
+                sprintf('Email delivery failed for form "%s" — submission was saved to the database.', $this->id),
+                ['form_id' => $this->id],
+            );
         }
 
         wp_send_json_success([
@@ -474,7 +483,11 @@ class Form
                 // Malformed pattern in the field config itself — a developer
                 // error, not a user-input problem. Fail safe (reject) and log,
                 // rather than silently accepting anything.
-                error_log('[TAW Form] Invalid pattern in field "' . $field['id'] . '": ' . $field['pattern']);
+                Logger::warning(
+                    'form.invalid_field_pattern',
+                    sprintf('Invalid regex pattern in field "%s" — rejecting the value fail-safe.', $field['id']),
+                    ['form_id' => $this->id, 'field_id' => $field['id'], 'pattern' => $field['pattern']],
+                );
                 return sprintf(__('%s could not be validated.', 'taw'), $label);
             }
             if ($matched === 0) {
@@ -769,7 +782,11 @@ class Form
                     ->send();
             }
         } catch (\Throwable $e) {
-            error_log('[TAW Form] sendWithTemplate failed for form "' . $this->id . '": ' . $e->getMessage());
+            Logger::error(
+                'form.send_with_template_failed',
+                sprintf('sendWithTemplate failed for form "%s".', $this->id),
+                ['form_id' => $this->id, 'exception' => get_class($e), 'error' => $e->getMessage()],
+            );
             return false;
         }
 

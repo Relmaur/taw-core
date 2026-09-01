@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Helpers;
 
+use TAW\Core\Log\Logger;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -241,7 +242,11 @@ class Svg
         // Check whether the enshrined/svg-sanitize library is available. If so, use it for robust sanitization; if not, fall back to a simpler custom sanitizer.
         if (!class_exists(\enshrined\svgSanitize\Sanitizer::class)) {
 
-            error_log('Warning: enshrined/svg-sanitize library not found. SVG sanitization will be less robust. Consider installing it via Composer for better security.');
+            Logger::warning(
+                'svg.sanitizer_library_missing',
+                'enshrined/svg-sanitize not found — falling back to the built-in sanitizer, which covers fewer SVG/XSS vectors.',
+                ['suggestion' => 'composer require enshrined/svg-sanitize'],
+            );
 
             // Without enshrine/svg:
             // Strip PHP processing instructions before the XML parser sees them
