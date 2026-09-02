@@ -300,13 +300,15 @@ BlockRegistry::render('post_grid--noticias');
 
 the edit screen for any page assigned that template will always show those blocks' metaboxes in that exact order, and dragging is disabled. This works via a static scan of the template file (it's never executed in wp-admin). Boxes not tied to a block on the page (e.g. core WordPress boxes) keep their relative position and render after the ordered ones.
 
-Template resolution mirrors WordPress's own hierarchy, not just the raw Page Attributes selection:
+Template resolution mirrors WordPress's own hierarchy, not just the raw Page Attributes selection. Candidates are tried highest-priority first:
 
-- If the post has an explicit page template selected (`get_page_template_slug()`), that file is used — as above.
-- Otherwise, if the post is the site's static front page (Settings → Reading), `front-page.php` is used automatically — no `Template Name:` header or Page Attributes selection required, since `front-page.php` renders whenever `is_front_page()` is true regardless of what's picked in that dropdown.
-- Posts matching neither are left unordered.
+- An explicitly-selected page template (`_wp_page_template`, the Page Attributes dropdown) — as above.
+- `front-page.php` for the site's static front page (Settings → Reading) — no `Template Name:` header or Page Attributes selection required, since `front-page.php` renders whenever `is_front_page()` is true regardless of what's picked in that dropdown.
+- `home.php` for the posts page (Settings → Reading → "Posts page") — same filename convention, no meta written.
+- `page-{slug}.php` for a page whose slug is `{slug}` — WordPress applies it automatically via the template hierarchy, again with no meta written.
+- Posts matching none of these are left unordered.
 
-The posts page (`page_for_posts` / `home.php`) has the same filename-convention resolution in core WordPress but isn't handled yet — a candidate for the same treatment if needed.
+Both this resolution and the `screens` template matching in `Metabox` share one code path (`Metabox::templateCandidatesForPost()`), so they can't drift apart.
 
 ---
 

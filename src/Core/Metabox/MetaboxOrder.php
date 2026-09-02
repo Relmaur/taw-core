@@ -27,11 +27,12 @@ if (!defined('ABSPATH')) {
  * The latter statically scans the template file that will actually render
  * the post for `BlockRegistry::render('block_id')` calls (in source order —
  * the file is never executed) and maps each block ID to the metabox ID(s) it
- * registered via Metabox::getFieldRegistry(). Resolves the explicitly
- * selected page template (get_page_template_slug) first, then falls back to
- * front-page.php for the site's static front page — no Template Name header
- * or Page Attributes selection required for that case. Posts with neither
- * are left unordered.
+ * registered via Metabox::getFieldRegistry(). Template resolution mirrors
+ * WordPress's own hierarchy via Metabox::templateCandidatesForPost(): an
+ * explicitly-selected page template (`_wp_page_template`) wins, then the
+ * filename conventions that need no Page Attributes selection —
+ * `front-page.php` (static front page), `home.php` (posts page), and
+ * `page-{slug}.php`. Posts matching none of these are left unordered.
  */
 class MetaboxOrder
 {
@@ -82,21 +83,22 @@ class MetaboxOrder
      * Resolve the metabox order for a post from the template that will
      * actually render it.
      *
-     * Prefers the explicitly-selected page template (Page Attributes
-     * dropdown / _wp_page_template meta). If none is set, falls back to
-     * WordPress's own template-hierarchy conventions for the static front
-     * page — front-page.php renders whenever is_front_page() is true,
-     * regardless of what (if anything) is selected in Page Attributes, and
-     * usually can't even be selected there since it rarely declares a
-     * Template Name header.
+     * Walks Metabox::templateCandidatesForPost() — the same WordPress
+     * template-hierarchy resolution Metabox::postMatchesTemplate() uses — in
+     * priority order and locks onto the first candidate that resolves to a
+     * real file in the theme. That covers an explicitly-selected page
+     * template (`_wp_page_template`) as well as the filename conventions that
+     * need no Page Attributes selection: `front-page.php`, `home.php`, and
+     * `page-{slug}.php`.
      */
     private static function orderForPost(\WP_Post $post): array
     {
-        $slug = get_page_template_slug($post->ID);
-        $file = $slug ? locate_template([$slug]) : false;
-
-        if (!$file && self::isStaticFrontPage($post)) {
-            $file = locate_template(['front-page.php']);
+        $file = false;
+        foreach (Metabox::templateCandidatesForPost($post) as $candidate) {
+            $file = locate_template([$candidate]);
+            if ($file) {
+                break;
+            }
         }
 
         if (!$file) {
@@ -105,20 +107,6 @@ class MetaboxOrder
 
         $blockIds = self::blockOrderFromTemplateFile($file);
         return self::metaboxOrderForBlocks($blockIds);
-    }
-
-    /**
-     * Whether $post is the site's static front page (Settings > Reading).
-     *
-     * Note: the posts page (page_for_posts / home.php) has the same
-     * filename-convention problem but isn't covered here — home.php only
-     * governs the posts listing, not a single editable page's own fields in
-     * the same way, so it's left as a follow-up if that need arises.
-     */
-    private static function isStaticFrontPage(\WP_Post $post): bool
-    {
-        return get_option('show_on_front') === 'page'
-            && (int) get_option('page_on_front') === $post->ID;
     }
 
     /**

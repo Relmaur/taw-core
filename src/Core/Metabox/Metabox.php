@@ -257,14 +257,10 @@ class Metabox
     /**
      * Checks whether a post matches any of the configured template screens.
      *
-     * Two sources are checked for each template entry:
-     *
-     *   1. Explicit assignment — the `_wp_page_template` post meta set when the
-     *      user selects a template from the Page Attributes dropdown.
-     *
-     *   2. Template hierarchy — WordPress automatically applies `page-{slug}.php`
-     *      to the page whose slug is `{slug}` without writing any meta. We detect
-     *      this pattern and compare against the post slug directly.
+     * Delegates the actual resolution to {@see self::templateCandidatesForPost()}
+     * — a screen entry matches when it is one of the template files WordPress
+     * would actually apply to this post (explicit `_wp_page_template`
+     * assignment, `front-page.php`, `home.php`, or `page-{slug}.php`).
      *
      * @param \WP_Post $post      The post being evaluated.
      * @param string[] $templates Template filenames from parseScreens().
@@ -272,39 +268,52 @@ class Metabox
      */
     private function postMatchesTemplate(\WP_Post $post, array $templates): bool
     {
+        return (bool) array_intersect($templates, self::templateCandidatesForPost($post));
+    }
+
+    /**
+     * The template files WordPress could apply to $post, in the order its own
+     * template hierarchy would try them — highest priority first.
+     *
+     * Covers the four ways a page ends up on a specific template:
+     *
+     *   1. Explicit assignment — the `_wp_page_template` post meta written when
+     *      the user picks a template from the Page Attributes dropdown.
+     *   2. `front-page.php` — applied by WP to the static front page
+     *      (`page_on_front`), no meta written.
+     *   3. `home.php` — applied by WP to the posts page (`page_for_posts`),
+     *      no meta written.
+     *   4. `page-{slug}.php` — applied by WP to the page whose slug is
+     *      `{slug}`, no meta written.
+     *
+     * Shared by {@see self::postMatchesTemplate()} and
+     * {@see MetaboxOrder::orderForPost()} so the two never drift apart.
+     *
+     * @return string[] e.g. ['page-about.php'] or ['my-template.php', 'front-page.php']
+     */
+    public static function templateCandidatesForPost(\WP_Post $post): array
+    {
+        $candidates = [];
+
         $assigned = get_post_meta($post->ID, '_wp_page_template', true) ?: '';
+        if ($assigned !== '' && $assigned !== 'default') {
+            $candidates[] = $assigned;
+        }
 
-        $frontPageId = (int) get_option('page_on_front');
-
-        foreach ($templates as $template) {
-            // Explicit template assignment via Page Attributes
-            if ($template === $assigned) {
-                return true;
+        if (get_option('show_on_front') === 'page') {
+            if ((int) get_option('page_on_front') === $post->ID) {
+                $candidates[] = 'front-page.php';
             }
-
-            // front-page.php is applied by WP to the page set as the static
-            // front page — no meta is written, so we match by page_on_front.
-            if ($template === 'front-page.php' && $frontPageId && $post->ID === $frontPageId) {
-                return true;
-            }
-
-            // home.php is applied by WP to the page set as the Posts page — no
-            // meta is written, so we match by page_for_posts.
-            if ($template === 'home.php') {
-                $postsPageId = (int) get_option('page_for_posts');
-                if ($postsPageId && $post->ID === $postsPageId) {
-                    return true;
-                }
-            }
-
-            // Template hierarchy: page-{slug}.php auto-applies to the page
-            // with that slug — no meta is ever written in this case.
-            if (preg_match('/^page-(.+)\.php$/', $template, $m) && $post->post_name === $m[1]) {
-                return true;
+            if ((int) get_option('page_for_posts') === $post->ID) {
+                $candidates[] = 'home.php';
             }
         }
 
-        return false;
+        if ($post->post_name !== '') {
+            $candidates[] = "page-{$post->post_name}.php";
+        }
+
+        return $candidates;
     }
 
     /**

@@ -31,3 +31,26 @@ if (!defined('HOUR_IN_SECONDS')) {
 }
 
 require __DIR__ . '/../vendor/autoload.php';
+
+/**
+ * Minimal stand-in for WordPress's WP_Post. Several src/ methods type-hint
+ * `\WP_Post` (e.g. Metabox::templateCandidatesForPost()); this stub carries
+ * just the properties those code paths read, so tests can construct one
+ * without a real WordPress install.
+ */
+if (!class_exists('WP_Post')) {
+    class WP_Post
+    {
+        public int $ID = 0;
+        public string $post_name = '';
+        public string $post_type = 'page';
+
+        /** @param array<string, mixed> $props */
+        public function __construct(array $props = [])
+        {
+            foreach ($props as $key => $value) {
+                $this->{$key} = $value;
+            }
+        }
+    }
+}
