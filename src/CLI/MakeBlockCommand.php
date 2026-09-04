@@ -231,7 +231,7 @@ class MakeBlockCommand extends Command
                 ]);
             }
 
-            protected function getData(int \$postId): array
+            protected function getData(int|false \$postId): array
             {
                 return [
                     'heading' => \$this->getMeta(\$postId, '{$id}_heading'),
