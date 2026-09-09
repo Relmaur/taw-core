@@ -1007,6 +1007,32 @@ A folder's place in the tree is its only "category" — one folder per attachmen
 
 ---
 
+## Security / Hardening
+
+`TAW\Core\Security\Hardening` collects opinionated hardening helpers. Unlike the opt-in subsystems above, these are **wired into `Theme::boot()` by default** — they are auth-gated, their failure mode is minimal, and each carries an `apply_filters()` escape hatch so a headless or integration site can restore stock WordPress behaviour without editing framework code.
+
+### `Hardening::hideUsersEndpoint()` — user-enumeration lockdown
+
+Removes the public `/wp/v2/users` REST collection and the single-user `/wp/v2/users/(?P<id>[\d]+)` route for **anonymous** requests. `/wp/v2/users/me` and every logged-in request are left untouched.
+
+```php
+// Already called for you by Theme::boot(). To opt a site back out,
+// in inc/customizations.php (or a plugin):
+add_filter('taw_security_hide_users_endpoint', '__return_false');
+```
+
+**Why filter at `rest_endpoints` and not match a URL.** The filter runs at REST dispatch — *after* the request has been resolved to a route — so it closes every routing form at once:
+
+- `/wp-json/wp/v2/users` — the canonical path form.
+- `/?rest_route=/wp/v2/users` — the **query-routed** form. Host WAF anti-enumeration rules and "hide users endpoint" plugins routinely match only the `/wp-json/` path prefix and miss this one, which still returns `200` and leaks `id`, `name`, and the author `slug` (≈ the login name) for every user on the site.
+- `/batch/v1` sub-requests that wrap a `/wp/v2/users` call.
+
+**Why it's gated on `is_user_logged_in()` rather than a capability.** Enumeration is an anonymous-attacker threat. The block editor's author selector fetches `/wp/v2/users?who=authors` for Editors too, who lack the `list_users` capability — gating on authentication keeps that (and the mobile apps, Jetpack, etc.) working while still closing the hole for logged-out visitors. `/wp/v2/users/me` already `401`s without a valid login, so it is not an enumeration vector and stays available to everyone.
+
+The classic `?author=N` → `/author/{slug}/` redirect probe is **not** handled here — it's site policy (it also kills author-archive query URLs) and overlaps with security-plugin behaviour, so it lives in `taw-theme`'s scaffold `inc/security.php`, not in the framework.
+
+---
+
 ## CLI
 
 ```bash

@@ -15,6 +15,7 @@ use TAW\Core\OptionsPage\OptionsPage;
 use TAW\Core\Rest\Cors;
 use TAW\Core\Rest\SearchEndpoints;
 use TAW\Core\Rest\VisualEditorEndpoint;
+use TAW\Core\Security\Hardening;
 use TAW\Core\Seo\Schema;
 use TAW\Core\Seo\SeoMeta;
 use TAW\Helpers\Svg;
@@ -64,6 +65,8 @@ class Theme
      *   9. SEO structured data (JSON-LD Organization/WebSite/Article/BreadcrumbList — stands down if an SEO plugin is active)
      *  10. Lucide icon picker (opt-in — no-op unless Lucide::enable() was called)
      *  11. TAW Media (opt-in — no-op unless MediaFolders::enable() was called)
+     *  12. Security hardening (default-on — hides the public /wp/v2/users REST
+     *      routes from anonymous requests; filter taw_security_hide_users_endpoint to opt out)
      */
     public static function boot(): void
     {
@@ -137,6 +140,15 @@ class Theme
         // Nestable Media Library folders: a dedicated Media -> TAW Media
         // screen plus a filter/column/bulk-action on the classic List view.
         MediaFolders::init();
+
+        // ── 12. Security hardening ────────────────────────────────────────────
+        // Default-on (unlike the opt-in helpers above): remove the public
+        // /wp/v2/users REST collection + single-user routes for anonymous
+        // requests. Filtering at rest_endpoints catches every routing form
+        // at once (/wp-json/, ?rest_route=, /batch/v1). /wp/v2/users/me and
+        // all logged-in access are untouched. Opt a site back out with:
+        //   add_filter('taw_security_hide_users_endpoint', '__return_false');
+        Hardening::hideUsersEndpoint();
     }
 
     /**
