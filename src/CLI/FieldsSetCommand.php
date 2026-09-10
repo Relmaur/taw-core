@@ -124,32 +124,17 @@ class FieldsSetCommand extends Command
         $prefix = $fieldConfig['prefix'] ?? '_taw_';
         $metaKey = $prefix . $fieldId;
 
-        // Same dispatch and sanitizers VisualEditorEndpoint uses for its
-        // REST-driven saves — repeaters need their own entry point since
-        // they sanitize an array of rows, not a single scalar.
-        $sanitized = $type === 'repeater'
-            ? Metabox::sanitizeRepeaterRows($fieldConfig, $rawValue)
-            : Metabox::sanitizeValue($fieldConfig, $rawValue);
-
         if ($dryRun) {
+            // Same sanitization Metabox::writeMeta() would apply, without the write.
+            $sanitized = Metabox::sanitizeForStorage($fieldConfig, $rawValue);
             $this->report($io, $output, $asJson, $postId, $fieldId, $type, $metaKey, $sanitized, saved: false);
             return Command::SUCCESS;
         }
 
-        // Mirrors VisualEditorEndpoint::save_single_field() — no wp_slash()
-        // here deliberately: that's only needed to counteract
-        // update_post_meta()'s internal wp_unslash() when the source value
-        // came from a magic-quoted superglobal ($_POST). CLI/JSON-sourced
-        // values were never slashed to begin with.
-        $result = update_post_meta($postId, $metaKey, $sanitized);
-
-        if ($result === false) {
-            $current = get_post_meta($postId, $metaKey, true);
-            if ($current != $sanitized) {
-                $io->error("Failed to save field: {$fieldId}");
-                return Command::FAILURE;
-            }
-        }
+        // The one shared write primitive — same sanitize + wp_slash + update_post_meta
+        // sequence an admin metabox save runs (Metabox::save()), and the same one
+        // TAW\Core\Content\Importer uses. Returns the value actually stored.
+        $sanitized = Metabox::writeMeta($postId, $fieldConfig, $rawValue);
 
         $this->report($io, $output, $asJson, $postId, $fieldId, $type, $metaKey, $sanitized, saved: true);
         return Command::SUCCESS;

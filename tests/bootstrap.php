@@ -39,6 +39,7 @@ require __DIR__ . '/../vendor/autoload.php';
  * without a real WordPress install.
  */
 if (!class_exists('WP_Post')) {
+    #[\AllowDynamicProperties]
     class WP_Post
     {
         public int $ID = 0;

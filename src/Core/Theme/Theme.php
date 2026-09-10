@@ -12,7 +12,10 @@ use TAW\Core\Icons\Lucide;
 use TAW\Core\Media\MediaFolders;
 use TAW\Core\Metabox\MetaboxOrder;
 use TAW\Core\OptionsPage\OptionsPage;
+use TAW\Core\Content\ContentAdminScreen;
+use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\Cors;
+use TAW\Core\Rest\FieldMetaRegistrar;
 use TAW\Core\Rest\SearchEndpoints;
 use TAW\Core\Rest\VisualEditorEndpoint;
 use TAW\Core\Security\Hardening;
@@ -67,6 +70,9 @@ class Theme
      *  11. TAW Media (opt-in — no-op unless MediaFolders::enable() was called)
      *  12. Security hardening (default-on — hides the public /wp/v2/users REST
      *      routes from anonymous requests; filter taw_security_hide_users_endpoint to opt out)
+     *  13. Content interchange (default-on, cap-gated — Tools → TAW Data screen,
+     *      GET taw/v1/content/export, and REST-registered field meta; filter
+     *      taw_register_meta_in_rest to opt out of the REST meta)
      */
     public static function boot(): void
     {
@@ -149,6 +155,18 @@ class Theme
         // all logged-in access are untouched. Opt a site back out with:
         //   add_filter('taw_security_hide_users_endpoint', '__return_false');
         Hardening::hideUsersEndpoint();
+
+        // ── 13. Content interchange ──────────────────────────────────────────
+        // Default-on, capability-gated at runtime (same posture as SeoMeta).
+        //  - Tools -> TAW Data: export a portable snapshot / import one with a
+        //    mandatory dry-run + rollback (cap: export / taw_import_content).
+        //  - GET /wp-json/taw/v1/content/export (cap: export).
+        //  - Every registered TAW field exposed over wp/v2 (register_post_meta
+        //    + register_rest_field). Opt out of the REST-meta half with:
+        //      add_filter('taw_register_meta_in_rest', '__return_false');
+        (new ContentAdminScreen())->register();
+        new ContentEndpoint();
+        FieldMetaRegistrar::register();
     }
 
     /**

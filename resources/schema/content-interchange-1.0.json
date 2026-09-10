@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://taw.mlizardo.com/schema/content-interchange-1.0.json",
+  "title": "TAW Content Interchange 1.0",
+  "description": "Portable snapshot / change-set format produced by TAW\\Core\\Content\\Exporter and consumed by TAW\\Core\\Content\\Importer (php bin/taw content:export | content:import | content:diff).",
+  "oneOf": [
+    { "$ref": "#/$defs/snapshot" },
+    { "$ref": "#/$defs/changeset" }
+  ],
+  "$defs": {
+    "snapshot": {
+      "type": "object",
+      "required": ["meta", "options", "terms", "posts"],
+      "properties": {
+        "meta": {
+          "type": "object",
+          "required": ["schema", "generated_at", "source"],
+          "properties": {
+            "schema": { "const": "1.0" },
+            "generated_at": { "type": "string", "format": "date-time" },
+            "source": {
+              "type": "object",
+              "properties": {
+                "url": { "type": "string" },
+                "taw_core_version": { "type": ["string", "null"] },
+                "theme": { "type": "string" }
+              }
+            },
+            "registry_fingerprint": {
+              "type": "object",
+              "description": "The block/field registry at export time, so the importer can warn on drift.",
+              "properties": {
+                "blocks": { "type": "array", "items": { "type": "string" } },
+                "fields": { "type": "object", "additionalProperties": { "type": "string" } },
+                "options": { "type": "object", "additionalProperties": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "options": {
+          "type": "object",
+          "description": "Every _taw_* option (repeater/files decoded to arrays) plus an allowlisted core set. page_on_front / page_for_posts are resolved to slugs.",
+          "additionalProperties": true
+        },
+        "terms": {
+          "type": "object",
+          "description": "Keyed by taxonomy. nav_menu is excluded.",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/term" }
+          }
+        },
+        "posts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/post" }
+        },
+        "media": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/media" }
+        }
+      }
+    },
+    "changeset": {
+      "type": "object",
+      "required": ["taw_changeset", "operations"],
+      "properties": {
+        "taw_changeset": {
+          "type": "object",
+          "required": ["schema"],
+          "properties": {
+            "schema": { "const": "1.0" },
+            "base": {},
+            "target": {}
+          }
+        },
+        "operations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/operation" }
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "required": ["target"],
+      "properties": {
+        "op": { "enum": ["create", "update", "delete", "skip"] },
+        "target": {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["post", "option", "term"] },
+            "type": { "type": "string", "description": "post type, or taxonomy for kind=term" },
+            "slug": { "type": "string" },
+            "key": { "type": "string", "description": "option name, for kind=option" }
+          }
+        },
+        "post": { "$ref": "#/$defs/post" },
+        "fields": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "post": {
+      "type": "object",
+      "required": ["type", "slug"],
+      "properties": {
+        "type": { "type": "string" },
+        "slug": { "type": "string" },
+        "status": { "type": "string" },
+        "title": { "type": "string" },
+        "excerpt": { "type": "string" },
+        "content": { "type": "string" },
+        "menu_order": { "type": "integer" },
+        "date": { "type": "string" },
+        "parent": { "type": ["string", "null"], "description": "parent post slug" },
+        "template": { "type": ["string", "null"] },
+        "terms": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "featured_media": { "type": ["string", "null"], "description": "attachment filename" },
+        "fields": {
+          "type": "object",
+          "description": "field_id => value, decoded by the field's registered type.",
+          "additionalProperties": true
+        }
+      }
+    },
+    "term": {
+      "type": "object",
+      "required": ["slug", "name"],
+      "properties": {
+        "slug": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "parent": { "type": ["string", "null"], "description": "parent term slug" },
+        "meta": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "media": {
+      "type": "object",
+      "required": ["ref", "filename"],
+      "properties": {
+        "id": { "type": "integer", "description": "source-site attachment ID, used only to build the old->new ID map" },
+        "ref": { "type": "string", "description": "filename — the stable match key" },
+        "filename": { "type": "string" },
+        "url": { "type": "string" },
+        "alt": { "type": "string" },
+        "caption": { "type": "string" },
+        "mime": { "type": "string" }
+      }
+    }
+  }
+}
