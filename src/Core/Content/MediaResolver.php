@@ -226,7 +226,15 @@ final class MediaResolver
             'tmp_name' => $tmp,
         ];
 
-        $id = media_handle_sideload($fileArray, 0);
+        $postData = [];
+        if (isset($entry['title']) && (string) $entry['title'] !== '') {
+            $postData['post_title'] = sanitize_text_field((string) $entry['title']);
+        }
+        if (isset($entry['description']) && (string) $entry['description'] !== '') {
+            $postData['post_content'] = wp_kses_post((string) $entry['description']);
+        }
+
+        $id = media_handle_sideload($fileArray, 0, null, $postData);
 
         if (is_wp_error($id)) {
             if (file_exists($tmp)) {

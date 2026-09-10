@@ -3338,6 +3338,63 @@ class Metabox
     }
 
     /**
+     * Every concrete post type that has at least one Metabox attached to it,
+     * derived from the field registry's `screens` lists.
+     *
+     * A screen entry resolves to a post type by the same rule
+     * {@see self::parseScreens()} uses: a template filename (`*.php`) or a
+     * bare page/post slug is page-scoped by TAW convention and resolves to
+     * `page`; a registered post-type slug resolves to itself.
+     *
+     * This is a reliable "human-curated TAW content" signal — used by
+     * {@see \TAW\Core\Content\Exporter} to auto-include `public => false`
+     * content CPTs, and by {@see \TAW\Core\Rest\FieldMetaRegistrar} to place
+     * REST meta.
+     *
+     * @return list<string>
+     */
+    public static function postTypesWithMetabox(): array
+    {
+        $types = [];
+
+        foreach (self::$fieldRegistry as $config) {
+            $screens = is_array($config['screens'] ?? null) ? $config['screens'] : [];
+            foreach (self::screensToPostTypes($screens) as $postType) {
+                $types[$postType] = true;
+            }
+        }
+
+        return array_keys($types);
+    }
+
+    /**
+     * Resolve a raw `screens` list (post-type slugs / page slugs / template
+     * filenames) to concrete post types.
+     *
+     * @param list<string> $screens
+     * @return list<string>
+     */
+    public static function screensToPostTypes(array $screens): array
+    {
+        $types = [];
+        foreach ($screens as $screen) {
+            $screen = (string) $screen;
+            if ($screen === '') {
+                continue;
+            }
+            if (str_ends_with($screen, '.php')) {
+                $types['page'] = true;
+            } elseif (post_type_exists($screen)) {
+                $types[$screen] = true;
+            } else {
+                $types['page'] = true;
+            }
+        }
+
+        return array_keys($types);
+    }
+
+    /**
      * Retrieve the editor config for a field
      * Returns null if the field doesn't exists or has editor disabled.
      * Returns true for simple 'editor' => true declarations.

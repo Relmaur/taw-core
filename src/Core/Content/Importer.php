@@ -20,16 +20,28 @@ use TAW\Core\Metabox\Metabox;
  * touches the database, and it writes a full rollback snapshot before it
  * does.
  *
- * Records are matched by natural key — posts by `(type, slug)`, options by
- * key, terms by `(taxonomy, slug)` — never by numeric ID. Meta is written
- * through {@see Metabox::writeMeta()}, the same sanitize + `wp_slash` path
- * an admin metabox save uses.
+ * Records are matched by natural key — posts by `(type, slug)` (or a
+ * composite `(type, match_key)` for slug-less drafts), options by key, terms
+ * by `(taxonomy, slug)`, users by login→email, comments by a content hash —
+ * never by numeric ID. Meta is written through {@see Metabox::writeMeta()},
+ * the same sanitize + `wp_slash` path an admin metabox save uses.
+ *
+ * **Apply order** is dependency-first and deterministic:
+ * `users → terms → posts → options (non-settings) → comments → settings`.
+ * Media is sideloaded and its old→new ID map built before posts are written.
+ *
+ * Accepts snapshots at schema `1.0` and `1.1`.
  *
  * @phpstan-type Operation array{op?: string, target: array<string, mixed>, post?: array<string, mixed>, fields?: array<string, mixed>}
  */
 class Importer
 {
     public const POLICIES = ['update', 'create', 'skip'];
+
+    public const SUPPORTED_SCHEMA_MAJORS = ['1'];
+
+    /** Relative apply order for each target kind (lower runs first). */
+    private const KIND_ORDER = ['user' => 0, 'term' => 1, 'post' => 2, 'option' => 3, 'comment' => 4];
 
     /** @var list<string> */
     private array $warnings = [];
@@ -44,25 +56,17 @@ class Importer
     {
         if (isset($input['taw_changeset'])) {
             $ops = $input['operations'] ?? [];
-            return is_array($ops) ? array_values(array_filter($ops, 'is_array')) : [];
+            $ops = is_array($ops) ? array_values(array_filter($ops, 'is_array')) : [];
+            return self::sortByDependencyOrder($ops);
         }
 
         // A full snapshot — every record becomes an upsert operation.
         $ops = [];
 
-        foreach ((is_array($input['posts'] ?? null) ? $input['posts'] : []) as $post) {
-            if (!is_array($post)) {
-                continue;
+        foreach ((is_array($input['users'] ?? null) ? $input['users'] : []) as $user) {
+            if (is_array($user) && isset($user['login'])) {
+                $ops[] = ['op' => 'update', 'target' => ['kind' => 'user', 'key' => (string) $user['login']], 'fields' => $user];
             }
-            $ops[] = [
-                'op'     => 'update',
-                'target' => ['kind' => 'post', 'type' => $post['type'] ?? null, 'slug' => $post['slug'] ?? null],
-                'post'   => $post,
-            ];
-        }
-
-        foreach ((is_array($input['options'] ?? null) ? $input['options'] : []) as $key => $value) {
-            $ops[] = ['op' => 'update', 'target' => ['kind' => 'option', 'key' => (string) $key], 'fields' => ['value' => $value]];
         }
 
         foreach ((is_array($input['terms'] ?? null) ? $input['terms'] : []) as $taxonomy => $rows) {
@@ -77,7 +81,71 @@ class Importer
             }
         }
 
-        return $ops;
+        foreach ((is_array($input['posts'] ?? null) ? $input['posts'] : []) as $post) {
+            if (!is_array($post)) {
+                continue;
+            }
+            $ops[] = [
+                'op'     => 'update',
+                'target' => ['kind' => 'post', 'type' => $post['type'] ?? null, 'slug' => $post['slug'] ?? null, 'match_key' => $post['match_key'] ?? null],
+                'post'   => $post,
+            ];
+        }
+
+        foreach ((is_array($input['options'] ?? null) ? $input['options'] : []) as $key => $value) {
+            $ops[] = ['op' => 'update', 'target' => ['kind' => 'option', 'key' => (string) $key], 'fields' => ['value' => $value]];
+        }
+
+        foreach ((is_array($input['comments'] ?? null) ? $input['comments'] : []) as $comment) {
+            if (is_array($comment) && isset($comment['post_ref'])) {
+                $ops[] = ['op' => 'update', 'target' => ['kind' => 'comment', 'key' => self::commentKey($comment)], 'fields' => $comment];
+            }
+        }
+
+        return self::sortByDependencyOrder($ops);
+    }
+
+    /**
+     * Stable sort into `users → terms → posts → options → comments →
+     * settings-options` — the dependency order {@see self::apply()} relies on.
+     *
+     * @param list<array<string, mixed>> $ops
+     * @return list<array<string, mixed>>
+     */
+    private static function sortByDependencyOrder(array $ops): array
+    {
+        $rank = static function (array $op): int {
+            $kind = is_array($op['target'] ?? null) ? (string) ($op['target']['kind'] ?? '') : '';
+            $base = self::KIND_ORDER[$kind] ?? 9;
+            if ($kind === 'option' && in_array((string) ($op['target']['key'] ?? ''), Exporter::SETTINGS_OPTION_ALLOWLIST, true)) {
+                return 5; // settings options run last of all
+            }
+            return $base;
+        };
+
+        // array_multisort would drop string keys; a stable manual sort keeps insertion order within a rank.
+        $indexed = [];
+        foreach ($ops as $i => $op) {
+            $indexed[] = [$rank($op), $i, $op];
+        }
+        usort($indexed, static fn (array $a, array $b): int => $a[0] <=> $b[0] ?: $a[1] <=> $b[1]);
+
+        return array_map(static fn (array $row): array => $row[2], $indexed);
+    }
+
+    /**
+     * Content-hash idempotency key for a comment record.
+     *
+     * @param array<string, mixed> $comment
+     */
+    private static function commentKey(array $comment): string
+    {
+        return sha1(implode('|', [
+            (string) ($comment['post_ref'] ?? ''),
+            (string) ($comment['author_email'] ?? ''),
+            (string) ($comment['date_gmt'] ?? ''),
+            (string) ($comment['content'] ?? ''),
+        ]));
     }
 
     /**
@@ -89,15 +157,18 @@ class Importer
     public function plan(array $input): array
     {
         $this->warnings = [];
+        $this->checkSchema($input);
 
         $records = [];
         foreach (self::operationsFrom($input) as $op) {
             $kind = $op['target']['kind'] ?? '';
             $records[] = match ($kind) {
-                'post'   => $this->planPost($op),
-                'option' => $this->planOption($op),
-                'term'   => $this->planTerm($op),
-                default  => ['kind' => $kind, 'op' => 'skip', 'note' => "Unknown target kind '{$kind}'."],
+                'post'    => $this->planPost($op),
+                'option'  => $this->planOption($op),
+                'term'    => $this->planTerm($op),
+                'user'    => $this->planUser($op),
+                'comment' => $this->planComment($op),
+                default   => ['kind' => $kind, 'op' => 'skip', 'note' => "Unknown target kind '{$kind}'."],
             };
         }
 
@@ -109,21 +180,46 @@ class Importer
     }
 
     /**
+     * Record a warning (not a hard failure) if the snapshot's schema major
+     * is one this importer doesn't know.
+     *
+     * @param array<string, mixed> $input
+     */
+    private function checkSchema(array $input): void
+    {
+        $schema = $input['meta']['schema'] ?? ($input['taw_changeset']['schema'] ?? null);
+        if (!is_string($schema) || $schema === '') {
+            return;
+        }
+        $major = explode('.', $schema)[0];
+        if (!in_array($major, self::SUPPORTED_SCHEMA_MAJORS, true)) {
+            $this->warnings[] = "Snapshot schema '{$schema}' is newer than this taw/core understands (supports "
+                . implode('.x / ', self::SUPPORTED_SCHEMA_MAJORS) . ".x) — importing best-effort.";
+        }
+    }
+
+    /**
      * Apply the input. Writes a rollback snapshot first (unless
      * `$options['rollback'] === false`). Only call after a reviewed
      * {@see self::plan()} / an explicit `--yes` / the admin confirm.
      *
      * @param array<string, mixed> $input
-     * @param array{policy?: string, rollback?: bool} $options
+     * @param array{policy?: string, rollback?: bool, include_settings?: bool} $options
      * @return array<string, mixed>
      */
     public function apply(array $input, array $options = []): array
     {
         $this->warnings = [];
+        $this->commentIdMap = [];
+        $this->pendingCommentParents = [];
+        $this->touchedCommentPosts = [];
+        $includeSettings = !empty($options['include_settings']);
         $policy = $options['policy'] ?? 'update';
         if (!in_array($policy, self::POLICIES, true)) {
             $policy = 'update';
         }
+        $this->checkSchema($input);
+        $schemaWarnings = $this->warnings;
 
         $report = [
             'created' => [], 'updated' => [], 'skipped' => [], 'deleted' => [],
@@ -160,18 +256,53 @@ class Importer
                 continue;
             }
 
+            // The one section that's import-gated as well as export-gated:
+            // environment settings only move under an explicit --with-settings.
+            if ($kind === 'option'
+                && in_array((string) ($op['target']['key'] ?? ''), Exporter::SETTINGS_OPTION_ALLOWLIST, true)
+                && !$includeSettings
+            ) {
+                $report['skipped'][] = 'option:' . (string) ($op['target']['key'] ?? '') . ' (settings — pass --with-settings)';
+                continue;
+            }
+
             $result = match ($kind) {
-                'post'   => $this->applyPost($op, $policy, $idMap),
-                'option' => $this->applyOption($op, $policy),
-                'term'   => $this->applyTerm($op, $policy),
-                default  => ['bucket' => 'skipped', 'label' => "unknown:{$kind}"],
+                'post'    => $this->applyPost($op, $policy, $idMap),
+                'option'  => $this->applyOption($op, $policy),
+                'term'    => $this->applyTerm($op, $policy),
+                'user'    => $this->applyUser($op, $policy),
+                'comment' => $this->applyComment($op, $policy),
+                default   => ['bucket' => 'skipped', 'label' => "unknown:{$kind}"],
             };
             $report[$result['bucket']][] = $result['label'];
         }
 
-        $report['warnings'] = $this->warnings;
+        // Second pass — comment threading + counts, once every comment exists.
+        $this->finalizeComments();
+
+        $report['warnings'] = array_merge($schemaWarnings, $this->warnings);
 
         return $report;
+    }
+
+    /** @var array<string, int> source comment ref => new comment ID */
+    private array $commentIdMap = [];
+    /** @var array<int, string> new comment ID => source parent ref */
+    private array $pendingCommentParents = [];
+    /** @var array<int, true> post IDs whose comment count needs recomputing */
+    private array $touchedCommentPosts = [];
+
+    private function finalizeComments(): void
+    {
+        foreach ($this->pendingCommentParents as $newId => $parentRef) {
+            $newParent = $this->commentIdMap[$parentRef] ?? 0;
+            if ($newParent > 0) {
+                wp_update_comment(['comment_ID' => $newId, 'comment_parent' => $newParent]);
+            }
+        }
+        foreach (array_keys($this->touchedCommentPosts) as $postId) {
+            wp_update_comment_count((int) $postId);
+        }
     }
 
     /** @return list<string> */
@@ -191,11 +322,15 @@ class Importer
         $t = is_array($opOrRecord['target'] ?? null) ? $opOrRecord['target'] : $opOrRecord;
         $kind = (string) ($t['kind'] ?? '');
 
-        if ($kind === 'option') {
-            return 'option:' . (string) ($t['key'] ?? '');
+        if (in_array($kind, ['option', 'user', 'comment'], true)) {
+            return $kind . ':' . (string) ($t['key'] ?? '');
         }
 
-        return $kind . ':' . (string) ($t['type'] ?? '') . ':' . (string) ($t['slug'] ?? '');
+        // Slug-less drafts key on their composite match_key instead.
+        $slug = (string) ($t['slug'] ?? '');
+        $identity = $slug !== '' ? $slug : (string) ($t['match_key'] ?? '');
+
+        return $kind . ':' . (string) ($t['type'] ?? '') . ':' . $identity;
     }
 
     /**
@@ -230,20 +365,19 @@ class Importer
         $type = (string) ($op['target']['type'] ?? '');
         $slug = (string) ($op['target']['slug'] ?? '');
         $incoming = is_array($op['post'] ?? null) ? $op['post'] : [];
+        $matchKey = (string) ($op['target']['match_key'] ?? ($incoming['match_key'] ?? ''));
         $explicitOp = $op['op'] ?? 'update';
 
-        $existing = $this->findPost($type, $slug);
+        $existing = $this->findPost($type, $slug, $matchKey, $incoming);
+        $identity = ['kind' => 'post', 'type' => $type, 'slug' => $slug, 'match_key' => $matchKey];
 
         if ($explicitOp === 'delete') {
-            return [
-                'kind' => 'post', 'type' => $type, 'slug' => $slug,
-                'op' => $existing ? 'would-delete' : 'skip',
-            ];
+            return $identity + ['op' => $existing ? 'would-delete' : 'skip'];
         }
 
         $changes = [];
 
-        foreach (['title', 'excerpt', 'content', 'status', 'menu_order', 'template', 'parent'] as $prop) {
+        foreach (['title', 'excerpt', 'content', 'status', 'menu_order', 'template', 'parent', 'comment_status', 'ping_status'] as $prop) {
             if (!array_key_exists($prop, $incoming)) {
                 continue;
             }
@@ -254,6 +388,18 @@ class Importer
             } elseif ((string) $old !== (string) $new) {
                 $changes[$prop] = ['status' => 'changed', 'old' => $old, 'new' => $new];
             }
+        }
+
+        // Author — compare the incoming ref's *resolved local* user ID to the
+        // post's current author, so a round-trip (or a snapshot from a site
+        // with the same login) is a no-op and a missing author isn't noise.
+        if ($existing && array_key_exists('author', $incoming) && $incoming['author'] !== null) {
+            $incomingAuthor = $this->resolveLocalUserId($incoming['author']);
+            if ($incomingAuthor > 0 && $incomingAuthor !== (int) $existing->post_author) {
+                $changes['author'] = ['status' => 'changed', 'old' => (int) $existing->post_author, 'new' => $incomingAuthor];
+            }
+        } elseif (!$existing && !empty($incoming['author'])) {
+            $changes['author'] = ['status' => 'new', 'new' => $incoming['author']];
         }
 
         // featured_media — the exporter renders it as a filename; compare
@@ -291,8 +437,7 @@ class Importer
                 : ['status' => 'new', 'new' => $newDecoded];
         }
 
-        return [
-            'kind' => 'post', 'type' => $type, 'slug' => $slug,
+        return $identity + [
             'op' => $existing ? 'update' : 'create',
             'changes' => $changes,
         ];
@@ -348,6 +493,67 @@ class Importer
                 'op' => $existing ? 'update' : 'create', 'changes' => $changes];
     }
 
+    /**
+     * @param array<string, mixed> $op
+     * @return array<string, mixed>
+     */
+    private function planUser(array $op): array
+    {
+        $fields = is_array($op['fields'] ?? null) ? $op['fields'] : [];
+        $login = (string) ($fields['login'] ?? '');
+        $key = (string) ($op['target']['key'] ?? $login);
+        $existing = $this->resolveLocalUserId(['login' => $login, 'email' => (string) ($fields['email'] ?? '')]);
+
+        $changes = [];
+        if ($existing === 0) {
+            $changes['user'] = ['status' => 'new', 'new' => $login];
+            return ['kind' => 'user', 'key' => $key, 'op' => 'create', 'changes' => $changes];
+        }
+
+        $user = get_userdata($existing);
+        if ($user) {
+            if (array_key_exists('display_name', $fields) && (string) $user->display_name !== (string) $fields['display_name']) {
+                $changes['display_name'] = ['status' => 'changed', 'old' => $user->display_name, 'new' => $fields['display_name']];
+            }
+            $incomingRoles = array_values(array_map('strval', (array) ($fields['roles'] ?? [])));
+            sort($incomingRoles);
+            $currentRoles = array_values(array_map('strval', (array) $user->roles));
+            sort($currentRoles);
+            if ($incomingRoles !== [] && $incomingRoles !== $currentRoles) {
+                $changes['roles'] = ['status' => 'changed', 'old' => $currentRoles, 'new' => $incomingRoles];
+            }
+            foreach (is_array($fields['meta'] ?? null) ? $fields['meta'] : [] as $mk => $mv) {
+                if ((string) get_user_meta($existing, (string) $mk, true) !== (string) $mv) {
+                    $changes['meta.' . $mk] = ['status' => 'changed', 'old' => get_user_meta($existing, (string) $mk, true), 'new' => $mv];
+                }
+            }
+        }
+
+        return ['kind' => 'user', 'key' => $key, 'op' => 'update', 'changes' => $changes];
+    }
+
+    /**
+     * @param array<string, mixed> $op
+     * @return array<string, mixed>
+     */
+    private function planComment(array $op): array
+    {
+        $fields = is_array($op['fields'] ?? null) ? $op['fields'] : [];
+        $key = (string) ($op['target']['key'] ?? '');
+        $postId = $this->resolveAnyPostId((string) ($fields['post_ref'] ?? ''));
+
+        if ($postId === 0) {
+            return ['kind' => 'comment', 'key' => $key, 'op' => 'skip',
+                    'note' => "post '" . (string) ($fields['post_ref'] ?? '') . "' not matched", 'changes' => []];
+        }
+
+        $exists = $this->findExistingComment($postId, $fields) > 0;
+
+        return ['kind' => 'comment', 'key' => $key,
+                'op' => $exists ? 'update' : 'create',
+                'changes' => $exists ? [] : ['comment' => ['status' => 'new', 'new' => mb_substr((string) ($fields['content'] ?? ''), 0, 40)]]];
+    }
+
     /* -----------------------------------------------------------------
      * Apply (writes)
      * ----------------------------------------------------------------- */
@@ -361,11 +567,12 @@ class Importer
     {
         $type = (string) ($op['target']['type'] ?? '');
         $slug = (string) ($op['target']['slug'] ?? '');
-        $label = "{$type}:{$slug}";
         $incoming = is_array($op['post'] ?? null) ? $op['post'] : [];
+        $matchKey = (string) ($op['target']['match_key'] ?? ($incoming['match_key'] ?? ''));
+        $label = "{$type}:" . ($slug !== '' ? $slug : "(draft {$matchKey})");
         $explicitOp = $op['op'] ?? 'update';
 
-        $existing = $this->findPost($type, $slug);
+        $existing = $this->findPost($type, $slug, $matchKey, $incoming);
 
         if ($explicitOp === 'delete') {
             if ($existing) {
@@ -391,6 +598,28 @@ class Importer
             'post_content' => MediaResolver::rewriteContent((string) ($incoming['content'] ?? ''), $idMap),
             'menu_order'   => (int) ($incoming['menu_order'] ?? 0),
         ];
+
+        foreach (['comment_status', 'ping_status'] as $prop) {
+            if (array_key_exists($prop, $incoming)) {
+                $postArr[$prop] = (string) $incoming[$prop];
+            }
+        }
+
+        // Author — resolve the portable {login,email} ref to a local user;
+        // fall back to the importing user with a warning when it's absent.
+        if (array_key_exists('author', $incoming) && $incoming['author'] !== null) {
+            $authorId = $this->resolveLocalUserId($incoming['author']);
+            if ($authorId > 0) {
+                $postArr['post_author'] = $authorId;
+            } else {
+                $fallback = (int) get_current_user_id();
+                if ($fallback > 0) {
+                    $postArr['post_author'] = $fallback;
+                }
+                $ref = is_array($incoming['author']) ? (string) ($incoming['author']['login'] ?? $incoming['author']['email'] ?? '?') : '?';
+                $this->warnings[] = "{$label}: author '{$ref}' not found on this site — assigned to the importing user.";
+            }
+        }
 
         if (!empty($incoming['date'])) {
             $postArr['post_date_gmt'] = (string) $incoming['date'];
@@ -501,9 +730,17 @@ class Importer
         // page_on_front / page_for_posts arrive as a slug (the exporter's
         // portable form); WordPress requires the integer post ID — resolve
         // it back before writing, or the front page breaks (Bug A).
-        $stored = in_array($key, self::POST_ID_OPTIONS, true)
-            ? $this->resolveLocalPostId($value)
-            : $this->encodeOptionForStorage($key, $value);
+        // sticky_posts is the list variant.
+        if (in_array($key, self::POST_ID_OPTIONS, true)) {
+            $stored = $this->resolveLocalPostId($value);
+        } elseif (in_array($key, self::POST_ID_LIST_OPTIONS, true)) {
+            $stored = array_values(array_filter(array_map(
+                fn ($ref): int => $this->resolveLocalPostId($ref),
+                is_array($value) ? $value : []
+            )));
+        } else {
+            $stored = $this->encodeOptionForStorage($key, $value);
+        }
 
         update_option($key, $stored);
 
@@ -566,37 +803,248 @@ class Importer
         return ['bucket' => $bucket, 'label' => $label];
     }
 
+    /**
+     * @param array<string, mixed> $op
+     * @return array{bucket: string, label: string}
+     */
+    private function applyUser(array $op, string $policy): array
+    {
+        $fields = is_array($op['fields'] ?? null) ? $op['fields'] : [];
+        $login = (string) ($fields['login'] ?? '');
+        $email = (string) ($fields['email'] ?? '');
+        $label = "user:{$login}";
+        $explicitOp = $op['op'] ?? 'update';
+
+        if ($login === '' || $email === '') {
+            $this->warnings[] = "{$label}: missing login or email — skipped.";
+            return ['bucket' => 'skipped', 'label' => $label];
+        }
+
+        $existingId = $this->resolveLocalUserId(['login' => $login, 'email' => $email]);
+
+        if ($explicitOp === 'delete') {
+            return ['bucket' => 'skipped', 'label' => $label]; // user deletion is never automatic
+        }
+        if ($explicitOp === 'skip' || $policy === 'skip' || ($existingId > 0 && $policy === 'create')) {
+            return ['bucket' => 'skipped', 'label' => $label];
+        }
+
+        // Only ever grant roles the target site actually defines.
+        $definedRoles = array_keys(wp_roles()->get_names());
+        $roles = array_values(array_intersect(
+            array_map('strval', (array) ($fields['roles'] ?? [])),
+            array_map('strval', $definedRoles)
+        ));
+        foreach (array_diff(array_map('strval', (array) ($fields['roles'] ?? [])), $roles) as $dropped) {
+            $this->warnings[] = "{$label}: role '{$dropped}' is not defined on this site — not granted.";
+        }
+
+        $userData = [
+            'user_login'   => $login,
+            'user_email'   => $email,
+            'display_name' => (string) ($fields['display_name'] ?? $login),
+            'role'         => $roles[0] ?? '',
+        ];
+
+        if ($existingId > 0) {
+            $userData['ID'] = $existingId;
+            $result = wp_update_user($userData);
+            $bucket = 'updated';
+        } else {
+            $userData['user_pass'] = wp_generate_password(24, true, true);
+            $result = wp_insert_user($userData);
+            $bucket = 'created';
+        }
+
+        if (is_wp_error($result)) {
+            $this->warnings[] = "{$label}: " . $result->get_error_message();
+            return ['bucket' => 'skipped', 'label' => $label];
+        }
+
+        $userId = (int) $result;
+
+        // Apply every role (wp_insert_user only takes the first).
+        if ($roles !== []) {
+            $user = new \WP_User($userId);
+            $user->set_role('');
+            foreach ($roles as $role) {
+                $user->add_role($role);
+            }
+        }
+
+        foreach (is_array($fields['meta'] ?? null) ? $fields['meta'] : [] as $mk => $mv) {
+            update_user_meta($userId, (string) $mk, $mv);
+        }
+
+        // Portable password hash — WP would re-hash a plain value, so write it raw.
+        if (!empty($fields['password_hash'])) {
+            global $wpdb;
+            $wpdb->update($wpdb->users, ['user_pass' => (string) $fields['password_hash']], ['ID' => $userId]);
+            clean_user_cache($userId);
+        }
+
+        return ['bucket' => $bucket, 'label' => $label];
+    }
+
+    /**
+     * @param array<string, mixed> $op
+     * @return array{bucket: string, label: string}
+     */
+    private function applyComment(array $op, string $policy): array
+    {
+        $fields = is_array($op['fields'] ?? null) ? $op['fields'] : [];
+        $sourceRef = (string) ($fields['ref'] ?? ($op['target']['key'] ?? ''));
+        $postRef = (string) ($fields['post_ref'] ?? '');
+        $label = "comment:{$postRef}";
+
+        if (($op['op'] ?? 'update') === 'skip' || $policy === 'skip') {
+            return ['bucket' => 'skipped', 'label' => $label];
+        }
+
+        $postId = $this->resolveAnyPostId($postRef);
+        if ($postId === 0) {
+            $this->warnings[] = "{$label}: target post not matched — comment skipped.";
+            return ['bucket' => 'skipped', 'label' => $label];
+        }
+
+        $existing = $this->findExistingComment($postId, $fields);
+        if ($existing > 0) {
+            if ($sourceRef !== '') {
+                $this->commentIdMap[$sourceRef] = $existing;
+            }
+            return ['bucket' => 'skipped', 'label' => $label];
+        }
+
+        $newId = (int) wp_insert_comment([
+            'comment_post_ID'      => $postId,
+            'comment_author'       => (string) ($fields['author_name'] ?? ''),
+            'comment_author_email' => (string) ($fields['author_email'] ?? ''),
+            'comment_author_url'   => (string) ($fields['author_url'] ?? ''),
+            'comment_content'      => (string) ($fields['content'] ?? ''),
+            'comment_date_gmt'     => (string) ($fields['date_gmt'] ?? ''),
+            'comment_approved'     => (string) ($fields['approved'] ?? '1'),
+            'comment_type'         => (string) ($fields['type'] ?? 'comment'),
+        ]);
+
+        if ($newId <= 0) {
+            $this->warnings[] = "{$label}: insert failed.";
+            return ['bucket' => 'skipped', 'label' => $label];
+        }
+
+        if ($sourceRef !== '') {
+            $this->commentIdMap[$sourceRef] = $newId;
+        }
+        if (!empty($fields['parent_ref'])) {
+            $this->pendingCommentParents[$newId] = (string) $fields['parent_ref'];
+        }
+        $this->touchedCommentPosts[$postId] = true;
+
+        return ['bucket' => 'created', 'label' => $label];
+    }
+
+    /**
+     * @param array<string, mixed> $fields
+     */
+    private function findExistingComment(int $postId, array $fields): int
+    {
+        $matches = get_comments([
+            'post_id'      => $postId,
+            'author_email' => (string) ($fields['author_email'] ?? ''),
+            'date_query'   => [['column' => 'comment_date_gmt', 'after' => '-1 second', 'before' => '+1 second', 'inclusive' => true]],
+            'number'       => 50,
+            'status'       => 'all',
+        ]);
+        $wanted = (string) ($fields['content'] ?? '');
+        $wantedDate = (string) ($fields['date_gmt'] ?? '');
+        foreach ($matches as $c) {
+            if ((string) $c->comment_content === $wanted
+                && ($wantedDate === '' || (string) $c->comment_date_gmt === $wantedDate)) {
+                return (int) $c->comment_ID;
+            }
+        }
+        return 0;
+    }
+
     /* -----------------------------------------------------------------
      * Helpers
      * ----------------------------------------------------------------- */
 
-    private function findPost(string $type, string $slug): ?\WP_Post
+    /**
+     * Resolve a post slug to a local ID regardless of post type — used for
+     * comment `post_ref`s, which don't carry their post's type.
+     */
+    private function resolveAnyPostId(string $slug): int
     {
-        if ($type === '' || $slug === '') {
-            return null;
+        if ($slug === '') {
+            return 0;
         }
-        $matches = get_posts([
-            'post_type'        => $type,
+        $found = get_posts([
             'name'             => $slug,
+            'post_type'        => 'any',
             'post_status'      => 'any',
             'posts_per_page'   => 1,
+            'no_found_rows'    => true,
+            'suppress_filters' => false,
+        ]);
+        return ($found[0] ?? null) instanceof \WP_Post ? (int) $found[0]->ID : 0;
+    }
+
+    /**
+     * @param array<string, mixed> $incoming The full incoming post record (for the slug-less composite match).
+     */
+    private function findPost(string $type, string $slug, string $matchKey = '', array $incoming = []): ?\WP_Post
+    {
+        if ($type === '') {
+            return null;
+        }
+
+        if ($slug !== '') {
+            $matches = get_posts([
+                'post_type'        => $type,
+                'name'             => $slug,
+                'post_status'      => 'any',
+                'posts_per_page'   => 1,
+                'suppress_filters' => false,
+                'no_found_rows'    => true,
+            ]);
+            return $matches[0] ?? null;
+        }
+
+        // Slug-less draft: match on the composite key (type | title | date_gmt).
+        if ($matchKey === '') {
+            return null;
+        }
+        $title = (string) ($incoming['title'] ?? '');
+        $dateGmt = (string) ($incoming['date'] ?? '');
+        foreach (get_posts([
+            'post_type'        => $type,
+            'post_status'      => ['draft', 'pending', 'auto-draft'],
+            'title'            => $title,
+            'posts_per_page'   => 20,
             'suppress_filters' => false,
             'no_found_rows'    => true,
-        ]);
-        return $matches[0] ?? null;
+        ]) as $candidate) {
+            $candidateKey = sha1($type . '|' . $candidate->post_title . '|' . $candidate->post_date_gmt);
+            if ($candidateKey === $matchKey || ($title !== '' && $dateGmt !== '' && $candidate->post_title === $title && $candidate->post_date_gmt === $dateGmt)) {
+                return $candidate;
+            }
+        }
+        return null;
     }
 
     private function currentPostProp(\WP_Post $post, string $prop): mixed
     {
         return match ($prop) {
-            'title'      => $post->post_title,
-            'excerpt'    => $post->post_excerpt,
-            'content'    => $post->post_content,
-            'status'     => $post->post_status,
-            'menu_order' => (int) $post->menu_order,
-            'template'   => get_page_template_slug($post) ?: '',
-            'parent'     => $post->post_parent ? (get_post($post->post_parent)->post_name ?? '') : '',
-            default      => null,
+            'title'          => $post->post_title,
+            'excerpt'        => $post->post_excerpt,
+            'content'        => $post->post_content,
+            'status'         => $post->post_status,
+            'menu_order'     => (int) $post->menu_order,
+            'comment_status' => $post->comment_status,
+            'ping_status'    => $post->ping_status,
+            'template'       => get_page_template_slug($post) ?: '',
+            'parent'         => $post->post_parent ? (get_post($post->post_parent)->post_name ?? '') : '',
+            default          => null,
         };
     }
 
@@ -605,6 +1053,35 @@ class Importer
      * WordPress stores (and requires) as an integer post ID.
      */
     private const POST_ID_OPTIONS = ['page_on_front', 'page_for_posts'];
+
+    /** Options stored as a *list* of post IDs, exported as a list of slugs. */
+    private const POST_ID_LIST_OPTIONS = ['sticky_posts'];
+
+    /**
+     * Reverse a portable user reference (`{login, email}`) to a local user
+     * ID — login first, then email; `0` when unresolved.
+     */
+    private function resolveLocalUserId(mixed $ref): int
+    {
+        if (!is_array($ref)) {
+            return 0;
+        }
+        $login = (string) ($ref['login'] ?? '');
+        if ($login !== '') {
+            $user = get_user_by('login', $login);
+            if ($user) {
+                return (int) $user->ID;
+            }
+        }
+        $email = (string) ($ref['email'] ?? '');
+        if ($email !== '') {
+            $user = get_user_by('email', $email);
+            if ($user) {
+                return (int) $user->ID;
+            }
+        }
+        return 0;
+    }
 
     /**
      * Reverse a portable post reference (slug, or an already-numeric ID) to
@@ -662,6 +1139,12 @@ class Importer
             return 'pid:' . $this->resolveLocalPostId($value);
         }
 
+        if (in_array($key, self::POST_ID_LIST_OPTIONS, true)) {
+            $ids = array_map(fn ($ref): int => $this->resolveLocalPostId($ref), is_array($value) ? $value : []);
+            sort($ids);
+            return 'pids:' . implode(',', $ids);
+        }
+
         $config = \TAW\Core\OptionsPage\OptionsPage::getFieldRegistry()[$key] ?? null;
         $decoded = $config !== null ? FieldCodec::decode($config, $value) : $value;
 
@@ -708,10 +1191,21 @@ class Importer
             }
         }
 
+        // Maximal scope — an undo of a `--migrate` import has to be able to
+        // put users, settings, drafts and every attachment back, regardless
+        // of what the incoming file happened to carry.
+        $rollbackScope = [
+            'include_users'    => true,
+            'include_comments' => true,
+            'include_settings' => true,
+            'all_media'        => true,
+            'include_drafts'   => true,
+        ];
+
         $path = $dir . '/rollback-' . gmdate('Ymd-His') . '.json';
         file_put_contents(
             $path,
-            (string) wp_json_encode((new Exporter())->snapshot(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+            (string) wp_json_encode((new Exporter())->snapshot($rollbackScope), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
         );
 
         return $path;

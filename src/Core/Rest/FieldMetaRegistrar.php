@@ -143,17 +143,7 @@ final class FieldMetaRegistrar
      */
     private static function resolvePostTypes(array $screens): array
     {
-        $types = [];
-        foreach ($screens as $screen) {
-            $screen = (string) $screen;
-            if (str_ends_with($screen, '.php')) {
-                $types[] = 'page';
-            } elseif (post_type_exists($screen)) {
-                $types[] = $screen;
-            } else {
-                $types[] = 'page';
-            }
-        }
+        $types = Metabox::screensToPostTypes(array_map('strval', $screens));
 
         /**
          * Filter: the post types a field's REST meta registers on.

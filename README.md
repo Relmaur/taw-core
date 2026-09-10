@@ -1183,42 +1183,49 @@ Schema::push(['@type' => 'HowTo', 'name' => '...', /* ... */]);
 
 ## Content Interchange
 
-A first-class way to move content — posts / CPT entries, `_taw_*` metabox values, `_taw_*` options, terms, and every referenced media file — between environments, or to hand it to a code agent to read and transform. `wp export` (WXR) doesn't understand TAW meta; a full DB copy is all-or-nothing and needs SSH. This is the same **serialize → review → apply** loop as `seo:extract`/`seo:inject` and `fields:get`/`fields:set`, generalized to whole-site content.
+A first-class way to move a TAW site's **state** — posts / CPT entries, `_taw_*` metabox values, `_taw_*` options, terms, referenced media, and (opt-in) authorship, users, comments and environment settings — between environments, or to hand to a code agent to transform. Because a disciplined TAW site keeps everything in `_taw_` fields and options instead of a plugin stack, that state fits in one reviewable, diffable, rollback-able JSON file — no `.wpress` black box, no 400 MB `.sql`. Same **serialize → review → apply** loop as `seo:extract`/`seo:inject`, generalized to the whole site.
+
+> **Migrate state, deploy code.** This tool never touches theme/plugin PHP or the DB binary internals — code travels through git and the deploy pipeline. Single-site only (no multisite).
 
 ```bash
-php bin/taw content:export --output=/tmp/site.json          # build a snapshot
-php bin/taw content:import /tmp/site.json                   # dry-run: prints a field-level diff, writes nothing
-php bin/taw content:import /tmp/site.json --yes             # apply (writes a rollback snapshot first)
+php bin/taw content:export --output=/tmp/site.json          # content snapshot
+php bin/taw content:export --migrate --output=/tmp/site.json # + users, settings, all media, drafts
+php bin/taw content:import /tmp/site.json                   # dry-run: field-level diff, writes nothing
+php bin/taw content:import /tmp/site.json --yes             # apply (rollback snapshot written first)
+php bin/taw content:import /tmp/site.json --yes --with-settings   # also apply environment settings
 php bin/taw content:diff before.json after.json --out=changes.json
 ```
 
-Also, in wp-admin: **Tools → TAW Data** (Export button + Import-with-review), and `GET /wp-json/taw/v1/content/export` (capability: `export`).
+Also, in wp-admin: **Tools → TAW Data** (Export with option checkboxes + Import-with-review), and `GET /wp-json/taw/v1/content/export` (capability `export`; content-only — no users/settings over REST).
 
 ### The snapshot
 
-`TAW\Core\Content\Exporter::snapshot($scope)` — a plain array, `json_encode`-ready. Schema: [`resources/schema/content-interchange-1.0.json`](resources/schema/content-interchange-1.0.json) (`schema` starts at `"1.0"`).
+`TAW\Core\Content\Exporter::snapshot($scope)` — a plain array, `json_encode`-ready. Schema: [`resources/schema/content-interchange-1.1.json`](resources/schema/content-interchange-1.1.json) (`schema` is `"1.1"`; the importer also accepts `"1.0"`).
 
 | Section | Contents |
 |---|---|
 | `meta` | `schema`, `generated_at`, `source` (url, `taw/core` version, theme), and a `registry_fingerprint` (block IDs + a `field_id → type` map) so the importer can warn on drift |
-| `options` | every `_taw_*` option (repeater/files **decoded to arrays**, not JSON strings), plus an allowlisted core set — `blogname`, `blogdescription`, `show_on_front`, and `page_on_front`/`page_for_posts` **resolved to slugs**. Filter: `taw_content_export_core_options` |
+| `options` | every `_taw_*` option (repeater/files **decoded to arrays**), plus an allowlisted core set — `blogname`, `blogdescription`, `show_on_front`, `page_on_front`/`page_for_posts` **resolved to slugs**. Filter: `taw_content_export_core_options`. With `--with-settings`, also a **second** allowlist of environment settings (`permalink_structure`, `timezone_string`, `sticky_posts` → slugs, …). Filter: `taw_content_export_settings_options` |
 | `terms` | per public taxonomy (except `nav_menu`): `{slug, name, description, parent (by slug), meta}` |
-| `posts` | `page`/`post` + every public CPT except `taw_submission` (filter: `taw_content_export_post_types`). Per post: `type, slug, status, title, excerpt, content, menu_order, date, parent (by slug), template, terms ({tax: [slug]}), featured_media (filename), fields ({field_id: decoded value})`. `fields` decodes every `_taw_*` meta key by its registered type |
-| `media` | every attachment referenced by an exported post/field: `{id (source), ref (filename), filename, url, alt, caption, mime}` |
+| `posts` | `page`/`post`, every **public** CPT, **and** every CPT with a `Metabox` attached (so `public => false` content CPTs export without a manual filter) — except `taw_submission` and framework-internal types. Filter: `taw_content_export_post_types` (runs last). Per post: `type, slug, status, title, excerpt, content, menu_order, date, author ({login,email}), comment_status, ping_status, parent (by slug), template, terms, featured_media (filename), fields`. A slug-less draft also carries a composite `match_key` |
+| `users` | opt-in (`--with-users`): `{login, email, display_name, roles[], meta{first_name,last_name,description,nickname,locale}, user_registered}`. Password hashes only with the second flag `--with-user-passwords` |
+| `comments` | opt-in (`--with-comments`): comments on exported posts, with `parent_ref` threading |
+| `media` | every referenced attachment: `{id, ref (filename), filename, url, title, description, alt, caption, mime}`. `--all-media` also carries unreferenced attachments |
 
-**Never exported:** users, revisions, comments, transients, non-allowlisted core/plugin options, `nav_menu`/`nav_menu_item` (code-owned in TAW themes).
+**Never exported:** revisions, transients, non-allowlisted core/plugin options, `nav_menu`/`nav_menu_item` (code-owned in TAW themes). Drafts are excluded unless `--include-drafts`.
 
-Scope options: `--types=page,post`, `--since=2025-01-01`, `--posts=12,about` (IDs or slugs), `--no-media`.
+Scope options: `--types=`, `--since=`, `--posts=` (IDs or slugs), `--no-media`, `--all-media`, `--include-drafts`, `--with-users`, `--with-user-passwords`, `--with-comments`, `--with-settings`, `--migrate` (= `--with-users --with-settings --all-media --include-drafts`).
 
 ### Import — dry-run mandatory, rollback automatic
 
-`TAW\Core\Content\Importer` consumes a snapshot **or** a change-set (`{taw_changeset, operations: [...]}`). Records are matched by natural key — posts by `(type, slug)`, options by key, terms by `(taxonomy, slug)` — **never by numeric ID**.
+`TAW\Core\Content\Importer` consumes a snapshot **or** a change-set (`{taw_changeset, operations: [...]}`). Records are matched by natural key — posts by `(type, slug)` (or `(type, match_key)` for slug-less drafts), options by key, terms by `(taxonomy, slug)`, users by login→email, comments by a content hash — **never by numeric ID**.
 
-- **Media:** each `media[]` entry is matched to an existing attachment by filename; if absent it's sideloaded from `url`. An `old id → new id` map is built and applied to `wp-image-N` / `"id":N` / `"ids":[…]` in `post_content` and to `image`/`files` field values **before** anything is written.
-- **Portable transforms are reversed on import.** The exporter renders `page_on_front`/`page_for_posts` as page slugs, `post.parent` as a slug, `featured_media` as a filename — the importer resolves each back to the local ID before comparing and writing (so it never writes a slug where WordPress needs an integer). A clean **export → import of the same site is a verified no-op**: `plan()` reports zero changes and `apply()` skips every record the dry-run shows unchanged, so re-running an import doesn't churn `post_modified` dates.
-- **`Importer::plan()`** produces the field-level diff (`unchanged` / `changed old→new` / `new` / `would-delete`) and writes nothing. Both sides of every comparison are normalized through the same decode path, so `""` ↔ missing ↔ `null` ↔ `[]`, `"1"` ↔ `true`, and `"[…]"` ↔ the decoded array all compare equal. `content:import` without `--yes` stops here; the admin screen renders it as a review table.
-- **Apply** writes a full `Exporter` snapshot to `wp-content/uploads/taw-private/` (an `.htaccess`-denied dir) first, then: posts via `wp_insert_post`/`wp_update_post`; **meta via `Metabox::writeMeta()`** — the same sanitize + `wp_slash` path an admin metabox save uses; options via `update_option`; terms via `wp_insert_term`/`wp_update_term`. Per-record conflict policy `update` (overwrite) / `create` (only new) / `skip`, global default via `--policy=` or the admin selector.
-- **Report:** created / updated / skipped / deleted / media sideloaded / warnings (registry drift, unresolved parent slug, missing media) / rollback path.
+- **Apply order** is dependency-first: `users → terms → media (sideload + id-map) → posts (resolve author, terms, media refs) → comments (threading rebuilt) → settings`.
+- **Media:** each `media[]` entry is matched to an existing attachment by filename, else sideloaded from `url` (with its title / description / alt / caption). An `old id → new id` map is applied to `wp-image-N` / `"id":N` / `"ids":[…]` in `post_content` and to `image`/`files` field values before anything is written.
+- **Portable transforms are reversed on import** — `page_on_front`/`page_for_posts` and `sticky_posts` (slugs), `post.parent` (slug), `featured_media` (filename), `author` (`{login,email}`) all resolve back to a local ID before the diff and the write. A clean **export → import of the same site is a verified no-op** (`--migrate` export then `import --yes` → 0 created / 0 updated / 0 deleted): `plan()` reports zero changes and `apply()` skips every record the dry-run shows unchanged.
+- **`Importer::plan()`** produces the field-level diff (`unchanged` / `changed old→new` / `new` / `would-delete`) and writes nothing. `""` ↔ missing ↔ `null` ↔ `[]`, `"1"` ↔ `true`, `"[…]"` ↔ the decoded array all compare equal. `content:import` without `--yes` stops here.
+- **Apply** writes a full **maximal-scope** `Exporter` snapshot to `wp-content/uploads/taw-private/` (an `.htaccess`-denied dir) first, then: posts via `wp_insert_post`/`wp_update_post`; **meta via `Metabox::writeMeta()`**; options via `update_option`; terms via `wp_insert_term`/`wp_update_term`; users via `wp_insert_user`/`wp_update_user` (roles sanitised against the target's defined roles); comments via `wp_insert_comment`. Per-record conflict policy `update` / `create` / `skip`. **Environment settings are also import-gated** — skipped unless `--with-settings` / the admin checkbox.
+- **Report:** created / updated / skipped / deleted / media sideloaded / warnings (registry drift, unresolved author/parent, undefined role, missing media) / rollback path.
 
 ### REST-registered field meta
 

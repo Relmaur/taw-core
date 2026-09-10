@@ -33,6 +33,8 @@ final class ChangeSet
         array_push($operations, ...self::diffPosts($base['posts'] ?? [], $target['posts'] ?? []));
         array_push($operations, ...self::diffOptions($base['options'] ?? [], $target['options'] ?? []));
         array_push($operations, ...self::diffTerms($base['terms'] ?? [], $target['terms'] ?? []));
+        array_push($operations, ...self::diffUsers($base['users'] ?? [], $target['users'] ?? []));
+        array_push($operations, ...self::diffComments($base['comments'] ?? [], $target['comments'] ?? []));
 
         return [
             'taw_changeset' => [
@@ -51,13 +53,14 @@ final class ChangeSet
      */
     private static function diffPosts(mixed $base, mixed $target): array
     {
-        $baseMap = self::indexBy(is_array($base) ? $base : [], static fn (array $p): string => ($p['type'] ?? '') . '|' . ($p['slug'] ?? ''));
-        $targetMap = self::indexBy(is_array($target) ? $target : [], static fn (array $p): string => ($p['type'] ?? '') . '|' . ($p['slug'] ?? ''));
+        $keyer = static fn (array $p): string => ($p['type'] ?? '') . '|' . (($p['slug'] ?? '') !== '' ? $p['slug'] : ($p['match_key'] ?? ''));
+        $baseMap = self::indexBy(is_array($base) ? $base : [], $keyer);
+        $targetMap = self::indexBy(is_array($target) ? $target : [], $keyer);
 
         $ops = [];
 
         foreach ($targetMap as $key => $record) {
-            $t = ['kind' => 'post', 'type' => $record['type'] ?? null, 'slug' => $record['slug'] ?? null];
+            $t = ['kind' => 'post', 'type' => $record['type'] ?? null, 'slug' => $record['slug'] ?? null, 'match_key' => $record['match_key'] ?? null];
             if (!isset($baseMap[$key])) {
                 $ops[] = ['op' => 'create', 'target' => $t, 'post' => $record];
                 continue;
@@ -71,11 +74,72 @@ final class ChangeSet
             if (!isset($targetMap[$key])) {
                 $ops[] = [
                     'op'     => 'delete',
-                    'target' => ['kind' => 'post', 'type' => $record['type'] ?? null, 'slug' => $record['slug'] ?? null],
+                    'target' => ['kind' => 'post', 'type' => $record['type'] ?? null, 'slug' => $record['slug'] ?? null, 'match_key' => $record['match_key'] ?? null],
                 ];
             }
         }
 
+        return $ops;
+    }
+
+    /**
+     * @param mixed $base
+     * @param mixed $target
+     * @return list<array<string, mixed>>
+     */
+    private static function diffUsers(mixed $base, mixed $target): array
+    {
+        $keyer = static fn (array $u): string => (string) ($u['login'] ?? '');
+        $baseMap = self::indexBy(is_array($base) ? $base : [], $keyer);
+        $targetMap = self::indexBy(is_array($target) ? $target : [], $keyer);
+        $ops = [];
+
+        foreach ($targetMap as $key => $record) {
+            if ($key === '') {
+                continue;
+            }
+            $t = ['kind' => 'user', 'key' => $key];
+            if (!isset($baseMap[$key])) {
+                $ops[] = ['op' => 'create', 'target' => $t, 'fields' => $record];
+            } elseif (self::normalize($baseMap[$key]) !== self::normalize($record)) {
+                $ops[] = ['op' => 'update', 'target' => $t, 'fields' => $record];
+            }
+        }
+        foreach ($baseMap as $key => $record) {
+            if ($key !== '' && !isset($targetMap[$key])) {
+                $ops[] = ['op' => 'delete', 'target' => ['kind' => 'user', 'key' => $key]];
+            }
+        }
+        return $ops;
+    }
+
+    /**
+     * @param mixed $base
+     * @param mixed $target
+     * @return list<array<string, mixed>>
+     */
+    private static function diffComments(mixed $base, mixed $target): array
+    {
+        $keyer = static fn (array $c): string => sha1(implode('|', [
+            (string) ($c['post_ref'] ?? ''),
+            (string) ($c['author_email'] ?? ''),
+            (string) ($c['date_gmt'] ?? ''),
+            (string) ($c['content'] ?? ''),
+        ]));
+        $baseMap = self::indexBy(is_array($base) ? $base : [], $keyer);
+        $targetMap = self::indexBy(is_array($target) ? $target : [], $keyer);
+        $ops = [];
+
+        foreach ($targetMap as $key => $record) {
+            if (!isset($baseMap[$key])) {
+                $ops[] = ['op' => 'create', 'target' => ['kind' => 'comment', 'key' => $key], 'fields' => $record];
+            }
+        }
+        foreach ($baseMap as $key => $record) {
+            if (!isset($targetMap[$key])) {
+                $ops[] = ['op' => 'delete', 'target' => ['kind' => 'comment', 'key' => $key], 'fields' => $record];
+            }
+        }
         return $ops;
     }
 

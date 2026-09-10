@@ -51,6 +51,8 @@ final class ExporterTest extends TestCase
         ]);
         Functions\when('wp_basename')->alias(static fn (string $p): string => basename($p));
         Functions\when('get_post_types')->justReturn(['page' => 'page', 'post' => 'post']);
+        Functions\when('post_type_exists')->alias(static fn (string $t): bool => in_array($t, ['page', 'post'], true));
+        Functions\when('get_userdata')->justReturn(false);
         Functions\when('get_taxonomies')->justReturn([]);
         Functions\when('get_object_taxonomies')->justReturn([]);
         Functions\when('get_page_template_slug')->justReturn('');
@@ -114,7 +116,7 @@ final class ExporterTest extends TestCase
     {
         $snapshot = (new Exporter())->snapshot();
 
-        $this->assertSame('1.0', $snapshot['meta']['schema']);
+        $this->assertSame('1.1', $snapshot['meta']['schema']);
         $this->assertSame('https://example.test', $snapshot['meta']['source']['url']);
 
         $post = $snapshot['posts'][0];
@@ -149,5 +151,113 @@ final class ExporterTest extends TestCase
         $snapshot = (new Exporter())->snapshot(['include_media' => false]);
 
         $this->assertArrayNotHasKey('media', $snapshot);
+    }
+
+    public function test_post_record_carries_author_and_comment_status(): void
+    {
+        Functions\when('get_userdata')->alias(static fn ($id) => (int) $id === 5
+            ? (object) ['user_login' => 'ada', 'user_email' => 'ada@example.test']
+            : false);
+
+        $page = new \WP_Post([
+            'ID' => 10, 'post_type' => 'page', 'post_name' => 'home', 'post_status' => 'publish',
+            'post_title' => 'Home', 'post_excerpt' => '', 'post_content' => '', 'post_parent' => 0,
+            'menu_order' => 0, 'post_date_gmt' => '2026-01-01 00:00:00', 'post_author' => 5,
+            'comment_status' => 'closed', 'ping_status' => 'closed',
+        ]);
+        Functions\when('get_posts')->justReturn([$page]);
+
+        $post = (new Exporter())->snapshot()['posts'][0];
+
+        $this->assertSame(['login' => 'ada', 'email' => 'ada@example.test'], $post['author']);
+        $this->assertSame('closed', $post['comment_status']);
+        $this->assertSame('closed', $post['ping_status']);
+    }
+
+    public function test_with_users_adds_a_users_section_without_passwords(): void
+    {
+        Functions\when('get_users')->justReturn([
+            (object) [
+                'ID' => 1, 'user_login' => 'admin', 'user_email' => 'a@example.test',
+                'display_name' => 'Admin', 'roles' => ['administrator'],
+                'user_registered' => '2025-01-01 00:00:00', 'user_pass' => '$P$SECRET',
+            ],
+        ]);
+        Functions\when('get_user_meta')->justReturn('');
+
+        $snapshot = (new Exporter())->snapshot(['include_users' => true, 'include_media' => false]);
+
+        $this->assertCount(1, $snapshot['users']);
+        $this->assertSame('admin', $snapshot['users'][0]['login']);
+        $this->assertSame(['administrator'], $snapshot['users'][0]['roles']);
+        $this->assertArrayNotHasKey('password_hash', $snapshot['users'][0]);
+    }
+
+    public function test_with_user_passwords_includes_the_hash(): void
+    {
+        Functions\when('get_users')->justReturn([
+            (object) [
+                'ID' => 1, 'user_login' => 'admin', 'user_email' => 'a@example.test',
+                'display_name' => 'Admin', 'roles' => ['administrator'],
+                'user_registered' => '2025-01-01 00:00:00', 'user_pass' => '$P$SECRET',
+            ],
+        ]);
+        Functions\when('get_user_meta')->justReturn('');
+
+        $users = (new Exporter())->snapshot([
+            'include_users' => true, 'include_user_passwords' => true, 'include_media' => false,
+        ])['users'];
+
+        $this->assertSame('$P$SECRET', $users[0]['password_hash']);
+    }
+
+    public function test_drafts_are_excluded_by_default_and_included_with_the_flag(): void
+    {
+        $captured = [];
+        Functions\when('get_posts')->alias(static function (array $args) use (&$captured) {
+            $captured[] = $args['post_status'] ?? null;
+            return [];
+        });
+
+        (new Exporter())->snapshot(['include_media' => false]);
+        (new Exporter())->snapshot(['include_media' => false, 'include_drafts' => true]);
+
+        $this->assertNotContains('draft', $captured[0]);
+        $this->assertContains('draft', $captured[1]);
+    }
+
+    public function test_a_non_public_cpt_with_a_metabox_is_still_exported(): void
+    {
+        // 'activity' is registered but public => false; a TAW Metabox targets it.
+        Functions\when('post_type_exists')->alias(static fn (string $t): bool => in_array($t, ['page', 'post', 'activity'], true));
+        new \TAW\Core\Metabox\Metabox([
+            'id' => 'taw_activity', 'title' => 'Activity', 'screens' => 'activity',
+            'fields' => [['id' => 'starts_at', 'type' => 'text']],
+        ]);
+
+        $captured = [];
+        Functions\when('get_posts')->alias(static function (array $args) use (&$captured) {
+            $captured = $args['post_type'] ?? [];
+            return [];
+        });
+
+        (new Exporter())->snapshot(['include_media' => false]);
+
+        $this->assertContains('activity', $captured);
+    }
+
+    public function test_slugless_post_gets_a_composite_match_key(): void
+    {
+        $draft = new \WP_Post([
+            'ID' => 30, 'post_type' => 'post', 'post_name' => '', 'post_status' => 'draft',
+            'post_title' => 'Untitled note', 'post_excerpt' => '', 'post_content' => '', 'post_parent' => 0,
+            'menu_order' => 0, 'post_date_gmt' => '2026-02-02 12:00:00',
+        ]);
+        Functions\when('get_posts')->justReturn([$draft]);
+
+        $post = (new Exporter())->snapshot(['include_drafts' => true, 'include_media' => false])['posts'][0];
+
+        $this->assertSame('', $post['slug']);
+        $this->assertSame(sha1('post|Untitled note|2026-02-02 12:00:00'), $post['match_key']);
     }
 }
