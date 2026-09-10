@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace TAW\Core\Content;
 
+// No `if (!defined('ABSPATH')) exit;` guard: the `content:*` CLI
+// commands autoload these classes *before* WordPress boots, and the
+// guard's `exit` silently kills the command (v1.25.1 fix). They are
+// pure class definitions with no include-time side effects — like
+// TAW\Helpers\Framework and TAW\CLI\WpLoader, which omit it too.
+
 use Composer\InstalledVersions;
 use TAW\Core\Metabox\Metabox;
 use TAW\Core\OptionsPage\OptionsPage;
-
-if (!defined('ABSPATH')) {
-    exit;
-}
 
 /**
  * Builds a portable, human-reviewable snapshot of a TAW site's content —
@@ -401,12 +403,7 @@ class Exporter
 
     private function attachmentFilename(int $attId): string
     {
-        $file = get_post_meta($attId, '_wp_attached_file', true);
-        if (is_string($file) && $file !== '') {
-            return wp_basename($file);
-        }
-        $url = wp_get_attachment_url($attId);
-        return is_string($url) ? wp_basename($url) : (string) $attId;
+        return MediaResolver::attachmentFilename($attId);
     }
 
     /* -----------------------------------------------------------------

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace TAW\Core\Content;
 
-if (!defined('ABSPATH')) {
-    exit;
-}
+// No `if (!defined('ABSPATH')) exit;` guard: the `content:*` CLI
+// commands autoload these classes *before* WordPress boots, and the
+// guard's `exit` silently kills the command (v1.25.1 fix). They are
+// pure class definitions with no include-time side effects — like
+// TAW\Helpers\Framework and TAW\CLI\WpLoader, which omit it too.
 
 /**
  * The one place that knows how a stored `_taw_*` value maps to and from a

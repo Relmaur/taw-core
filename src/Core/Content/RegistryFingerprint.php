@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace TAW\Core\Content;
 
+// No `if (!defined('ABSPATH')) exit;` guard: the `content:*` CLI
+// commands autoload these classes *before* WordPress boots, and the
+// guard's `exit` silently kills the command (v1.25.1 fix). They are
+// pure class definitions with no include-time side effects — like
+// TAW\Helpers\Framework and TAW\CLI\WpLoader, which omit it too.
+
 use TAW\Core\Block\BlockRegistry;
 use TAW\Core\Metabox\Metabox;
 use TAW\Core\OptionsPage\OptionsPage;
-
-if (!defined('ABSPATH')) {
-    exit;
-}
 
 /**
  * A compact description of the field/block registry at the moment a

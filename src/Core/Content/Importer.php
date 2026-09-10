@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace TAW\Core\Content;
 
-use TAW\Core\Metabox\Metabox;
+// No `if (!defined('ABSPATH')) exit;` guard: the `content:*` CLI
+// commands autoload these classes *before* WordPress boots, and the
+// guard's `exit` silently kills the command (v1.25.1 fix). They are
+// pure class definitions with no include-time side effects — like
+// TAW\Helpers\Framework and TAW\CLI\WpLoader, which omit it too.
 
-if (!defined('ABSPATH')) {
-    exit;
-}
+use TAW\Core\Metabox\Metabox;
 
 /**
  * Consumes a content snapshot ({@see Exporter} output) or a change-set
@@ -118,7 +120,10 @@ class Importer
     public function apply(array $input, array $options = []): array
     {
         $this->warnings = [];
-        $policy = in_array($options['policy'] ?? 'update', self::POLICIES, true) ? $options['policy'] : 'update';
+        $policy = $options['policy'] ?? 'update';
+        if (!in_array($policy, self::POLICIES, true)) {
+            $policy = 'update';
+        }
 
         $report = [
             'created' => [], 'updated' => [], 'skipped' => [], 'deleted' => [],
@@ -128,6 +133,14 @@ class Importer
         if (($options['rollback'] ?? true) !== false) {
             $report['rollback_path'] = $this->writeRollbackSnapshot();
         }
+
+        // Records the dry-run diff shows as already matching are skipped —
+        // so a clean export → import round-trip is a genuine no-op and
+        // re-running an import doesn't churn post_modified dates. Computed
+        // before the run mutates anything (it also resets $this->warnings,
+        // so it must come before the media step below).
+        $unchanged = $this->unchangedRecordKeys($input);
+        $this->warnings = [];
 
         // Media first — the ID map is needed to rewrite references in posts/fields.
         $media = is_array($input['media'] ?? null) ? $input['media'] : [];
@@ -141,6 +154,12 @@ class Importer
 
         foreach (self::operationsFrom($input) as $op) {
             $kind = $op['target']['kind'] ?? '';
+
+            if (($op['op'] ?? 'update') === 'update' && isset($unchanged[$this->recordKey($op)])) {
+                $report['skipped'][] = $this->recordKey($op);
+                continue;
+            }
+
             $result = match ($kind) {
                 'post'   => $this->applyPost($op, $policy, $idMap),
                 'option' => $this->applyOption($op, $policy),
@@ -159,6 +178,43 @@ class Importer
     public function warnings(): array
     {
         return $this->warnings;
+    }
+
+    /**
+     * Stable identity for an operation / plan record — used to line up the
+     * dry-run diff with the apply loop.
+     *
+     * @param array<string, mixed> $opOrRecord
+     */
+    private function recordKey(array $opOrRecord): string
+    {
+        $t = is_array($opOrRecord['target'] ?? null) ? $opOrRecord['target'] : $opOrRecord;
+        $kind = (string) ($t['kind'] ?? '');
+
+        if ($kind === 'option') {
+            return 'option:' . (string) ($t['key'] ?? '');
+        }
+
+        return $kind . ':' . (string) ($t['type'] ?? '') . ':' . (string) ($t['slug'] ?? '');
+    }
+
+    /**
+     * The set of record keys the dry run reports as already matching the
+     * site — `[key => true]`.
+     *
+     * @param array<string, mixed> $input
+     * @return array<string, true>
+     */
+    private function unchangedRecordKeys(array $input): array
+    {
+        $keys = [];
+        foreach ($this->plan($input)['records'] as $record) {
+            $changes = is_array($record['changes'] ?? null) ? $record['changes'] : [];
+            if ($changes === [] && ($record['op'] ?? '') !== 'would-delete') {
+                $keys[$this->recordKey($record)] = true;
+            }
+        }
+        return $keys;
     }
 
     /* -----------------------------------------------------------------
@@ -200,16 +256,39 @@ class Importer
             }
         }
 
+        // featured_media — the exporter renders it as a filename; compare
+        // against the current thumbnail's filename, not its numeric ID.
+        if (array_key_exists('featured_media', $incoming)) {
+            $newRef = $incoming['featured_media'];
+            $currentThumb = $existing ? (int) get_post_thumbnail_id($existing) : 0;
+            $currentRef = $currentThumb > 0 ? MediaResolver::attachmentFilename($currentThumb) : null;
+            if ((string) $currentRef !== (string) $newRef) {
+                $changes['featured_media'] = ($existing && $currentRef !== null)
+                    ? ['status' => 'changed', 'old' => $currentRef, 'new' => $newRef]
+                    : ['status' => 'new', 'new' => $newRef];
+            }
+        }
+
         foreach (is_array($incoming['fields'] ?? null) ? $incoming['fields'] : [] as $fieldId => $newVal) {
             $config = Metabox::get_field_config((string) $fieldId) ?? ['type' => 'text', 'id' => $fieldId];
-            $oldDecoded = $existing
-                ? FieldCodec::decode($config, get_post_meta($existing->ID, '_taw_' . $fieldId, true))
-                : null;
-            if (!$existing || $oldDecoded === '' || $oldDecoded === null) {
-                $changes['fields.' . $fieldId] = ['status' => 'new', 'new' => $newVal];
-            } elseif (wp_json_encode($oldDecoded) !== wp_json_encode($newVal)) {
-                $changes['fields.' . $fieldId] = ['status' => 'changed', 'old' => $oldDecoded, 'new' => $newVal];
+
+            // Normalize BOTH sides through the same decode path so that
+            // empty ↔ empty, "1" ↔ true, "[…]" ↔ [...], "42" ↔ 42 all
+            // compare equal — a clean export→import round-trip must be a
+            // no-op (see Bug B).
+            $oldDecoded = FieldCodec::decode(
+                $config,
+                $existing ? get_post_meta($existing->ID, '_taw_' . $fieldId, true) : ''
+            );
+            $newDecoded = FieldCodec::decode($config, $newVal);
+
+            if (self::valueKey($oldDecoded) === self::valueKey($newDecoded)) {
+                continue;
             }
+
+            $changes['fields.' . $fieldId] = ($existing && !self::isEmptyValue($oldDecoded))
+                ? ['status' => 'changed', 'old' => $oldDecoded, 'new' => $newDecoded]
+                : ['status' => 'new', 'new' => $newDecoded];
         }
 
         return [
@@ -226,15 +305,20 @@ class Importer
     private function planOption(array $op): array
     {
         $key = (string) ($op['target']['key'] ?? '');
-        $new = $op['fields']['value'] ?? null;
-        $current = get_option($key, null);
+        $incoming = $op['fields']['value'] ?? null;
+        $currentRaw = get_option($key, null);
+        $exists = $currentRaw !== null;
 
-        $status = $current === null
-            ? 'new'
-            : (wp_json_encode($this->decodeOptionForCompare($key, $current)) === wp_json_encode($new) ? 'unchanged' : 'changed');
+        if ($exists && $this->optionCompareKey($key, $currentRaw) === $this->optionCompareKey($key, $incoming)) {
+            return ['kind' => 'option', 'key' => $key, 'op' => 'update', 'changes' => []];
+        }
 
-        return ['kind' => 'option', 'key' => $key, 'op' => $current === null ? 'create' : 'update',
-                'changes' => $status === 'unchanged' ? [] : ['value' => ['status' => $status, 'old' => $current, 'new' => $new]]];
+        return [
+            'kind'    => 'option',
+            'key'     => $key,
+            'op'      => $exists ? 'update' : 'create',
+            'changes' => ['value' => ['status' => $exists ? 'changed' : 'new', 'old' => $currentRaw, 'new' => $incoming]],
+        ];
     }
 
     /**
@@ -414,7 +498,14 @@ class Importer
             return ['bucket' => 'skipped', 'label' => "option:{$key}"];
         }
 
-        update_option($key, $this->encodeOptionForStorage($key, $value));
+        // page_on_front / page_for_posts arrive as a slug (the exporter's
+        // portable form); WordPress requires the integer post ID — resolve
+        // it back before writing, or the front page breaks (Bug A).
+        $stored = in_array($key, self::POST_ID_OPTIONS, true)
+            ? $this->resolveLocalPostId($value)
+            : $this->encodeOptionForStorage($key, $value);
+
+        update_option($key, $stored);
 
         return ['bucket' => $exists ? 'updated' : 'created', 'label' => "option:{$key}"];
     }
@@ -509,10 +600,72 @@ class Importer
         };
     }
 
-    private function decodeOptionForCompare(string $key, mixed $current): mixed
+    /**
+     * Options the exporter renders as a post slug for portability but which
+     * WordPress stores (and requires) as an integer post ID.
+     */
+    private const POST_ID_OPTIONS = ['page_on_front', 'page_for_posts'];
+
+    /**
+     * Reverse a portable post reference (slug, or an already-numeric ID) to
+     * a local post ID — `0` when it is empty or doesn't resolve on this
+     * site. The inverse of the exporter's slug-isation.
+     */
+    private function resolveLocalPostId(mixed $ref): int
     {
+        if ($ref === null || $ref === '' || $ref === 0 || $ref === '0') {
+            return 0;
+        }
+
+        if (is_numeric($ref)) {
+            $post = get_post((int) $ref);
+            return $post instanceof \WP_Post ? (int) $post->ID : 0;
+        }
+
+        $found = get_posts([
+            'name'             => (string) $ref,
+            'post_type'        => ['page', 'post'],
+            'post_status'      => 'any',
+            'posts_per_page'   => 1,
+            'no_found_rows'    => true,
+            'suppress_filters' => false,
+        ]);
+
+        return ($found[0] ?? null) instanceof \WP_Post ? (int) $found[0]->ID : 0;
+    }
+
+    /**
+     * A stable comparison key for a decoded field / option value. Whichever
+     * "effectively empty" form a value takes — missing key, `''`, `null`,
+     * `[]`, `false` — collapses to the same token, so a clean
+     * export → import round-trip diffs to nothing.
+     */
+    private static function valueKey(mixed $value): string
+    {
+        return self::isEmptyValue($value) ? "\0empty" : (string) wp_json_encode($value);
+    }
+
+    private static function isEmptyValue(mixed $value): bool
+    {
+        return $value === null || $value === '' || $value === [] || $value === false;
+    }
+
+    /**
+     * Comparison key for an option value — post-ID options resolve through
+     * {@see self::resolveLocalPostId()} (so a stored ID and an incoming
+     * slug that point at the same post compare equal); TAW options decode
+     * through their registered field type; everything else compares raw.
+     */
+    private function optionCompareKey(string $key, mixed $value): string
+    {
+        if (in_array($key, self::POST_ID_OPTIONS, true)) {
+            return 'pid:' . $this->resolveLocalPostId($value);
+        }
+
         $config = \TAW\Core\OptionsPage\OptionsPage::getFieldRegistry()[$key] ?? null;
-        return $config !== null ? FieldCodec::decode($config, $current) : $current;
+        $decoded = $config !== null ? FieldCodec::decode($config, $value) : $value;
+
+        return self::valueKey($decoded);
     }
 
     private function encodeOptionForStorage(string $key, mixed $value): mixed
