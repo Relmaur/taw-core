@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace TAW\Core\Content;
 
-if (!defined('ABSPATH')) {
-    exit;
-}
+// No `if (!defined('ABSPATH')) exit;` guard: the `content:*` CLI
+// commands autoload these classes *before* WordPress boots, and the
+// guard's `exit` silently kills the command (v1.25.1 fix). They are
+// pure class definitions with no include-time side effects — like
+// TAW\Helpers\Framework and TAW\CLI\WpLoader, which omit it too.
 
 /**
  * Resolves the `media[]` section of a snapshot against the target site.
@@ -136,6 +138,21 @@ final class MediaResolver
         );
 
         return $content;
+    }
+
+    /**
+     * The basename of an attachment's file — the stable, portable key used
+     * throughout the interchange format for `featured_media` and media
+     * references. Falls back to the URL basename, then the ID.
+     */
+    public static function attachmentFilename(int $attachmentId): string
+    {
+        $file = get_post_meta($attachmentId, '_wp_attached_file', true);
+        if (is_string($file) && $file !== '') {
+            return wp_basename($file);
+        }
+        $url = wp_get_attachment_url($attachmentId);
+        return is_string($url) && $url !== '' ? wp_basename($url) : (string) $attachmentId;
     }
 
     /**

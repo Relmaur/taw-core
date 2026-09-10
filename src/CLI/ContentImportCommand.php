@@ -93,7 +93,9 @@ class ContentImportCommand extends Command
 
         if (!$apply) {
             $this->renderPlan($io, $output, $plan, $asJson);
-            $io->note('Dry run — nothing was written. Re-run with --yes to apply.');
+            if (!$asJson) {
+                $io->note('Dry run — nothing was written. Re-run with --yes to apply.');
+            }
             return Command::SUCCESS;
         }
 
