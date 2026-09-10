@@ -47,6 +47,17 @@ class OptionsPage
     private string $icon;
     private ?int   $position;
 
+    /**
+     * Flat registry of every options field ever registered, keyed by its
+     * full option name (prefix + id, group sub-fields already compounded).
+     * The options-side equivalent of {@see Metabox::getFieldRegistry()} —
+     * lets Content\Exporter / FieldMetaRegistrar look up an option's field
+     * type without holding an OptionsPage instance.
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    private static array $fieldRegistry = [];
+
     public function __construct(array $config)
     {
         $this->id         = $config['id'];
@@ -59,9 +70,26 @@ class OptionsPage
         $this->icon       = $config['icon']        ?? 'dashicons-admin-generic';
         $this->position   = $config['position']    ?? null;
 
+        foreach ($this->get_all_fields() as $field) {
+            self::$fieldRegistry[$this->prefix . $field['id']] = array_merge($field, [
+                'option_page' => $this->id,
+                'prefix'      => $this->prefix,
+            ]);
+        }
+
         add_action('admin_menu', [$this, 'register_page']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
+    }
+
+    /**
+     * Every registered options field, keyed by full option name.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function getFieldRegistry(): array
+    {
+        return self::$fieldRegistry;
     }
 
     public function enqueue_admin_assets(string $hook): void

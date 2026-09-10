@@ -185,6 +185,11 @@ class Metabox
             'metabox_title' => $this->title,
             'prefix'        => $this->prefix,
             'block_id'      => self::$currentBlockId,
+            // Raw screens list (post types / slugs / template files) so consumers
+            // that only have the field registry — FieldMetaRegistrar (REST meta),
+            // Content\RegistryFingerprint — can map a field back to its post types
+            // without a separate registry of Metabox instances.
+            'screens'       => $this->screens,
         ];
 
         foreach ($this->fields as $field) {
@@ -2876,11 +2881,26 @@ class Metabox
     }
 
     /**
-     * Sanitize post selector value.
-     * Single mode: returns a post ID as string.
-     * Multi mode: returns a JSON array of post IDs.
+     * Sanitize post selector value. Instance wrapper around
+     * {@see self::sanitizePostSelectValue()} — kept so the save() path reads
+     * the same as the other private sanitize_* helpers.
      */
     private function sanitize_post_select(array $field, mixed $value): string
+    {
+        return self::sanitizePostSelectValue($field, $value);
+    }
+
+    /**
+     * Sanitize a post_select value.
+     * Single mode: returns a post ID as string.
+     * Multi mode: returns a JSON array of post IDs.
+     *
+     * Static so the Visual Editor endpoint, `fields:set`, and Content\Importer
+     * all reach the same rules the admin metabox save uses.
+     *
+     * @param array<string, mixed> $field
+     */
+    public static function sanitizePostSelectValue(array $field, mixed $value): string
     {
         $multiple = !empty($field['multiple']);
 
@@ -2891,7 +2911,7 @@ class Metabox
         }
 
         // Multi mode: JSON array of IDs
-        $ids = json_decode($value, true);
+        $ids = json_decode(is_string($value) ? $value : (string) wp_json_encode($value), true);
         if (!is_array($ids)) {
             return '[]';
         }
@@ -2905,20 +2925,32 @@ class Metabox
             $clean = array_slice($clean, 0, $max);
         }
 
-        return wp_json_encode($clean);
+        return (string) wp_json_encode($clean);
     }
 
     /**
-     * Sanitize files field value.
-     * Decodes the JSON array of attachment IDs and sanitizes each as absint.
+     * Sanitize files field value. Instance wrapper around
+     * {@see self::sanitizeFilesValue()}.
      */
     private function sanitize_files(mixed $value): string
     {
-        $ids = json_decode((string) $value, true);
-        if (!is_array($ids)) return '[]';
+        return self::sanitizeFilesValue($value);
+    }
+
+    /**
+     * Sanitize a files-field value — a JSON array of attachment IDs, each
+     * coerced with absint(). Static, for the same reason as
+     * {@see self::sanitizePostSelectValue()}.
+     */
+    public static function sanitizeFilesValue(mixed $value): string
+    {
+        $ids = json_decode(is_string($value) ? $value : (string) wp_json_encode($value), true);
+        if (!is_array($ids)) {
+            return '[]';
+        }
 
         $clean = array_values(array_filter(array_map('absint', $ids)));
-        return wp_json_encode($clean, JSON_UNESCAPED_UNICODE);
+        return (string) wp_json_encode($clean, JSON_UNESCAPED_UNICODE);
     }
 
     /**
@@ -3240,6 +3272,55 @@ class Metabox
         }
 
         return (string) wp_json_encode($sanitized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * Sanitize a value for a field and persist it to post meta, using the
+     * exact same path as an admin metabox save (see {@see self::save()}):
+     * type-appropriate sanitization, then `wp_slash()` before
+     * `update_post_meta()` — the slash counteracts the `wp_unslash()`
+     * `update_post_meta()` runs internally, so a value containing `"` or `\`
+     * (common in repeater JSON) round-trips intact.
+     *
+     * The single write primitive shared by `fields:set` and
+     * `TAW\Core\Content\Importer`, so none of them re-implement the
+     * sanitize/slash/store sequence (and drift from it).
+     *
+     * @param array<string, mixed> $fieldConfig A field config from {@see self::get_field_config()}.
+     * @param mixed                $value       Raw value (scalar, or JSON string / array for repeater/files/post_select).
+     * @return mixed The value actually stored (post-sanitization).
+     */
+    public static function writeMeta(int $postId, array $fieldConfig, mixed $value): mixed
+    {
+        $type   = $fieldConfig['type'] ?? 'text';
+        $prefix = $fieldConfig['prefix'] ?? '_taw_';
+        $id     = $fieldConfig['id'] ?? '';
+        $metaKey = $prefix . $id;
+
+        $sanitized = self::sanitizeForStorage($fieldConfig, $value);
+
+        update_post_meta($postId, $metaKey, wp_slash($sanitized));
+
+        return $sanitized;
+    }
+
+    /**
+     * Type-aware sanitization for a stored value — the static counterpart of
+     * the instance {@see self::sanitize_field()}, covering every field type
+     * (scalars via {@see self::sanitizeValue()}, plus repeater / files /
+     * post_select). Returns the value ready for `update_post_meta()` (JSON
+     * string for the structured types), before any `wp_slash()`.
+     *
+     * @param array<string, mixed> $fieldConfig
+     */
+    public static function sanitizeForStorage(array $fieldConfig, mixed $value): mixed
+    {
+        return match ($fieldConfig['type'] ?? 'text') {
+            'repeater'    => self::sanitizeRepeaterRows($fieldConfig, $value),
+            'files'       => self::sanitizeFilesValue($value),
+            'post_select' => self::sanitizePostSelectValue($fieldConfig, $value),
+            default       => self::sanitizeValue($fieldConfig, $value),
+        };
     }
 
     /**
