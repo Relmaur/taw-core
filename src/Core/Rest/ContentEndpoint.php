@@ -51,6 +51,11 @@ final class ContentEndpoint
                     'default'  => true,
                     'type'     => 'boolean',
                 ],
+                'include_drafts' => [
+                    'required' => false,
+                    'default'  => false,
+                    'type'     => 'boolean',
+                ],
             ],
         ]);
     }
@@ -62,7 +67,12 @@ final class ContentEndpoint
 
     public function export(\WP_REST_Request $request): \WP_REST_Response
     {
-        $scope = ['include_media' => (bool) $request->get_param('include_media')];
+        $scope = [
+            'include_media'  => (bool) $request->get_param('include_media'),
+            'include_drafts' => (bool) $request->get_param('include_drafts'),
+        ];
+        // Deliberately no users / settings / comments over REST — those are
+        // CLI + admin-screen only, where the migration intent is unmistakable.
 
         $types = (string) $request->get_param('types');
         if ($types !== '') {

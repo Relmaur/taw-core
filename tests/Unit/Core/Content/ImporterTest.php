@@ -194,6 +194,203 @@ final class ImporterTest extends TestCase
         $this->assertSame([], $report['updated']);
     }
 
+    public function test_operations_from_emits_kinds_in_dependency_order(): void
+    {
+        $snapshot = [
+            'meta'     => ['schema' => '1.1'],
+            'users'    => [['login' => 'ada', 'email' => 'a@x.test']],
+            'terms'    => ['category' => [['slug' => 'news', 'name' => 'News']]],
+            'posts'    => [['type' => 'page', 'slug' => 'home', 'fields' => []]],
+            'options'  => ['_taw_phone' => '5', 'permalink_structure' => '/%postname%/'],
+            'comments' => [['post_ref' => 'home', 'content' => 'hi', 'author_email' => 'c@x.test', 'date_gmt' => '2026-01-01 00:00:00']],
+        ];
+
+        $kinds = [];
+        foreach (Importer::operationsFrom($snapshot) as $op) {
+            $k = $op['target']['kind'];
+            $kinds[] = $k === 'option' && ($op['target']['key'] ?? '') === 'permalink_structure' ? 'settings' : $k;
+        }
+
+        $this->assertSame(['user', 'term', 'post', 'option', 'comment', 'settings'], $kinds);
+    }
+
+    public function test_plan_warns_on_an_unknown_schema_major_but_not_on_1_x(): void
+    {
+        Functions\when('get_posts')->justReturn([]);
+
+        $this->assertSame([], (new Importer())->plan(['meta' => ['schema' => '1.0'], 'posts' => []])['warnings']);
+        $this->assertSame([], (new Importer())->plan(['meta' => ['schema' => '1.1'], 'posts' => []])['warnings']);
+        $this->assertNotSame([], (new Importer())->plan(['meta' => ['schema' => '2.0'], 'posts' => []])['warnings']);
+    }
+
+    public function test_author_round_trips_without_a_change(): void
+    {
+        $existing = new \WP_Post(['ID' => 7, 'post_type' => 'page', 'post_name' => 'about', 'post_author' => 4]);
+        Functions\when('get_posts')->justReturn([$existing]);
+        Functions\when('get_post_meta')->justReturn('');
+        Functions\when('get_post_thumbnail_id')->justReturn(0);
+        Functions\when('get_user_by')->alias(static fn (string $by, $val) => $val === 'ada' || $val === 'ada@x.test'
+            ? (object) ['ID' => 4] : false);
+        Functions\when('wp_json_encode')->alias(static fn ($v) => json_encode($v));
+
+        $plan = (new Importer())->plan(['posts' => [[
+            'type' => 'page', 'slug' => 'about',
+            'author' => ['login' => 'ada', 'email' => 'ada@x.test'],
+        ]]]);
+
+        $this->assertSame([], $plan['records'][0]['changes']);
+    }
+
+    public function test_apply_falls_back_to_the_current_user_when_the_author_is_absent(): void
+    {
+        Functions\when('get_posts')->justReturn([]);
+        Functions\when('get_user_by')->justReturn(false);
+        Functions\when('get_current_user_id')->justReturn(1);
+        Functions\when('wp_json_encode')->alias(static fn ($v) => json_encode($v));
+        Functions\when('apply_filters')->alias(static fn (string $h, $v = null) => $v);
+        Functions\when('wp_slash')->returnArg(1);
+        Functions\when('wp_set_object_terms')->justReturn(true);
+        Functions\when('set_post_thumbnail')->justReturn(true);
+
+        $captured = null;
+        Functions\when('wp_insert_post')->alias(static function ($arr) use (&$captured) {
+            $captured = $arr;
+            return 55;
+        });
+
+        $importer = new Importer();
+        $report = $importer->apply(['posts' => [[
+            'type' => 'page', 'slug' => 'new-page', 'title' => 'New',
+            'author' => ['login' => 'ghost', 'email' => 'ghost@x.test'], 'fields' => [],
+        ]]], ['rollback' => false]);
+
+        $this->assertSame(1, $captured['post_author']);
+        $this->assertNotSame([], $report['warnings']);
+    }
+
+    public function test_with_users_sanitizes_roles_against_the_target_and_writes_no_password(): void
+    {
+        Functions\when('get_user_by')->justReturn(false);
+        Functions\when('wp_json_encode')->alias(static fn ($v) => json_encode($v));
+        Functions\when('apply_filters')->alias(static fn (string $h, $v = null) => $v);
+        Functions\when('get_posts')->justReturn([]);
+        Functions\when('wp_roles')->justReturn(new class {
+            /** @return array<string, string> */
+            public function get_names(): array
+            {
+                return ['administrator' => 'Administrator', 'editor' => 'Editor'];
+            }
+        });
+        Functions\when('wp_generate_password')->justReturn('generated');
+        Functions\when('update_user_meta')->justReturn(true);
+
+        $captured = null;
+        Functions\when('wp_insert_user')->alias(static function ($data) use (&$captured) {
+            $captured = $data;
+            return 9;
+        });
+
+        $importer = new Importer();
+        $report = $importer->apply([
+            'users' => [[
+                'login' => 'sam', 'email' => 'sam@x.test', 'display_name' => 'Sam',
+                'roles' => ['administrator', 'shop_manager'], 'meta' => [],
+            ]],
+        ], ['rollback' => false]);
+
+        $this->assertContains('user:sam', $report['created']);
+        $this->assertSame('administrator', $captured['role']);
+        // A default export carries no hash → the new account gets a random password.
+        $this->assertSame('generated', $captured['user_pass']);
+        // shop_manager isn't defined on the target → a warning, never granted.
+        $this->assertNotSame([], array_filter($report['warnings'], static fn ($w) => str_contains($w, 'shop_manager')));
+    }
+
+    public function test_sticky_posts_setting_is_skipped_without_the_flag_and_remapped_with_it(): void
+    {
+        $sticky = new \WP_Post(['ID' => 12, 'post_type' => 'post', 'post_name' => 'featured']);
+        Functions\when('get_option')->alias(static fn (string $k, $d = null) => $k === 'sticky_posts' ? [] : $d);
+        Functions\when('get_posts')->justReturn([$sticky]);
+        Functions\when('get_post')->justReturn($sticky);
+        Functions\when('wp_json_encode')->alias(static fn ($v) => json_encode($v));
+        Functions\when('apply_filters')->alias(static fn (string $h, $v = null) => $v);
+
+        $withoutFlag = (new Importer())->apply(['options' => ['sticky_posts' => ['featured']]], ['rollback' => false]);
+        $this->assertNotSame([], array_filter($withoutFlag['skipped'], static fn ($s) => str_contains($s, 'sticky_posts')));
+        $this->assertSame([], $withoutFlag['created']);
+        $this->assertSame([], $withoutFlag['updated']);
+
+        Functions\expect('update_option')->once()->with('sticky_posts', [12]);
+        $withFlag = (new Importer())->apply(['options' => ['sticky_posts' => ['featured']]], ['rollback' => false, 'include_settings' => true]);
+        $this->assertContains('option:sticky_posts', $withFlag['updated']);
+    }
+
+    public function test_slugless_draft_re_import_is_idempotent(): void
+    {
+        $draft = new \WP_Post([
+            'ID' => 30, 'post_type' => 'post', 'post_name' => '', 'post_title' => 'Note',
+            'post_date_gmt' => '2026-02-02 12:00:00', 'post_author' => 0,
+        ]);
+        Functions\when('get_posts')->justReturn([$draft]);
+        Functions\when('get_post_meta')->justReturn('');
+        Functions\when('get_post_thumbnail_id')->justReturn(0);
+        Functions\when('wp_json_encode')->alias(static fn ($v) => json_encode($v));
+
+        $record = [
+            'type' => 'post', 'slug' => '', 'title' => 'Note', 'date' => '2026-02-02 12:00:00',
+            'match_key' => sha1('post|Note|2026-02-02 12:00:00'), 'fields' => [],
+        ];
+
+        $plan = (new Importer())->plan(['posts' => [$record]]);
+
+        $this->assertSame('update', $plan['records'][0]['op'], 'the slug-less draft is matched, not recreated');
+        $this->assertSame([], $plan['records'][0]['changes']);
+    }
+
+    public function test_migrate_scope_snapshot_plans_zero_changes_against_the_same_site(): void
+    {
+        // The top-level acceptance criterion: export --migrate then re-plan
+        // against the unchanged site → nothing would be written.
+        $this->forbidAllWrites();
+
+        $about = new \WP_Post([
+            'ID' => 7, 'post_type' => 'page', 'post_name' => 'about', 'post_author' => 4,
+            'post_title' => 'About', 'comment_status' => 'open', 'ping_status' => 'open',
+        ]);
+        Functions\when('get_posts')->justReturn([$about]);
+        Functions\when('get_post_meta')->justReturn('');
+        Functions\when('get_post_thumbnail_id')->justReturn(0);
+        Functions\when('get_user_by')->alias(static fn (string $by, $v) => in_array($v, ['ada', 'ada@x.test'], true) ? (object) ['ID' => 4] : false);
+        Functions\when('get_userdata')->justReturn((object) [
+            'display_name' => 'Ada', 'roles' => ['administrator'],
+        ]);
+        Functions\when('get_user_meta')->justReturn('');
+        Functions\when('get_option')->alias(static fn (string $k, $d = null) => match ($k) {
+            'blogname'            => 'Site',
+            'permalink_structure' => '/%postname%/',
+            default               => $d,
+        });
+        Functions\when('wp_json_encode')->alias(static fn ($v) => json_encode($v));
+        Functions\when('apply_filters')->alias(static fn (string $h, $v = null) => $v);
+
+        $snapshot = [
+            'meta'    => ['schema' => '1.1'],
+            'users'   => [['login' => 'ada', 'email' => 'ada@x.test', 'display_name' => 'Ada', 'roles' => ['administrator'], 'meta' => []]],
+            'options' => ['blogname' => 'Site', 'permalink_structure' => '/%postname%/'],
+            'posts'   => [[
+                'type' => 'page', 'slug' => 'about', 'title' => 'About',
+                'author' => ['login' => 'ada', 'email' => 'ada@x.test'],
+                'comment_status' => 'open', 'ping_status' => 'open', 'fields' => [],
+            ]],
+        ];
+
+        $records = (new Importer())->plan($snapshot)['records'];
+
+        foreach ($records as $record) {
+            $this->assertSame([], $record['changes'] ?? [], "{$record['kind']} record should be unchanged");
+        }
+    }
+
     /**
      * Any of these being called during plan() fails the test.
      */

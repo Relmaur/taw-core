@@ -81,6 +81,48 @@ final class ChangeSetTest extends TestCase
         $this->assertSame(['create', 'new'], $map['_taw_b']);
     }
 
+    public function test_diffs_the_users_section(): void
+    {
+        $base = ['meta' => ['schema' => '1.1'], 'users' => [
+            ['login' => 'ada', 'email' => 'ada@x.test', 'display_name' => 'Ada'],
+        ]];
+        $target = ['meta' => ['schema' => '1.1'], 'users' => [
+            ['login' => 'ada', 'email' => 'ada@x.test', 'display_name' => 'Ada Lovelace'],
+            ['login' => 'grace', 'email' => 'grace@x.test', 'display_name' => 'Grace'],
+        ]];
+
+        $ops = ChangeSet::between($base, $target)['operations'];
+        $map = [];
+        foreach ($ops as $op) {
+            $map[$op['target']['key']] = $op['op'];
+        }
+
+        $this->assertSame('update', $map['ada']);
+        $this->assertSame('create', $map['grace']);
+        $this->assertSame('user', $ops[0]['target']['kind']);
+    }
+
+    public function test_diffs_the_comments_section(): void
+    {
+        $c = static fn (string $body): array => ['post_ref' => 'about', 'author_email' => 'x@x.test', 'date_gmt' => '2026-01-01 00:00:00', 'content' => $body];
+        $base = ['meta' => ['schema' => '1.1'], 'comments' => [$c('hi')]];
+        $target = ['meta' => ['schema' => '1.1'], 'comments' => [$c('hi'), $c('second')]];
+
+        $ops = ChangeSet::between($base, $target)['operations'];
+
+        $this->assertCount(1, $ops);
+        $this->assertSame('create', $ops[0]['op']);
+        $this->assertSame('comment', $ops[0]['target']['kind']);
+    }
+
+    public function test_slugless_posts_match_on_the_composite_key(): void
+    {
+        $draft = ['type' => 'post', 'slug' => '', 'match_key' => 'abc123', 'title' => 'Note', 'fields' => []];
+        $snap = ['meta' => ['schema' => '1.1'], 'posts' => [$draft], 'options' => [], 'terms' => []];
+
+        $this->assertSame([], ChangeSet::between($snap, $snap)['operations'], 'a slug-less post keyed on match_key is stable');
+    }
+
     public function test_term_diff_by_taxonomy_and_slug(): void
     {
         $base = $this->snapshot([], [], ['category' => [['slug' => 'news', 'name' => 'News']]]);

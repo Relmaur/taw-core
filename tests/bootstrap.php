@@ -53,5 +53,41 @@ if (!class_exists('WP_Post')) {
                 $this->{$key} = $value;
             }
         }
+
+        /**
+         * A real WP_Post always has every column populated; this stub only
+         * carries what a test explicitly set, so reads of anything else
+         * (post_content, comment_status, post_author, …) return '' rather
+         * than emitting an "undefined property" warning.
+         */
+        public function __get(string $name): string
+        {
+            return '';
+        }
+    }
+}
+
+if (!class_exists('WP_User')) {
+    #[\AllowDynamicProperties]
+    class WP_User
+    {
+        public int $ID = 0;
+        /** @var list<string> */
+        public array $roles = [];
+
+        public function __construct(int $id = 0)
+        {
+            $this->ID = $id;
+        }
+
+        public function set_role(string $role): void
+        {
+            $this->roles = $role === '' ? [] : [$role];
+        }
+
+        public function add_role(string $role): void
+        {
+            $this->roles[] = $role;
+        }
     }
 }

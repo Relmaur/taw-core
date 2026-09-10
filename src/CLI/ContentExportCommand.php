@@ -40,12 +40,24 @@ class ContentExportCommand extends Command
                   <info>php bin/taw content:export --output=/tmp/site.json</info>
                   <info>php bin/taw content:export --types=page,post --since=2025-01-01</info>
                   <info>php bin/taw content:export --posts=12,about --no-media</info>
+                  <info>php bin/taw content:export --migrate --output=/tmp/site.json</info>   full site state
+
+                --migrate is a shorthand for --with-users --with-settings --all-media
+                --include-drafts (it does NOT enable --with-user-passwords or
+                --with-comments — those stay explicit).
                 HELP)
             ->addOption('output', null, InputOption::VALUE_REQUIRED, 'File to write (default: .taw/content-export.json)')
             ->addOption('types', null, InputOption::VALUE_REQUIRED, 'Comma-separated post types to limit the export to')
             ->addOption('since', null, InputOption::VALUE_REQUIRED, 'Only posts dated on or after this date (Y-m-d)')
             ->addOption('posts', null, InputOption::VALUE_REQUIRED, 'Comma-separated post IDs or slugs to limit the export to')
-            ->addOption('no-media', null, InputOption::VALUE_NONE, 'Omit the media[] section');
+            ->addOption('no-media', null, InputOption::VALUE_NONE, 'Omit the media[] section')
+            ->addOption('all-media', null, InputOption::VALUE_NONE, 'Also export attachments not referenced by any exported post/field')
+            ->addOption('include-drafts', null, InputOption::VALUE_NONE, 'Include draft / pending posts (excluded by default)')
+            ->addOption('with-users', null, InputOption::VALUE_NONE, 'Export a users[] section (no password hashes)')
+            ->addOption('with-user-passwords', null, InputOption::VALUE_NONE, 'Include portable password hashes in users[] (implies --with-users)')
+            ->addOption('with-comments', null, InputOption::VALUE_NONE, 'Export comments on the exported posts')
+            ->addOption('with-settings', null, InputOption::VALUE_NONE, 'Export the environment-settings option allowlist')
+            ->addOption('migrate', null, InputOption::VALUE_NONE, '= --with-users --with-settings --all-media --include-drafts');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -66,7 +78,17 @@ class ContentExportCommand extends Command
         WpLoader::autoConfigureLocalSocket($this->themeDir);
         require $wpLoad;
 
-        $scope = ['include_media' => !$input->getOption('no-media')];
+        $migrate = (bool) $input->getOption('migrate');
+
+        $scope = [
+            'include_media'          => !$input->getOption('no-media'),
+            'all_media'              => $migrate || (bool) $input->getOption('all-media'),
+            'include_drafts'         => $migrate || (bool) $input->getOption('include-drafts'),
+            'include_users'          => $migrate || (bool) $input->getOption('with-users') || (bool) $input->getOption('with-user-passwords'),
+            'include_user_passwords' => (bool) $input->getOption('with-user-passwords'),
+            'include_comments'       => (bool) $input->getOption('with-comments'),
+            'include_settings'       => $migrate || (bool) $input->getOption('with-settings'),
+        ];
         if (is_string($input->getOption('types')) && $input->getOption('types') !== '') {
             $scope['types'] = array_values(array_filter(array_map('trim', explode(',', (string) $input->getOption('types')))));
         }
@@ -98,6 +120,8 @@ class ContentExportCommand extends Command
             ['Options' => (string) count($snapshot['options'])],
             ['Terms' => (string) array_sum(array_map('count', $snapshot['terms']))],
             ['Media' => (string) count($snapshot['media'] ?? [])],
+            ['Users' => (string) count($snapshot['users'] ?? [])],
+            ['Comments' => (string) count($snapshot['comments'] ?? [])],
         );
 
         foreach ($exporter->warnings() as $warning) {

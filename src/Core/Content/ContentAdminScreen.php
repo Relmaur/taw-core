@@ -83,8 +83,28 @@ final class ContentAdminScreen
                 <input type="hidden" name="action" value="taw_content_export">
                 <p>
                     <label><input type="checkbox" name="include_media" value="1" checked>
-                        <?php esc_html_e('Include referenced media (URLs + metadata)', 'taw-theme'); ?></label>
+                        <?php esc_html_e('Include referenced media (URLs + metadata)', 'taw-theme'); ?></label><br>
+                    <label><input type="checkbox" name="all_media" value="1">
+                        <?php esc_html_e('Include unreferenced media (orphans, widget images)', 'taw-theme'); ?></label><br>
+                    <label><input type="checkbox" name="include_drafts" value="1">
+                        <?php esc_html_e('Include draft / pending posts', 'taw-theme'); ?></label><br>
+                    <label><input type="checkbox" name="with_users" value="1">
+                        <?php esc_html_e('Include users (login, email, roles, profile — no passwords)', 'taw-theme'); ?></label><br>
+                    <label><input type="checkbox" name="with_settings" value="1">
+                        <?php esc_html_e('Include environment settings (permalinks, timezone, sticky posts, …)', 'taw-theme'); ?></label>
                 </p>
+                <details>
+                    <summary><?php esc_html_e('Advanced', 'taw-theme'); ?></summary>
+                    <p class="description" style="color:#b32d2e">
+                        <?php esc_html_e('These carry sensitive or bulky data — only for a deliberate full-site migration.', 'taw-theme'); ?>
+                    </p>
+                    <p>
+                        <label><input type="checkbox" name="with_user_passwords" value="1">
+                            <?php esc_html_e('Include portable password hashes', 'taw-theme'); ?></label><br>
+                        <label><input type="checkbox" name="with_comments" value="1">
+                            <?php esc_html_e('Include comments on exported posts', 'taw-theme'); ?></label>
+                    </p>
+                </details>
                 <?php submit_button(__('Download snapshot', 'taw-theme'), 'primary', 'submit', false); ?>
             </form>
 
@@ -124,7 +144,15 @@ final class ContentAdminScreen
         }
         check_admin_referer('taw_content_export');
 
-        $scope = ['include_media' => !empty($_POST['include_media'])];
+        $scope = [
+            'include_media'          => !empty($_POST['include_media']),
+            'all_media'              => !empty($_POST['all_media']),
+            'include_drafts'         => !empty($_POST['include_drafts']),
+            'include_users'          => !empty($_POST['with_users']) || !empty($_POST['with_user_passwords']),
+            'include_user_passwords' => !empty($_POST['with_user_passwords']),
+            'include_comments'       => !empty($_POST['with_comments']),
+            'include_settings'       => !empty($_POST['with_settings']),
+        ];
         $snapshot = (new Exporter())->snapshot($scope);
 
         $host = wp_parse_url(home_url(), PHP_URL_HOST) ?: 'site';
@@ -173,7 +201,10 @@ final class ContentAdminScreen
 
         $policy = sanitize_text_field((string) ($_POST['policy'] ?? 'update'));
 
-        $report = (new Importer())->apply($pending['data'], ['policy' => $policy]);
+        $report = (new Importer())->apply($pending['data'], [
+            'policy'           => $policy,
+            'include_settings' => !empty($_POST['with_settings']),
+        ]);
 
         @unlink($this->pendingPath());
 
@@ -255,6 +286,10 @@ final class ContentAdminScreen
                         <option value="skip"><?php esc_html_e('skip everything (no writes)', 'taw-theme'); ?></option>
                     </select>
                 </label>
+            </p>
+            <p>
+                <label><input type="checkbox" name="with_settings" value="1">
+                    <?php esc_html_e('Also apply environment-settings options (permalinks, timezone, sticky posts, …)', 'taw-theme'); ?></label>
             </p>
             <?php submit_button(sprintf(__('Apply %d changes', 'taw-theme'), (int) $changeCount), 'primary', 'submit', false); ?>
             <a class="button" href="<?php echo esc_url(admin_url('tools.php?page=taw-data&cancel=1')); ?>"><?php esc_html_e('Cancel', 'taw-theme'); ?></a>

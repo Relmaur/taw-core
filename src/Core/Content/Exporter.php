@@ -24,13 +24,13 @@ use TAW\Core\OptionsPage\OptionsPage;
  * transients, non-allowlisted core/plugin options, and
  * `nav_menu` / `nav_menu_item` (code-owned in TAW themes).
  *
- * Schema: see `resources/schema/content-interchange-1.0.json`.
+ * Schema: see `resources/schema/content-interchange-1.1.json`.
  *
- * @phpstan-type Scope array{types?: list<string>, since?: string, posts?: list<int|string>, include_media?: bool}
+ * @phpstan-type Scope array{types?: list<string>, since?: string, posts?: list<int|string>, include_media?: bool, all_media?: bool, include_drafts?: bool, include_users?: bool, include_user_passwords?: bool, include_comments?: bool, include_settings?: bool}
  */
 class Exporter
 {
-    public const SCHEMA_VERSION = '1.0';
+    public const SCHEMA_VERSION = '1.1';
 
     /**
      * Core (non-`_taw_`) options included in every export. `page_on_front`
@@ -43,6 +43,31 @@ class Exporter
         'page_on_front',
         'page_for_posts',
     ];
+
+    /**
+     * A *second*, opt-in allowlist for environment-ish settings a full
+     * `--migrate` wants but a routine content sync must never touch. Only
+     * exported when `$scope['include_settings']` is set, and the importer
+     * gates them behind `--with-settings` as well. `sticky_posts` is
+     * rendered as a list of post slugs. Filter: `taw_content_export_settings_options`.
+     */
+    public const SETTINGS_OPTION_ALLOWLIST = [
+        'permalink_structure',
+        'timezone_string',
+        'gmt_offset',
+        'date_format',
+        'time_format',
+        'start_of_week',
+        'sticky_posts',
+        'blog_public',
+        'default_comment_status',
+        'default_ping_status',
+        'WPLANG',
+    ];
+
+    /** Options in an allowlist whose value is a post slug (or list of slugs) standing in for a post ID. */
+    public const POST_SLUG_OPTIONS = ['page_on_front', 'page_for_posts'];
+    public const POST_SLUG_LIST_OPTIONS = ['sticky_posts'];
 
     /**
      * Post types never exported, regardless of scope — framework-internal
@@ -70,6 +95,9 @@ class Exporter
     /** @var array<int, true> attachment IDs referenced by exported content */
     private array $referencedAttachments = [];
 
+    /** @var array<int, array{type: string, slug: string}> post ID => natural key of every exported post */
+    private array $exportedPosts = [];
+
     /**
      * @param Scope $scope
      * @return array<string, mixed>
@@ -78,12 +106,13 @@ class Exporter
     {
         $this->warnings = [];
         $this->referencedAttachments = [];
+        $this->exportedPosts = [];
 
         $includeMedia = $scope['include_media'] ?? true;
 
         $posts = $this->exportPosts($scope);
         $terms = $this->exportTerms();
-        $options = $this->exportOptions();
+        $options = $this->exportOptions($scope);
 
         $snapshot = [
             'meta' => [
@@ -103,8 +132,16 @@ class Exporter
             'posts'   => $posts,
         ];
 
+        if (!empty($scope['include_users'])) {
+            $snapshot['users'] = $this->exportUsers(!empty($scope['include_user_passwords']));
+        }
+
+        if (!empty($scope['include_comments'])) {
+            $snapshot['comments'] = $this->exportComments();
+        }
+
         if ($includeMedia) {
-            $snapshot['media'] = $this->exportMedia();
+            $snapshot['media'] = $this->exportMedia(!empty($scope['all_media']));
         }
 
         return $snapshot;
@@ -128,9 +165,17 @@ class Exporter
     {
         $types = $this->postTypesToExport($scope['types'] ?? null);
 
+        // Drafts are excluded by default: a draft with an empty post_name
+        // can't be keyed by (type, slug) and duplicates on every re-import.
+        // `--include-drafts` re-adds draft + pending, and slug-less records
+        // then carry a composite `match_key` the importer keys on instead.
+        $statuses = empty($scope['include_drafts'])
+            ? ['publish', 'private', 'future']
+            : ['publish', 'private', 'future', 'draft', 'pending'];
+
         $args = [
             'post_type'        => $types,
-            'post_status'      => ['publish', 'draft', 'pending', 'private', 'future'],
+            'post_status'      => $statuses,
             'posts_per_page'   => -1,
             'orderby'          => 'ID',
             'order'            => 'ASC',
@@ -173,7 +218,12 @@ class Exporter
     {
         $all = array_values(array_unique(array_merge(
             ['page', 'post'],
-            array_keys(get_post_types(['public' => true], 'names'))
+            array_keys(get_post_types(['public' => true], 'names')),
+            // A registered post type with a TAW Metabox attached is
+            // human-curated content by definition — auto-include it even
+            // when `public => false` (e.g. a Mass-schedule CPT), so sites
+            // stop needing a manual `taw_content_export_post_types` filter.
+            Metabox::postTypesWithMetabox()
         )));
 
         $all = array_values(array_filter($all, fn (string $t): bool => !in_array($t, self::NEVER_EXPORT_POST_TYPES, true)));
@@ -226,7 +276,9 @@ class Exporter
             $featured = $this->attachmentFilename($thumbId);
         }
 
-        return [
+        $this->exportedPosts[(int) $post->ID] = ['type' => (string) $post->post_type, 'slug' => (string) $post->post_name];
+
+        $record = [
             'type'           => $post->post_type,
             'slug'           => $post->post_name,
             'status'         => $post->post_status,
@@ -235,12 +287,39 @@ class Exporter
             'content'        => $post->post_content,
             'menu_order'     => (int) $post->menu_order,
             'date'           => $post->post_date_gmt,
+            'author'         => $this->authorRef((int) $post->post_author),
+            'comment_status' => (string) $post->comment_status,
+            'ping_status'    => (string) $post->ping_status,
             'parent'         => $post->post_parent ? (get_post($post->post_parent)->post_name ?? null) : null,
             'template'       => get_page_template_slug($post) ?: null,
             'terms'          => $this->postTerms($post),
             'featured_media' => $featured,
             'fields'         => $fields,
         ];
+
+        // A slug-less post (draft / auto-draft) needs a stable composite key
+        // so the importer doesn't recreate it on every run.
+        if ((string) $post->post_name === '') {
+            $record['match_key'] = sha1($post->post_type . '|' . $post->post_title . '|' . $post->post_date_gmt);
+        }
+
+        return $record;
+    }
+
+    /**
+     * @return array{login: string, email: string}|null
+     */
+    private function authorRef(int $userId): ?array
+    {
+        if ($userId <= 0) {
+            return null;
+        }
+        $user = get_userdata($userId);
+        if (!$user) {
+            $this->warnings[] = "Post author user #{$userId} no longer exists — author omitted.";
+            return null;
+        }
+        return ['login' => (string) $user->user_login, 'email' => (string) $user->user_email];
     }
 
     /**
@@ -321,9 +400,10 @@ class Exporter
      * ----------------------------------------------------------------- */
 
     /**
+     * @param Scope $scope
      * @return array<string, mixed>
      */
-    private function exportOptions(): array
+    private function exportOptions(array $scope): array
     {
         global $wpdb;
 
@@ -345,13 +425,30 @@ class Exporter
         /** @var list<string> $allowlist */
         $allowlist = (array) apply_filters('taw_content_export_core_options', self::CORE_OPTION_ALLOWLIST);
 
+        if (!empty($scope['include_settings'])) {
+            /** @var list<string> $settings */
+            $settings = (array) apply_filters('taw_content_export_settings_options', self::SETTINGS_OPTION_ALLOWLIST);
+            $allowlist = array_values(array_unique(array_merge($allowlist, $settings)));
+        }
+
         foreach ($allowlist as $name) {
             $name = (string) $name;
-            if (in_array($name, ['page_on_front', 'page_for_posts'], true)) {
+
+            if (in_array($name, self::POST_SLUG_OPTIONS, true)) {
                 $id = (int) get_option($name);
                 $out[$name] = $id > 0 ? (get_post($id)->post_name ?? null) : null;
                 continue;
             }
+
+            if (in_array($name, self::POST_SLUG_LIST_OPTIONS, true)) {
+                $ids = (array) get_option($name, []);
+                $out[$name] = array_values(array_filter(array_map(
+                    static fn ($id): ?string => (int) $id > 0 ? (get_post((int) $id)->post_name ?? null) : null,
+                    $ids
+                )));
+                continue;
+            }
+
             $out[$name] = get_option($name);
         }
 
@@ -376,26 +473,47 @@ class Exporter
     /**
      * @return list<array<string, mixed>>
      */
-    private function exportMedia(): array
+    private function exportMedia(bool $allMedia = false): array
     {
+        $ids = $this->referencedAttachments;
+
+        if ($allMedia) {
+            // Also carry attachments referenced only by widgets / options /
+            // orphaned uploads, so a --migrate export is a complete snapshot.
+            $everyAttachment = get_posts([
+                'post_type'      => 'attachment',
+                'post_status'    => 'inherit',
+                'posts_per_page' => -1,
+                'fields'         => 'ids',
+                'no_found_rows'  => true,
+            ]);
+            foreach ($everyAttachment as $id) {
+                $ids[(int) $id] = true;
+            }
+        }
+
         $out = [];
-        foreach (array_keys($this->referencedAttachments) as $attId) {
+        foreach (array_keys($ids) as $attId) {
             $attId = (int) $attId;
             $post = get_post($attId);
             if (!$post || $post->post_type !== 'attachment') {
-                $this->warnings[] = "Referenced attachment {$attId} no longer exists.";
+                if (isset($this->referencedAttachments[$attId])) {
+                    $this->warnings[] = "Referenced attachment {$attId} no longer exists.";
+                }
                 continue;
             }
 
             $filename = $this->attachmentFilename($attId);
             $out[] = [
-                'id'       => $attId,
-                'ref'      => $filename,
-                'filename' => $filename,
-                'url'      => wp_get_attachment_url($attId) ?: '',
-                'alt'      => get_post_meta($attId, '_wp_attachment_image_alt', true) ?: '',
-                'caption'  => $post->post_excerpt,
-                'mime'     => $post->post_mime_type,
+                'id'          => $attId,
+                'ref'         => $filename,
+                'filename'    => $filename,
+                'url'         => wp_get_attachment_url($attId) ?: '',
+                'title'       => (string) $post->post_title,
+                'description' => (string) $post->post_content,
+                'alt'         => get_post_meta($attId, '_wp_attachment_image_alt', true) ?: '',
+                'caption'     => $post->post_excerpt,
+                'mime'        => $post->post_mime_type,
             ];
         }
         return $out;
@@ -404,6 +522,83 @@ class Exporter
     private function attachmentFilename(int $attId): string
     {
         return MediaResolver::attachmentFilename($attId);
+    }
+
+    /* -----------------------------------------------------------------
+     * Users (opt-in — $scope['include_users'])
+     * ----------------------------------------------------------------- */
+
+    private const USER_META_KEYS = ['first_name', 'last_name', 'description', 'nickname', 'locale'];
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function exportUsers(bool $includePasswords): array
+    {
+        $out = [];
+        foreach (get_users(['fields' => 'all']) as $user) {
+            $meta = [];
+            foreach (self::USER_META_KEYS as $key) {
+                $meta[$key] = (string) get_user_meta($user->ID, $key, true);
+            }
+
+            $record = [
+                'login'           => (string) $user->user_login,
+                'email'           => (string) $user->user_email,
+                'display_name'    => (string) $user->display_name,
+                'roles'           => array_values(array_map('strval', (array) $user->roles)),
+                'meta'            => $meta,
+                'user_registered' => (string) $user->user_registered,
+            ];
+
+            if ($includePasswords) {
+                // WP password hashes (phpass, or bcrypt on newer cores) are
+                // self-contained and verify on any install — still gated
+                // behind the explicit second flag.
+                $record['password_hash'] = (string) $user->user_pass;
+            }
+
+            $out[] = $record;
+        }
+        return $out;
+    }
+
+    /* -----------------------------------------------------------------
+     * Comments (opt-in — $scope['include_comments'])
+     * ----------------------------------------------------------------- */
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function exportComments(): array
+    {
+        $postIds = array_keys($this->exportedPosts);
+        if ($postIds === []) {
+            return [];
+        }
+
+        $out = [];
+        foreach (get_comments(['post__in' => $postIds, 'status' => 'all', 'orderby' => 'comment_ID', 'order' => 'ASC']) as $comment) {
+            $postId = (int) $comment->comment_post_ID;
+            $postRef = $this->exportedPosts[$postId]['slug'] ?? '';
+            if ($postRef === '') {
+                continue;
+            }
+
+            $out[] = [
+                'ref'          => (string) $comment->comment_ID,
+                'post_ref'     => $postRef,
+                'author_name'  => (string) $comment->comment_author,
+                'author_email' => (string) $comment->comment_author_email,
+                'author_url'   => (string) $comment->comment_author_url,
+                'content'      => (string) $comment->comment_content,
+                'date_gmt'     => (string) $comment->comment_date_gmt,
+                'approved'     => (string) $comment->comment_approved,
+                'type'         => (string) ($comment->comment_type ?: 'comment'),
+                'parent_ref'   => (int) $comment->comment_parent > 0 ? (string) $comment->comment_parent : null,
+            ];
+        }
+        return $out;
     }
 
     /* -----------------------------------------------------------------

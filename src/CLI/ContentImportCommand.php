@@ -49,6 +49,7 @@ class ContentImportCommand extends Command
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Force dry-run even if --yes is given')
             ->addOption('yes', null, InputOption::VALUE_NONE, 'Apply the changes (otherwise the command only previews them)')
             ->addOption('policy', null, InputOption::VALUE_REQUIRED, 'Conflict policy for records that already exist: update | create | skip', 'update')
+            ->addOption('with-settings', null, InputOption::VALUE_NONE, 'Also apply environment-settings options (permalink_structure, timezone, sticky_posts, …) — skipped by default')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the plan/report as JSON');
     }
 
@@ -99,7 +100,10 @@ class ContentImportCommand extends Command
             return Command::SUCCESS;
         }
 
-        $report = $importer->apply($data, ['policy' => $policy]);
+        $report = $importer->apply($data, [
+            'policy'           => $policy,
+            'include_settings' => (bool) $input->getOption('with-settings'),
+        ]);
 
         if ($asJson) {
             $output->writeln((string) json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
