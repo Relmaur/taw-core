@@ -127,4 +127,41 @@ final class IngestionPipelineTest extends TestCase
         $count = (int) $pdo->query('SELECT COUNT(*) FROM taw_rag_chunks WHERE post_id = 3')->fetchColumn();
         $this->assertSame(0, $count);
     }
+
+    /**
+     * removePost() runs inline on every ineligible save_post (see
+     * PostIndexer) — a storage failure here (a missing pdo_sqlite driver
+     * on the host, permissions, disk full…) must degrade to a logged
+     * warning, never an uncaught PDOException that would fatal the
+     * editor's save request.
+     */
+    public function test_remove_post_does_not_throw_when_storage_is_unavailable(): void
+    {
+        Storage::ensureProtectedDir(Storage::dir());
+        // A directory sitting where the sqlite file should be forces PDO's
+        // sqlite driver to fail opening it, simulating any storage failure
+        // without needing to actually disable the pdo_sqlite extension.
+        mkdir(Storage::dbPath('taw_vectors.sqlite'));
+
+        $llm = $this->createMock(LlmClientInterface::class);
+
+        (new IngestionPipeline($llm))->removePost(99);
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_ingest_post_does_not_throw_when_storage_is_unavailable(): void
+    {
+        Storage::ensureProtectedDir(Storage::dir());
+        mkdir(Storage::dbPath('taw_vectors.sqlite'));
+
+        Functions\when('get_post')->justReturn($this->fakePost(11, 'Some content that will chunk fine.'));
+
+        $llm = $this->createMock(LlmClientInterface::class);
+        $llm->method('embeddings')->willReturn([[1.0, 0.0]]);
+
+        (new IngestionPipeline($llm))->ingestPost(11);
+
+        $this->addToAssertionCount(1);
+    }
 }

@@ -59,7 +59,15 @@ final class IngestionPipeline
             return;
         }
 
-        $this->repository()->upsertChunks($postId, $chunks, $embeddings, $model);
+        try {
+            $this->repository()->upsertChunks($postId, $chunks, $embeddings, $model);
+        } catch (\Throwable $e) {
+            Logger::warning('rag.storage_unavailable', 'Could not save post to the RAG index.', [
+                'post_id' => $postId,
+                'error' => $e->getMessage(),
+            ]);
+            return;
+        }
 
         Logger::info('rag.post_indexed', 'Post indexed for RAG search.', [
             'post_id' => $postId,
@@ -69,7 +77,18 @@ final class IngestionPipeline
 
     public function removePost(int $postId): void
     {
-        $this->repository()->deletePost($postId);
+        // Runs inline on every ineligible save_post (see PostIndexer), not
+        // via cron — a storage failure here (e.g. pdo_sqlite missing on the
+        // host) must degrade to a logged warning rather than an uncaught
+        // PDOException fataling the editor's save request.
+        try {
+            $this->repository()->deletePost($postId);
+        } catch (\Throwable $e) {
+            Logger::warning('rag.storage_unavailable', 'Could not remove post from the RAG index.', [
+                'post_id' => $postId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function repository(): VectorRepository
