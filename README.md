@@ -1254,7 +1254,7 @@ A visitor-facing chat widget that answers from **any number of named knowledge b
 
 `Settings → TAW Chatbot → Knowledge Bases` (`TAW\Core\Rag\KnowledgeBase\KnowledgeBaseAdminScreen`) — upload any `.sqlite` file with a name and description; that's the entire setup. On ingestion, every table is scanned and every column whose declared SQLite type has TEXT affinity (`CHAR`/`CLOB`/`TEXT`, or no declared type at all) is extracted as `"column: value"` lines per row, chunked, embedded, and written into a `taw_rag_chunks` table **inside that same file** — one file per knowledge base, not two. A table with no text-affinity column is skipped; nothing schema-specific is assumed.
 
-The site's own WordPress content is always present as a built-in, non-deletable `wp-content` knowledge base — it isn't stored in the registry option at all, since it's fully derived from the `Settings → TAW Chatbot` post-type/chunking settings below and the existing `save_post`/`before_delete_post` ingestion pipeline.
+The site's own WordPress content is always present as a built-in, non-deletable `wp-content` knowledge base — it isn't stored in the registry option at all, since it's fully derived from the `Settings → TAW Chatbot` post-type/chunking settings below and the existing `save_post`/`before_delete_post` ingestion pipeline. A post is eligible only while `publish` status, an indexed post type, and not password-protected — losing any of those (unpublish, trash, add a password) removes it from the index immediately, inline (no WP-Cron round-trip), so it never stays searchable after it's no longer publicly readable.
 
 ```bash
 php bin/taw content:reindex --post-type=post,page --batch=20   # backfill/refresh the wp-content knowledge base
