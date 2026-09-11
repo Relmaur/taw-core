@@ -135,10 +135,17 @@ class BibleReader
     }
 
     /**
-     * FTS5 search over verse text. The whole query is treated as one
-     * literal phrase (quotes doubled to escape) rather than exposed as raw
-     * FTS5 MATCH syntax — a public search box shouldn't hand end users an
-     * operator DSL that can throw a syntax error on unbalanced input.
+     * FTS5 search over verse text. Every whitespace-separated word in the
+     * query becomes its own quoted phrase (so none of it is ever
+     * interpreted as FTS5 operator syntax — a public search box shouldn't
+     * hand end users an operator DSL that can throw a syntax error on
+     * unbalanced input), joined with FTS5's implicit AND between quoted
+     * tokens — i.e. a row must contain every word, in any order or
+     * position, not the query as one exact contiguous phrase. The latter
+     * would silently return zero results for almost any real multi-word
+     * search ("amor de Dios" only ever matches if those three words
+     * happen to appear consecutively and in that order somewhere in
+     * Scripture — "Dios amor" or "fe, esperanza, caridad" would not).
      *
      * @return list<array{id: int, verse_number: int, verse_label: string, text: string, excerpt: string, book_slug: string, book_name: string, book_abbreviation: string, chapter_number: int}>
      */
@@ -183,7 +190,7 @@ class BibleReader
 
     /**
      * FTS5 search over Straubinger's own footnote commentary. Same
-     * literal-phrase escaping as {@see self::searchVerses()}.
+     * per-word AND matching as {@see self::searchVerses()}.
      *
      * @return list<array{id: int, type: string, marker: ?string, excerpt: string, book_slug: string, book_name: string, start_chapter: ?int, start_verse: ?int}>
      */
@@ -354,7 +361,15 @@ class BibleReader
 
     protected static function escapeFtsPhrase(string $query): string
     {
-        return '"' . str_replace('"', '""', trim($query)) . '"';
+        $terms = preg_split('/\s+/', trim($query), -1, PREG_SPLIT_NO_EMPTY);
+        if ($terms === false || $terms === []) {
+            return '""';
+        }
+
+        return implode(' ', array_map(
+            static fn (string $term): string => '"' . str_replace('"', '""', $term) . '"',
+            $terms
+        ));
     }
 
     protected static function clampLimit(int $limit): int

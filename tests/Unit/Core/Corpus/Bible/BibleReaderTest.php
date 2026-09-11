@@ -158,6 +158,22 @@ final class BibleReaderTest extends TestCase
         $this->assertIsArray($results);
     }
 
+    /**
+     * "Dios el cielo" (verse 100) means a literal-phrase MATCH for "cielo
+     * Dios" — words present, reversed, not adjacent — would return nothing,
+     * even though both words are genuinely in that verse. Every multi-word
+     * query must AND the individual words instead of requiring them as one
+     * exact contiguous phrase.
+     */
+    public function test_search_verses_matches_all_words_regardless_of_order_or_adjacency(): void
+    {
+        $results = (new BibleReader())->searchVerses('cielo Dios');
+
+        $this->assertCount(1, $results);
+        $this->assertSame('genesis', $results[0]['book_slug']);
+        $this->assertSame(1, $results[0]['verse_number']);
+    }
+
     public function test_search_verses_with_an_empty_query_returns_nothing(): void
     {
         $this->assertSame([], (new BibleReader())->searchVerses('   '));
