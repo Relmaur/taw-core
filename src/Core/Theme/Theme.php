@@ -13,6 +13,7 @@ use TAW\Core\Media\MediaFolders;
 use TAW\Core\Metabox\MetaboxOrder;
 use TAW\Core\OptionsPage\OptionsPage;
 use TAW\Core\Content\ContentAdminScreen;
+use TAW\Core\Rag\RagSettings;
 use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\Cors;
 use TAW\Core\Rest\FieldMetaRegistrar;
@@ -73,6 +74,7 @@ class Theme
      *  13. Content interchange (default-on, cap-gated — Tools → TAW Data screen,
      *      GET taw/v1/content/export, and REST-registered field meta; filter
      *      taw_register_meta_in_rest to opt out of the REST meta)
+     *  14. Sovereign Hybrid-RAG Chatbot (Settings → TAW Chatbot admin page)
      */
     public static function boot(): void
     {
@@ -167,6 +169,13 @@ class Theme
         (new ContentAdminScreen())->register();
         new ContentEndpoint();
         FieldMetaRegistrar::register();
+
+        // ── 14. Sovereign Hybrid-RAG Chatbot ──────────────────────────────────
+        // Settings → TAW Chatbot admin page (LLM base URL/model config,
+        // indexed post types, chunking, tool-call iteration cap). Ingestion
+        // and the chat REST endpoint are wired here in later steps as they
+        // land.
+        new RagSettings();
     }
 
     /**
