@@ -829,6 +829,9 @@ Annotations give the editor a direct DOM reference, making live updates exact an
 | `GET`  | `/taw/v1/search-posts`         | Post search for `post_select` fields |
 | `GET`  | `/taw/v1/icons`                | Lucide icon search for the `icon` field type — only registered when `Lucide::enable()` was called |
 | `POST` | `/taw/v1/chat`                 | Hybrid-RAG chatbot — see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot). Public by default, rate-limited |
+| `GET`  | `/taw/v1/bible/books`          | Bible reader — see [Bible Reader Corpus](#bible-reader-corpus). Opt-in, rate-limited |
+| `GET`  | `/taw/v1/bible/books/{slug}/chapters/{n}` | Bible reader — one chapter's verses/sections/notes |
+| `GET`  | `/taw/v1/bible/search`         | Bible reader — FTS5 search over verses or notes |
 
 Cross-origin access to these routes (and to `admin-ajax.php?action=taw_form_*`) is opt-in and off by default — see [Static Export & Headless CORS](#static-export--headless-cors).
 
@@ -1059,6 +1062,7 @@ php bin/taw content:import /tmp/site.json                       # dry-run diff; 
 php bin/taw content:diff a.json b.json --out=changes.json       # two snapshots → a change-set for content:import
 php bin/taw content:reindex --post-type=post,page --batch=20    # backfill/refresh the RAG chatbot's WP-content vectors (see Sovereign Hybrid-RAG Chatbot)
 php bin/taw content:reindex-kb kb-a1b2c3d4                      # re-run ingestion for one admin-uploaded RAG knowledge base
+php bin/taw corpus:install /path/to/bible.sqlite bible-straubinger.sqlite   # install a reference corpus (see Bible Reader Corpus)
 ```
 
 `make:block` generates the block folder, PHP class, template file, and Vite entry points.
@@ -1084,6 +1088,8 @@ The two skills directories (`.claude/skills/`, `.agents/skills/`) are Tier 1 but
 `icons:sync` re-vendors the Lucide icon set this package ships (see [Icon System](#icon-system)) — shallow-clones `lucide-icons/lucide`, copies every icon SVG into `resources/icons/lucide/`, and rebuilds `resources/icons/lucide-index.json`. Doesn't boot WordPress or touch a consuming theme; only run it here, in `taw-core` itself, when Lucide ships new icons.
 
 `content:reindex` and `content:reindex-kb` are the RAG chatbot's manual-backfill commands — see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot). Uploading a new knowledge base itself is a wp-admin action, not a CLI one.
+
+`corpus:install` installs a developer-curated reference corpus — see [Bible Reader Corpus](#bible-reader-corpus). Unlike a RAG knowledge base, this is CLI-only by design: no wp-admin upload screen.
 
 ---
 
@@ -1290,6 +1296,63 @@ Runs an OpenAI-compatible tool-calling loop (`TAW\Core\Rag\Orchestrator\ChatOrch
 
 ---
 
+## Bible Reader Corpus
+
+A read-only REST surface over a developer-installed reference corpus — currently a Straubinger-translation Spanish Catholic Bible (`books`/`chapters`/`verses`/`sections`/`notes` + FTS5 full-text search), built for the fsspx-taw client site's `/formacion/bible` reader but framework-level and content-agnostic in the same spirit as [Content Interchange](#content-interchange): the schema is fixed (this isn't a generic query layer — see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot)'s knowledge bases for that), but the storage/install/REST plumbing generalizes to any future reference corpus the same shape describes. See `docs/adr/0001-reference-corpus-storage.md` for the full reasoning behind the decisions below.
+
+**Opt-in** — call `TAW\Core\Rest\BibleEndpoint::enable()` in the theme's `customizations.php` before `Theme::boot()`, same posture as `Lucide::enable()`/`RagSettings::enable()`. Nothing here registers on a site that doesn't call it.
+
+### Installing the corpus file
+
+A reference corpus is a curated, developer-placed dataset, not end-user content — installed via CLI, not a wp-admin upload form:
+
+```bash
+php bin/taw corpus:install /path/to/bible_straubinger.sqlite bible-straubinger.sqlite
+```
+
+`TAW\CLI\CorpusInstallCommand` validates the SQLite magic-byte header (same check `KnowledgeBaseAdminScreen` uses for RAG knowledge-base uploads), then copies it into a protected uploads subdirectory — `TAW\Core\Corpus\Storage`, `wp-content/uploads/taw-private/corpus/`, a directory deliberately separate from the RAG chatbot's `taw-private/rag/` (see the ADR: a reference corpus and a RAG knowledge base are different concerns that happen to share "protected dir + read-only PDO" plumbing, extracted into `TAW\Core\Storage\ProtectedSqlite` rather than duplicated). The installed filename is fixed and versionless — the file's own `meta` table carries `release_channel`/`generated_at`/`source_revision`, so reader code never needs to know which build is installed. `bin/taw corpus:install` never overwrites destructively in a way that loses the source; re-running it against an updated source file is always safe.
+
+### Reading the corpus
+
+`TAW\Core\Corpus\Bible\BibleReader` — plain PDO, no WordPress dependency beyond resolving the uploads directory, opened via `Storage::openReadOnly()` (`PRAGMA query_only = 1` — a reference corpus is never written to at runtime):
+
+```php
+$reader = new TAW\Core\Corpus\Bible\BibleReader();
+
+$reader->books();                       // every book, grouped by testament then division, in canonical order
+$reader->chapter('genesis', 1);         // verses + any overlapping section headings + any overlapping notes
+$reader->searchVerses('en el principio'); // FTS5 phrase search over verse text, with a <mark>-highlighted excerpt
+$reader->searchNotes('creación');         // FTS5 phrase search over Straubinger's own footnote commentary
+```
+
+`chapter()` deliberately returns `verses`/`sections`/`notes` as three flat, chapter-scoped lists rather than an interleaved rendering shape — where a heading sits relative to a verse, or how a note marker anchors into verse text, is presentation, and stays the consuming theme's decision. `searchVerses()`/`searchNotes()` treat the whole query as one literal phrase (internal quotes doubled to escape) rather than exposing raw FTS5 `MATCH` operator syntax to a public search box.
+
+`BibleReader` is not `final` on purpose — every internal fetch method is `protected`, and `FILENAME` is overridable — so a theme can subclass it (different installed filename, different fetch behavior) without a taw-core fork. `TAW\Core\Rest\BibleEndpoint` resolves which reader it queries through a filter:
+
+```php
+add_filter('taw_corpus_bible_reader', function () {
+    return new MyThemeBibleReader();
+});
+```
+
+No `BibleReaderInterface` exists yet — one real consumer doesn't justify a formal contract; the endpoint narrows the filter's return via `instanceof BibleReader` and falls back to the default reader if a filter callback returns something else.
+
+### `GET /wp-json/taw/v1/bible/books`
+
+Every book, grouped by testament then division — the shape a books-list nav needs directly.
+
+### `GET /wp-json/taw/v1/bible/books/{slug}/chapters/{n}`
+
+One chapter: `{book, chapter_number, verses, sections, notes}`. 404 if the book slug or chapter number doesn't exist.
+
+### `GET /wp-json/taw/v1/bible/search?q=...&scope=verses|notes&limit=20`
+
+FTS5 search (`scope` defaults to `verses`; `limit` is clamped to 1-50).
+
+All three routes 404 with `{"error": "No Bible corpus is installed."}` until `corpus:install` has been run. **Public** (no auth — this is public Scripture text) but rate limited regardless: 120 requests/10 min per IP for `books`/chapter reads, 30 requests/10 min per IP for `search` (a heavier query, and a more attractive scraping target).
+
+---
+
 ## Static Export & Headless CORS
 
 `export:static` only freezes what's actually static: rendered page/post HTML, Vite assets, and uploads. Forms (`admin-ajax.php?action=taw_form_*`) and search (`GET /taw/v1/search-posts`) stay dynamic by design — they keep hitting this WordPress install, over the network, exactly as before. That's the right call: there's no server at a static host to answer them otherwise.
@@ -1338,7 +1401,7 @@ Dump::log($value);
 
 | Package | Purpose |
 |---------|---------|
-| `ext-pdo_sqlite` | The RAG chatbot's SQLite knowledge-base files (see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot)) |
+| `ext-pdo_sqlite` | The RAG chatbot's SQLite knowledge-base files (see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot)) and reference-corpus files (see [Bible Reader Corpus](#bible-reader-corpus)) |
 | `symfony/console ^7.4` | CLI commands |
 | `symfony/process ^7.4` | `wp` command — shells out to the real WP-CLI binary |
 | `enshrined/svg-sanitize ^0.22.0` | SVG XSS prevention on upload |

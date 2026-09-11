@@ -16,6 +16,7 @@ use TAW\Core\Content\ContentAdminScreen;
 use TAW\Core\Rag\Ingestion\PostIndexer;
 use TAW\Core\Rag\KnowledgeBase\KnowledgeBaseAdminScreen;
 use TAW\Core\Rag\RagSettings;
+use TAW\Core\Rest\BibleEndpoint;
 use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\Cors;
 use TAW\Core\Rest\FieldMetaRegistrar;
@@ -80,6 +81,8 @@ class Theme
      *  14. Sovereign Hybrid-RAG Chatbot (Settings → TAW Chatbot admin page +
      *      Knowledge Bases screen, save_post/before_delete_post ingestion,
      *      POST taw/v1/chat)
+     *  15. Bible reader corpus (opt-in — no-op unless BibleEndpoint::enable()
+     *      was called; GET taw/v1/bible/*)
      */
     public static function boot(): void
     {
@@ -188,6 +191,16 @@ class Theme
         (new KnowledgeBaseAdminScreen())->register();
         new PostIndexer();
         new RagChatEndpoint();
+
+        // ── 15. Bible reader corpus ────────────────────────────────────────────
+        // Opt-in only — no-op unless BibleEndpoint::enable() was called.
+        // GET taw/v1/bible/books, taw/v1/bible/books/{slug}/chapters/{n}, and
+        // taw/v1/bible/search over a developer-installed reference corpus
+        // (bin/taw corpus:install — see CorpusInstallCommand's docblock).
+        // Public, rate-limited — see BibleEndpoint's own docblock.
+        if (BibleEndpoint::isEnabled()) {
+            new BibleEndpoint();
+        }
     }
 
     /**

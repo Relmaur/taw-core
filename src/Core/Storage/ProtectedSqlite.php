@@ -1,0 +1,108 @@
+<?php
+
+declare(strict_types=1);
+
+namespace TAW\Core\Storage;
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * Shared plumbing for "a subsystem keeps its own SQLite file(s) in a
+ * webserver-inaccessible uploads subdirectory" — the mechanics
+ * {@see \TAW\Core\Rag\Storage} and {@see \TAW\Core\Corpus\Storage} both
+ * need, extracted here rather than duplicated, because the protection
+ * guarantee (never directly HTTP-reachable) and the open-with-exceptions
+ * connection setup have to stay identical across every subsystem that
+ * relies on them — a copy-pasted drift here is a real vulnerability, not
+ * just untidy code. What differs per subsystem (which directory, whether
+ * writes ever happen) stays in each subsystem's own thin `Storage` class.
+ *
+ * See docs/adr/0001-reference-corpus-storage.md for why this was extracted
+ * instead of letting {@see \TAW\Core\Corpus\Storage} duplicate it.
+ */
+final class ProtectedSqlite
+{
+    /** First 16 bytes of every valid SQLite database file. */
+    public const SQLITE_MAGIC = "SQLite format 3\000";
+
+    /**
+     * Guard a directory against direct HTTP access: `.htaccess` denying all
+     * requests, plus a silent `index.php` stub since Apache doesn't always
+     * honor `.htaccess` (e.g. `AllowOverride` off).
+     */
+    public static function ensureProtectedDir(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            wp_mkdir_p($dir);
+        }
+
+        foreach (
+            [
+                '.htaccess' => "Require all denied\nDeny from all\n",
+                'index.php' => "<?php\n// Silence is golden.\n",
+            ] as $guard => $body
+        ) {
+            $path = $dir . '/' . $guard;
+            if (!file_exists($path)) {
+                file_put_contents($path, $body);
+            }
+        }
+    }
+
+    /**
+     * Open a SQLite file with exceptions-on-error consistently enabled.
+     *
+     * Note on sqlite-vec reachability: `PDO::loadExtension()` only exists
+     * on PHP 8.4+'s `Pdo\Sqlite` driver-specific subclass (PHP RFC "PDO
+     * driver-specific subclasses"), and only on a connection actually
+     * constructed as that subclass — a plain `new PDO(...)`, which is what
+     * this method does, never exposes it, on any PHP version. This
+     * package targets PHP >=8.2 and sqlite-vec is confirmed absent on
+     * every target host today, so {@see \TAW\Core\Rag\Vector\VectorCapability}
+     * is written to degrade to "unavailable" here rather than requiring
+     * every caller to branch on PHP version for a currently-theoretical
+     * accelerator.
+     */
+    public static function open(string $path): \PDO
+    {
+        $pdo = new \PDO('sqlite:' . $path);
+        $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+        return $pdo;
+    }
+
+    /**
+     * Open a SQLite file the caller will only ever read from. Sets
+     * `PRAGMA query_only = 1` so an accidental write anywhere on the
+     * connection fails loudly instead of silently mutating a curated,
+     * developer-installed dataset — belt-and-braces on top of the caller
+     * never issuing a write, not a substitute for it.
+     */
+    public static function openReadOnly(string $path): \PDO
+    {
+        $pdo = self::open($path);
+        $pdo->exec('PRAGMA query_only = 1');
+
+        return $pdo;
+    }
+
+    /**
+     * Whether a file's first bytes match the SQLite 3 file format magic
+     * header — a cheap, real check against non-SQLite uploads/installs
+     * before ever attempting to open one.
+     */
+    public static function looksLikeSqliteFile(string $path): bool
+    {
+        $handle = fopen($path, 'rb');
+        if ($handle === false) {
+            return false;
+        }
+
+        $header = fread($handle, strlen(self::SQLITE_MAGIC));
+        fclose($handle);
+
+        return $header === self::SQLITE_MAGIC;
+    }
+}

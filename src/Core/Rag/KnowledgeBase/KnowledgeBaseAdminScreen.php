@@ -6,6 +6,7 @@ namespace TAW\Core\Rag\KnowledgeBase;
 
 use TAW\Core\Rag\Llm\LlmClient;
 use TAW\Core\Rag\Storage;
+use TAW\Core\Storage\ProtectedSqlite;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -22,9 +23,6 @@ final class KnowledgeBaseAdminScreen
 {
     private const CAP = 'manage_options';
     private const INGEST_HOOK = 'taw_rag_ingest_kb';
-
-    /** First 16 bytes of every valid SQLite database file. */
-    private const SQLITE_MAGIC = "SQLite format 3\000";
 
     public function register(): void
     {
@@ -196,15 +194,7 @@ final class KnowledgeBaseAdminScreen
 
     private function looksLikeSqlite(string $path): bool
     {
-        $handle = fopen($path, 'rb');
-        if ($handle === false) {
-            return false;
-        }
-
-        $header = fread($handle, strlen(self::SQLITE_MAGIC));
-        fclose($handle);
-
-        return $header === self::SQLITE_MAGIC;
+        return ProtectedSqlite::looksLikeSqliteFile($path);
     }
 
     private function renderNotices(): void
