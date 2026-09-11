@@ -6,10 +6,6 @@ namespace TAW\Core\Corpus;
 
 use TAW\Core\Storage\ProtectedSqlite;
 
-if (!defined('ABSPATH')) {
-    exit;
-}
-
 /**
  * Filesystem home for reference-corpus SQLite files (e.g. the Straubinger
  * Bible) — a deliberately separate protected directory from
@@ -27,6 +23,15 @@ if (!defined('ABSPATH')) {
  * (see {@see \TAW\CLI\CorpusInstallCommand}), not uploaded through
  * wp-admin — a curated dataset a developer places, not something an
  * end-user swaps through a web form.
+ *
+ * Deliberately no `if (!defined('ABSPATH')) exit;` guard, for the same
+ * reason {@see \TAW\Core\Storage\ProtectedSqlite} omits one:
+ * `CorpusInstallCommand::execute()` calls `dir()`/`ensureProtectedDir()`/
+ * `dbPath()` before `require $wpLoad` — a guard here would silently exit
+ * the whole CLI process pre-boot. `wp_upload_dir()`/`wp_mkdir_p()` are
+ * still only actually *called* once WordPress is loaded (either via that
+ * `require`, or because a REST request already booted it), so this stays
+ * safe despite the missing guard.
  */
 final class Storage
 {
