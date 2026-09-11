@@ -138,3 +138,40 @@ from the required-AND set before building the boolean-mode expression, rather th
 unsatisfiable term. Same "silently ignore, don't exclude everything" handling a real search
 engine applies to short/stop words. A query where every word falls below the threshold returns
 no results (there's nothing left to search for), rather than matching everything.
+
+## Addendum: `MysqlBibleInstaller` could report success on an import that wrote nothing
+
+A production install against WPMUdev/MariaDB 10.6.23 once printed a clean
+`[OK] Imported 73 books, 1334 chapters...` — and then `GET /wp-json/taw/v1/bible/books` kept
+404ing with "No Bible corpus is installed." Checked directly via `wp eval`: the table didn't
+exist at all. A second run genuinely succeeded with identical-looking output. The underlying
+transient cause (most likely an incomplete file transfer of the JSON export that still happened
+to parse) was never pinned down, but the *reporting* was a real, deterministic bug regardless of
+root cause, for two independent reasons:
+
+1. `CorpusInstallCommand::installMysql()`'s success message was built from `count($data['books'])`
+   etc. — the **input** JSON's own counts — never anything actually read back from MySQL after
+   the writes. A run that wrote zero rows for any reason would still print the input file's real
+   row counts as if they'd landed.
+2. Every `$wpdb->query()` call in `install()`/`reload()` (5× `CREATE TABLE`, `TRUNCATE`, batched
+   `INSERT`s) ran unchecked. `$wpdb->query()` returns `false` on failure and does **not** throw —
+   a silently-failed statement (permissions, a malformed statement, a dropped connection) just
+   fell through to the next line, all the way to `install()` returning normally.
+
+Fixed both: every `query()` call now goes through a checked wrapper that throws a
+`\RuntimeException` (with `$wpdb->last_error`) on `false`, and `install()` returns the actual
+row counts read back via `COUNT(*)` *after* the import completes — `CorpusInstallCommand`
+reports those, not the input's. A real failure is now a loud, actionable CLI error; a real
+success is now verified against MySQL, not assumed from the input file.
+
+One caveat surfaced along the way, documented rather than "fixed" (there's no full fix available
+within `$wpdb`'s transaction model): `TRUNCATE TABLE` is DDL on InnoDB/MariaDB and causes an
+**implicit commit** — so the `START TRANSACTION`/`COMMIT`/`ROLLBACK` wrapping around the
+five-table reload was never a true all-or-nothing guarantee across tables, only cosmetic once a
+`TRUNCATE` fires. The wrapping is kept (harmless, and still meaningful for the `INSERT` batches
+within one table's reload on a connection with autocommit off) but the real safety net is the
+loud-failure behavior above, not the transaction — a genuinely failed import is now impossible
+to mistake for a successful one, even though a failure partway through can still leave some
+tables reloaded and others not. Re-running `corpus:install` against a corrected export always
+puts every table back in a consistent state regardless, since every table is unconditionally
+truncated and reloaded from scratch.

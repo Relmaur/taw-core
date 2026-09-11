@@ -1340,7 +1340,9 @@ php bin/taw corpus:export /path/to/bible_straubinger.sqlite /path/to/bible-expor
 
 `TAW\CLI\CorpusExportCommand` reads the source `.sqlite` via plain PDO (no WordPress dependency — both paths are given directly as arguments) and writes a portable JSON export carrying only the columns `BibleReader` actually reads. Transfer that JSON file to the target server, then run `corpus:install` against it there — `TAW\Core\Corpus\Bible\MysqlBibleInstaller` creates `{$wpdb->prefix}taw_corpus_bible_{books,chapters,verses,sections,notes}` (`FULLTEXT` indexes on `verses.text`/`notes.body`) and bulk-loads the export via `$wpdb`, no `pdo_sqlite` needed on that host at any point.
 
-Both paths are safe to re-run against an updated source: the `.sqlite` path just overwrites the copied file; the JSON path truncates and reloads its MySQL tables inside a transaction. The installed filename (path 1) is fixed and versionless — the file's own `meta` table carries `release_channel`/`generated_at`/`source_revision`, so reader code never needs to know which build is installed.
+Both paths are safe to re-run against an updated source: the `.sqlite` path just overwrites the copied file; the JSON path truncates and reloads its MySQL tables. The installed filename (path 1) is fixed and versionless — the file's own `meta` table carries `release_channel`/`generated_at`/`source_revision`, so reader code never needs to know which build is installed.
+
+> **A real MySQL query failure is a loud CLI error, not a false success.** Every `$wpdb->query()` call in `MysqlBibleInstaller` is checked — a `false` result throws with `$wpdb->last_error`, and `install()` reports row counts read back from MySQL via `COUNT(*)` *after* the import, not the input export's own counts. (`TRUNCATE TABLE` is DDL on InnoDB/MariaDB and causes an implicit commit, so the transaction wrapping around the five-table reload isn't a true cross-table atomicity guarantee — the loud-failure behavior is the real safety net, not the transaction. See the ADR's addendum.)
 
 ### Reading the corpus
 
