@@ -18,6 +18,7 @@ use TAW\Core\Rag\RagSettings;
 use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\Cors;
 use TAW\Core\Rest\FieldMetaRegistrar;
+use TAW\Core\Rest\RagChatEndpoint;
 use TAW\Core\Rest\SearchEndpoints;
 use TAW\Core\Rest\VisualEditorEndpoint;
 use TAW\Core\Security\Hardening;
@@ -75,7 +76,8 @@ class Theme
      *  13. Content interchange (default-on, cap-gated — Tools → TAW Data screen,
      *      GET taw/v1/content/export, and REST-registered field meta; filter
      *      taw_register_meta_in_rest to opt out of the REST meta)
-     *  14. Sovereign Hybrid-RAG Chatbot (Settings → TAW Chatbot admin page)
+     *  14. Sovereign Hybrid-RAG Chatbot (Settings → TAW Chatbot admin page,
+     *      save_post/before_delete_post ingestion, POST taw/v1/chat)
      */
     public static function boot(): void
     {
@@ -173,12 +175,14 @@ class Theme
 
         // ── 14. Sovereign Hybrid-RAG Chatbot ──────────────────────────────────
         // Settings → TAW Chatbot admin page (LLM base URL/model config,
-        // indexed post types, chunking, tool-call iteration cap), and the
+        // indexed post types, chunking, tool-call iteration cap); the
         // save_post/before_delete_post ingestion pipeline (dispatched via
-        // WP-Cron — see PostIndexer's own docblock). The chat REST endpoint
-        // is wired here in a later step as it lands.
+        // WP-Cron — see PostIndexer's own docblock); and POST
+        // taw/v1/chat — public by default, rate-limited regardless (see
+        // RagChatEndpoint's own docblock).
         new RagSettings();
         new PostIndexer();
+        new RagChatEndpoint();
     }
 
     /**
