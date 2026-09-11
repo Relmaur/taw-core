@@ -7,6 +7,7 @@ namespace TAW\Tests\Unit\CLI;
 use Brain\Monkey\Functions;
 use Symfony\Component\Console\Tester\CommandTester;
 use TAW\CLI\CorpusInstallCommand;
+use TAW\Tests\Support\FakeWpdb;
 use TAW\Tests\TestCase;
 
 final class CorpusInstallCommandTest extends TestCase
@@ -115,5 +116,56 @@ final class CorpusInstallCommandTest extends TestCase
 
         $this->assertSame(0, $exit);
         $this->assertFileExists($this->uploadsDir . '/taw-private/corpus/bible-straubinger.sqlite');
+    }
+
+    public function test_rejects_a_sqlite_source_when_pdo_sqlite_is_not_available_on_this_host(): void
+    {
+        Functions\when('extension_loaded')->justReturn(false);
+        $source = $this->fakeSqliteFile();
+
+        $tester = new CommandTester(new CorpusInstallCommand($this->themeDir));
+        $exit = $tester->execute(['path' => $source, 'filename' => 'bible-straubinger.sqlite']);
+
+        $this->assertSame(1, $exit);
+        $this->assertStringContainsString('corpus:export', $tester->getDisplay());
+        $this->assertFileDoesNotExist($this->uploadsDir . '/taw-private/corpus/bible-straubinger.sqlite');
+    }
+
+    public function test_installs_a_portable_json_export_into_mysql_storage(): void
+    {
+        $GLOBALS['wpdb'] = new FakeWpdb();
+        Functions\when('esc_sql')->alias(static fn (string $s): string => str_replace("'", "''", $s));
+
+        $source = $this->tmp . '/export.json';
+        file_put_contents($source, json_encode([
+            'books' => [['id' => 1, 'slug' => 'genesis', 'name' => 'Génesis', 'full_name' => null, 'latin_name' => null, 'abbreviation' => 'Gén', 'canon' => 'protocanonical', 'testament' => 'Antiguo Testamento', 'division' => null, 'book_order' => 1]],
+            'chapters' => [['id' => 10, 'book_id' => 1, 'chapter_number' => 1]],
+            'verses' => [['id' => 100, 'book_id' => 1, 'chapter_id' => 10, 'verse_number' => 1, 'verse_label' => '1', 'text' => 'Al principio...', 'is_editorial_addition' => 0]],
+            'sections' => [],
+            'notes' => [],
+        ]));
+
+        try {
+            $tester = new CommandTester(new CorpusInstallCommand($this->themeDir));
+            $exit = $tester->execute(['path' => $source, 'filename' => 'unused.sqlite']);
+
+            $this->assertSame(0, $exit);
+            $display = preg_replace('/\s+/', ' ', $tester->getDisplay());
+            $this->assertStringContainsString('MySQL storage', $display);
+            $this->assertFileDoesNotExist($this->uploadsDir . '/taw-private/corpus/unused.sqlite');
+        } finally {
+            unset($GLOBALS['wpdb']);
+        }
+    }
+
+    public function test_rejects_a_file_that_is_neither_sqlite_nor_a_recognized_json_export(): void
+    {
+        $source = $this->tmp . '/garbage.json';
+        file_put_contents($source, '{"not": "a corpus export"}');
+
+        $tester = new CommandTester(new CorpusInstallCommand($this->themeDir));
+        $exit = $tester->execute(['path' => $source, 'filename' => 'bible-straubinger.sqlite']);
+
+        $this->assertSame(1, $exit);
     }
 }

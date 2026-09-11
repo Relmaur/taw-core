@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace TAW\Core\Rest;
 
 use TAW\Core\Corpus\Bible\BibleReader;
+use TAW\Core\Corpus\Bible\BibleReaderInterface;
+use TAW\Core\Corpus\Bible\MysqlBibleReader;
 use TAW\Core\Form\RateLimiter;
 use TAW\Core\Form\SubmissionsHandler;
+use TAW\Core\Storage\ProtectedSqlite;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -14,7 +17,12 @@ if (!defined('ABSPATH')) {
 
 /**
  * `GET /wp-json/taw/v1/bible/*` — read-only REST surface over an installed
- * Bible corpus (see {@see \TAW\Core\Corpus\Bible\BibleReader}).
+ * Bible corpus. Transparently queries whichever backend is actually
+ * installed: {@see BibleReader} (SQLite) when `pdo_sqlite` is available,
+ * else {@see MysqlBibleReader} — some real managed hosting (confirmed:
+ * WPMUdev) has no `pdo_sqlite` and declines to add it, while `$wpdb`
+ * (`mysqli`) is guaranteed on every WordPress host since WP core itself
+ * can't function without it.
  *
  * Opt-in — no-op unless {@see self::enable()} was called, same posture as
  * {@see \TAW\Core\Rag\RagSettings}. This is a client-specific feature (the
@@ -105,7 +113,7 @@ final class BibleEndpoint
 
     public function books(): \WP_REST_Response
     {
-        if (!BibleReader::isInstalled()) {
+        if (!self::corpusInstalled()) {
             return new \WP_REST_Response(['error' => 'No Bible corpus is installed.'], 404);
         }
         if ($this->rateLimited('bible_read', self::READ_RATE_LIMIT_MAX, self::READ_RATE_LIMIT_WINDOW)) {
@@ -117,7 +125,7 @@ final class BibleEndpoint
 
     public function chapter(\WP_REST_Request $request): \WP_REST_Response
     {
-        if (!BibleReader::isInstalled()) {
+        if (!self::corpusInstalled()) {
             return new \WP_REST_Response(['error' => 'No Bible corpus is installed.'], 404);
         }
         if ($this->rateLimited('bible_read', self::READ_RATE_LIMIT_MAX, self::READ_RATE_LIMIT_WINDOW)) {
@@ -138,7 +146,7 @@ final class BibleEndpoint
 
     public function search(\WP_REST_Request $request): \WP_REST_Response
     {
-        if (!BibleReader::isInstalled()) {
+        if (!self::corpusInstalled()) {
             return new \WP_REST_Response(['error' => 'No Bible corpus is installed.'], 404);
         }
         if ($this->rateLimited('bible_search', self::SEARCH_RATE_LIMIT_MAX, self::SEARCH_RATE_LIMIT_WINDOW)) {
@@ -171,16 +179,36 @@ final class BibleEndpoint
     }
 
     /**
-     * Resolves the reader this endpoint queries against. Filterable so a
-     * theme can point at a differently-installed corpus filename, or swap
-     * in an entirely different reader implementation — anything exposing
-     * the same four public methods (books()/chapter()/searchVerses()/
-     * searchNotes()) — without a taw-core fork.
+     * Whether a corpus is installed under either backend. SQLite is
+     * checked first — cheap (a file-existence check) and doesn't require
+     * ever touching `$wpdb` on a host where the simpler path already
+     * works.
      */
-    private static function reader(): BibleReader
+    private static function corpusInstalled(): bool
     {
-        $reader = apply_filters('taw_corpus_bible_reader', new BibleReader());
+        if (ProtectedSqlite::isAvailable() && BibleReader::isInstalled()) {
+            return true;
+        }
 
-        return $reader instanceof BibleReader ? $reader : new BibleReader();
+        return MysqlBibleReader::isInstalled();
+    }
+
+    /**
+     * Resolves the reader this endpoint queries against — SQLite-backed
+     * when `pdo_sqlite` is available on this host (unchanged default
+     * behavior), MySQL-backed otherwise. Filterable so a theme can point
+     * at a differently-installed corpus, or swap in an entirely different
+     * reader implementation — anything implementing
+     * {@see BibleReaderInterface} — without a taw-core fork.
+     */
+    private static function reader(): BibleReaderInterface
+    {
+        $default = (ProtectedSqlite::isAvailable() && BibleReader::isInstalled())
+            ? new BibleReader()
+            : new MysqlBibleReader();
+
+        $reader = apply_filters('taw_corpus_bible_reader', $default);
+
+        return $reader instanceof BibleReaderInterface ? $reader : $default;
     }
 }
