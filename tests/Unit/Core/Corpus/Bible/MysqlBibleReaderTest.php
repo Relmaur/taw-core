@@ -137,6 +137,39 @@ final class MysqlBibleReaderTest extends TestCase
         $this->assertSame([], (new MysqlBibleReader())->searchVerses('   '));
     }
 
+    /**
+     * Regression: a required `+word` term for a word shorter than
+     * innodb_ft_min_token_size (default 3) can never match anything,
+     * since InnoDB never indexed it — a query mixing a short word ("de")
+     * with real words used to return zero results even though the real
+     * words genuinely matched. Confirmed against a real MySQL server.
+     */
+    public function test_search_verses_ignores_words_too_short_for_innodb_to_have_indexed(): void
+    {
+        $results = (new MysqlBibleReader())->searchVerses('cielo de Dios');
+
+        $this->assertCount(1, $results);
+        $this->assertSame('genesis', $results[0]['book_slug']);
+        $this->assertSame(1, $results[0]['verse_number']);
+    }
+
+    public function test_search_verses_returns_nothing_when_every_word_is_too_short(): void
+    {
+        $this->assertSame([], (new MysqlBibleReader())->searchVerses('de la y'));
+    }
+
+    public function test_search_verses_respects_a_differently_configured_min_token_size(): void
+    {
+        $this->wpdb->innodbFtMinTokenSize = 5;
+
+        // "Dios" (4 chars) now falls below the configured minimum too —
+        // only "principio" (9 chars) is treated as indexed/searchable.
+        $results = (new MysqlBibleReader())->searchVerses('principio Dios');
+
+        $this->assertCount(1, $results);
+        $this->assertSame(1, $results[0]['verse_number']);
+    }
+
     public function test_search_notes_matches_the_footnote_body(): void
     {
         $results = (new MysqlBibleReader())->searchNotes('prueba luz');

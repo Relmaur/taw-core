@@ -119,10 +119,15 @@ class MysqlBibleReader implements BibleReaderInterface
             return [];
         }
 
+        $significant = self::significantWords($words);
+        if ($significant === []) {
+            return [];
+        }
+
         $verses = MysqlBibleSchema::verses();
         $books = MysqlBibleSchema::books();
         $chapters = MysqlBibleSchema::chapters();
-        $boolean = self::booleanModeQuery($words);
+        $boolean = self::booleanModeQuery($significant);
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT v.id, v.verse_number, v.verse_label, v.text,
@@ -164,9 +169,14 @@ class MysqlBibleReader implements BibleReaderInterface
             return [];
         }
 
+        $significant = self::significantWords($words);
+        if ($significant === []) {
+            return [];
+        }
+
         $notes = MysqlBibleSchema::notes();
         $books = MysqlBibleSchema::books();
-        $boolean = self::booleanModeQuery($words);
+        $boolean = self::booleanModeQuery($significant);
 
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT n.id, n.type, n.marker, n.start_chapter, n.start_verse, n.body,
@@ -370,6 +380,50 @@ class MysqlBibleReader implements BibleReaderInterface
         }
 
         return $clean;
+    }
+
+    /**
+     * Drops words InnoDB's own FULLTEXT indexer would never have indexed
+     * in the first place — a required `+word` term for a word shorter
+     * than `innodb_ft_min_token_size` (default 3; not settable at
+     * runtime, and not something managed hosting will change) can never
+     * match, which made every query containing a short word (Spanish is
+     * full of them: de, la, el, en, un, es, no, y...) return zero results
+     * — recreating, from a different root cause, the exact class of bug
+     * this whole subsystem's search escaping exists to avoid. Same
+     * "silently ignore, don't exclude everything" handling a real search
+     * engine applies to short/stop words, rather than making the whole
+     * query unsatisfiable — confirmed against a real MySQL server:
+     * `+amor +de +Dios` (0 results) vs. `+amor +Dios` (correct results)
+     * once "de" is dropped.
+     *
+     * @param list<string> $words
+     * @return list<string>
+     */
+    private static function significantWords(array $words): array
+    {
+        $minLength = self::innodbFtMinTokenSize();
+
+        return array_values(array_filter(
+            $words,
+            static fn (string $w): bool => mb_strlen($w) >= $minLength
+        ));
+    }
+
+    /**
+     * Reads InnoDB's actual configured minimum indexed-token length
+     * rather than hardcoding MySQL's documented default (3) — this is a
+     * global `my.cnf` setting a host is free to change, and querying it
+     * is cheap and always available on the InnoDB tables this schema
+     * creates.
+     */
+    private static function innodbFtMinTokenSize(): int
+    {
+        global $wpdb;
+
+        $value = $wpdb->get_var('SELECT @@innodb_ft_min_token_size');
+
+        return $value !== null ? (int) $value : 3;
     }
 
     /**

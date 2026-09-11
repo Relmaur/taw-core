@@ -1357,6 +1357,8 @@ $reader->searchNotes('creación');         // same word-matching semantics over 
 
 `chapter()` deliberately returns `verses`/`sections`/`notes` as three flat, chapter-scoped lists rather than an interleaved rendering shape — where a heading sits relative to a verse, or how a note marker anchors into verse text, is presentation, and stays the consuming theme's decision. `searchVerses()`/`searchNotes()` treat every whitespace-separated word of the query as a separate AND'd term — a row must contain every word, in any order or position — rather than exposing raw `MATCH` operator syntax to a public search box, or requiring the whole query as one exact contiguous phrase (which would silently return nothing for almost any realistic multi-word search). SQLite FTS5 does this via per-word quoted phrases; MySQL boolean mode via `+word1 +word2` — same semantics, different syntax.
 
+> **`innodb_ft_min_token_size`.** `MysqlBibleReader` additionally drops any word shorter than MySQL's actual configured `innodb_ft_min_token_size` (default 3, read at query time via `SELECT @@innodb_ft_min_token_size`) from the required set before searching. InnoDB never indexes a word below that length, so a required `+word` term for one recreates the exact-match failure this whole design avoids — confirmed against a real MySQL server: `+amor +de +Dios` returned nothing until "de" was dropped. Spanish is full of words this short (`de`/`la`/`el`/`en`/`un`/...), so this isn't an edge case.
+
 `TAW\Core\Rest\BibleEndpoint` resolves which reader it queries — SQLite first, MySQL otherwise — through a filter, so a theme can override either the pick itself or supply an entirely different implementation:
 
 ```php
