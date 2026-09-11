@@ -56,6 +56,7 @@ final class RagChatEndpoint
                 'history' => [
                     'required' => false,
                     'default' => [],
+                    'sanitize_callback' => [$this, 'sanitize_history'],
                     'validate_callback' => [$this, 'validate_history'],
                     'description' => 'Prior turns of the conversation: [{role, content}, ...].',
                 ],
@@ -91,6 +92,24 @@ final class RagChatEndpoint
         return true;
     }
 
+    /**
+     * @return list<array{role: string, content: string}>
+     */
+    public function sanitize_history(mixed $value): array
+    {
+        $history = is_array($value) ? $value : [];
+
+        $clean = [];
+        foreach (array_slice($history, -self::MAX_HISTORY_TURNS) as $turn) {
+            $clean[] = [
+                'role' => (string) (is_array($turn) ? ($turn['role'] ?? 'user') : 'user'),
+                'content' => sanitize_textarea_field((string) (is_array($turn) ? ($turn['content'] ?? '') : '')),
+            ];
+        }
+
+        return $clean;
+    }
+
     public function handle(\WP_REST_Request $request): \WP_REST_Response
     {
         $ip = SubmissionsHandler::getUserIp();
@@ -99,8 +118,7 @@ final class RagChatEndpoint
         }
 
         $message = (string) $request->get_param('message');
-        $rawHistory = $request->get_param('history');
-        $history = $this->sanitizeHistory(is_array($rawHistory) ? $rawHistory : []);
+        $history = $this->sanitize_history($request->get_param('history'));
 
         $llm = new LlmClient();
         $tools = [
@@ -113,22 +131,5 @@ final class RagChatEndpoint
         $result = $orchestrator->respond($message, $history);
 
         return new \WP_REST_Response(['message' => $result['message']], 200);
-    }
-
-    /**
-     * @param list<array<string, mixed>> $history
-     * @return list<array{role: string, content: string}>
-     */
-    private function sanitizeHistory(array $history): array
-    {
-        $clean = [];
-        foreach (array_slice($history, -self::MAX_HISTORY_TURNS) as $turn) {
-            $clean[] = [
-                'role' => (string) ($turn['role'] ?? 'user'),
-                'content' => sanitize_textarea_field((string) ($turn['content'] ?? '')),
-            ];
-        }
-
-        return $clean;
     }
 }
