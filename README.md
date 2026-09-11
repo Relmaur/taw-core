@@ -1252,9 +1252,16 @@ This exposes field values over `wp/v2` for **headless front-ends and external in
 
 ## Sovereign Hybrid-RAG Chatbot
 
-A visitor-facing chat widget that answers from **any number of named knowledge bases** — the site's own WordPress content, plus any `.sqlite` file an admin uploads — with an OpenAI-compatible LLM doing semantic search across whichever one the question calls for. Content-agnostic by design: no particular schema is assumed or required of an uploaded file. "Sovereign" describes data ownership, not hosting — the LLM endpoint is admin-configurable (`Settings → TAW Chatbot`), defaulting to OpenAI's cloud API but swappable to any OpenAI-compatible endpoint (self-hosted Ollama/vLLM/etc.) — your SQLite files and WordPress DB never leave the site either way. Wired unconditionally in `Theme::boot()`, no `enable()` call — same posture as Content Interchange and SEO structured data.
+A visitor-facing chat widget that answers from **any number of named knowledge bases** — the site's own WordPress content, plus any `.sqlite` file an admin uploads — with an OpenAI-compatible LLM doing semantic search across whichever one the question calls for. Content-agnostic by design: no particular schema is assumed or required of an uploaded file. "Sovereign" describes data ownership, not hosting — the LLM endpoint is admin-configurable (`Settings → TAW Chatbot`), defaulting to OpenAI's cloud API but swappable to any OpenAI-compatible endpoint (self-hosted Ollama/vLLM/etc.) — your SQLite files and WordPress DB never leave the site either way.
 
 > **Strict separation of concerns.** Every piece of this — SQLite connections, embeddings, LLM orchestration, REST — lives here in `taw/core`. The consuming theme owns only the chat widget's Alpine.js/Tailwind presentation and talks to `POST /taw/v1/chat`, nothing else — no LLM base URL or API key ever reaches the browser.
+
+**Opt-in, same posture as Lucide/TAW Media** — the settings page, knowledge-base uploads, WP-content ingestion, and the `POST /taw/v1/chat` route all stay off (no admin menu, no hooks, no REST route registered) until a theme explicitly calls:
+
+```php
+// In the theme's inc/customizations.php, before Theme::boot():
+TAW\Core\Rag\RagSettings::enable();
+```
 
 ### Knowledge bases
 

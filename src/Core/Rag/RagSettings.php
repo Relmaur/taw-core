@@ -19,10 +19,43 @@ if (!defined('ABSPATH')) {
  * pattern as {@see \TAW\Core\Form\Turnstile}: OptionsPage fields are
  * readable via the REST API by anyone with `edit_posts`, which makes the
  * options table the wrong place for a secret.
+ *
+ * Opt-in, same posture as {@see \TAW\Core\Icons\Lucide} and
+ * {@see \TAW\Core\Media\MediaFolders} — the entire chatbot subsystem
+ * (settings page, knowledge-base uploads, WP-content ingestion, and the
+ * public taw/v1/chat REST route) stays off unless a theme explicitly calls
+ * {@see self::enable()} in customizations.php before Theme::boot().
+ *
+ * Usage:
+ *   // In the theme's inc/customizations.php, before Theme::boot():
+ *   TAW\Core\Rag\RagSettings::enable();
  */
 final class RagSettings
 {
     private const PREFIX = '_taw_';
+
+    /**
+     * Whether the RAG chatbot has been explicitly enabled for this theme.
+     * Must call RagSettings::enable() in customizations.php to activate.
+     */
+    private static bool $enabled = false;
+
+    /**
+     * Opt-in to the Sovereign Hybrid-RAG Chatbot.
+     * Call this in the theme's customizations.php before Theme::boot().
+     */
+    public static function enable(): void
+    {
+        self::$enabled = true;
+    }
+
+    /**
+     * Whether the RAG chatbot has been enabled.
+     */
+    public static function isEnabled(): bool
+    {
+        return self::$enabled;
+    }
 
     public function __construct()
     {
