@@ -41,9 +41,20 @@ final class PostIndexer
             return;
         }
 
-        $eligible = $post->post_status === 'publish'
-            && $post->post_password === ''
-            && in_array($post->post_type, RagSettings::indexedPostTypes(), true);
+        // A post type that was never indexable was never indexed — nothing
+        // to remove either, regardless of its current status. Without this
+        // early return, every save of a post type outside the indexed set
+        // (nav_menu_item, attachment, revision-adjacent internal types)
+        // fell through to a pointless removePost() call — noisy at best,
+        // and a hard failure wherever RAG storage isn't reachable (e.g. no
+        // pdo_sqlite in the CLI's PHP binary), as surfaced by a routine
+        // `wp taw nav menus` rebuild tearing down/recreating dozens of
+        // nav_menu_item posts.
+        if (!in_array($post->post_type, RagSettings::indexedPostTypes(), true)) {
+            return;
+        }
+
+        $eligible = $post->post_status === 'publish' && $post->post_password === '';
 
         if ($eligible) {
             wp_schedule_single_event(time(), self::HOOK, [$postId]);
@@ -59,6 +70,14 @@ final class PostIndexer
 
     public function onBeforeDeletePost(int $postId): void
     {
+        // Same reasoning as onSavePost()'s early return — a post type
+        // that's never indexable was never indexed, so there's nothing to
+        // remove. get_post_type() is still safe to call here: before_delete_post
+        // fires before the row is actually gone.
+        if (!in_array(get_post_type($postId), RagSettings::indexedPostTypes(), true)) {
+            return;
+        }
+
         (new IngestionPipeline(new LlmClient()))->removePost($postId);
     }
 
