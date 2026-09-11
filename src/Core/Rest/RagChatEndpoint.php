@@ -9,9 +9,7 @@ use TAW\Core\Form\SubmissionsHandler;
 use TAW\Core\Rag\Llm\LlmClient;
 use TAW\Core\Rag\Orchestrator\ChatOrchestrator;
 use TAW\Core\Rag\RagSettings;
-use TAW\Core\Rag\Tools\ArchiveSearchTool;
-use TAW\Core\Rag\Tools\BibleLookupTool;
-use TAW\Core\Rag\Tools\CatechismLookupTool;
+use TAW\Core\Rag\Tools\SearchKnowledgeBaseTool;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -121,11 +119,8 @@ final class RagChatEndpoint
         $history = $this->sanitize_history($request->get_param('history'));
 
         $llm = new LlmClient();
-        $tools = [
-            'lookup_bible' => new BibleLookupTool(),
-            'lookup_catechism' => new CatechismLookupTool(),
-            'search_unstructured_archive' => new ArchiveSearchTool($llm),
-        ];
+        $searchTool = new SearchKnowledgeBaseTool($llm);
+        $tools = [$searchTool->name() => $searchTool];
 
         $orchestrator = new ChatOrchestrator($llm, $tools, RagSettings::chatModel(), RagSettings::maxToolIterations());
         $result = $orchestrator->respond($message, $history);
