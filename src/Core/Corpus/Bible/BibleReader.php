@@ -41,7 +41,7 @@ use TAW\Core\Corpus\Storage;
  * @phpstan-type Section array{id: int, parent_id: ?int, kind: string, heading: string, subheading: ?string, body: ?string, start_chapter: int, start_verse: ?int, end_chapter: int, end_verse: ?int, position: int}
  * @phpstan-type Note array{id: int, type: string, marker: ?string, body: string, start_chapter: ?int, start_verse: ?int, end_chapter: ?int, end_verse: ?int, position: int}
  */
-class BibleReader
+class BibleReader implements BibleReaderInterface
 {
     public const FILENAME = 'bible-straubinger.sqlite';
 

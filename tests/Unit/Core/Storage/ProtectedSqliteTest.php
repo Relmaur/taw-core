@@ -23,14 +23,18 @@ final class ProtectedSqliteTest extends TestCase
 
     protected function tearDown(): void
     {
-        $it = @new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($this->dir, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST,
-        );
-        foreach ($it ?: [] as $f) {
-            $f->isDir() ? @rmdir($f->getPathname()) : @unlink($f->getPathname());
+        // Not every test in this file creates $this->dir (e.g. isAvailable()
+        // tests never touch the filesystem at all).
+        if (is_dir($this->dir)) {
+            $it = @new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($this->dir, \FilesystemIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::CHILD_FIRST,
+            );
+            foreach ($it ?: [] as $f) {
+                $f->isDir() ? @rmdir($f->getPathname()) : @unlink($f->getPathname());
+            }
+            @rmdir($this->dir);
         }
-        @rmdir($this->dir);
         parent::tearDown();
     }
 
@@ -94,5 +98,19 @@ final class ProtectedSqliteTest extends TestCase
         file_put_contents($path, 'not a database');
 
         $this->assertFalse(ProtectedSqlite::looksLikeSqliteFile($path));
+    }
+
+    public function test_is_available_is_true_when_the_extension_is_loaded_and_a_connection_works(): void
+    {
+        // On the real test machine, pdo_sqlite genuinely is available —
+        // every other test in this suite already depends on that being true.
+        $this->assertTrue(ProtectedSqlite::isAvailable());
+    }
+
+    public function test_is_available_is_false_when_the_extension_is_not_loaded(): void
+    {
+        Functions\when('extension_loaded')->justReturn(false);
+
+        $this->assertFalse(ProtectedSqlite::isAvailable());
     }
 }
