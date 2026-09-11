@@ -108,3 +108,33 @@ truncating each table first — safe to re-run, same posture as the `.sqlite` pa
   JSON/blob column, cosine similarity computed in PHP at query time) is a plausible follow-up,
   but out of scope here: continuous writes from ongoing post saves don't fit the
   export-once-to-JSON approach this ADR relies on.
+
+## Addendum: `innodb_ft_min_token_size` recreated the original bug from a new cause
+
+Verified against a real MySQL server (not this repo's `FakeWpdb` test double — see "Consequences"
+above and the test suite's own fast-isolated-logic/real-end-to-end split): `books()`/`chapter()`
+and the full corpus import were confirmed byte-for-byte correct (73 books, 1334 chapters, 35777
+verses, 4938 sections, 13035 notes). Search was not: `+amor +de +Dios` returned zero results
+even though three verses genuinely contain all three words — `+amor +Dios` (dropping "de")
+returned the correct three.
+
+Root cause: InnoDB's FULLTEXT indexer never indexes a word shorter than
+`innodb_ft_min_token_size` (default `3`) at all. A required `+word` term for a word that was
+never indexed can never match anything — so any AND query containing a short word returned
+nothing, regardless of whether the rest of the query genuinely matched. Spanish is full of
+words under this threshold (`de`, `la`, `el`, `en`, `un`, `es`, `no`, `y`, ...), so this wasn't
+an edge case — it recreated, from a completely different root cause, the exact "search silently
+returns nothing" failure class this whole search-escaping design exists to avoid (the same class
+of bug the SQLite-side literal-phrase-match fix, landed just before this ADR, already fixed
+once).
+
+Not fixable via server configuration in general: `innodb_ft_min_token_size` is a global
+`my.cnf` setting requiring a server restart *and* a full index rebuild to change, and won't be
+settable on managed hosting anyway — that limitation is the entire reason this fallback exists
+in the first place. Fixed query-side instead: `MysqlBibleReader::significantWords()` reads the
+actual configured value at query time (`SELECT @@innodb_ft_min_token_size` — cheap, and correct
+even if a host's value differs from the documented default) and drops any word shorter than it
+from the required-AND set before building the boolean-mode expression, rather than including an
+unsatisfiable term. Same "silently ignore, don't exclude everything" handling a real search
+engine applies to short/stop words. A query where every word falls below the threshold returns
+no results (there's nothing left to search for), rather than matching everything.

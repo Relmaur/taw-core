@@ -28,6 +28,12 @@ final class FakeWpdb
 {
     public string $prefix = 'wp_';
 
+    /**
+     * Simulated `innodb_ft_min_token_size` — real MySQL's own default,
+     * overridable per test to exercise a differently-configured host.
+     */
+    public int $innodbFtMinTokenSize = 3;
+
     /** @var list<string> */
     public array $recordedQueries = [];
 
@@ -110,6 +116,10 @@ final class FakeWpdb
 
     public function get_var(string $query): mixed
     {
+        if (trim($query) === 'SELECT @@innodb_ft_min_token_size') {
+            return $this->innodbFtMinTokenSize;
+        }
+
         $stmt = $this->pdo->query($this->translate($query));
         $value = $stmt === false ? false : $stmt->fetchColumn();
 
