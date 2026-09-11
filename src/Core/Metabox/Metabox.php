@@ -1587,6 +1587,19 @@ class Metabox
                             if (typeof window.tawInitFilesPickers === 'function') {
                                 window.tawInitFilesPickers($row[0]);
                             }
+                            // wp_editor() already printed each wysiwyg sub-field's full
+                            // markup server-side, but WordPress only auto-boots the
+                            // TinyMCE/Quicktags instances that existed at page load —
+                            // a row cloned from the <template> needs its editor(s)
+                            // wired up explicitly or it's just an inert textarea.
+                            if (window.wp && wp.editor && typeof wp.editor.initialize === 'function') {
+                                $row.find('textarea.wp-editor-area').each(function() {
+                                    var editorId = $(this).attr('id');
+                                    if (editorId) {
+                                        wp.editor.initialize(editorId, { tinymce: true, quicktags: true });
+                                    }
+                                });
+                            }
                             // Recursively initialize any nested repeaters in the new row
                             $row.find('.taw-repeater').each(function() {
                                 initRepeater($(this));
@@ -1913,7 +1926,17 @@ class Metabox
 
             /* ---- MARK: WYSIWYG ---- */
             case 'wysiwyg':
-                wp_editor($value ?: '', $field_id, [
+                // WordPress core silently disables the rich "Visual"/TinyMCE
+                // toolbar for any editor_id containing "[" (see
+                // wp-includes/class-wp-editor.php), which every repeater
+                // sub-field's $field_id has — e.g.
+                // "taw_repeater[sections][0][body]". Give the editor its own
+                // bracket-free id (character-substitution only, so the
+                // placeholder substring the repeater JS swaps per-row stays
+                // byte-identical — see enqueue_repeater_script()) while
+                // $field_id itself stays the POST field name.
+                $editor_id = str_replace(['[', ']'], ['-', ''], $field_id);
+                wp_editor($value ?: '', $editor_id, [
                     'textarea_name' => $field_id,
                     'textarea_rows' => intval($field['rows'] ?? 8),
                     'media_buttons' => $field['media_buttons'] ?? true,
