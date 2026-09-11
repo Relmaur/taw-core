@@ -1321,11 +1321,11 @@ $reader = new TAW\Core\Corpus\Bible\BibleReader();
 
 $reader->books();                       // every book, grouped by testament then division, in canonical order
 $reader->chapter('genesis', 1);         // verses + any overlapping section headings + any overlapping notes
-$reader->searchVerses('en el principio'); // FTS5 phrase search over verse text, with a <mark>-highlighted excerpt
-$reader->searchNotes('creación');         // FTS5 phrase search over Straubinger's own footnote commentary
+$reader->searchVerses('en el principio'); // FTS5 word search over verse text (every word must match, any order), with a <mark>-highlighted excerpt
+$reader->searchNotes('creación');         // FTS5 word search over Straubinger's own footnote commentary
 ```
 
-`chapter()` deliberately returns `verses`/`sections`/`notes` as three flat, chapter-scoped lists rather than an interleaved rendering shape — where a heading sits relative to a verse, or how a note marker anchors into verse text, is presentation, and stays the consuming theme's decision. `searchVerses()`/`searchNotes()` treat the whole query as one literal phrase (internal quotes doubled to escape) rather than exposing raw FTS5 `MATCH` operator syntax to a public search box.
+`chapter()` deliberately returns `verses`/`sections`/`notes` as three flat, chapter-scoped lists rather than an interleaved rendering shape — where a heading sits relative to a verse, or how a note marker anchors into verse text, is presentation, and stays the consuming theme's decision. `searchVerses()`/`searchNotes()` quote every whitespace-separated word of the query individually (escaping internal quotes) and AND them together — a row must contain every word, in any order or position — rather than exposing raw FTS5 `MATCH` operator syntax to a public search box, or requiring the whole query as one exact contiguous phrase (which would silently return nothing for almost any realistic multi-word search).
 
 `BibleReader` is not `final` on purpose — every internal fetch method is `protected`, and `FILENAME` is overridable — so a theme can subclass it (different installed filename, different fetch behavior) without a taw-core fork. `TAW\Core\Rest\BibleEndpoint` resolves which reader it queries through a filter:
 
@@ -1430,7 +1430,7 @@ composer run test   # tests/Unit/ — also runs in CI
 
 Uses [Brain Monkey](https://brain-wp.github.io/BrainMonkey/) to stub individual WordPress functions (`add_action`, `get_transient`, `wp_remote_post`, etc.) per test rather than booting a real WordPress install — fast, no MySQL, no network. This is a deliberate division of labor with `taw-theme`'s `bin/ci/smoke-test.php`, which boots a real WordPress + MySQL environment and exercises the full render path against a live theme: this suite covers `taw-core`'s own logic in isolation (validation rule precedence, rate limiting, Turnstile verification), the smoke test covers "does this actually work end-to-end against a real site."
 
-Every file in `src/` starts with `if (!defined('ABSPATH')) exit;` (the standard WordPress direct-access guard) — `tests/bootstrap.php` defines a dummy `ABSPATH` before the autoloader ever loads a class, or the test process would exit the moment one is included.
+Every file in `src/` starts with `if (!defined('ABSPATH')) exit;` (the standard WordPress direct-access guard) — `tests/bootstrap.php` defines a dummy `ABSPATH` before the autoloader ever loads a class, or the test process would exit the moment one is included. Documented exceptions: `Content\*` (autoloaded by `content:*` commands before WordPress boots — see "Content Interchange"), and `TAW\Core\Corpus\Storage`/`TAW\Core\Storage\ProtectedSqlite` (autoloaded by `CorpusInstallCommand` before `require $wpLoad` — see "Reading the corpus"). Each has neither a WordPress dependency of its own nor the guard, and a subprocess regression test (`PreBootAutoloadTest`) asserting it loads with no `ABSPATH` defined at all.
 
 **Reflection is used deliberately** for testing private methods (`Form::validateRules()`, `Form::requiredMessage()`, `Form::emailMessage()`) — see `tests/TestCase::callMethod()`. These stay private by design (internal details of a public API), reflection lets tests verify that logic without widening the class's real surface just to make it testable.
 

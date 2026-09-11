@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace TAW\Core\Storage;
 
-if (!defined('ABSPATH')) {
-    exit;
-}
-
 /**
  * Shared plumbing for "a subsystem keeps its own SQLite file(s) in a
  * webserver-inaccessible uploads subdirectory" — the mechanics
@@ -18,6 +14,16 @@ if (!defined('ABSPATH')) {
  * relies on them — a copy-pasted drift here is a real vulnerability, not
  * just untidy code. What differs per subsystem (which directory, whether
  * writes ever happen) stays in each subsystem's own thin `Storage` class.
+ *
+ * Deliberately no `if (!defined('ABSPATH')) exit;` guard — same reasoning
+ * as `Content\*`: this is a pure class def with no WordPress dependency of
+ * its own (`ensureProtectedDir()`/`open()`/`openReadOnly()` take a path
+ * and call plain PHP + PDO), and `TAW\CLI\CorpusInstallCommand` autoloads
+ * it — via `Corpus\Storage` — before `require $wpLoad`. A guard here would
+ * silently `exit` the whole CLI process the moment this class is touched,
+ * pre-boot, with no output at all — exactly the failure mode `taw-core`'s
+ * CLAUDE.md already documents for `Content\*` (v1.25.1): "the guard's
+ * `exit` silently kills the command."
  *
  * See docs/adr/0001-reference-corpus-storage.md for why this was extracted
  * instead of letting {@see \TAW\Core\Corpus\Storage} duplicate it.
