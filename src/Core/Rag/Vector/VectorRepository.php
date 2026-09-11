@@ -39,7 +39,7 @@ final class VectorRepository
         $this->deletePost($postId);
 
         $stmt = $this->pdo->prepare(
-            'INSERT INTO chunks (post_id, chunk_index, content, embedding, model, updated_at)
+            'INSERT INTO taw_rag_chunks (post_id, chunk_index, content, embedding, model, updated_at)
              VALUES (:post_id, :chunk_index, :content, :embedding, :model, :updated_at)'
         );
 
@@ -57,8 +57,37 @@ final class VectorRepository
 
     public function deletePost(int $postId): void
     {
-        $stmt = $this->pdo->prepare('DELETE FROM chunks WHERE post_id = :post_id');
+        $stmt = $this->pdo->prepare('DELETE FROM taw_rag_chunks WHERE post_id = :post_id');
         $stmt->execute(['post_id' => $postId]);
+    }
+
+    /**
+     * Full wipe-and-rebuild — the ingestion model a generic uploaded
+     * knowledge base needs (a re-uploaded/re-ingested .sqlite file has no
+     * stable per-row identity to diff against, unlike a WP post), distinct
+     * from {@see upsertChunks()}'s per-post incremental semantics.
+     *
+     * @param list<array{content: string, embedding: list<float>}> $rows
+     */
+    public function replaceAll(array $rows, string $model): void
+    {
+        $this->pdo->exec('DELETE FROM taw_rag_chunks');
+
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO taw_rag_chunks (post_id, chunk_index, content, embedding, model, updated_at)
+             VALUES (:post_id, :chunk_index, :content, :embedding, :model, :updated_at)'
+        );
+
+        foreach ($rows as $index => $row) {
+            $stmt->execute([
+                'post_id' => $index,
+                'chunk_index' => 0,
+                'content' => $row['content'],
+                'embedding' => VectorMath::packVector($row['embedding']),
+                'model' => $model,
+                'updated_at' => gmdate('c'),
+            ]);
+        }
     }
 
     /**
@@ -86,7 +115,7 @@ final class VectorRepository
     private function searchWithBruteForce(array $queryVector, int $limit): array
     {
         $stmt = $this->pdo->query(sprintf(
-            'SELECT post_id, chunk_index, content, embedding FROM chunks LIMIT %d',
+            'SELECT post_id, chunk_index, content, embedding FROM taw_rag_chunks LIMIT %d',
             self::FALLBACK_SCAN_LIMIT
         ));
 
@@ -121,7 +150,7 @@ final class VectorRepository
         $stmt = $this->pdo->prepare(
             'SELECT c.post_id, c.chunk_index, c.content, v.distance AS distance
              FROM vec_chunks v
-             JOIN chunks c ON c.id = v.rowid
+             JOIN taw_rag_chunks c ON c.id = v.rowid
              WHERE v.embedding MATCH :query AND k = :limit
              ORDER BY v.distance'
         );
@@ -150,11 +179,11 @@ final class VectorRepository
         ));
 
         $existing = (int) ($this->pdo->query('SELECT COUNT(*) FROM vec_chunks')->fetchColumn() ?: 0);
-        $expected = (int) ($this->pdo->query('SELECT COUNT(*) FROM chunks')->fetchColumn() ?: 0);
+        $expected = (int) ($this->pdo->query('SELECT COUNT(*) FROM taw_rag_chunks')->fetchColumn() ?: 0);
 
         if ($existing < $expected) {
             $this->pdo->exec('DELETE FROM vec_chunks');
-            $this->pdo->exec('INSERT INTO vec_chunks (rowid, embedding) SELECT id, embedding FROM chunks');
+            $this->pdo->exec('INSERT INTO vec_chunks (rowid, embedding) SELECT id, embedding FROM taw_rag_chunks');
         }
     }
 }

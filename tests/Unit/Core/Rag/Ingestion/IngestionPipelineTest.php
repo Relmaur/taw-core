@@ -67,7 +67,7 @@ final class IngestionPipelineTest extends TestCase
         (new IngestionPipeline($llm))->ingestPost(42);
 
         $pdo = $this->vectorsDb();
-        $count = (int) $pdo->query('SELECT COUNT(*) FROM chunks WHERE post_id = 42')->fetchColumn();
+        $count = (int) $pdo->query('SELECT COUNT(*) FROM taw_rag_chunks WHERE post_id = 42')->fetchColumn();
         $this->assertSame(1, $count);
     }
 
@@ -81,11 +81,11 @@ final class IngestionPipelineTest extends TestCase
         // Seed one chunk directly, then ingest empty content.
         $pdo = $this->vectorsDb();
         \TAW\Core\Rag\Vector\SchemaManager::ensureVectorSchema($pdo);
-        $pdo->exec("INSERT INTO chunks (post_id, chunk_index, content, embedding, model, updated_at) VALUES (7, 0, 'stale', X'00', 'm', '2020-01-01')");
+        $pdo->exec("INSERT INTO taw_rag_chunks (post_id, chunk_index, content, embedding, model, updated_at) VALUES (7, 0, 'stale', X'00', 'm', '2020-01-01')");
 
         (new IngestionPipeline($llm))->ingestPost(7);
 
-        $count = (int) $pdo->query('SELECT COUNT(*) FROM chunks WHERE post_id = 7')->fetchColumn();
+        $count = (int) $pdo->query('SELECT COUNT(*) FROM taw_rag_chunks WHERE post_id = 7')->fetchColumn();
         $this->assertSame(0, $count);
     }
 
@@ -111,7 +111,7 @@ final class IngestionPipelineTest extends TestCase
         (new IngestionPipeline($llm))->ingestPost(5);
 
         $pdo = $this->vectorsDb();
-        $count = (int) $pdo->query('SELECT COUNT(*) FROM chunks WHERE post_id = 5')->fetchColumn();
+        $count = (int) $pdo->query('SELECT COUNT(*) FROM taw_rag_chunks WHERE post_id = 5')->fetchColumn();
         $this->assertSame(0, $count);
     }
 
@@ -119,12 +119,12 @@ final class IngestionPipelineTest extends TestCase
     {
         $pdo = $this->vectorsDb();
         \TAW\Core\Rag\Vector\SchemaManager::ensureVectorSchema($pdo);
-        $pdo->exec("INSERT INTO chunks (post_id, chunk_index, content, embedding, model, updated_at) VALUES (3, 0, 'x', X'00', 'm', '2020-01-01')");
+        $pdo->exec("INSERT INTO taw_rag_chunks (post_id, chunk_index, content, embedding, model, updated_at) VALUES (3, 0, 'x', X'00', 'm', '2020-01-01')");
 
         $llm = $this->createMock(LlmClientInterface::class);
         (new IngestionPipeline($llm))->removePost(3);
 
-        $count = (int) $pdo->query('SELECT COUNT(*) FROM chunks WHERE post_id = 3')->fetchColumn();
+        $count = (int) $pdo->query('SELECT COUNT(*) FROM taw_rag_chunks WHERE post_id = 3')->fetchColumn();
         $this->assertSame(0, $count);
     }
 }

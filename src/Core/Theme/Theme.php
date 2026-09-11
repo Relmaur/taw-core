@@ -14,6 +14,7 @@ use TAW\Core\Metabox\MetaboxOrder;
 use TAW\Core\OptionsPage\OptionsPage;
 use TAW\Core\Content\ContentAdminScreen;
 use TAW\Core\Rag\Ingestion\PostIndexer;
+use TAW\Core\Rag\KnowledgeBase\KnowledgeBaseAdminScreen;
 use TAW\Core\Rag\RagSettings;
 use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\Cors;
@@ -76,8 +77,9 @@ class Theme
      *  13. Content interchange (default-on, cap-gated — Tools → TAW Data screen,
      *      GET taw/v1/content/export, and REST-registered field meta; filter
      *      taw_register_meta_in_rest to opt out of the REST meta)
-     *  14. Sovereign Hybrid-RAG Chatbot (Settings → TAW Chatbot admin page,
-     *      save_post/before_delete_post ingestion, POST taw/v1/chat)
+     *  14. Sovereign Hybrid-RAG Chatbot (Settings → TAW Chatbot admin page +
+     *      Knowledge Bases screen, save_post/before_delete_post ingestion,
+     *      POST taw/v1/chat)
      */
     public static function boot(): void
     {
@@ -175,12 +177,15 @@ class Theme
 
         // ── 14. Sovereign Hybrid-RAG Chatbot ──────────────────────────────────
         // Settings → TAW Chatbot admin page (LLM base URL/model config,
-        // indexed post types, chunking, tool-call iteration cap); the
-        // save_post/before_delete_post ingestion pipeline (dispatched via
-        // WP-Cron — see PostIndexer's own docblock); and POST
-        // taw/v1/chat — public by default, rate-limited regardless (see
-        // RagChatEndpoint's own docblock).
+        // indexed post types, chunking, tool-call iteration cap); Settings →
+        // TAW Chatbot → Knowledge Bases (upload any .sqlite file as a
+        // semantically-searchable knowledge base); the save_post/before_delete_post
+        // WP-content ingestion pipeline (dispatched via WP-Cron — see
+        // PostIndexer's own docblock); and POST taw/v1/chat — public by
+        // default, rate-limited regardless (see RagChatEndpoint's own
+        // docblock).
         new RagSettings();
+        (new KnowledgeBaseAdminScreen())->register();
         new PostIndexer();
         new RagChatEndpoint();
     }

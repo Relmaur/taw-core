@@ -69,6 +69,37 @@ final class VectorRepositoryTest extends TestCase
         $this->assertSame('only one chunk now', array_values($matchingPost)[0]['content']);
     }
 
+    public function test_replace_all_wipes_and_rebuilds(): void
+    {
+        VectorCapability::setOverrideForTests(false);
+        $repo = $this->repository();
+
+        $repo->upsertChunks(1, ['old chunk'], [[1.0, 0.0]], 'test-model');
+
+        $repo->replaceAll([
+            ['content' => 'row one', 'embedding' => [1.0, 0.0]],
+            ['content' => 'row two', 'embedding' => [0.0, 1.0]],
+        ], 'test-model');
+
+        $results = $repo->search([1.0, 0.0], 10);
+
+        $this->assertCount(2, $results);
+        $contents = array_column($results, 'content');
+        $this->assertContains('row one', $contents);
+        $this->assertContains('row two', $contents);
+        $this->assertNotContains('old chunk', $contents);
+    }
+
+    public function test_replace_all_on_an_empty_store_is_a_no_op_wipe(): void
+    {
+        VectorCapability::setOverrideForTests(false);
+        $repo = $this->repository();
+
+        $repo->replaceAll([], 'test-model');
+
+        $this->assertSame([], $repo->search([1.0], 10));
+    }
+
     public function test_mismatched_chunk_and_embedding_counts_throws(): void
     {
         $repo = $this->repository();

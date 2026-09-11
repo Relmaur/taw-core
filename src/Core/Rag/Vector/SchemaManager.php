@@ -6,13 +6,18 @@ namespace TAW\Core\Rag\Vector;
 
 /**
  * No ABSPATH guard — pure PDO, no WordPress dependency.
+ *
+ * The table is named `taw_rag_chunks`, not the generic `chunks` — this
+ * schema is now also created inside arbitrary admin-uploaded .sqlite
+ * knowledge-base files (see `Core\Rag\KnowledgeBase\*`), where a plain
+ * `chunks` name would risk colliding with the uploaded file's own schema.
  */
 final class SchemaManager
 {
     public static function ensureVectorSchema(\PDO $pdo): void
     {
         $pdo->exec(
-            'CREATE TABLE IF NOT EXISTS chunks (
+            'CREATE TABLE IF NOT EXISTS taw_rag_chunks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 post_id INTEGER NOT NULL,
                 chunk_index INTEGER NOT NULL,
