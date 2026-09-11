@@ -78,9 +78,9 @@ class Theme
      *  13. Content interchange (default-on, cap-gated — Tools → TAW Data screen,
      *      GET taw/v1/content/export, and REST-registered field meta; filter
      *      taw_register_meta_in_rest to opt out of the REST meta)
-     *  14. Sovereign Hybrid-RAG Chatbot (Settings → TAW Chatbot admin page +
-     *      Knowledge Bases screen, save_post/before_delete_post ingestion,
-     *      POST taw/v1/chat)
+     *  14. Sovereign Hybrid-RAG Chatbot (opt-in — no-op unless RagSettings::enable()
+     *      was called; Settings → TAW Chatbot admin page + Knowledge Bases screen,
+     *      save_post/before_delete_post ingestion, POST taw/v1/chat)
      *  15. Bible reader corpus (opt-in — no-op unless BibleEndpoint::enable()
      *      was called; GET taw/v1/bible/*)
      */
@@ -179,18 +179,21 @@ class Theme
         FieldMetaRegistrar::register();
 
         // ── 14. Sovereign Hybrid-RAG Chatbot ──────────────────────────────────
-        // Settings → TAW Chatbot admin page (LLM base URL/model config,
-        // indexed post types, chunking, tool-call iteration cap); Settings →
-        // TAW Chatbot → Knowledge Bases (upload any .sqlite file as a
-        // semantically-searchable knowledge base); the save_post/before_delete_post
-        // WP-content ingestion pipeline (dispatched via WP-Cron — see
-        // PostIndexer's own docblock); and POST taw/v1/chat — public by
-        // default, rate-limited regardless (see RagChatEndpoint's own
-        // docblock).
-        new RagSettings();
-        (new KnowledgeBaseAdminScreen())->register();
-        new PostIndexer();
-        new RagChatEndpoint();
+        // Opt-in only — no-op unless RagSettings::enable() was called.
+        // When enabled: Settings → TAW Chatbot admin page (LLM base
+        // URL/model config, indexed post types, chunking, tool-call
+        // iteration cap); Settings → TAW Chatbot → Knowledge Bases (upload
+        // any .sqlite file as a semantically-searchable knowledge base);
+        // the save_post/before_delete_post WP-content ingestion pipeline
+        // (dispatched via WP-Cron — see PostIndexer's own docblock); and
+        // POST taw/v1/chat — public by default, rate-limited regardless
+        // (see RagChatEndpoint's own docblock).
+        if (RagSettings::isEnabled()) {
+            new RagSettings();
+            (new KnowledgeBaseAdminScreen())->register();
+            new PostIndexer();
+            new RagChatEndpoint();
+        }
 
         // ── 15. Bible reader corpus ────────────────────────────────────────────
         // Opt-in only — no-op unless BibleEndpoint::enable() was called.
