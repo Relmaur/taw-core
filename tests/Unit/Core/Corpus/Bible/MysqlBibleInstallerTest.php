@@ -102,4 +102,51 @@ final class MysqlBibleInstallerTest extends TestCase
         $p = $this->wpdb->prefix . 'taw_corpus_bible_';
         $this->assertSame(2, (int) $this->wpdb->get_var("SELECT COUNT(*) FROM {$p}books"));
     }
+
+    /**
+     * Regression: install() used to be void, and CorpusInstallCommand
+     * reported the *input* export's own row counts as "success" — so a
+     * run that wrote nothing at all to MySQL still printed a clean
+     * "[OK] Imported 73 books..." (confirmed once in production). install()
+     * must return what's actually in MySQL after the import.
+     */
+    public function test_install_returns_row_counts_actually_read_back_from_mysql(): void
+    {
+        $counts = MysqlBibleInstaller::install($this->sampleData());
+
+        $this->assertSame(
+            ['books' => 1, 'chapters' => 1, 'verses' => 1, 'sections' => 1, 'notes' => 1],
+            $counts
+        );
+    }
+
+    /**
+     * Regression: every $wpdb->query() call here used to go unchecked —
+     * a false-returning failure (permissions, a malformed statement, a
+     * dropped connection) just fell through to `install()` returning
+     * normally, meaning a real MySQL failure looked identical to success.
+     */
+    public function test_install_throws_with_the_real_mysql_error_when_a_query_fails(): void
+    {
+        $this->wpdb->failOnQueryContaining = 'INSERT INTO ' . $this->wpdb->prefix . 'taw_corpus_bible_verses';
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/Simulated failure/');
+
+        MysqlBibleInstaller::install($this->sampleData());
+    }
+
+    public function test_install_rolls_back_the_transaction_when_a_query_fails(): void
+    {
+        $this->wpdb->failOnQueryContaining = 'INSERT INTO ' . $this->wpdb->prefix . 'taw_corpus_bible_verses';
+
+        try {
+            MysqlBibleInstaller::install($this->sampleData());
+            $this->fail('Expected install() to throw.');
+        } catch (\RuntimeException) {
+            // expected
+        }
+
+        $this->assertContains('ROLLBACK', $this->wpdb->recordedQueries);
+    }
 }

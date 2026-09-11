@@ -158,6 +158,34 @@ final class CorpusInstallCommandTest extends TestCase
         }
     }
 
+    /**
+     * Regression: a failed MySQL import must be a clean CLI error (exit
+     * 1, a readable message), never a false "success" or an uncaught
+     * exception's raw stack trace.
+     */
+    public function test_reports_a_clean_failure_when_the_mysql_import_fails(): void
+    {
+        $fakeWpdb = new FakeWpdb();
+        $fakeWpdb->failOnQueryContaining = 'CREATE TABLE';
+        $GLOBALS['wpdb'] = $fakeWpdb;
+        Functions\when('esc_sql')->alias(static fn (string $s): string => str_replace("'", "''", $s));
+
+        $source = $this->tmp . '/export.json';
+        file_put_contents($source, json_encode([
+            'books' => [], 'chapters' => [], 'verses' => [], 'sections' => [], 'notes' => [],
+        ]));
+
+        try {
+            $tester = new CommandTester(new CorpusInstallCommand($this->themeDir));
+            $exit = $tester->execute(['path' => $source, 'filename' => 'unused.sqlite']);
+
+            $this->assertSame(1, $exit);
+            $this->assertStringContainsString('MySQL import failed', $tester->getDisplay());
+        } finally {
+            unset($GLOBALS['wpdb']);
+        }
+    }
+
     public function test_rejects_a_file_that_is_neither_sqlite_nor_a_recognized_json_export(): void
     {
         $source = $this->tmp . '/garbage.json';

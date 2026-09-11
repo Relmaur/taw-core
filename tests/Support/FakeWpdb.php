@@ -34,6 +34,21 @@ final class FakeWpdb
      */
     public int $innodbFtMinTokenSize = 3;
 
+    /**
+     * Mirrors real `$wpdb::$last_error`, set whenever query() "fails"
+     * (either because it matches failOnQueryContaining, or because the
+     * underlying SQLite engine itself raised on the translated SQL).
+     */
+    public string $last_error = '';
+
+    /**
+     * When set, any query() call whose SQL contains this substring
+     * returns false (with last_error populated) instead of executing —
+     * lets a test simulate a real $wpdb query failure (permissions, a
+     * dropped connection, ...) without needing SQLite to actually fail.
+     */
+    public ?string $failOnQueryContaining = null;
+
     /** @var list<string> */
     public array $recordedQueries = [];
 
@@ -130,7 +145,22 @@ final class FakeWpdb
     {
         $this->recordedQueries[] = $query;
 
-        return $this->pdo->exec($this->translate($query));
+        if ($this->failOnQueryContaining !== null && str_contains($query, $this->failOnQueryContaining)) {
+            $this->last_error = "Simulated failure: query contains '{$this->failOnQueryContaining}'";
+
+            return false;
+        }
+
+        try {
+            $result = $this->pdo->exec($this->translate($query));
+            $this->last_error = '';
+
+            return $result;
+        } catch (\PDOException $e) {
+            $this->last_error = $e->getMessage();
+
+            return false;
+        }
     }
 
     private function translate(string $sql): string

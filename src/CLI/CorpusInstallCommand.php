@@ -164,15 +164,23 @@ class CorpusInstallCommand extends Command
             return Command::FAILURE;
         }
 
-        MysqlBibleInstaller::install($data);
+        try {
+            $counts = MysqlBibleInstaller::install($data);
+        } catch (\Throwable $e) {
+            $io->error('MySQL import failed: ' . $e->getMessage());
+            return Command::FAILURE;
+        }
 
+        // Report what MysqlBibleInstaller actually read back from MySQL
+        // after the import, not the input export's own counts — a run
+        // that wrote nothing at all must never print a clean success.
         $io->success(sprintf(
             'Imported %d books, %d chapters, %d verses, %d sections, %d notes into MySQL storage.',
-            count($data['books']),
-            count($data['chapters']),
-            count($data['verses']),
-            count($data['sections']),
-            count($data['notes'])
+            $counts['books'],
+            $counts['chapters'],
+            $counts['verses'],
+            $counts['sections'],
+            $counts['notes']
         ));
 
         return Command::SUCCESS;
