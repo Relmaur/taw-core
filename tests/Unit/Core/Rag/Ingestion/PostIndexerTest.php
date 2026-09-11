@@ -26,7 +26,10 @@ final class PostIndexerTest extends TestCase
         Functions\when('wp_mkdir_p')->alias(static fn (string $dir): bool => is_dir($dir) || mkdir($dir, 0777, true));
         Functions\when('wp_is_post_revision')->justReturn(false);
         Functions\when('wp_is_post_autosave')->justReturn(false);
-        // RagSettings::indexedPostTypes() default: 'post,page'.
+        // RagSettings::indexedPostTypes() default: 'post,page'. onBeforeDeletePost()
+        // resolves its own post type via get_post_type() — default to an indexed
+        // type here; tests covering the non-indexed path override this.
+        Functions\when('get_post_type')->justReturn('post');
         Functions\when('get_option')->alias(static fn ($name, $default = false) => $default);
     }
 
@@ -128,6 +131,38 @@ final class PostIndexerTest extends TestCase
 
         (new PostIndexer())->onSavePost(11, $this->fakePost(11, 'publish', 'attachment'));
 
-        $this->assertSame(0, $this->chunkCount(11));
+        // Same "Storage was never touched at all" check as the revision/
+        // autosave test — a chunkCount(11) of 0 alone would be true either
+        // way (nothing was ever seeded for post 11), so it can't distinguish
+        // "removePost() was skipped" from "removePost() ran and correctly
+        // found nothing"; only this catches a pointless removePost() call.
+        // (chunkCount() itself would now throw — Storage::ensureProtectedDir()
+        // never ran, so the directory a PDO connection needs doesn't exist.)
+        $this->assertFileDoesNotExist(Storage::dbPath('taw_vectors.sqlite'));
+    }
+
+    public function test_deleting_a_non_indexed_post_type_does_not_touch_storage(): void
+    {
+        // Regression: onBeforeDeletePost() used to call removePost() for
+        // every deleted post regardless of type — e.g. taw_sync_menus()
+        // tearing down old nav_menu_item posts during a menu rebuild,
+        // which then failed loudly wherever RAG storage wasn't reachable
+        // (found via a live "could not find driver" flood from a routine
+        // `wp taw nav menus` run under a WP-CLI PHP binary missing
+        // pdo_sqlite).
+        Functions\when('get_post_type')->justReturn('nav_menu_item');
+
+        (new PostIndexer())->onBeforeDeletePost(12);
+
+        $this->assertFileDoesNotExist(Storage::dbPath('taw_vectors.sqlite'));
+    }
+
+    public function test_deleting_a_previously_indexed_post_removes_its_chunks(): void
+    {
+        $this->seedChunk(13);
+
+        (new PostIndexer())->onBeforeDeletePost(13);
+
+        $this->assertSame(0, $this->chunkCount(13));
     }
 }
