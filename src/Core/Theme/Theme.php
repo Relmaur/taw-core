@@ -13,6 +13,7 @@ use TAW\Core\Media\MediaFolders;
 use TAW\Core\Metabox\MetaboxOrder;
 use TAW\Core\OptionsPage\OptionsPage;
 use TAW\Core\Content\ContentAdminScreen;
+use TAW\Core\Rag\Ingestion\PostIndexer;
 use TAW\Core\Rag\RagSettings;
 use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\Cors;
@@ -172,10 +173,12 @@ class Theme
 
         // ── 14. Sovereign Hybrid-RAG Chatbot ──────────────────────────────────
         // Settings → TAW Chatbot admin page (LLM base URL/model config,
-        // indexed post types, chunking, tool-call iteration cap). Ingestion
-        // and the chat REST endpoint are wired here in later steps as they
-        // land.
+        // indexed post types, chunking, tool-call iteration cap), and the
+        // save_post/before_delete_post ingestion pipeline (dispatched via
+        // WP-Cron — see PostIndexer's own docblock). The chat REST endpoint
+        // is wired here in a later step as it lands.
         new RagSettings();
+        new PostIndexer();
     }
 
     /**
