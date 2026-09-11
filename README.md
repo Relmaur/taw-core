@@ -828,6 +828,7 @@ Annotations give the editor a direct DOM reference, making live updates exact an
 | `GET`  | `/taw/v1/visual-editor/fields` | Load all registered fields + current values for the editor panel |
 | `GET`  | `/taw/v1/search-posts`         | Post search for `post_select` fields |
 | `GET`  | `/taw/v1/icons`                | Lucide icon search for the `icon` field type — only registered when `Lucide::enable()` was called |
+| `POST` | `/taw/v1/chat`                 | Hybrid-RAG chatbot — see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot). Public by default, rate-limited |
 
 Cross-origin access to these routes (and to `admin-ajax.php?action=taw_form_*`) is opt-in and off by default — see [Static Export & Headless CORS](#static-export--headless-cors).
 
@@ -1056,6 +1057,8 @@ php bin/taw log:tail --level=error --limit=100                  # read back the 
 php bin/taw content:export --output=/tmp/site.json              # portable content snapshot (see Content Interchange)
 php bin/taw content:import /tmp/site.json                       # dry-run diff; add --yes to apply (rollback snapshot written first)
 php bin/taw content:diff a.json b.json --out=changes.json       # two snapshots → a change-set for content:import
+php bin/taw content:reindex --post-type=post,page --batch=20    # backfill/refresh the RAG chatbot's WP-content vectors (see Sovereign Hybrid-RAG Chatbot)
+php bin/taw content:reindex-kb kb-a1b2c3d4                      # re-run ingestion for one admin-uploaded RAG knowledge base
 ```
 
 `make:block` generates the block folder, PHP class, template file, and Vite entry points.
@@ -1079,6 +1082,8 @@ The two skills directories (`.claude/skills/`, `.agents/skills/`) are Tier 1 but
 `log:tail` prints the most recent entries from `wp-content/taw-logs/taw.log.jsonl` (the file `TAW\Core\Log\JsonlFileSink` writes) — `--level=`, `--code=` (prefix match), `--since=` (ISO-8601), `--limit=` (default 50), `--json` for raw output to pipe. Resolves `wp-content` from `wp-load.php` via `WpLoader` like the other WP-adjacent commands; it does not boot WordPress. See [Logging](#logging).
 
 `icons:sync` re-vendors the Lucide icon set this package ships (see [Icon System](#icon-system)) — shallow-clones `lucide-icons/lucide`, copies every icon SVG into `resources/icons/lucide/`, and rebuilds `resources/icons/lucide-index.json`. Doesn't boot WordPress or touch a consuming theme; only run it here, in `taw-core` itself, when Lucide ships new icons.
+
+`content:reindex` and `content:reindex-kb` are the RAG chatbot's manual-backfill commands — see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot). Uploading a new knowledge base itself is a wp-admin action, not a CLI one.
 
 ---
 
@@ -1239,6 +1244,52 @@ This exposes field values over `wp/v2` for **headless front-ends and external in
 
 ---
 
+## Sovereign Hybrid-RAG Chatbot
+
+A visitor-facing chat widget that answers from **any number of named knowledge bases** — the site's own WordPress content, plus any `.sqlite` file an admin uploads — with an OpenAI-compatible LLM doing semantic search across whichever one the question calls for. Content-agnostic by design: no particular schema is assumed or required of an uploaded file. "Sovereign" describes data ownership, not hosting — the LLM endpoint is admin-configurable (`Settings → TAW Chatbot`), defaulting to OpenAI's cloud API but swappable to any OpenAI-compatible endpoint (self-hosted Ollama/vLLM/etc.) — your SQLite files and WordPress DB never leave the site either way. Wired unconditionally in `Theme::boot()`, no `enable()` call — same posture as Content Interchange and SEO structured data.
+
+> **Strict separation of concerns.** Every piece of this — SQLite connections, embeddings, LLM orchestration, REST — lives here in `taw/core`. The consuming theme owns only the chat widget's Alpine.js/Tailwind presentation and talks to `POST /taw/v1/chat`, nothing else — no LLM base URL or API key ever reaches the browser.
+
+### Knowledge bases
+
+`Settings → TAW Chatbot → Knowledge Bases` (`TAW\Core\Rag\KnowledgeBase\KnowledgeBaseAdminScreen`) — upload any `.sqlite` file with a name and description; that's the entire setup. On ingestion, every table is scanned and every column whose declared SQLite type has TEXT affinity (`CHAR`/`CLOB`/`TEXT`, or no declared type at all) is extracted as `"column: value"` lines per row, chunked, embedded, and written into a `taw_rag_chunks` table **inside that same file** — one file per knowledge base, not two. A table with no text-affinity column is skipped; nothing schema-specific is assumed.
+
+The site's own WordPress content is always present as a built-in, non-deletable `wp-content` knowledge base — it isn't stored in the registry option at all, since it's fully derived from the `Settings → TAW Chatbot` post-type/chunking settings below and the existing `save_post`/`before_delete_post` ingestion pipeline.
+
+```bash
+php bin/taw content:reindex --post-type=post,page --batch=20   # backfill/refresh the wp-content knowledge base
+php bin/taw content:reindex-kb kb-a1b2c3d4                     # re-run ingestion for one uploaded knowledge base
+```
+
+Uploading itself is wp-admin only, by design — there's no CLI import step; the upload handler validates the SQLite magic-byte header before accepting a file, and ingestion runs via WP-Cron (never inline on the upload request).
+
+### Settings
+
+`Settings → TAW Chatbot` (`TAW\Core\Rag\RagSettings`): API base URL (default `https://api.openai.com/v1`), embedding/chat model names, indexed post types for the `wp-content` knowledge base (comma-separated, default `post,page`), chunk size/overlap, max tool-call iterations, and whether anonymous visitors can chat (default on). The LLM API key is **not** one of these fields — like `TAW_TURNSTILE_SECRET_KEY`, it's wp-config-constant-only, since OptionsPage fields are REST-readable by anyone with `edit_posts`:
+
+```php
+// wp-config.php
+define('TAW_RAG_API_KEY', 'sk-...');
+```
+
+### Vector search
+
+Every knowledge base's `taw_rag_chunks` table is searched with pure-PHP cosine similarity by default (`TAW\Core\Rag\Vector\VectorRepository`) — the [`sqlite-vec`](https://github.com/asg017/sqlite-vec) loadable extension isn't installed on most PHP hosts, and `PDO::loadExtension()` only exists on PHP 8.4+'s `Pdo\Sqlite` driver subclass in the first place, not on a plain `PDO` connection on any version. `VectorCapability::sqliteVecAvailable()` detects it at runtime and search falls back to the brute-force path on any failure — never a hard dependency.
+
+### `POST /wp-json/taw/v1/chat`
+
+```json
+{"message": "Do you have anything about return policies?", "history": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]}
+```
+
+Runs an OpenAI-compatible tool-calling loop (`TAW\Core\Rag\Orchestrator\ChatOrchestrator`, capped at the configured max iterations, then forces one final non-tool answer) against a single tool:
+
+- **`search_knowledge_base(knowledge_base, query)`** (`TAW\Core\Rag\Tools\SearchKnowledgeBaseTool`) — semantic search over one named knowledge base. Its `knowledge_base` parameter is an enum built fresh from the current registry on every request (so a newly-uploaded knowledge base is searchable the moment ingestion finishes, no redeploy needed), and the tool's own description lists each available knowledge base's id + human description inline so the model can pick the right one without a clarifying round-trip.
+
+**Public by default** (`RagSettings::publicChatEnabled()`) — the endpoint's `permission_callback` doesn't gate anonymous requests, since WP's cookie-auth nonce check only protects logged-in callers anyway. The actual defense is unconditional rate limiting via `TAW\Core\Form\RateLimiter` (20 requests/10 min per IP), applied regardless of the public/logged-in-only setting.
+
+---
+
 ## Static Export & Headless CORS
 
 `export:static` only freezes what's actually static: rendered page/post HTML, Vite assets, and uploads. Forms (`admin-ajax.php?action=taw_form_*`) and search (`GET /taw/v1/search-posts`) stay dynamic by design — they keep hitting this WordPress install, over the network, exactly as before. That's the right call: there's no server at a static host to answer them otherwise.
@@ -1287,6 +1338,7 @@ Dump::log($value);
 
 | Package | Purpose |
 |---------|---------|
+| `ext-pdo_sqlite` | The RAG chatbot's SQLite knowledge-base files (see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot)) |
 | `symfony/console ^7.4` | CLI commands |
 | `symfony/process ^7.4` | `wp` command — shells out to the real WP-CLI binary |
 | `enshrined/svg-sanitize ^0.22.0` | SVG XSS prevention on upload |
