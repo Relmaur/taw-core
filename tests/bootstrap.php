@@ -91,3 +91,40 @@ if (!class_exists('WP_User')) {
         }
     }
 }
+
+if (!class_exists('WP_Error')) {
+    class WP_Error
+    {
+        /** @var array<string, list<string>> */
+        public array $errors = [];
+
+        /** @var array<string, mixed> */
+        public array $error_data = [];
+
+        public function __construct(string $code = '', string $message = '', mixed $data = '')
+        {
+            if ($code === '') {
+                return;
+            }
+
+            $this->errors[$code][] = $message;
+            if ($data !== '') {
+                $this->error_data[$code] = $data;
+            }
+        }
+
+        public function get_error_code(): string
+        {
+            $codes = array_keys($this->errors);
+
+            return $codes[0] ?? '';
+        }
+
+        public function get_error_message(): string
+        {
+            $code = $this->get_error_code();
+
+            return $code === '' ? '' : ($this->errors[$code][0] ?? '');
+        }
+    }
+}
