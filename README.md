@@ -1063,6 +1063,7 @@ php bin/taw content:diff a.json b.json --out=changes.json       # two snapshots 
 php bin/taw content:reindex --post-type=post,page --batch=20    # backfill/refresh the RAG chatbot's WP-content vectors (see Sovereign Hybrid-RAG Chatbot)
 php bin/taw content:reindex-kb kb-a1b2c3d4                      # re-run ingestion for one admin-uploaded RAG knowledge base
 php bin/taw corpus:install /path/to/bible.sqlite bible-straubinger.sqlite   # install a reference corpus (see Bible Reader Corpus)
+php bin/taw corpus:export /path/to/bible.sqlite /path/to/bible-export.json  # portable export for a host with no pdo_sqlite
 ```
 
 `make:block` generates the block folder, PHP class, template file, and Vite entry points.
@@ -1089,7 +1090,9 @@ The two skills directories (`.claude/skills/`, `.agents/skills/`) are Tier 1 but
 
 `content:reindex` and `content:reindex-kb` are the RAG chatbot's manual-backfill commands — see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot). Uploading a new knowledge base itself is a wp-admin action, not a CLI one.
 
-`corpus:install` installs a developer-curated reference corpus — see [Bible Reader Corpus](#bible-reader-corpus). Unlike a RAG knowledge base, this is CLI-only by design: no wp-admin upload screen.
+`corpus:install` installs a developer-curated reference corpus — see [Bible Reader Corpus](#bible-reader-corpus). Unlike a RAG knowledge base, this is CLI-only by design: no wp-admin upload screen. Accepts either a raw `.sqlite` file (needs `pdo_sqlite` on this host) or a portable JSON export (works on any host — see `corpus:export`), auto-detected by content.
+
+`corpus:export` dumps a `.sqlite` reference corpus to the portable JSON format `corpus:install` can import into MySQL storage — run it on a machine that has `pdo_sqlite` (typically a developer's local machine), then transfer the output to and install it on a target host that doesn't.
 
 ---
 
@@ -1305,44 +1308,64 @@ Runs an OpenAI-compatible tool-calling loop (`TAW\Core\Rag\Orchestrator\ChatOrch
 
 ## Bible Reader Corpus
 
-A read-only REST surface over a developer-installed reference corpus — currently a Straubinger-translation Spanish Catholic Bible (`books`/`chapters`/`verses`/`sections`/`notes` + FTS5 full-text search), built for the fsspx-taw client site's `/formacion/bible` reader but framework-level and content-agnostic in the same spirit as [Content Interchange](#content-interchange): the schema is fixed (this isn't a generic query layer — see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot)'s knowledge bases for that), but the storage/install/REST plumbing generalizes to any future reference corpus the same shape describes. See `docs/adr/0001-reference-corpus-storage.md` for the full reasoning behind the decisions below.
+A read-only REST surface over a developer-installed reference corpus — currently a Straubinger-translation Spanish Catholic Bible (`books`/`chapters`/`verses`/`sections`/`notes` + full-text search), built for the fsspx-taw client site's `/formacion/bible` reader but framework-level and content-agnostic in the same spirit as [Content Interchange](#content-interchange): the schema is fixed (this isn't a generic query layer — see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot)'s knowledge bases for that), but the storage/install/REST plumbing generalizes to any future reference corpus the same shape describes. See `docs/adr/0001-reference-corpus-storage.md` and `docs/adr/0002-corpus-mysql-fallback.md` for the full reasoning behind the decisions below.
 
 **Opt-in** — call `TAW\Core\Rest\BibleEndpoint::enable()` in the theme's `customizations.php` before `Theme::boot()`, same posture as `Lucide::enable()`/`RagSettings::enable()`. Nothing here registers on a site that doesn't call it.
 
+### Two storage backends — SQLite by default, MySQL when `pdo_sqlite` isn't available
+
+`TAW\Core\Storage\ProtectedSqlite::isAvailable()` checks `extension_loaded('pdo_sqlite')` *and* attempts a real `sqlite::memory:` connection (a loaded extension isn't always a functional one on every host build). This is a real, confirmed gap on production managed hosting — not theoretical: WPMUdev's managed hosting has no `pdo_sqlite`/`sqlite3` on either PHP-FPM or CLI, on multiple PHP versions, and declined to add it ("As a Managed Hosting service, we are unable to implement custom extensions... the database we offer is MySQL, not SQLite"). `$wpdb` — and the `mysqli` extension it's built on — is guaranteed on every WordPress host, since WP core itself can't function without it, unlike `pdo_sqlite`, which nothing requires.
+
+Every consumer (`bin/taw corpus:install`, `TAW\Core\Rest\BibleEndpoint`) checks `isAvailable()` and picks a backend accordingly — **zero behavior change on a host where `pdo_sqlite` already works**; the SQLite path is checked first and used unconditionally whenever it's both available and installed.
+
 ### Installing the corpus file
 
-A reference corpus is a curated, developer-placed dataset, not end-user content — installed via CLI, not a wp-admin upload form:
+A reference corpus is a curated, developer-placed dataset, not end-user content — installed via CLI, not a wp-admin upload form. `bin/taw corpus:install` accepts either of two source formats, auto-detected by content:
 
 ```bash
+# 1. Raw .sqlite file — needs pdo_sqlite on THIS host:
 php bin/taw corpus:install /path/to/bible_straubinger.sqlite bible-straubinger.sqlite
+
+# 2. Portable JSON export — works on any host, no pdo_sqlite required here at all:
+php bin/taw corpus:install /path/to/bible-export.json bible-straubinger.sqlite   # filename arg is unused for this path
 ```
 
-`TAW\CLI\CorpusInstallCommand` validates the SQLite magic-byte header (same check `KnowledgeBaseAdminScreen` uses for RAG knowledge-base uploads), then copies it into a protected uploads subdirectory — `TAW\Core\Corpus\Storage`, `wp-content/uploads/taw-private/corpus/`, a directory deliberately separate from the RAG chatbot's `taw-private/rag/` (see the ADR: a reference corpus and a RAG knowledge base are different concerns that happen to share "protected dir + read-only PDO" plumbing, extracted into `TAW\Core\Storage\ProtectedSqlite` rather than duplicated). The installed filename is fixed and versionless — the file's own `meta` table carries `release_channel`/`generated_at`/`source_revision`, so reader code never needs to know which build is installed. `bin/taw corpus:install` never overwrites destructively in a way that loses the source; re-running it against an updated source file is always safe.
+**Path 1 (`.sqlite`)** — `TAW\CLI\CorpusInstallCommand` validates the SQLite magic-byte header (same check `KnowledgeBaseAdminScreen` uses for RAG knowledge-base uploads), confirms `ProtectedSqlite::isAvailable()` on *this* host, then copies the file into a protected uploads subdirectory — `TAW\Core\Corpus\Storage`, `wp-content/uploads/taw-private/corpus/`, a directory deliberately separate from the RAG chatbot's `taw-private/rag/` (see ADR-0001: a reference corpus and a RAG knowledge base are different concerns that happen to share "protected dir + read-only PDO" plumbing, extracted into `TAW\Core\Storage\ProtectedSqlite` rather than duplicated). If `pdo_sqlite` isn't available here, the command fails with a clear message pointing at path 2 instead of a bare `PDOException` from deep inside the reader.
+
+**Path 2 (portable JSON)** — for a target host with no `pdo_sqlite` at all. First, on a machine that *does* have it (typically a developer's local machine):
+
+```bash
+php bin/taw corpus:export /path/to/bible_straubinger.sqlite /path/to/bible-export.json
+```
+
+`TAW\CLI\CorpusExportCommand` reads the source `.sqlite` via plain PDO (no WordPress dependency — both paths are given directly as arguments) and writes a portable JSON export carrying only the columns `BibleReader` actually reads. Transfer that JSON file to the target server, then run `corpus:install` against it there — `TAW\Core\Corpus\Bible\MysqlBibleInstaller` creates `{$wpdb->prefix}taw_corpus_bible_{books,chapters,verses,sections,notes}` (`FULLTEXT` indexes on `verses.text`/`notes.body`) and bulk-loads the export via `$wpdb`, no `pdo_sqlite` needed on that host at any point.
+
+Both paths are safe to re-run against an updated source: the `.sqlite` path just overwrites the copied file; the JSON path truncates and reloads its MySQL tables inside a transaction. The installed filename (path 1) is fixed and versionless — the file's own `meta` table carries `release_channel`/`generated_at`/`source_revision`, so reader code never needs to know which build is installed.
 
 ### Reading the corpus
 
-`TAW\Core\Corpus\Bible\BibleReader` — plain PDO, no WordPress dependency beyond resolving the uploads directory, opened via `Storage::openReadOnly()` (`PRAGMA query_only = 1` — a reference corpus is never written to at runtime):
+`TAW\Core\Corpus\Bible\BibleReaderInterface` is implemented by two independent readers with identical output shapes — `BibleReader` (SQLite, plain PDO, opened via `Storage::openReadOnly()` — `PRAGMA query_only = 1`, a reference corpus is never written to at runtime) and `MysqlBibleReader` (MySQL, plain `$wpdb`, selected automatically when `pdo_sqlite` isn't available). Deliberately two separate classes rather than a shared abstract base — SQLite FTS5 and MySQL boolean-mode `FULLTEXT` differ enough (no `snippet()` equivalent in MySQL; `MysqlBibleReader` builds excerpts by hand) that sharing internals would mostly move complexity around, and it keeps the already-shipped `BibleReader` completely untouched by this addition:
 
 ```php
-$reader = new TAW\Core\Corpus\Bible\BibleReader();
+$reader = new TAW\Core\Corpus\Bible\BibleReader();        // or MysqlBibleReader() — same contract
 
 $reader->books();                       // every book, grouped by testament then division, in canonical order
 $reader->chapter('genesis', 1);         // verses + any overlapping section headings + any overlapping notes
-$reader->searchVerses('en el principio'); // FTS5 word search over verse text (every word must match, any order), with a <mark>-highlighted excerpt
-$reader->searchNotes('creación');         // FTS5 word search over Straubinger's own footnote commentary
+$reader->searchVerses('en el principio'); // every word must match, any order, with a <mark>-highlighted excerpt
+$reader->searchNotes('creación');         // same word-matching semantics over Straubinger's own footnote commentary
 ```
 
-`chapter()` deliberately returns `verses`/`sections`/`notes` as three flat, chapter-scoped lists rather than an interleaved rendering shape — where a heading sits relative to a verse, or how a note marker anchors into verse text, is presentation, and stays the consuming theme's decision. `searchVerses()`/`searchNotes()` quote every whitespace-separated word of the query individually (escaping internal quotes) and AND them together — a row must contain every word, in any order or position — rather than exposing raw FTS5 `MATCH` operator syntax to a public search box, or requiring the whole query as one exact contiguous phrase (which would silently return nothing for almost any realistic multi-word search).
+`chapter()` deliberately returns `verses`/`sections`/`notes` as three flat, chapter-scoped lists rather than an interleaved rendering shape — where a heading sits relative to a verse, or how a note marker anchors into verse text, is presentation, and stays the consuming theme's decision. `searchVerses()`/`searchNotes()` treat every whitespace-separated word of the query as a separate AND'd term — a row must contain every word, in any order or position — rather than exposing raw `MATCH` operator syntax to a public search box, or requiring the whole query as one exact contiguous phrase (which would silently return nothing for almost any realistic multi-word search). SQLite FTS5 does this via per-word quoted phrases; MySQL boolean mode via `+word1 +word2` — same semantics, different syntax.
 
-`BibleReader` is not `final` on purpose — every internal fetch method is `protected`, and `FILENAME` is overridable — so a theme can subclass it (different installed filename, different fetch behavior) without a taw-core fork. `TAW\Core\Rest\BibleEndpoint` resolves which reader it queries through a filter:
+`TAW\Core\Rest\BibleEndpoint` resolves which reader it queries — SQLite first, MySQL otherwise — through a filter, so a theme can override either the pick itself or supply an entirely different implementation:
 
 ```php
 add_filter('taw_corpus_bible_reader', function () {
-    return new MyThemeBibleReader();
+    return new MyThemeBibleReader(); // any BibleReaderInterface implementation
 });
 ```
 
-No `BibleReaderInterface` exists yet — one real consumer doesn't justify a formal contract; the endpoint narrows the filter's return via `instanceof BibleReader` and falls back to the default reader if a filter callback returns something else.
+The filter's return is narrowed via `instanceof BibleReaderInterface`, falling back to the computed default (SQLite-or-MySQL) if a filter callback returns something else. `BibleReader` itself is not `final` — every internal fetch method is `protected`, `FILENAME` is overridable — so a theme can also subclass it directly (different installed filename, different fetch behavior) without a taw-core fork.
 
 ### `GET /wp-json/taw/v1/bible/books`
 
@@ -1354,7 +1377,7 @@ One chapter: `{book, chapter_number, verses, sections, notes}`. 404 if the book 
 
 ### `GET /wp-json/taw/v1/bible/search?q=...&scope=verses|notes&limit=20`
 
-FTS5 search (`scope` defaults to `verses`; `limit` is clamped to 1-50).
+Full-text search (`scope` defaults to `verses`; `limit` is clamped to 1-50) — SQLite FTS5 or MySQL `FULLTEXT`, whichever backend is installed.
 
 All three routes 404 with `{"error": "No Bible corpus is installed."}` until `corpus:install` has been run. **Public** (no auth — this is public Scripture text) but rate limited regardless: 120 requests/10 min per IP for `books`/chapter reads, 30 requests/10 min per IP for `search` (a heavier query, and a more attractive scraping target).
 

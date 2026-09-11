@@ -95,6 +95,33 @@ final class ProtectedSqlite
     }
 
     /**
+     * Whether SQLite storage is actually usable on this host: the
+     * `pdo_sqlite` extension loaded, AND a real connection actually works.
+     * `extension_loaded()` alone isn't sufficient on every build — some
+     * managed-hosting PHP builds report the extension present but fail to
+     * construct a real connection, so this also opens a throwaway
+     * `:memory:` database to confirm the driver is genuinely functional.
+     *
+     * Deliberately not cached — a `:memory:` connection is cheap (no
+     * filesystem I/O), and the result must stay fresh across test runs
+     * that stub `extension_loaded()`.
+     */
+    public static function isAvailable(): bool
+    {
+        if (!extension_loaded('pdo_sqlite')) {
+            return false;
+        }
+
+        try {
+            new \PDO('sqlite::memory:');
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Whether a file's first bytes match the SQLite 3 file format magic
      * header — a cheap, real check against non-SQLite uploads/installs
      * before ever attempting to open one.

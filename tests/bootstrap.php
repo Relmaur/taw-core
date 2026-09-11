@@ -30,6 +30,12 @@ if (!defined('HOUR_IN_SECONDS')) {
     define('HOUR_IN_SECONDS', 3600);
 }
 
+// $wpdb's own OBJECT/ARRAY_A/ARRAY_N output-format constants — referenced
+// directly by MysqlBibleReader's $wpdb->get_results(..., ARRAY_A) calls.
+if (!defined('ARRAY_A')) {
+    define('ARRAY_A', 'ARRAY_A');
+}
+
 require __DIR__ . '/../vendor/autoload.php';
 
 /**
