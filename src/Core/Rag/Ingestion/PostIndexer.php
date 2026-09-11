@@ -40,14 +40,21 @@ final class PostIndexer
         if (wp_is_post_revision($postId) || wp_is_post_autosave($postId)) {
             return;
         }
-        if ($post->post_status !== 'publish') {
-            return;
-        }
-        if (!in_array($post->post_type, RagSettings::indexedPostTypes(), true)) {
+
+        $eligible = $post->post_status === 'publish'
+            && $post->post_password === ''
+            && in_array($post->post_type, RagSettings::indexedPostTypes(), true);
+
+        if ($eligible) {
+            wp_schedule_single_event(time(), self::HOOK, [$postId]);
             return;
         }
 
-        wp_schedule_single_event(time(), self::HOOK, [$postId]);
+        // Not (or no longer) eligible — unpublished, trashed, moved to
+        // draft/private, or password-protected. A post that was indexed
+        // while eligible must not stay searchable once it isn't; a plain
+        // DB delete is cheap enough to run inline rather than via cron.
+        (new IngestionPipeline(new LlmClient()))->removePost($postId);
     }
 
     public function onBeforeDeletePost(int $postId): void
