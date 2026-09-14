@@ -1387,6 +1387,66 @@ All three routes 404 with `{"error": "No Bible corpus is installed."}` until `co
 
 ---
 
+## Catechism Reader Corpus
+
+One level deeper than [Bible Reader Corpus](#bible-reader-corpus)'s book → chapter → verse: a catechism's part → section → chapter → numbered question/answer. Unlike the single-installed Bible, this is explicitly **edition-parameterized** from day one — more than one catechism (the Catechism of Saint Pius X today, others later) can be installed side by side. Same storage/install/REST posture and the same two-backend split as the Bible corpus, applied one navigational level deeper.
+
+**Opt-in** — call `TAW\Core\Rest\CatechismEndpoint::enable()` in the theme's `customizations.php` before `Theme::boot()`.
+
+### Editions
+
+`TAW\Core\Corpus\Catechism\CatechismEditions` is the one place valid edition slugs are declared — a plain, developer-curated array, not admin-configurable, same posture as the Bible's fixed filename:
+
+```php
+'pius-x' => ['filename' => 'catechism-pius-x.sqlite', 'name' => 'Catecismo Mayor de San Pío X'],
+```
+
+Adding a second edition is one new array entry plus installing its own `.sqlite` file or export — no other code in this namespace changes. `GET /wp-json/taw/v1/catechism/editions` lists every registered edition, installed or not.
+
+### Installing an edition
+
+`bin/taw catechism:install <edition> <path> [filename]` — the same two source formats as `corpus:install`, scoped to one edition at a time:
+
+```bash
+# Raw .sqlite — needs pdo_sqlite on THIS host:
+php bin/taw catechism:install pius-x /path/to/catechism-pius-x.sqlite
+
+# Portable JSON export — any host, no pdo_sqlite required here at all:
+php bin/taw catechism:export /path/to/catechism-pius-x.sqlite /path/to/export.json
+php bin/taw catechism:install pius-x /path/to/export.json
+```
+
+Unlike the Bible's five MySQL tables (one corpus, one table-set), `MysqlCatechismInstaller` writes into **one shared table-set across every edition** — each row carries both `edition` and the source file's own `source_id` (`UNIQUE (edition, source_id)` stands in for the source's primary key, since two independently-exported editions can both legitimately use `id = 1`). Re-running `catechism:install` for one edition only ever touches that edition's own rows: `reload()` issues `DELETE FROM ... WHERE edition = ?`, not `TRUNCATE TABLE` — DML, not DDL, so it carries none of the implicit-commit caveat `MysqlBibleInstaller`'s per-table `TRUNCATE` has. That makes the transaction wrapping around a catechism install a genuine cross-table atomicity guarantee: a failure partway through actually rolls back every `DELETE`/`INSERT` the run issued, not just the table it happened to be mid-way through.
+
+Every `$wpdb->query()` call is checked the same way `MysqlBibleInstaller` learned to check it in production — a `false` result throws with `$wpdb->last_error`, and `install()` returns row counts read back via `COUNT(*)` after the import, never the input export's own counts.
+
+### Reading an edition
+
+`TAW\Core\Corpus\Catechism\CatechismReaderInterface` — implemented by `CatechismReader` (SQLite) and `MysqlCatechismReader` (MySQL fallback), the same independent-implementation choice as the Bible reader. Every method takes `$edition` explicitly rather than assuming a single installed catechism:
+
+```php
+$reader = new TAW\Core\Corpus\Catechism\CatechismReader();    // or MysqlCatechismReader() — same contract
+
+$reader->parts('pius-x');                     // full part → section → chapter tree; each chapter carries its own paragraph_count
+$reader->chapter('pius-x', 12);                // one chapter's question/answer paragraphs + part/section breadcrumb
+$reader->searchParagraphs('pius-x', 'gracia'); // full-text search across both question_text and answer_text
+```
+
+`MysqlCatechismReader` reuses `MysqlBibleReader`'s `innodb_ft_min_token_size` short-word filtering from the start rather than rediscovering the same production gap — see [Bible Reader Corpus](#bible-reader-corpus)'s note on that setting.
+
+`TAW\Core\Rest\CatechismEndpoint` resolves the reader the same SQLite-first, filterable way `BibleEndpoint` does, via the `taw_corpus_catechism_reader` filter.
+
+### Routes
+
+- `GET /wp-json/taw/v1/catechism/editions` — every registered edition, installed or not.
+- `GET /wp-json/taw/v1/catechism/{edition}/parts` — the full navigable tree for that edition.
+- `GET /wp-json/taw/v1/catechism/{edition}/chapters/{id}` — one chapter's paragraphs + breadcrumb.
+- `GET /wp-json/taw/v1/catechism/{edition}/search?q=...&limit=20` — full-text search (limit clamped 1-50).
+
+An unknown edition slug 404s with `{"error": "Unknown catechism edition."}`; a known-but-not-yet-installed edition 404s separately with `{"error": "This catechism edition is not installed."}` — kept distinct so a misconfigured `customizations.php` doesn't look identical to "just hasn't been installed yet." **Public** (no auth), rate limited the same as the Bible routes: 120 requests/10 min per IP for reads, 30 requests/10 min per IP for search.
+
+---
+
 ## Static Export & Headless CORS
 
 `export:static` only freezes what's actually static: rendered page/post HTML, Vite assets, and uploads. Forms (`admin-ajax.php?action=taw_form_*`) and search (`GET /taw/v1/search-posts`) stay dynamic by design — they keep hitting this WordPress install, over the network, exactly as before. That's the right call: there's no server at a static host to answer them otherwise.
