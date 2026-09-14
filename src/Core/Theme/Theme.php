@@ -17,6 +17,7 @@ use TAW\Core\Rag\Ingestion\PostIndexer;
 use TAW\Core\Rag\KnowledgeBase\KnowledgeBaseAdminScreen;
 use TAW\Core\Rag\RagSettings;
 use TAW\Core\Rest\BibleEndpoint;
+use TAW\Core\Rest\CatechismEndpoint;
 use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\Cors;
 use TAW\Core\Rest\FieldMetaRegistrar;
@@ -203,6 +204,18 @@ class Theme
         // Public, rate-limited — see BibleEndpoint's own docblock.
         if (BibleEndpoint::isEnabled()) {
             new BibleEndpoint();
+        }
+
+        // ── 16. Catechism reader corpus ─────────────────────────────────────────
+        // Opt-in only — no-op unless CatechismEndpoint::enable() was called.
+        // GET taw/v1/catechism/editions, taw/v1/catechism/{edition}/parts,
+        // taw/v1/catechism/{edition}/chapters/{id}, and
+        // taw/v1/catechism/{edition}/search over a developer-installed
+        // reference corpus (bin/taw catechism:install — see
+        // CatechismInstallCommand's docblock). Public, rate-limited — see
+        // CatechismEndpoint's own docblock.
+        if (CatechismEndpoint::isEnabled()) {
+            new CatechismEndpoint();
         }
     }
 
