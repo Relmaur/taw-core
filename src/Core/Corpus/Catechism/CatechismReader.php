@@ -22,10 +22,22 @@ use TAW\Core\Corpus\Storage;
  * no content under it yet (confirmed in practice: an early Pius X export
  * briefly carried four empty, unrelated Trent-catechism part/section/
  * chapter stubs alongside the real content, before the upstream exporter's
- * own edition-scoping bug was fixed) — every tree method here filters to
- * chapters with at least one paragraph, and prunes any section/part left
- * with no chapters as a result, so a stray empty branch in a future export
- * can never surface as a dead-end in the UI.
+ * own edition-scoping bug was fixed) — `parts()` prunes any *section* (and
+ * transitively, part) left with zero paragraphs across every one of its
+ * chapters, so a stray empty branch in a future export can never surface
+ * as a dead-end in the UI. A single zero-paragraph *chapter* inside an
+ * otherwise real section is kept, though, and deliberately not filtered:
+ * the source book itself sometimes prints a chapter heading (e.g.
+ * "CAPÍTULO II | DEL PRIMER ARTÍCULO DEL SÍMBOLO") that carries no
+ * paragraphs of its own, immediately followed by several numbered
+ * sub-items ("1º.- De Dios Padre...") the export stores as further sibling
+ * chapter rows with no parent-child column between them — the theme's
+ * reader regroups those client-side into a nested chapter/subchapter tree,
+ * and needs this zero-paragraph heading row present in `parts()`'s output
+ * to attach them to. `chapter()` still returns null for a zero-paragraph
+ * id directly, since there's genuinely nothing to read there — the theme
+ * renders such a row as a non-clickable group label rather than ever
+ * calling `chapter()` on it.
  *
  * Deliberately not `final`, same reasoning as `BibleReader`: a theme can
  * swap in a differently-configured reader via
@@ -81,7 +93,6 @@ class CatechismReader implements CatechismReaderInterface
              JOIN chapters c ON c.section_id = s.id
              LEFT JOIN paragraphs pg ON pg.chapter_id = c.id
              GROUP BY c.id
-             HAVING paragraph_count > 0
              ORDER BY p."order", s."order", c."order"'
         )->fetchAll(\PDO::FETCH_ASSOC);
 
@@ -192,7 +203,10 @@ class CatechismReader implements CatechismReaderInterface
      * the nested tree {@see CatechismReaderInterface::parts()} promises —
      * same grouping approach as
      * {@see \TAW\Core\Corpus\Bible\BibleReader::books()}'s
-     * testament/division fold, one level deeper.
+     * testament/division fold, one level deeper. Prunes any section whose
+     * chapters carry zero paragraphs between them (and any part left with
+     * no sections as a result) — see this class's own docblock for why
+     * that's a section-level check, not a per-chapter one.
      *
      * @param list<array<string, mixed>> $rows
      * @return list<Part>
@@ -229,15 +243,26 @@ class CatechismReader implements CatechismReaderInterface
             ];
         }
 
-        return array_values(array_map(
-            static fn (array $part): array => [
+        $tree = [];
+        foreach ($parts as $part) {
+            $sections = array_values(array_filter(
+                $part['sections'],
+                static fn (array $section): bool => array_sum(array_column($section['chapters'], 'paragraph_count')) > 0
+            ));
+
+            if ($sections === []) {
+                continue;
+            }
+
+            $tree[] = [
                 'id' => $part['id'],
                 'name' => $part['name'],
                 'order' => $part['order'],
-                'sections' => array_values($part['sections']),
-            ],
-            $parts
-        ));
+                'sections' => $sections,
+            ];
+        }
+
+        return $tree;
     }
 
     /**

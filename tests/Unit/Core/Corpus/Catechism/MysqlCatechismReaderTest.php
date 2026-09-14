@@ -41,20 +41,28 @@ final class MysqlCatechismReaderTest extends TestCase
         $this->wpdb->exec("INSERT INTO {$p}parts VALUES (1, 'pius-x', 5, 'De la Doctrina Cristiana', 1)");
         $this->wpdb->exec("INSERT INTO {$p}sections VALUES (1, 'pius-x', 6, 5, 'Lección preliminar', 1)");
         $this->wpdb->exec("INSERT INTO {$p}chapters VALUES (1, 'pius-x', 10, 6, 'Lección preliminar', 1)");
+        // A chapter heading with zero paragraphs of its own, in the same
+        // section as real content — the source book's "CAPÍTULO II | ..."
+        // group-header shape (see CatechismReader's docblock). Must
+        // survive in parts()'s output.
         $this->wpdb->exec("INSERT INTO {$p}chapters VALUES (2, 'pius-x', 11, 6, 'Segunda lección', 2)");
 
         $this->wpdb->exec("INSERT INTO {$p}paragraphs VALUES (1, 'pius-x', 1, 10, 6, 5, 1, '¿Sois cristiano?', 'Sí, señor; soy cristiano por la gracia de Dios.')");
         $this->wpdb->exec("INSERT INTO {$p}paragraphs VALUES (2, 'pius-x', 2, 10, 6, 5, 2, '¿Por qué decís por la gracia de Dios?', 'Digo por la gracia de Dios porque el ser cristiano es un don gratuito.')");
 
-        // A chapter (id 11 / source_id 11) with zero paragraphs — must be
-        // filtered out of the tree.
-        // (deliberately no paragraphs row for chapter_id 11)
+        // (deliberately no paragraphs row for chapter_id 2 / source_id 11)
+
+        // A wholly empty part/section/chapter branch — nothing anywhere
+        // under it — proves pruning still happens at that level.
+        $this->wpdb->exec("INSERT INTO {$p}parts VALUES (3, 'pius-x', 1, 'The Creed', 2)");
+        $this->wpdb->exec("INSERT INTO {$p}sections VALUES (3, 'pius-x', 2, 1, 'On the Apostles Creed', 1)");
+        $this->wpdb->exec("INSERT INTO {$p}chapters VALUES (4, 'pius-x', 30, 2, 'Empty chapter', 1)");
 
         // A second edition sharing the same source_id space — proves
         // every query scopes on edition, not just source_id.
-        $this->wpdb->exec("INSERT INTO {$p}parts VALUES (2, 'jp2', 5, 'A Different Catechism', 1)");
-        $this->wpdb->exec("INSERT INTO {$p}sections VALUES (2, 'jp2', 6, 5, 'Otra sección', 1)");
-        $this->wpdb->exec("INSERT INTO {$p}chapters VALUES (3, 'jp2', 10, 6, 'Otro capítulo', 1)");
+        $this->wpdb->exec("INSERT INTO {$p}parts VALUES (5, 'jp2', 5, 'A Different Catechism', 1)");
+        $this->wpdb->exec("INSERT INTO {$p}sections VALUES (5, 'jp2', 6, 5, 'Otra sección', 1)");
+        $this->wpdb->exec("INSERT INTO {$p}chapters VALUES (6, 'jp2', 10, 6, 'Otro capítulo', 1)");
         $this->wpdb->exec("INSERT INTO {$p}paragraphs VALUES (3, 'jp2', 1, 10, 6, 5, 1, 'Otra pregunta', 'Otra respuesta.')");
     }
 
@@ -80,13 +88,24 @@ final class MysqlCatechismReaderTest extends TestCase
         $this->assertSame('De la Doctrina Cristiana', $result[0]['name']);
     }
 
-    public function test_parts_filters_out_a_chapter_with_zero_paragraphs(): void
+    public function test_parts_keeps_a_zero_paragraph_chapter_when_its_section_has_other_content(): void
     {
         $result = (new MysqlCatechismReader())->parts('pius-x');
 
         $chapters = $result[0]['sections'][0]['chapters'];
         $titles = array_column($chapters, 'title');
-        $this->assertNotContains('Segunda lección', $titles);
+        $this->assertContains('Segunda lección', $titles, 'A zero-paragraph group-header chapter must survive alongside real content in its section.');
+
+        $header = $chapters[array_search('Segunda lección', $titles, true)];
+        $this->assertSame(0, $header['paragraph_count']);
+    }
+
+    public function test_parts_filters_out_a_wholly_empty_section_and_prunes_its_empty_part(): void
+    {
+        $result = (new MysqlCatechismReader())->parts('pius-x');
+
+        $names = array_column($result, 'name');
+        $this->assertNotContains('The Creed', $names, 'Empty stub part must not surface.');
     }
 
     public function test_chapter_returns_paragraphs_with_breadcrumb_scoped_to_edition(): void

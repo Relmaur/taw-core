@@ -70,7 +70,6 @@ class MysqlCatechismReader implements CatechismReaderInterface
              LEFT JOIN {$paragraphs} pg ON pg.edition = c.edition AND pg.chapter_id = c.source_id
              WHERE p.edition = %s
              GROUP BY c.id
-             HAVING paragraph_count > 0
              ORDER BY p.part_order, s.section_order, c.chapter_order",
             $edition
         ), ARRAY_A);
@@ -207,7 +206,12 @@ class MysqlCatechismReader implements CatechismReaderInterface
      * Deliberately duplicated from {@see CatechismReader::buildTree()}
      * rather than shared — same "two independent implementations, no
      * shared base" decision {@see \TAW\Core\Corpus\Bible\MysqlBibleReader}
-     * already made for its own row-folding logic.
+     * already made for its own row-folding logic. Prunes any section whose
+     * chapters carry zero paragraphs between them (and any part left with
+     * no sections as a result) — see {@see CatechismReader}'s docblock for
+     * why that's a section-level check, not a per-chapter one: a chapter
+     * heading with zero paragraphs of its own but real sub-item chapters
+     * following it must survive so the theme can regroup them client-side.
      *
      * @param list<array<string, mixed>> $rows
      * @return list<Part>
@@ -244,15 +248,26 @@ class MysqlCatechismReader implements CatechismReaderInterface
             ];
         }
 
-        return array_values(array_map(
-            static fn (array $part): array => [
+        $tree = [];
+        foreach ($parts as $part) {
+            $sections = array_values(array_filter(
+                $part['sections'],
+                static fn (array $section): bool => array_sum(array_column($section['chapters'], 'paragraph_count')) > 0
+            ));
+
+            if ($sections === []) {
+                continue;
+            }
+
+            $tree[] = [
                 'id' => $part['id'],
                 'name' => $part['name'],
                 'order' => $part['order'],
-                'sections' => array_values($part['sections']),
-            ],
-            $parts
-        ));
+                'sections' => $sections,
+            ];
+        }
+
+        return $tree;
     }
 
     /**
