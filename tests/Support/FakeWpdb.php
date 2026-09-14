@@ -179,27 +179,58 @@ final class FakeWpdb
 
         if (preg_match('/^CREATE TABLE/i', trim($sql)) === 1) {
             $sql = (string) preg_replace('/,\s*FULLTEXT KEY \w+\s*\([^)]*\)/i', '', $sql);
+            $sql = (string) preg_replace('/,\s*UNIQUE KEY \w+\s*\([^)]*\)/i', '', $sql);
             $sql = (string) preg_replace('/,\s*KEY \w+\s*\([^)]*\)/i', '', $sql);
             $sql = (string) preg_replace('/\)\s*ENGINE=InnoDB\s*$/i', ')', trim($sql));
+
+            // MySQL's `id ... AUTO_INCREMENT NOT NULL` column plus a
+            // separate `PRIMARY KEY (id)` table constraint has no direct
+            // SQLite equivalent — SQLite's autoincrement rowid alias
+            // requires `id INTEGER PRIMARY KEY` declared inline on the
+            // column itself. Only rewritten when AUTO_INCREMENT is
+            // actually present (Bible's schema supplies its own ids and
+            // never hits this path, so its DDL passes through unchanged).
+            if (preg_match('/\bAUTO_INCREMENT\b/i', $sql) === 1) {
+                $sql = (string) preg_replace(
+                    '/^\s*id\s+[^,]*AUTO_INCREMENT[^,]*,/im',
+                    '    id INTEGER PRIMARY KEY AUTOINCREMENT,',
+                    $sql
+                );
+                $sql = (string) preg_replace('/,\s*PRIMARY KEY \(id\)/i', '', $sql);
+            }
 
             return $sql;
         }
 
         return (string) preg_replace_callback(
-            '/MATCH\(([a-zA-Z0-9_.]+)\)\s*AGAINST\s*\(\'([^\']*)\'\s*IN BOOLEAN MODE\)/i',
+            '/MATCH\(([a-zA-Z0-9_.,\s]+)\)\s*AGAINST\s*\(\'([^\']*)\'\s*IN BOOLEAN MODE\)/i',
             static function (array $m): string {
-                $column = $m[1];
+                $columns = array_filter(array_map('trim', explode(',', $m[1])));
                 $words = array_filter(array_map(
                     static fn (string $w): string => ltrim($w, '+'),
                     explode(' ', $m[2])
                 ));
 
-                if ($words === []) {
+                if ($words === [] || $columns === []) {
                     return '1=1';
                 }
 
+                // One column (Bible: MATCH(v.text)) ANDs a LIKE per word.
+                // Multiple columns (Catechism: MATCH(question_text,
+                // answer_text)) OR the columns for each word, so a word
+                // found in either column counts — approximating a real
+                // multi-column FULLTEXT index without claiming to
+                // replicate its actual relevance weighting.
                 $conditions = array_map(
-                    static fn (string $w): string => "{$column} LIKE '%" . str_replace("'", "''", $w) . "%'",
+                    static function (string $word) use ($columns): string {
+                        $escaped = str_replace("'", "''", $word);
+                        $perColumn = array_map(
+                            static fn (string $col): string => "{$col} LIKE '%{$escaped}%'",
+                            $columns
+                        );
+
+                        return '(' . implode(' OR ', $perColumn) . ')';
+                    },
                     $words
                 );
 
