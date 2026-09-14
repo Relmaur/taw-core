@@ -1791,7 +1791,15 @@ class Metabox
         $initial_values = [];
         foreach ($this->fields as $field) {
             $field_id = $this->prefix . $field['id'];
-            $initial_values[$field_id] = get_post_meta($post->ID, $field_id, true) ?: '';
+            $raw = get_post_meta($post->ID, $field_id, true) ?: '';
+            // Rich-text meta (wysiwyg, etc.) is stored with HTML entities baked in
+            // (e.g. a literal " saved as &quot;) — decode before JSON-encoding so
+            // this mirrors what a <textarea>/<input> actually exposes via .value,
+            // and so esc_attr() doesn't leave a real "&quot;" in the markup that
+            // the browser HTML-decodes back into a raw, JS-breaking " inside x-data.
+            $initial_values[$field_id] = is_string($raw)
+                ? html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8')
+                : $raw;
         }
         ?>
 
@@ -2547,9 +2555,15 @@ class Metabox
         $local_field_ids = array_column($sub_fields, 'id');
 
         // Seed rowFields with current row values so Alpine initialises in the right state.
+        // Decode HTML entities first (see the equivalent comment above for the top-level
+        // $initial_values build) so rich-text sub-field values round-trip through the
+        // x-data JSON safely instead of leaving a browser-decodable "&quot;" behind.
         $initial_row_values = [];
         foreach ($sub_fields as $sf) {
-            $initial_row_values[$sf['id']] = $row_data[$sf['id']] ?? '';
+            $raw = $row_data[$sf['id']] ?? '';
+            $initial_row_values[$sf['id']] = is_string($raw)
+                ? html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8')
+                : $raw;
         }
     ?>
         <div class="taw-repeater-row" data-index="<?php echo esc_attr((string) $index); ?>">

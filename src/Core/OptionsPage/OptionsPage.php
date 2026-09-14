@@ -699,9 +699,16 @@ class OptionsPage
     private function render_repeater_row(array $sub_fields, string $field_id, int|string $index, array $row_data): void
     {
         $local_field_ids    = array_column($sub_fields, 'id');
+        // Decode HTML entities first — rich-text sub-field values are stored with
+        // entities baked in (e.g. a literal " saved as &quot;); without decoding,
+        // esc_attr() leaves that "&quot;" in the markup and the browser HTML-decodes
+        // it back into a raw, JS-breaking " inside the x-data JSON.
         $initial_row_values = [];
         foreach ($sub_fields as $sf) {
-            $initial_row_values[$sf['id']] = $row_data[$sf['id']] ?? '';
+            $raw = $row_data[$sf['id']] ?? '';
+            $initial_row_values[$sf['id']] = is_string($raw)
+                ? html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8')
+                : $raw;
         }
     ?>
         <div class="taw-repeater-row" data-index="<?php echo esc_attr((string) $index); ?>">
