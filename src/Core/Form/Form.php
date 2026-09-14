@@ -35,10 +35,10 @@ if (!defined('ABSPATH')) {
  *  - Input field types: text, email, url, tel, number, textarea, select, date,
  *                       checkbox, radio, checkbox_group, image, wysiwyg
  *  - Conditional visibility with AND (default) or OR relation
- *  - Optional 'on_submit' callback — function(array $data): void, called after a
- *    successful submission is saved; throw a \RuntimeException to reject with a
- *    message shown to the submitter — any other \Throwable is logged and shown a
- *    generic message instead, never its own message (see 'On Submit Callback' in
+ *  - Optional 'on_submit' callback — function(array $data, int|false $postId): void,
+ *    called after a successful submission is saved; throw a \RuntimeException to
+ *    reject with a message shown to the submitter — any other \Throwable is logged
+ *    and shown a generic message instead, never its own message (see 'On Submit Callback' in
  *    the README)
  *
  * ── Single-step usage ────────────────────────────────────────────────────────
@@ -379,7 +379,7 @@ class Form
             : '';
 
         // Save first — guaranteed record regardless of email outcome.
-        SubmissionsHandler::saveSubmission($this->id, $inputFields, $data, $this->config['webhook'] ?? [], $pageUrl);
+        $postId = SubmissionsHandler::saveSubmission($this->id, $inputFields, $data, $this->config['webhook'] ?? [], $pageUrl);
 
         // Optional custom processing (e.g. creating a post from the submitted
         // data) — runs after the audit record above is guaranteed to exist,
@@ -394,7 +394,7 @@ class Form
         // adjacent text) the same way a raw PHP error display would.
         if (isset($this->config['on_submit']) && is_callable($this->config['on_submit'])) {
             try {
-                ($this->config['on_submit'])($data);
+                ($this->config['on_submit'])($data, $postId);
             } catch (\RuntimeException $e) {
                 $this->cleanupUploadedFiles($data);
                 wp_send_json_error(['general' => $e->getMessage()]);

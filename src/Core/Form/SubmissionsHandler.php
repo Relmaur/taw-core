@@ -191,6 +191,7 @@ class SubmissionsHandler
         update_post_meta($postId, '_taw_submission_data', $metaData);
         update_post_meta($postId, '_taw_user_ip', self::getUserIp());
         update_post_meta($postId, '_taw_page_url', $pageUrl);
+        update_post_meta($postId, '_taw_user_agent', self::getUserAgent());
 
         self::fireWebhook($postId, $formId, $data, $webhookConfig, $pageUrl);
 
@@ -521,5 +522,10 @@ class SubmissionsHandler
         }
 
         return sanitize_text_field($ip);
+    }
+
+    private static function getUserAgent(): string
+    {
+        return sanitize_text_field($_SERVER['HTTP_USER_AGENT'] ?? '');
     }
 }

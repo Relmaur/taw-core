@@ -646,27 +646,39 @@ Form::register([
         ['id' => 'post_body',       'label' => 'Body',             'type' => 'wysiwyg', 'required' => true],
         ['id' => 'featured_image',  'label' => 'Featured Image',  'type' => 'image'],
     ],
-    'on_submit' => function (array $data) {
-        $postId = wp_insert_post([
+    'on_submit' => function (array $data, int|false $submissionId) {
+        // $submissionId is the taw_submission record's own post ID — this
+        // callback creates a *different*, unrelated post from the submitted
+        // data, so it deliberately uses its own $newPostId rather than reusing
+        // (or shadowing) the parameter name.
+        $newPostId = wp_insert_post([
             'post_title'   => $data['post_title'],
             'post_content' => $data['post_body'],
             'post_status'  => 'draft',
         ], true);
 
-        if (is_wp_error($postId)) {
+        if (is_wp_error($newPostId)) {
             // Thrown message is shown to the submitter as a general error.
-            throw new \RuntimeException($postId->get_error_message());
+            throw new \RuntimeException($newPostId->get_error_message());
         }
 
         if (!empty($data['featured_image'])) {
-            set_post_thumbnail($postId, (int) $data['featured_image']);
+            set_post_thumbnail($newPostId, (int) $data['featured_image']);
         }
     },
 ]);
 ```
 
-The callback's signature is `function(array $data): void` — `$data` is the same
-fully-validated, sanitized field data the CPT record and webhook payload are built from.
+The callback's signature is `function(array $data, int|false $postId): void` — `$data` is the
+same fully-validated, sanitized field data the CPT record and webhook payload are built from,
+and the second parameter is the `taw_submission` post `SubmissionsHandler::saveSubmission()` just
+created (`false` if that save itself failed, e.g. `wp_insert_post()` erroring — check before
+relying on it as a real ID). Name it whatever fits the callback — the example above calls it
+`$submissionId` specifically to avoid colliding with its own `wp_insert_post()` result for the
+*different* post it creates from the submitted data. A callback that doesn't need it can just
+omit the second parameter — PHP
+silently ignores extra arguments passed to a closure declaring fewer, so every existing
+`on_submit` callback written against the old one-argument signature keeps working unchanged.
 **Throw a `\RuntimeException` to reject the submission** with a message shown to the submitter
 as a general error, rather than returning a value — there's no magic return-value contract to
 remember. `\RuntimeException` specifically, not any `\Throwable`: this handler runs for
