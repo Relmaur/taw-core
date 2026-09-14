@@ -58,12 +58,20 @@ final class CatechismReaderTest extends TestCase
         $pdo->exec("INSERT INTO sections VALUES (7, 5, 'Del Credo', 2)");
         $pdo->exec("INSERT INTO chapters VALUES (10, 6, 'Lección preliminar', 1)");
         $pdo->exec("INSERT INTO chapters VALUES (20, 7, 'Del primer artículo', 1)");
+        // A chapter heading with zero paragraphs of its own, followed by a
+        // sibling chapter row with real content in the same section — the
+        // source book's "CAPÍTULO II | ..." group-header shape (see
+        // CatechismReader's own docblock). Must survive in parts()'s
+        // output even though it has nothing to read directly.
+        $pdo->exec("INSERT INTO chapters VALUES (21, 7, 'CAPÍTULO II | DEL SEGUNDO ARTÍCULO', 2)");
+        $pdo->exec("INSERT INTO chapters VALUES (22, 7, 'De un sub-ítem numerado', 3)");
 
         $pdo->exec("INSERT INTO paragraphs VALUES (1, 10, 6, 5, 1, '¿Sois cristiano?', 'Sí, señor; soy cristiano por la gracia de Dios.')");
         $pdo->exec("INSERT INTO paragraphs VALUES (2, 10, 6, 5, 2, '¿Por qué decís por la gracia de Dios?', 'Digo por la gracia de Dios porque el ser cristiano es un don gratuito.')");
         // A run-on paragraph with no separated question — the known,
         // documented beta data-quality case (~1% of a real export).
         $pdo->exec("INSERT INTO paragraphs VALUES (3, 20, 7, 5, 3, NULL, '¿Quién creó el mundo?Dios creó el mundo.')");
+        $pdo->exec("INSERT INTO paragraphs VALUES (4, 22, 7, 5, 4, NULL, 'Contenido del sub-ítem.')");
 
         // Stub structure with zero paragraphs under it — mirrors the real
         // upstream bug (empty Trent-catechism parts bundled into an early
@@ -87,12 +95,26 @@ final class CatechismReaderTest extends TestCase
         $this->assertSame(2, $result[0]['sections'][0]['chapters'][0]['paragraph_count']);
     }
 
-    public function test_parts_filters_out_a_chapter_with_zero_paragraphs_and_prunes_its_empty_section_and_part(): void
+    public function test_parts_filters_out_a_wholly_empty_section_and_prunes_its_empty_part(): void
     {
         $result = (new CatechismReader())->parts('pius-x');
 
         $names = array_column($result, 'name');
         $this->assertNotContains('The Creed', $names, 'Empty stub part must not surface.');
+    }
+
+    public function test_parts_keeps_a_zero_paragraph_chapter_heading_when_its_section_has_other_content(): void
+    {
+        $result = (new CatechismReader())->parts('pius-x');
+
+        $section = $result[0]['sections'][1];
+        $this->assertSame('Del Credo', $section['title']);
+
+        $titles = array_column($section['chapters'], 'title');
+        $this->assertContains('CAPÍTULO II | DEL SEGUNDO ARTÍCULO', $titles, 'A zero-paragraph group-header chapter must survive alongside real content in its section.');
+
+        $header = $section['chapters'][array_search('CAPÍTULO II | DEL SEGUNDO ARTÍCULO', $titles, true)];
+        $this->assertSame(0, $header['paragraph_count']);
     }
 
     public function test_chapter_returns_paragraphs_in_order_with_part_and_section_breadcrumb(): void
