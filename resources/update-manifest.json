@@ -8,7 +8,8 @@
         { "path": ".github/workflows/ci.yml", "type": "file" },
         { "path": ".github/workflows/framework-sync.yml", "type": "file" },
         { "path": "tests/bootstrap.php", "type": "file" },
-        { "path": "tests/TestCase.php", "type": "file" }
+        { "path": "tests/TestCase.php", "type": "file" },
+        { "path": "resources/js/cleanup-registry.js", "type": "file" }
     ],
     "tier2": [
         { "path": "AGENTS.md", "type": "file" },
