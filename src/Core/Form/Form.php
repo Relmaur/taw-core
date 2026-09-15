@@ -1026,14 +1026,28 @@ class Form
      *
      * 'help_modal' => true goes a step further: instead of a popover
      * anchored to the trigger, the help text opens as a centered modal
-     * dialog over a backdrop — for cases where an anchored popup still
-     * reads as "attached to one small icon" rather than as its own piece
-     * of content. Implies click triggering regardless of
+     * dialog with its own dimmed backdrop — for cases where an anchored
+     * popup still reads as "attached to one small icon" rather than as
+     * its own piece of content. Implies click triggering regardless of
      * 'trigger_on_click' (a full-screen backdrop opening/closing on
-     * hover would be unusable), and renders an extra inner
-     * .taw-help-popup-card + close button that plain click mode doesn't
-     * need — .taw-help-popup itself becomes the fixed, centering backdrop
-     * rather than the visible surface.
+     * hover would be unusable).
+     *
+     * Renders a native <dialog> (opened via .showModal() in
+     * renderScript()), not a positioned <span> — deliberately. A
+     * fixed-position "backdrop" span, however high its own z-index,
+     * still only ever competes for stacking order within whichever
+     * ancestor's stacking context it happens to be nested in (anything
+     * with position + a non-auto z-index, transform, opacity < 1,
+     * filter, isolation, or will-change creates one). Since this markup
+     * can land inside an arbitrary page's arbitrary section wrappers,
+     * there's no z-index value that's safe from ending up trapped behind
+     * something like a fixed header with its own stacking context and a
+     * lower-looking-but-actually-unrelated z-index (confirmed happening
+     * in practice: a section wrapper with position:relative; z-index:1
+     * silently sank a backdrop with z-index:1000 behind a header at
+     * z-index:50). A native <dialog>'s top layer is a real fix, not a
+     * bigger number — it renders above the entire document tree by
+     * construction, independent of ancestor stacking contexts entirely.
      */
     private function renderHelp(array $field): void
     {
@@ -1061,8 +1075,7 @@ class Form
         if ($isModal) {
             printf(
                 '<span class="%s"><button type="button" class="taw-help-trigger" aria-label="%s"%s>?</button>'
-                    . '<span class="taw-help-popup"><span class="taw-help-popup-card" role="dialog" aria-modal="true">'
-                    . '<button type="button" class="taw-help-close" aria-label="%s">&times;</button>%s</span></span></span>',
+                    . '<dialog class="taw-help-popup"><button type="button" class="taw-help-close" aria-label="%s">&times;</button>%s</dialog></span>',
                 esc_attr(implode(' ', $wrapperClasses)),
                 esc_attr__('More information', 'taw'),
                 $triggerAttrs,
@@ -1458,100 +1471,114 @@ class Form
             // ── Click-triggered help popovers ────────────────────────
             // Fields with 'trigger_on_click' (or 'help_modal') => true
             // render a .taw-help--click wrapper instead of the default
-            // hover/focus one; form.css keys the popup's visibility purely
-            // off the trigger's aria-expanded attribute, which this
-            // toggles. 'help_modal' additionally renders a
-            // .taw-help--modal backdrop + .taw-help-popup-card + close
-            // button, handled by the same open/close plumbing below.
+            // hover/focus one; form.css keys the anchored popup's
+            // visibility purely off the trigger's aria-expanded attribute,
+            // which this toggles.
+            //
+            // 'help_modal' triggers are handled entirely separately, in
+            // their own branch below — they render a native <dialog>
+            // rather than a positioned <span>, opened/closed via
+            // .showModal()/.close() rather than aria-expanded + CSS. See
+            // renderHelp()'s doc comment for why: a <dialog>'s top layer
+            // renders above the whole document regardless of ancestor
+            // stacking contexts, which no fixed-position + z-index value
+            // can guarantee (confirmed breaking in practice — trapped
+            // behind a page's own header by an ancestor section wrapper
+            // several levels up that happened to create its own stacking
+            // context).
 
             var helpTriggers = form.querySelectorAll('.taw-help--click > .taw-help-trigger');
-            var openHelpModals = 0; // how many currently-open triggers are modal — locks body scroll while > 0
-
-            function setHelpOpen(trigger, open) {
-                var wasOpen = trigger.getAttribute('aria-expanded') === 'true';
-                if (wasOpen === open) return;
-
-                trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
-
-                var isModal = trigger.parentElement.classList.contains('taw-help--modal');
-                if (!isModal) return;
-
-                openHelpModals += open ? 1 : -1;
-                document.documentElement.style.overflow = openHelpModals > 0 ? 'hidden' : '';
-
-                // Move focus into the dialog on open. Deliberately NOT
-                // returning focus to the trigger here on close — a generic
-                // outside click (e.g. onto some other field) already gives
-                // that other element focus, and forcing it back to the
-                // trigger would yank focus away from what was actually
-                // clicked. The paths where returning focus IS correct
-                // (close button, backdrop click, Escape) call trigger.focus()
-                // themselves, right where they call this with open=false.
-                if (open) {
-                    var closeBtn = trigger.parentElement.querySelector('.taw-help-close');
-                    if (closeBtn) closeBtn.focus();
-                }
-            }
-
-            function closeAllHelpPopovers(except) {
-                helpTriggers.forEach(function (btn) {
-                    if (btn !== except) setHelpOpen(btn, false);
-                });
-            }
+            var openHelpModals = 0; // locks body scroll while any modal <dialog> is open
 
             helpTriggers.forEach(function (trigger) {
-                trigger.addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    var isOpen = trigger.getAttribute('aria-expanded') === 'true';
-                    closeAllHelpPopovers(trigger);
-                    setHelpOpen(trigger, !isOpen);
-                });
-
                 var popup = trigger.nextElementSibling; // .taw-help-popup
                 if (!popup) return;
 
-                var closeBtn = popup.querySelector('.taw-help-close');
-                if (closeBtn) {
-                    closeBtn.addEventListener('click', function (e) {
+                var isModal = trigger.parentElement.classList.contains('taw-help--modal');
+
+                if (isModal) {
+                    trigger.addEventListener('click', function (e) {
                         e.stopPropagation();
-                        setHelpOpen(trigger, false);
+                        trigger.setAttribute('aria-expanded', 'true');
+                        openHelpModals += 1;
+                        document.documentElement.style.overflow = 'hidden';
+                        popup.showModal();
+                    });
+
+                    // Fires for every way a <dialog> closes — Escape (native,
+                    // no listener needed for that part), the close button,
+                    // and the backdrop click below — so this is the one
+                    // place that needs to sync aria-expanded, unlock scroll,
+                    // and return focus, regardless of which path triggered it.
+                    popup.addEventListener('close', function () {
+                        trigger.setAttribute('aria-expanded', 'false');
+                        openHelpModals = Math.max(0, openHelpModals - 1);
+                        if (openHelpModals === 0) document.documentElement.style.overflow = '';
                         trigger.focus();
                     });
+
+                    var closeBtn = popup.querySelector('.taw-help-close');
+                    if (closeBtn) {
+                        closeBtn.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            popup.close();
+                        });
+                    }
+
+                    // A <dialog>'s own element IS the backdrop's hit area —
+                    // ::backdrop isn't part of the DOM and can't carry a
+                    // listener, but a click that lands on the dialog element
+                    // itself (not one of its children) can only have hit the
+                    // backdrop, since the dialog's padding box is exactly
+                    // its visible content area.
+                    popup.addEventListener('click', function (e) {
+                        if (e.target === popup) popup.close();
+                    });
+
+                    return;
                 }
 
-                // Modal only: .taw-help-popup is the full backdrop, with
-                // .taw-help-popup-card centered inside it — a click that
-                // lands on the backdrop itself (not the card) dismisses,
-                // same convention as clicking outside any modal.
-                popup.addEventListener('click', function (e) {
-                    if (e.target !== popup) return;
-                    setHelpOpen(trigger, false);
-                    trigger.focus();
+                trigger.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    var willOpen = trigger.getAttribute('aria-expanded') !== 'true';
+                    helpTriggers.forEach(function (btn) {
+                        if (btn !== trigger) btn.setAttribute('aria-expanded', 'false');
+                    });
+                    trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
                 });
             });
 
             if (helpTriggers.length) {
-                // Only closes for a click that actually lands outside every
-                // trigger/popup — without this guard, any click inside an
-                // open popup (selecting text, scrolling) bubbles to
-                // document and closes it before the click's own intent
-                // (e.g. hitting the close button) even registers. No forced
-                // trigger.focus() here: whatever else was clicked already
-                // has focus, and a real modal's backdrop would have caught
-                // the click before it got this far anyway (see above) — this
-                // branch is only reachable at all for the anchored,
-                // non-modal popover.
+                // Anchored (non-modal) popovers only: closes on a click
+                // landing outside every trigger/popup. Guarded so a click
+                // *inside* an open popup (selecting text, scrolling)
+                // doesn't bubble up and close it out from under itself.
+                // Modal <dialog>s aren't affected by this at all — a
+                // top-layer dialog's own backdrop already catches every
+                // click while it's open, so this handler never even sees
+                // one to (mis)close.
                 document.addEventListener('click', function (e) {
                     if (e.target.closest('.taw-help--click')) return;
-                    closeAllHelpPopovers(null);
+                    helpTriggers.forEach(function (btn) {
+                        if (!btn.parentElement.classList.contains('taw-help--modal')) {
+                            btn.setAttribute('aria-expanded', 'false');
+                        }
+                    });
                 });
+
+                // Escape closes an open anchored popover too — a modal
+                // <dialog> already gets this natively (its own 'cancel'/
+                // 'close' events fire without any listener here), so this
+                // only ever needs to act on the non-modal ones.
                 document.addEventListener('keydown', function (e) {
                     if (e.key !== 'Escape') return;
                     var openTrigger = Array.prototype.find.call(helpTriggers, function (btn) {
-                        return btn.getAttribute('aria-expanded') === 'true';
+                        return !btn.parentElement.classList.contains('taw-help--modal')
+                            && btn.getAttribute('aria-expanded') === 'true';
                     });
-                    closeAllHelpPopovers(null);
-                    if (openTrigger) openTrigger.focus();
+                    if (!openTrigger) return;
+                    openTrigger.setAttribute('aria-expanded', 'false');
+                    openTrigger.focus();
                 });
             }
 

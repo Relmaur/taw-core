@@ -122,7 +122,7 @@ final class FormHelpPopoverTest extends TestCase
         $this->assertStringContainsString('aria-expanded="false"', $output);
     }
 
-    public function test_help_modal_renders_card_and_close_button(): void
+    public function test_help_modal_renders_a_native_dialog_with_close_button(): void
     {
         $form = $this->makeForm();
 
@@ -134,11 +134,15 @@ final class FormHelpPopoverTest extends TestCase
         ]);
         $output = ob_get_clean();
 
+        // A native <dialog> (opened via .showModal() in renderScript()),
+        // not a positioned <span> — its own top layer is what makes this
+        // variant immune to any ancestor's stacking context, which no
+        // fixed-position z-index value could guarantee. Its implicit
+        // ARIA role/modal semantics apply once .showModal() runs, so no
+        // explicit role="dialog"/aria-modal is rendered here.
+        $this->assertStringContainsString('<dialog class="taw-help-popup">', $output);
         $this->assertStringContainsString('taw-help--modal', $output);
-        $this->assertStringContainsString('taw-help-popup-card', $output);
         $this->assertStringContainsString('taw-help-close', $output);
-        $this->assertStringContainsString('role="dialog"', $output);
-        $this->assertStringContainsString('aria-modal="true"', $output);
     }
 
     public function test_help_modal_implies_click_triggering_even_without_the_flag(): void

@@ -144,7 +144,14 @@
     border-color: #78716c;
 }
 
-.taw-help-popup {
+/*
+ * Anchored (non-modal) popup, always rendered as a <span> — tag-qualified
+ * everywhere in this section specifically so none of it can ever apply to
+ * the modal variant's <dialog> below (which needs none of this: no
+ * absolute positioning, no opacity/visibility/pointer-events toggling —
+ * the browser's own [open]/top-layer state is authoritative for that).
+ */
+span.taw-help-popup {
     position: absolute;
     z-index: 20;
     bottom: calc(100% + 0.5rem);
@@ -173,7 +180,7 @@
     transition: opacity .15s, transform .15s, visibility .15s;
 }
 
-.taw-help-popup::after {
+span.taw-help-popup::after {
     content: "";
     position: absolute;
     top: 100%;
@@ -189,11 +196,11 @@
  * the pointer from the trigger toward the popup crosses dead space that
  * belongs to neither element, dropping `.taw-help:hover` and hiding the
  * popup before the pointer ever reaches it — impossible to hover into,
- * let alone scroll. As a ::before of .taw-help-popup it's still a DOM
+ * let alone scroll. As a ::before of the popup it's still a DOM
  * descendant of .taw-help, so hovering it keeps the parent :hover (and
  * thus the popup) alive across the gap.
  */
-.taw-help-popup::before {
+span.taw-help-popup::before {
     content: "";
     position: absolute;
     top: 100%;
@@ -210,104 +217,80 @@
  * cross from the trigger into the popup to scroll it, and the popup
  * disappears the moment hover/focus is lost from either element.
  */
-.taw-help:not(.taw-help--click):hover .taw-help-popup,
-.taw-help:not(.taw-help--click) .taw-help-trigger:focus-visible + .taw-help-popup,
-.taw-help:not(.taw-help--click) .taw-help-trigger:focus + .taw-help-popup {
+.taw-help:not(.taw-help--click):hover span.taw-help-popup,
+.taw-help:not(.taw-help--click) .taw-help-trigger:focus-visible + span.taw-help-popup,
+.taw-help:not(.taw-help--click) .taw-help-trigger:focus + span.taw-help-popup {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
     transform: translateX(-50%) translateY(0);
 }
 
-/*
- * Click-triggered variant: shown purely off aria-expanded, set by JS.
- * Anchored (non-modal) popup only — the modal variant below only ever
- * needs opacity/visibility/pointer-events toggled; the backdrop itself
- * is never translated (transform: none in .taw-help--modal .taw-help-popup),
- * and the .taw-help-popup-card's own transform is handled by its own rule
- * further down. This selector has higher specificity than that base
- * transform: none, so it must exclude modal to avoid fighting it.
- */
-.taw-help--click:not(.taw-help--modal) .taw-help-trigger[aria-expanded="true"] + .taw-help-popup {
+/* Click-triggered anchored popover: shown purely off aria-expanded, set by JS. */
+.taw-help--click .taw-help-trigger[aria-expanded="true"] + span.taw-help-popup {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
     transform: translateX(-50%) translateY(0);
-}
-
-.taw-help--modal .taw-help-trigger[aria-expanded="true"] + .taw-help-popup {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
 }
 
 @media (max-width: 639px) {
-    .taw-help:not(.taw-help--modal) .taw-help-popup {
+    span.taw-help-popup {
         left: auto;
         right: 0;
         max-width: 240px;
         transform: translateX(0) translateY(4px);
     }
 
-    .taw-help:not(.taw-help--modal) .taw-help-popup::after {
+    span.taw-help-popup::after {
         left: auto;
         right: 0.5rem;
         transform: none;
     }
 
-    .taw-help:not(.taw-help--click):hover .taw-help-popup,
-    .taw-help:not(.taw-help--click) .taw-help-trigger:focus-visible + .taw-help-popup,
-    .taw-help:not(.taw-help--click) .taw-help-trigger:focus + .taw-help-popup,
-    .taw-help--click:not(.taw-help--modal) .taw-help-trigger[aria-expanded="true"] + .taw-help-popup {
+    .taw-help:not(.taw-help--click):hover span.taw-help-popup,
+    .taw-help:not(.taw-help--click) .taw-help-trigger:focus-visible + span.taw-help-popup,
+    .taw-help:not(.taw-help--click) .taw-help-trigger:focus + span.taw-help-popup,
+    .taw-help--click .taw-help-trigger[aria-expanded="true"] + span.taw-help-popup {
         transform: translateX(0) translateY(0);
     }
 }
 
 /*
- * Modal variant ('help_modal' => true): instead of a popover anchored to
- * the trigger, .taw-help-popup becomes a fixed, full-viewport, centering
- * backdrop, and the visible surface moves to the .taw-help-popup-card
- * nested inside it (plus a close button — a full-screen backdrop needs an
- * explicit, discoverable way to dismiss beyond "hope the user clicks
- * outside"). No caret/gap-bridge here; those only make sense for a popup
- * anchored to a specific point.
+ * Modal variant ('help_modal' => true): a native <dialog>, not a
+ * positioned <span> — see renderHelp()'s doc comment in Form.php for why.
+ * In short: a fixed-position "backdrop" element, however high its own
+ * z-index, only ever competes for stacking order within whichever
+ * ancestor's stacking context it happens to be nested in (this markup can
+ * land inside an arbitrary page's arbitrary wrappers — confirmed breaking
+ * in practice, trapped behind a fixed header by an unrelated ancestor
+ * section wrapper's own position:relative + z-index several levels up).
+ * A <dialog>'s top layer renders above the entire document by
+ * construction, independent of ancestor stacking contexts entirely — a
+ * real fix, not a bigger number.
+ *
+ * Opened via .showModal() in renderScript(), which is also what applies
+ * dialog:modal's own UA-stylesheet default (position: fixed; inset-block:
+ * 0; margin: auto — real centering, not something this stylesheet has to
+ * do) — deliberately not overridden here. ::backdrop is native too: the
+ * browser renders it behind the dialog, covering the full viewport, with
+ * no DOM node of its own to size or position.
  */
-.taw-help--modal .taw-help-popup {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    left: auto;
-    bottom: auto;
-    width: auto;
-    min-width: 0;
-    max-width: none;
-    max-height: none;
-    overflow: visible;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.5rem;
-    background: rgba(20, 18, 15, 0.6);
-    border-radius: 0;
-    box-shadow: none;
-    transform: none;
-}
-
-.taw-help--modal .taw-help-popup::after,
-.taw-help--modal .taw-help-popup::before {
-    content: none;
-}
-
-.taw-help-popup-card {
-    position: relative;
-    width: 100%;
-    max-width: 420px;
-    max-height: 80vh;
+dialog.taw-help-popup {
+    /* dialog:modal's UA stylesheet centers via margin: auto by default,
+       but that's an author-vs-UA cascade loser against any CSS reset a
+       site happens to load (e.g. Tailwind's preflight zeroes margin on
+       every element) — restated explicitly here so centering doesn't
+       silently depend on no such reset existing. */
+    margin: auto;
+    width: min(90vw, 640px); /* wide over tall, deliberately — cuts down how much a given amount of text needs the internal scroll below */
+    max-height: min(85vh, 720px);
     overflow-x: hidden;
     overflow-y: auto;
     word-wrap: break-word;
     overflow-wrap: break-word;
     padding: 1.75rem 1.5rem 1.5rem;
+    border: none;
     border-radius: 0.5rem;
     background: #1c1917;
     color: #fafaf9;
@@ -316,12 +299,10 @@
     line-height: 1.6;
     text-align: left;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-    transform: translateY(8px) scale(0.98);
-    transition: transform .2s ease;
 }
 
-.taw-help--modal .taw-help-trigger[aria-expanded="true"] + .taw-help-popup .taw-help-popup-card {
-    transform: translateY(0) scale(1);
+dialog.taw-help-popup::backdrop {
+    background: rgba(20, 18, 15, 0.6);
 }
 
 .taw-help-close {
