@@ -526,7 +526,23 @@ No `template` → plain-text fallback via `wp_mail()`. `to_client` requires an `
 | `divider` | `<hr>` |
 | `html` | `content` key; rendered with `wp_kses_post` |
 
-All input fields accept: `id`, `label`, `type`, `required`, `placeholder`, `width`, `conditions`.
+All input fields accept: `id`, `label`, `type`, `required`, `placeholder`, `width`, `conditions`, `help`.
+
+### Field Help Popover
+
+Any field — including labelless `checkbox`/`radio`/`checkbox_group` — accepts a `help` string, rendered as a small "?" icon next to its label. Hover (mouse) or focus (keyboard/tap) reveals a popover with the text; pure CSS (`form.css`), no JS dependency. Newlines in `help` become line breaks; the text itself is always escaped, so it's plain text only, not HTML.
+
+```php
+[
+    'id'       => 'privacy_consent',
+    'label'    => 'I have read the Privacy Notice and consent to the use of my data.',
+    'type'     => 'checkbox',
+    'required' => true,
+    'help'     => "Full plain-language summary of what data is collected and why...\n\nA second paragraph.",
+],
+```
+
+For a `checkbox`/`radio` field specifically, the trigger renders *outside* the `<label>` that wraps the input — nesting it inside would let a click on "?" also toggle the control.
 
 ### Multi-column Layout
 

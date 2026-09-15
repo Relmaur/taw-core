@@ -998,6 +998,28 @@ class Form
      * Field rendering
      * ---------------------------------------------------------------------- */
 
+    /**
+     * Renders a "?" trigger + popover for a field's optional 'help' string,
+     * e.g. a plain-language privacy summary next to a consent checkbox.
+     * CSS-only (:hover / :focus in form.css) — no JS dependency, and works
+     * for touch/keyboard via focus, not just mouse hover. No-op if 'help'
+     * isn't set. Always called as a sibling of the field's <label>, never
+     * nested inside one — a <label> wrapping a checkbox/radio toggles that
+     * control on any click inside it, including on the trigger button.
+     */
+    private function renderHelp(array $field): void
+    {
+        if (empty($field['help'])) {
+            return;
+        }
+
+        printf(
+            '<span class="taw-help"><button type="button" class="taw-help-trigger" aria-label="%s">?</button><span class="taw-help-popup" role="tooltip">%s</span></span>',
+            esc_attr__('More information', 'taw'),
+            nl2br(esc_html($field['help']))
+        );
+    }
+
     private function renderField(array $field): void
     {
         $type = $field['type'] ?? 'text';
@@ -1058,6 +1080,7 @@ class Form
                 echo ' <span class="taw-required" aria-hidden="true">*</span>';
             }
             echo '</label>';
+            $this->renderHelp($field);
         }
 
         switch ($type) {
@@ -1089,6 +1112,7 @@ class Form
                         echo ' <span class="taw-required" aria-hidden="true">*</span>';
                     }
                     echo '</span>';
+                    $this->renderHelp($field);
                 }
                 $layout = $field['layout'] ?? 'horizontal';
                 $groupClass = $layout === 'vertical'
@@ -1117,6 +1141,7 @@ class Form
                         echo ' <span class="taw-required" aria-hidden="true">*</span>';
                     }
                     echo '</span>';
+                    $this->renderHelp($field);
                 }
                 $layout = $field['layout'] ?? 'horizontal';
                 $groupClass = $layout === 'vertical'
@@ -1148,6 +1173,9 @@ class Form
                     echo '<span>' . esc_html($label) . '</span>';
                 }
                 echo '</label>';
+                // Outside the <label> — nesting the trigger inside would let
+                // clicking "?" also toggle the checkbox it's paired with.
+                $this->renderHelp($field);
                 break;
 
             case 'date':
