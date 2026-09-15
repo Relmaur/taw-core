@@ -191,6 +191,8 @@ new Metabox([
 | `repeater` | Dynamic rows stored as JSON; supports nesting |
 | `datepicker` | jQuery UI; stored as date string; `date_format`, `min_date`, `max_date` |
 | `icon` | Lucide icon picker; stores icon name — **opt-in**, requires `Lucide::enable()` (see [Icon System](#icon-system)) |
+| `gradient_text` | Ordered `{text, highlighted}` segments; stores JSON array (see [Gradient Text](#gradient-text)) |
+| `hubspot_form` | HubSpot embed config (`portal_id`/`form_id`/`region`); stores JSON object (see [HubSpot Form](#hubspot-form)) |
 
 All fields accept: `id`, `label`, `description`, `placeholder`, `default`, `required`, `width` (%), `readonly` (see [Readonly Fields](#readonly-fields)).
 
@@ -229,6 +231,46 @@ new Metabox([
 ```
 
 Repeater data is JSON; survives WordPress's `wp_unslash()` in `update_post_meta()`. Callers must `json_decode()`.
+
+### Gradient Text
+
+A `gradient_text` field authors a heading as an ordered list of plain/highlighted segments, rather than the older convention of a plain `heading` field plus one always-trailing `highlight` field — that convention can't express a heading like "How can **we help**?" where the highlighted run isn't the last word. Each segment is `{text: string, highlighted: bool}`; the admin UI is a lightweight Alpine-only segment editor (add/remove/toggle), no drag-reorder — reach for a real `repeater` instead if row reordering matters for a given field.
+
+```php
+['id' => 'heading', 'label' => 'Heading', 'type' => 'gradient_text'],
+```
+
+Render with `Metabox::renderGradientText()`, passing the highlighted segments' class(es) — the actual gradient is a per-theme design decision this framework method has no business hard-coding:
+
+```php
+$segments = Metabox::get_gradient_text($post_id, 'heading');
+echo Metabox::renderGradientText($segments, 'bg-clip-text text-transparent bg-gradient-to-r from-cyan-500 to-blue-500');
+// How can <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyan-500 to-blue-500">we help</span>?
+```
+
+`renderGradientText()` also accepts the raw JSON string directly (e.g. straight from `OptionsPage::get()`), so it works the same on either storage backend.
+
+### HubSpot Form
+
+A `hubspot_form` field stores a HubSpot embed's `{portal_id, form_id, region}` as a single JSON object — for a block offering a HubSpot embed with a fallback to the native [Forms](#forms) system when unconfigured:
+
+```php
+['id' => 'hubspot_form', 'label' => 'HubSpot Form', 'type' => 'hubspot_form'],
+```
+
+```php
+use TAW\Core\Integrations\Hubspot;
+
+$config = Metabox::get($post_id, 'hubspot_form');
+
+if (Hubspot::isConfigured($config)) {
+    echo Hubspot::render($config);
+} else {
+    // render the site's own Form block instead
+}
+```
+
+`Hubspot::render()` prints HubSpot's own `forms/embed/v2.js` loader plus a scoped `hbspt.forms.create()` call targeting a freshly generated container id — safe to call more than once per page. `region` defaults to `na1` when blank. No `enable()` gate — unlike `icon`'s bundled Lucide set, there's no asset here to opt into; the field type is available as soon as it's used.
 
 ### Reading Values
 
@@ -1100,6 +1142,7 @@ php bin/taw export:block HeroSection
 php bin/taw inspect --json                          # live registry: blocks, fields, forms
 php bin/taw fields:get 42 hero_heading --json        # read a field's current value
 php bin/taw fields:set 42 hero_heading "Welcome"     # write a field's value
+php bin/taw fields:set options company_phone "555-1234"  # write a site-wide OptionsPage field instead
 php bin/taw sync --json                              # check for framework drift (see below)
 php bin/taw sync --apply                             # also write Tier 1 scaffold changes
 php bin/taw export:static                            # static HTML export for edge hosting (see below)
@@ -1127,6 +1170,8 @@ php bin/taw corpus:export /path/to/bible.sqlite /path/to/bible-export.json  # po
 `hub:enroll` automates the last of those steps — registering the site with the Hub. It reads the identity `taw-hub-companion` generated on activation (`taw_hub_companion_public_key` / `_key_id` in the options table), the Hub URL (`TAW_HUB_URL`), and a one-time enrolment token (`--token`, or the `TAW_HUB_ENROLMENT_TOKEN` constant), and `POST`s them to the Hub's `POST /api/fleet/enroll` endpoint ([taw-hub ADR-0011](https://github.com/Relmaur/taw-hub/blob/main/docs/ADR/0011-site-enrolment.md)). That endpoint is not signature-guarded (the Hub does not know the site yet) — the token is the credential (single-use, 30-minute TTL, hashed at rest) — but every response *is* RESPONSE-signed with the Hub's Ed25519 identity, and `hub:enroll` verifies that signature against `TAW_HUB_PUBLIC_KEY` before trusting the reply. A signed `409 site_already_enrolled` is treated as idempotent success (a dropped connection after the Hub consumed the token); a signature-verification failure is a hard error and enrolment is reported as **not** confirmed. Boots WordPress via `WpLoader` like `inspect`. `--base-url` overrides the Hub-reachable URL (`home_url()` is often wrong behind a proxy or Herd's `:80`), `--dry-run` prints the request without sending, `--insecure` skips TLS verification for a local self-signed Hub.
 
 `fields:get`/`fields:set` are the read/write halves of the same primitive `VisualEditorEndpoint` uses for its REST-driven saves — they resolve a field's type from the live `Metabox` registry, then dispatch to the matching type-aware getter/sanitizer (`Metabox::get_repeater()`, `sanitizeRepeaterRows()`, etc.), so a repeater, `post_select`, or `files` field is read/written in exactly the shape the admin form itself would produce, with the same sanitization rules (XSS-stripping, ID coercion, JSON re-encoding). `fields:set` takes `--file=path.json` for repeater/array-shaped values, to sidestep shell JSON-quoting, and `--dry-run` to preview the sanitized result without writing. Both commands boot WordPress, like `inspect` — field configs and post data only exist once WordPress is loaded, so they walk up from the theme directory to find `wp-load.php` via the shared `TAW\CLI\WpLoader` helper.
+
+Pass the literal `options` in place of the post ID to target a site-wide `OptionsPage` field instead of a per-post `Metabox` field — the field is resolved via `OptionsPage::getFieldConfig()` (a bare-id lookup over `OptionsPage::getFieldRegistry()`) and written via `OptionsPage::writeOption()` (`update_option()`, sanitized the same way `writeMeta()` sanitizes a Metabox field — no `wp_slash()` first, since `update_option()` doesn't run the value through `wp_unslash()` the way `update_post_meta()` does). Everything else about the two commands — `--dry-run`, `--file`, `--json`, the per-type sanitize/decode rules — works identically for both scopes.
 
 `sync` is the scriptable core of the `update-theme` Claude Code skill and the `.github/workflows/framework-sync.yml` CI workflow — it checks whether the installed `taw/core` version is behind the latest GitHub tag, and whether the project's Tier 1/Tier 2 `taw-theme` scaffold paths (defined once in `resources/update-manifest.json`, shipped with this package) differ from the canonical repo. Unlike every other command here, it deliberately does **not** boot WordPress — the checks don't need it, and CI runners won't have a WP+DB environment available. Tier 1 paths (nothing client-specific has ever lived there) can be applied directly with `--apply`; Tier 2 paths (docs/build config that can legitimately accumulate client-specific additions) are always report-only — `sync` never writes them, by design, regardless of flags. It never touches `taw/core` itself either; run `composer update taw/core` separately.
 

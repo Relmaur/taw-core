@@ -11,6 +11,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use TAW\Core\Metabox\Metabox;
+use TAW\Core\OptionsPage\OptionsPage;
 
 /**
  * Read a single Metabox/OptionsPage field's current value, formatted
@@ -21,6 +22,10 @@ use TAW\Core\Metabox\Metabox;
  *
  * Boots WordPress (same pattern as InspectCommand) — field configs and
  * post_meta only exist once WordPress is loaded.
+ *
+ * Pass the literal string 'options' as the target instead of a numeric post
+ * ID to read a site-wide OptionsPage field instead of a per-post Metabox
+ * field — see {@see self::execute()}.
  */
 class FieldsGetCommand extends Command
 {
@@ -36,18 +41,20 @@ class FieldsGetCommand extends Command
     {
         $this
             ->setName('fields:get')
-            ->setDescription("Read a Metabox/OptionsPage field's current value for a post, decoded according to its type")
+            ->setDescription("Read a Metabox/OptionsPage field's current value for a post (or a site-wide option), decoded according to its type")
             ->setHelp(<<<'HELP'
-                Looks the field up in the live Metabox field registry (the same one
-                `php bin/taw inspect --json` reports) to know its type, then decodes
-                the stored value accordingly — repeaters and post_select come back as
-                arrays, checkboxes as booleans, everything else as its raw value.
+                Looks the field up in the live Metabox/OptionsPage field registry (the
+                same one `php bin/taw inspect --json` reports) to know its type, then
+                decodes the stored value accordingly — repeaters, post_select,
+                gradient_text and hubspot_form come back as arrays, checkboxes as
+                booleans, everything else as its raw value.
 
                 Examples:
                   <info>php bin/taw fields:get 42 hero_heading</info>
                   <info>php bin/taw fields:get 42 team_members --json</info>
+                  <info>php bin/taw fields:get options company_phone</info>
                 HELP)
-            ->addArgument('post_id', InputArgument::REQUIRED, 'Post ID the field is stored against')
+            ->addArgument('post_id', InputArgument::REQUIRED, "Post ID the field is stored against, or the literal 'options' for a site-wide OptionsPage field")
             ->addArgument('field_id', InputArgument::REQUIRED, "Field ID, without the meta key prefix (e.g. 'hero_heading', or 'hero_cta_text' for a group sub-field)")
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output machine-readable JSON instead of a formatted summary');
     }
@@ -56,7 +63,9 @@ class FieldsGetCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
         $asJson = (bool) $input->getOption('json');
-        $postId = (int) $input->getArgument('post_id');
+        $targetArg = (string) $input->getArgument('post_id');
+        $isOptionsTarget = $targetArg === 'options';
+        $postId = $isOptionsTarget ? 0 : (int) $targetArg;
         $fieldId = (string) $input->getArgument('field_id');
 
         $wpLoad = WpLoader::locate($this->themeDir);
@@ -71,36 +80,45 @@ class FieldsGetCommand extends Command
         WpLoader::autoConfigureLocalSocket($this->themeDir);
         require $wpLoad;
 
-        if (!get_post($postId)) {
+        if (!$isOptionsTarget && !get_post($postId)) {
             $io->error("No post found with ID {$postId}.");
             return Command::FAILURE;
         }
 
-        $fieldConfig = Metabox::get_field_config($fieldId);
+        $fieldConfig = $isOptionsTarget
+            ? OptionsPage::getFieldConfig($fieldId)
+            : Metabox::get_field_config($fieldId);
+
         if ($fieldConfig === null) {
-            $io->error("Unknown field: '{$fieldId}'. Run 'php bin/taw inspect --json' to see registered field IDs per block.");
+            $registry = $isOptionsTarget ? 'OptionsPage' : 'Metabox';
+            $io->error("Unknown {$registry} field: '{$fieldId}'. Run 'php bin/taw inspect --json' to see registered field IDs per block.");
             return Command::FAILURE;
         }
 
         $prefix = $fieldConfig['prefix'] ?? '_taw_';
         $type = $fieldConfig['type'] ?? 'text';
-        $value = $this->readValue($postId, $fieldId, $type, $prefix);
+        $value = $isOptionsTarget
+            ? $this->readOptionValue($fieldId, $type, $prefix)
+            : $this->readValue($postId, $fieldId, $type, $prefix);
+        $storageKey = $prefix . $fieldId;
 
         if ($asJson) {
-            $output->writeln((string) json_encode([
-                'post_id' => $postId,
-                'field_id' => $fieldId,
-                'type' => $type,
-                'meta_key' => $prefix . $fieldId,
-                'value' => $value,
-            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            $output->writeln((string) json_encode(array_merge(
+                $isOptionsTarget ? ['scope' => 'options'] : ['post_id' => $postId],
+                [
+                    'field_id' => $fieldId,
+                    'type' => $type,
+                    $isOptionsTarget ? 'option_name' : 'meta_key' => $storageKey,
+                    'value' => $value,
+                ]
+            ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
             return Command::SUCCESS;
         }
 
         $io->definitionList(
-            ['Post ID' => (string) $postId],
+            [$isOptionsTarget ? 'Scope' : 'Post ID' => $isOptionsTarget ? 'options' : (string) $postId],
             ['Field' => $fieldId . ' (' . $type . ')'],
-            ['Meta key' => $prefix . $fieldId],
+            [$isOptionsTarget ? 'Option name' : 'Meta key' => $storageKey],
         );
         $io->section('Value');
         $io->text(is_string($value) ? $value : (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
@@ -119,9 +137,29 @@ class FieldsGetCommand extends Command
             'repeater' => Metabox::get_repeater($postId, $fieldId, $prefix),
             'checkbox' => Metabox::get_bool($postId, $fieldId, $prefix),
             'post_select' => Metabox::get_posts($postId, $fieldId, $prefix),
-            'files' => json_decode((string) Metabox::get($postId, $fieldId, $prefix), true) ?: [],
+            'files', 'gradient_text', 'hubspot_form' => json_decode((string) Metabox::get($postId, $fieldId, $prefix), true) ?: [],
             'image' => (int) Metabox::get($postId, $fieldId, $prefix),
             default => Metabox::get($postId, $fieldId, $prefix),
+        };
+    }
+
+    /**
+     * Options-side counterpart of {@see self::readValue()}. OptionsPage has
+     * no typed static getters of its own (unlike Metabox's get_repeater()/
+     * get_bool()/get_posts()) — every option comes back from
+     * {@see OptionsPage::get()} as its raw stored form, so the type-aware
+     * decode happens here instead.
+     */
+    private function readOptionValue(string $fieldId, string $type, string $prefix): mixed
+    {
+        $raw = OptionsPage::get($fieldId, $prefix);
+
+        return match ($type) {
+            'checkbox' => (string) $raw === '1',
+            'post_select' => json_decode((string) $raw, true) ?: (($id = absint($raw)) ? [$id] : []),
+            'repeater', 'files', 'gradient_text', 'hubspot_form' => json_decode((string) $raw, true) ?: [],
+            'image' => (int) $raw,
+            default => $raw,
         };
     }
 }
