@@ -150,9 +150,13 @@
     bottom: calc(100% + 0.5rem);
     left: 50%;
     width: max-content;
+    min-width: 220px;
     max-width: 300px;
     max-height: 220px;
+    overflow-x: hidden;
     overflow-y: auto;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
     padding: 0.625rem 0.75rem;
     border-radius: 0.375rem;
     background: #1c1917;
@@ -198,9 +202,25 @@
     height: 0.75rem;
 }
 
-.taw-help:hover .taw-help-popup,
-.taw-help-trigger:focus-visible + .taw-help-popup,
-.taw-help-trigger:focus + .taw-help-popup {
+/*
+ * Default trigger: hover or focus on the trigger reveals the popup.
+ * Excluded from .taw-help--click, whose popup opens only on click (see
+ * renderScript() in Form.php, which toggles the trigger's aria-expanded)
+ * — hover proved hard to use for longer popups, since the pointer has to
+ * cross from the trigger into the popup to scroll it, and the popup
+ * disappears the moment hover/focus is lost from either element.
+ */
+.taw-help:not(.taw-help--click):hover .taw-help-popup,
+.taw-help:not(.taw-help--click) .taw-help-trigger:focus-visible + .taw-help-popup,
+.taw-help:not(.taw-help--click) .taw-help-trigger:focus + .taw-help-popup {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Click-triggered variant: shown purely off aria-expanded, set by JS. */
+.taw-help--click .taw-help-trigger[aria-expanded="true"] + .taw-help-popup {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
@@ -221,9 +241,10 @@
         transform: none;
     }
 
-    .taw-help:hover .taw-help-popup,
-    .taw-help-trigger:focus-visible + .taw-help-popup,
-    .taw-help-trigger:focus + .taw-help-popup {
+    .taw-help:not(.taw-help--click):hover .taw-help-popup,
+    .taw-help:not(.taw-help--click) .taw-help-trigger:focus-visible + .taw-help-popup,
+    .taw-help:not(.taw-help--click) .taw-help-trigger:focus + .taw-help-popup,
+    .taw-help--click .taw-help-trigger[aria-expanded="true"] + .taw-help-popup {
         transform: translateX(0) translateY(0);
     }
 }

@@ -530,7 +530,7 @@ All input fields accept: `id`, `label`, `type`, `required`, `placeholder`, `widt
 
 ### Field Help Popover
 
-Any field — including labelless `checkbox`/`radio`/`checkbox_group` — accepts a `help` string, rendered as a small "?" icon next to its label. Hover (mouse) or focus (keyboard/tap) reveals a popover with the text; pure CSS (`form.css`), no JS dependency. Newlines in `help` become line breaks; the text itself is always escaped, so it's plain text only, not HTML.
+Any field — including labelless `checkbox`/`radio`/`checkbox_group` — accepts a `help` string, rendered as a small "?" icon next to its label. By default, hover (mouse) or focus (keyboard/tap) reveals a popover with the text — pure CSS (`form.css`), no JS dependency. Newlines in `help` become line breaks; the text itself is always escaped, so it's plain text only, not HTML.
 
 ```php
 [
@@ -543,6 +543,12 @@ Any field — including labelless `checkbox`/`radio`/`checkbox_group` — accept
 ```
 
 For a `checkbox`/`radio` field specifically, the trigger renders *outside* the `<label>` that wraps the input — nesting it inside would let a click on "?" also toggle the control.
+
+**`trigger_on_click`** — add `'trigger_on_click' => true` to open the popover on click instead of hover/focus. Hover holds up poorly for longer text: the pointer has to cross from the trigger into the popup to scroll it, and hover is lost — hiding the popup — the instant it leaves either element. Click mode keeps the trigger's own hover/focus styling (still a visible "this is interactive" cue) but the popup itself only opens/closes on click, tracked via the trigger's `aria-expanded`; clicking elsewhere or pressing Escape closes it (handled in `renderScript()`, not CSS, for this mode).
+
+```php
+['id' => 'privacy_consent', 'type' => 'checkbox', 'help' => '...', 'trigger_on_click' => true],
+```
 
 ### Multi-column Layout
 

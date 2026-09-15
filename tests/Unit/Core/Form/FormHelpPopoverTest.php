@@ -23,6 +23,7 @@ final class FormHelpPopoverTest extends TestCase
 
         Functions\when('add_action')->justReturn(true);
         Functions\when('esc_attr__')->returnArg(1);
+        Functions\when('esc_attr')->returnArg();
         Functions\when('esc_html')->alias(
             fn(mixed $text) => htmlspecialchars((string) $text, ENT_QUOTES, 'UTF-8')
         );
@@ -90,5 +91,34 @@ final class FormHelpPopoverTest extends TestCase
 
         $this->assertStringContainsString('Line one.<br', $output);
         $this->assertStringContainsString('Line two.', $output);
+    }
+
+    public function test_default_trigger_has_no_click_class_or_aria_expanded(): void
+    {
+        $form = $this->makeForm();
+
+        ob_start();
+        $this->callMethod($form, 'renderHelp', ['id' => 'consent', 'help' => 'Summary.']);
+        $output = ob_get_clean();
+
+        $this->assertStringNotContainsString('taw-help--click', $output);
+        $this->assertStringNotContainsString('aria-expanded', $output);
+    }
+
+    public function test_trigger_on_click_adds_click_class_and_aria_attrs(): void
+    {
+        $form = $this->makeForm();
+
+        ob_start();
+        $this->callMethod($form, 'renderHelp', [
+            'id'               => 'consent',
+            'help'             => 'Summary.',
+            'trigger_on_click' => true,
+        ]);
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('taw-help--click', $output);
+        $this->assertStringContainsString('aria-haspopup="true"', $output);
+        $this->assertStringContainsString('aria-expanded="false"', $output);
     }
 }

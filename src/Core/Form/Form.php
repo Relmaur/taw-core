@@ -1001,11 +1001,20 @@ class Form
     /**
      * Renders a "?" trigger + popover for a field's optional 'help' string,
      * e.g. a plain-language privacy summary next to a consent checkbox.
-     * CSS-only (:hover / :focus in form.css) — no JS dependency, and works
-     * for touch/keyboard via focus, not just mouse hover. No-op if 'help'
-     * isn't set. Always called as a sibling of the field's <label>, never
-     * nested inside one — a <label> wrapping a checkbox/radio toggles that
-     * control on any click inside it, including on the trigger button.
+     * No-op if 'help' isn't set. Always called as a sibling of the field's
+     * <label>, never nested inside one — a <label> wrapping a
+     * checkbox/radio toggles that control on any click inside it,
+     * including on the trigger button.
+     *
+     * Default trigger is CSS-only (:hover / :focus in form.css) — no JS
+     * dependency, works for touch/keyboard via focus as well as mouse
+     * hover. Hover proved hard to use for longer popups in practice (the
+     * pointer has to cross from the trigger into the popup to scroll it,
+     * and hover is lost the instant it leaves either element), so a field
+     * can opt into 'trigger_on_click' => true instead: hover/focus do
+     * nothing, and the popup opens/closes only via the click handling in
+     * renderScript(), tracked through the trigger's aria-expanded state
+     * (also what form.css keys off of for the click variant).
      */
     private function renderHelp(array $field): void
     {
@@ -1013,9 +1022,15 @@ class Form
             return;
         }
 
+        $clickTriggered = !empty($field['trigger_on_click']);
+        $wrapperClass   = $clickTriggered ? 'taw-help taw-help--click' : 'taw-help';
+        $triggerAttrs   = $clickTriggered ? ' aria-haspopup="true" aria-expanded="false"' : '';
+
         printf(
-            '<span class="taw-help"><button type="button" class="taw-help-trigger" aria-label="%s">?</button><span class="taw-help-popup" role="tooltip">%s</span></span>',
+            '<span class="%s"><button type="button" class="taw-help-trigger" aria-label="%s"%s>?</button><span class="taw-help-popup" role="tooltip">%s</span></span>',
+            esc_attr($wrapperClass),
             esc_attr__('More information', 'taw'),
+            $triggerAttrs,
             nl2br(esc_html($field['help']))
         );
     }
@@ -1393,6 +1408,38 @@ class Form
             evaluateConditions();
             form.addEventListener('change', evaluateConditions);
             form.addEventListener('input',  evaluateConditions);
+
+            // ── Click-triggered help popovers ────────────────────────
+            // Fields with 'trigger_on_click' => true render a
+            // .taw-help--click wrapper instead of the default hover/focus
+            // one; form.css keys the popup's visibility purely off the
+            // trigger's aria-expanded attribute, which this toggles.
+
+            var helpTriggers = form.querySelectorAll('.taw-help--click > .taw-help-trigger');
+
+            function closeAllHelpPopovers(except) {
+                helpTriggers.forEach(function (btn) {
+                    if (btn !== except) btn.setAttribute('aria-expanded', 'false');
+                });
+            }
+
+            helpTriggers.forEach(function (trigger) {
+                trigger.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    var isOpen = trigger.getAttribute('aria-expanded') === 'true';
+                    closeAllHelpPopovers(trigger);
+                    trigger.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+                });
+            });
+
+            if (helpTriggers.length) {
+                document.addEventListener('click', function () {
+                    closeAllHelpPopovers(null);
+                });
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape') closeAllHelpPopovers(null);
+                });
+            }
 
             // ── Multi-step ──────────────────────────────────────────
 
