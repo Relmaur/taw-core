@@ -161,7 +161,11 @@ class ViteLoader
         // Called inline here (not via a separate wp_head hook) so it is
         // guaranteed to run in the same context as the rest of the enqueue,
         // mirroring how vite_inline_critical_css() worked in the old loader.
-        self::inlineCriticalCss();
+        // 'taw_critical_css_entry' lets a theme swap in a page-type-specific
+        // critical file (e.g. a full-page CPT template with its own above-the-
+        // fold hero) instead of the one shared resources/scss/critical.scss —
+        // unhooked, this is a pure passthrough to the existing default.
+        self::inlineCriticalCss(apply_filters('taw_critical_css_entry', 'resources/scss/critical.scss'));
 
         // ── Theme CSS (async — same media="print" swap as non-critical block
         // CSS, see BaseBlock::enqueueCssFile()) ──────────────────────────────
@@ -698,6 +702,15 @@ class ViteLoader
      * above-the-fold content paints immediately.
      *
      * Does nothing in dev mode (Vite HMR handles styles there).
+     *
+     * The default entry can be swapped per-request via the 'taw_critical_css_entry'
+     * filter on this method's one call site (enqueueThemeAssets()) — e.g. a
+     * full-page CPT template with its own above-the-fold hero can supply its
+     * own critical file instead of the site-wide default:
+     *
+     *   add_filter('taw_critical_css_entry', function (string $entry) {
+     *       return is_singular('event_invite') ? 'resources/scss/critical-event-invite.scss' : $entry;
+     *   });
      *
      * @param string $entry_key  Manifest key of the CSS entry, e.g. 'resources/scss/critical.scss'
      */

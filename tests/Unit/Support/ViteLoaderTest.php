@@ -334,6 +334,95 @@ final class ViteLoaderTest extends TestCase
     }
 
     /**
+     * Regression coverage for the 'taw_critical_css_entry' filter:
+     * enqueueThemeAssets()'s inlineCriticalCss() call site used to hardcode
+     * 'resources/scss/critical.scss' with no way to override it per request,
+     * so a full-page CPT template with its own above-the-fold hero (a client
+     * theme building event-invite microsites hit this) had no way to load a
+     * different critical file without a site-wide critical.scss covering
+     * every template's layout at once.
+     */
+    #[RunInSeparateProcess]
+    public function test_critical_css_entry_defaults_to_the_stock_filename_when_unfiltered(): void
+    {
+        Functions\when('wp_cache_get')->justReturn(false);
+        Functions\when('wp_cache_set')->justReturn(true);
+        Functions\when('esc_url')->returnArg();
+        Functions\when('esc_attr')->returnArg();
+        Functions\when('get_template_directory_uri')->justReturn('https://example.test');
+        Functions\when('wp_enqueue_script')->justReturn(true);
+        Functions\when('add_action')->justReturn(true);
+
+        file_put_contents($this->themeDir . '/public/build/manifest.json', json_encode([
+            'resources/js/app.js' => [
+                'file' => 'assets/app-HASH.js',
+                'isEntry' => true,
+            ],
+            'resources/scss/critical.scss' => ['file' => 'assets/critical-DEFAULT.css'],
+        ]));
+        @mkdir($this->themeDir . '/public/build/assets', 0777, true);
+        file_put_contents($this->themeDir . '/public/build/assets/critical-DEFAULT.css', '/* default critical */');
+
+        $ref = new \ReflectionMethod(ViteLoader::class, 'enqueueThemeAssets');
+        $ref->setAccessible(true);
+
+        ob_start();
+        $ref->invoke(null, 'resources/js/app.js');
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('/* default critical */', $output);
+
+        @unlink($this->themeDir . '/public/build/assets/critical-DEFAULT.css');
+        @rmdir($this->themeDir . '/public/build/assets');
+        @unlink($this->themeDir . '/public/build/manifest.json');
+    }
+
+    #[RunInSeparateProcess]
+    public function test_critical_css_entry_filter_swaps_in_a_different_file(): void
+    {
+        Functions\when('wp_cache_get')->justReturn(false);
+        Functions\when('wp_cache_set')->justReturn(true);
+        Functions\when('esc_url')->returnArg();
+        Functions\when('esc_attr')->returnArg();
+        Functions\when('get_template_directory_uri')->justReturn('https://example.test');
+        Functions\when('wp_enqueue_script')->justReturn(true);
+        Functions\when('add_action')->justReturn(true);
+
+        Functions\when('apply_filters')->alias(
+            fn(string $hook, mixed $value = null, mixed ...$rest): mixed => $hook === 'taw_critical_css_entry'
+                ? 'resources/scss/critical-event-invite.scss'
+                : $value
+        );
+
+        file_put_contents($this->themeDir . '/public/build/manifest.json', json_encode([
+            'resources/js/app.js' => [
+                'file' => 'assets/app-HASH.js',
+                'isEntry' => true,
+            ],
+            'resources/scss/critical.scss' => ['file' => 'assets/critical-DEFAULT.css'],
+            'resources/scss/critical-event-invite.scss' => ['file' => 'assets/critical-EVENT.css'],
+        ]));
+        @mkdir($this->themeDir . '/public/build/assets', 0777, true);
+        file_put_contents($this->themeDir . '/public/build/assets/critical-DEFAULT.css', '/* default critical */');
+        file_put_contents($this->themeDir . '/public/build/assets/critical-EVENT.css', '/* event-invite critical */');
+
+        $ref = new \ReflectionMethod(ViteLoader::class, 'enqueueThemeAssets');
+        $ref->setAccessible(true);
+
+        ob_start();
+        $ref->invoke(null, 'resources/js/app.js');
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('/* event-invite critical */', $output);
+        $this->assertStringNotContainsString('/* default critical */', $output);
+
+        @unlink($this->themeDir . '/public/build/assets/critical-DEFAULT.css');
+        @unlink($this->themeDir . '/public/build/assets/critical-EVENT.css');
+        @rmdir($this->themeDir . '/public/build/assets');
+        @unlink($this->themeDir . '/public/build/manifest.json');
+    }
+
+    /**
      * Starts a real PHP built-in server answering HTTP 200 to any request
      * (including GET /@vite/client) — a faithful stand-in for "a Vite dev
      * server is listening here," without depending on Vite/Node at all.

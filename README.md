@@ -381,6 +381,18 @@ ViteLoader::inlineCriticalCss('resources/css/critical.css');
 ViteLoader::preloadAssets(['resources/js/chunks/vendor.js']);
 ```
 
+`enqueueThemeAssets()`'s own call to `inlineCriticalCss()` always resolves the entry through a
+`taw_critical_css_entry` filter first, defaulting to `resources/scss/critical.scss` when
+unhooked — a full-page CPT template with its own above-the-fold hero (an event microsite, a
+landing page builder, anything with more than one visually distinct "page type") can swap in its
+own critical file per request instead of the one site-wide default:
+
+```php
+add_filter('taw_critical_css_entry', function (string $entry) {
+    return is_singular('event_invite') ? 'resources/scss/critical-event-invite.scss' : $entry;
+});
+```
+
 ---
 
 ## Forms
