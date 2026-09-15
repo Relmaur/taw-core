@@ -20,7 +20,8 @@ if (!defined('ABSPATH')) {
  * values in wp_options instead of post_meta.
  *
  * Supported field types: text, url, number, textarea, wysiwyg, select,
- * checkbox, color, range, datepicker, image, files, group, post_select, repeater.
+ * checkbox, color, range, datepicker, image, files, group, post_select,
+ * repeater, gradient_text, hubspot_form.
  *
  * Usage:
  *   new OptionsPage([
@@ -90,6 +91,58 @@ class OptionsPage
     public static function getFieldRegistry(): array
     {
         return self::$fieldRegistry;
+    }
+
+    /**
+     * Look up a registered options field by its bare ID (no prefix) — the
+     * options-side equivalent of {@see \TAW\Core\Metabox\Metabox::get_field_config()}.
+     * Unlike Metabox's registry, {@see self::$fieldRegistry} is keyed by the
+     * full option name (prefix + id), so this does a linear scan matching on
+     * `id` — used by `fields:set`/`fields:get` (CLI callers only pass the
+     * bare ID, matching Metabox field convention), which don't know a
+     * field's prefix ahead of time.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function getFieldConfig(string $fieldId): ?array
+    {
+        foreach (self::$fieldRegistry as $config) {
+            if (($config['id'] ?? null) === $fieldId) {
+                return $config;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Sanitize a value for an options field and persist it via
+     * `update_option()` — the options-side counterpart of
+     * {@see \TAW\Core\Metabox\Metabox::writeMeta()}. Reuses Metabox's static
+     * `sanitizeForStorage()` for the actual sanitization, matching how
+     * `Content\Importer::encodeOptionForStorage()` already sanitizes
+     * options-registry values — a single sanitizer shared by both storage
+     * backends, since the rule for a given field type never depends on
+     * where the value ends up.
+     *
+     * No `wp_slash()` before `update_option()`: unlike `update_post_meta()`,
+     * `update_option()` does not run the value through `wp_unslash()`
+     * internally (see `Content\Importer::applyOption()`, which writes
+     * options the same way).
+     *
+     * @param array<string, mixed> $fieldConfig A field config from {@see self::getFieldConfig()}.
+     * @return mixed The value actually stored (post-sanitization).
+     */
+    public static function writeOption(array $fieldConfig, mixed $value): mixed
+    {
+        $prefix = $fieldConfig['prefix'] ?? '_taw_';
+        $id     = $fieldConfig['id'] ?? '';
+
+        $sanitized = Metabox::sanitizeForStorage($fieldConfig, $value);
+
+        update_option($prefix . $id, $sanitized);
+
+        return $sanitized;
     }
 
     public function enqueue_admin_assets(string $hook): void
@@ -656,6 +709,16 @@ class OptionsPage
             <?php
                 break;
 
+            /* ---- Gradient Text (multi-segment, per-segment gradient highlight) ---- */
+            case 'gradient_text':
+                Metabox::render_gradient_text_field($field_id, $value);
+                break;
+
+            /* ---- HubSpot Form (portal/form/region embed config) ---- */
+            case 'hubspot_form':
+                Metabox::render_hubspot_form_field($field_id, $value);
+                break;
+
             /* ---- Default ---- */
             default:
                 printf(
@@ -863,6 +926,14 @@ class OptionsPage
             'post_select'    => $this->sanitize_post_select($field, $value),
             'files'          => $this->sanitize_files($value),
             'repeater'       => $this->sanitize_repeater($field, $value),
+            // gradient_text/hubspot_form delegate to Metabox's static sanitizers
+            // (rather than duplicating the JSON-shape logic here, the way the
+            // other structured types above do) — their storage shape has no
+            // reason to ever diverge between a Metabox field and an
+            // OptionsPage field, so a shared sanitizer removes the risk of
+            // the two contexts silently drifting apart.
+            'gradient_text'  => Metabox::sanitizeGradientTextValue($value),
+            'hubspot_form'   => Metabox::sanitizeHubspotFormValue($value),
             default          => sanitize_text_field($value),
         };
     }

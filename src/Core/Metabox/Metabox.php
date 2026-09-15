@@ -2161,6 +2161,16 @@ class Metabox
                 </div>
             <?php break;
 
+            /* ---- MARK: Gradient Text (multi-segment, per-segment gradient highlight) ---- */
+            case 'gradient_text':
+                self::render_gradient_text_field($field_id, $value);
+                break;
+
+            /* ---- MARK: HubSpot Form (portal/form/region embed config) ---- */
+            case 'hubspot_form':
+                self::render_hubspot_form_field($field_id, $value);
+                break;
+
             /* ---- MARK: Group ---- */
             case 'group':
                 $group_fields = $field['fields'] ?? [];
@@ -2431,9 +2441,140 @@ class Metabox
             case 'textarea':
                 return $value !== '' && $value !== null ? nl2br(esc_html((string) $value)) : $empty;
 
+            case 'gradient_text':
+                $segments = json_decode((string) $value, true);
+                if (!is_array($segments) || empty($segments)) {
+                    return $empty;
+                }
+                return implode('', array_map(
+                    static fn(array $s): string => !empty($s['highlighted'])
+                        ? '<mark>' . esc_html((string) ($s['text'] ?? '')) . '</mark>'
+                        : esc_html((string) ($s['text'] ?? '')),
+                    $segments
+                ));
+
+            case 'hubspot_form':
+                $config = json_decode((string) $value, true);
+                if (!is_array($config) || empty($config['portal_id']) || empty($config['form_id'])) {
+                    return $empty;
+                }
+                return esc_html(sprintf(
+                    /* translators: 1: HubSpot portal ID, 2: HubSpot form ID, 3: HubSpot region */
+                    __('Portal %1$s / Form %2$s (%3$s)', 'taw-theme'),
+                    $config['portal_id'],
+                    $config['form_id'],
+                    $config['region'] ?? 'na1'
+                ));
+
             default:
                 return $value !== '' && $value !== null ? esc_html((string) $value) : $empty;
         }
+    }
+
+    /**
+     * Render a gradient_text field: an Alpine-only segment editor (no
+     * separate enqueued JS — Alpine is already loaded for every Metabox/
+     * OptionsPage field, per {@see self::enqueue_admin_assets()}). Each
+     * segment is `{text, highlighted}`; the hidden input mirrors `segments`
+     * as JSON on every change via `$watch`, the same way the range field's
+     * own local `x-data` scope works above.
+     *
+     * Public + static (not a private instance renderer like most `case`
+     * bodies in {@see self::render_field()}) so {@see \TAW\Core\OptionsPage\OptionsPage::render_field()}
+     * can call it directly — the markup has no post-vs-option-specific
+     * behavior to diverge on, so sharing it removes a duplication that
+     * would otherwise need to be kept in lockstep by hand.
+     *
+     * @param string $field_id Full input name/id (post meta key or option name).
+     * @param mixed  $value    Current saved value — a JSON string, or already-decoded array.
+     */
+    public static function render_gradient_text_field(string $field_id, mixed $value): void
+    {
+        if (is_array($value)) {
+            $value = wp_json_encode($value) ?: '[]';
+        }
+        $segments = $value ? json_decode((string) $value, true) : [];
+        if (!is_array($segments)) {
+            $segments = [];
+        }
+        $alpine_id = str_replace(['[', ']'], ['-', ''], $field_id);
+    ?>
+        <div class="taw-gradient-text-field"
+            id="taw-gradient-text-<?php echo esc_attr($alpine_id); ?>"
+            x-data="{ segments: <?php echo esc_attr(wp_json_encode(array_values($segments), JSON_UNESCAPED_UNICODE)); ?> }"
+            x-init="$watch('segments', function (v) { $refs.input.value = JSON.stringify(v); $refs.input.dispatchEvent(new Event('change')); })">
+            <input type="hidden"
+                class="taw-gradient-text-input"
+                x-ref="input"
+                id="<?php echo esc_attr($field_id); ?>"
+                name="<?php echo esc_attr($field_id); ?>"
+                value="<?php echo esc_attr($value ?: '[]'); ?>">
+
+            <template x-for="(segment, index) in segments" :key="index">
+                <div class="taw-gradient-text-segment">
+                    <input type="text" x-model="segment.text" class="regular-text"
+                        placeholder="<?php echo esc_attr__('Segment text', 'taw-theme'); ?>">
+                    <label class="taw-gradient-text-highlight">
+                        <input type="checkbox" x-model="segment.highlighted">
+                        <?php esc_html_e('Highlighted', 'taw-theme'); ?>
+                    </label>
+                    <button type="button" class="button-link taw-gradient-text-remove" @click="segments.splice(index, 1)">
+                        <?php esc_html_e('Remove', 'taw-theme'); ?>
+                    </button>
+                </div>
+            </template>
+
+            <button type="button" class="button taw-gradient-text-add" @click="segments.push({ text: '', highlighted: false })">
+                <?php esc_html_e('Add Segment', 'taw-theme'); ?>
+            </button>
+        </div>
+    <?php
+    }
+
+    /**
+     * Render a hubspot_form field: three plain inputs (portal ID, form ID,
+     * region) kept in sync with a single hidden JSON input via Alpine —
+     * same sharing rationale as {@see self::render_gradient_text_field()}.
+     *
+     * @param string $field_id Full input name/id (post meta key or option name).
+     * @param mixed  $value    Current saved value — a JSON string, or already-decoded array.
+     */
+    public static function render_hubspot_form_field(string $field_id, mixed $value): void
+    {
+        $config = is_string($value) && $value !== '' ? json_decode($value, true) : $value;
+        if (!is_array($config)) {
+            $config = [];
+        }
+        $initial = [
+            'portal_id' => (string) ($config['portal_id'] ?? ''),
+            'form_id'   => (string) ($config['form_id'] ?? ''),
+            'region'    => (string) ($config['region'] ?? 'na1'),
+        ];
+    ?>
+        <div class="taw-hubspot-form-field"
+            x-data="{ hs: <?php echo esc_attr(wp_json_encode($initial, JSON_UNESCAPED_UNICODE)); ?> }"
+            x-init="$watch('hs', function (v) { $refs.input.value = JSON.stringify(v); $refs.input.dispatchEvent(new Event('change')); }, { deep: true })">
+            <input type="hidden"
+                class="taw-hubspot-form-input"
+                x-ref="input"
+                id="<?php echo esc_attr($field_id); ?>"
+                name="<?php echo esc_attr($field_id); ?>"
+                value="<?php echo esc_attr(is_string($value) ? $value : (wp_json_encode($initial) ?: '')); ?>">
+
+            <p class="taw-hubspot-form-row">
+                <label><?php esc_html_e('Portal ID', 'taw-theme'); ?>
+                    <input type="text" x-model="hs.portal_id" class="regular-text"></label>
+            </p>
+            <p class="taw-hubspot-form-row">
+                <label><?php esc_html_e('Form ID', 'taw-theme'); ?>
+                    <input type="text" x-model="hs.form_id" class="regular-text"></label>
+            </p>
+            <p class="taw-hubspot-form-row">
+                <label><?php esc_html_e('Region', 'taw-theme'); ?>
+                    <input type="text" x-model="hs.region" class="regular-text" placeholder="na1"></label>
+            </p>
+        </div>
+    <?php
     }
 
     /**
@@ -2913,6 +3054,8 @@ class Metabox
             'post_select'       => $this->sanitize_post_select($field, $value),
             'repeater'          => $this->sanitize_repeater($field, $value),
             'files'             => $this->sanitize_files($value),
+            'gradient_text'     => self::sanitizeGradientTextValue($value),
+            'hubspot_form'      => self::sanitizeHubspotFormValue($value),
             default          => sanitize_text_field($value),
         };
     }
@@ -2987,6 +3130,74 @@ class Metabox
         }
 
         $clean = array_values(array_filter(array_map('absint', $ids)));
+        return (string) wp_json_encode($clean, JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Sanitize a gradient_text value — a JSON array of
+     * `{"text": string, "highlighted": bool}` segments, in authoring order.
+     * A segment with empty text (after sanitizing) is dropped; `highlighted`
+     * always normalizes to a real boolean regardless of how the client sent
+     * it (JS `true`/`false`, or the string forms a hand-built payload might
+     * use).
+     *
+     * Static — shared by the instance save path, the static
+     * {@see self::sanitizeForStorage()} path (`fields:set`,
+     * `Content\Importer`), and {@see \TAW\Core\OptionsPage\OptionsPage}'s
+     * own `sanitize_field()`, so the segment shape can never drift between
+     * a Metabox field and an OptionsPage field of the same type.
+     */
+    public static function sanitizeGradientTextValue(mixed $value): string
+    {
+        $segments = json_decode(is_string($value) ? $value : (string) wp_json_encode($value), true);
+        if (!is_array($segments)) {
+            return '[]';
+        }
+
+        $clean = [];
+        foreach ($segments as $segment) {
+            if (!is_array($segment)) {
+                continue;
+            }
+
+            $text = sanitize_text_field((string) ($segment['text'] ?? ''));
+            if ($text === '') {
+                continue;
+            }
+
+            $clean[] = [
+                'text'        => $text,
+                'highlighted' => in_array($segment['highlighted'] ?? false, ['1', 1, true], true),
+            ];
+        }
+
+        return (string) wp_json_encode($clean, JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Sanitize a hubspot_form value — a JSON object of
+     * `{"portal_id": string, "form_id": string, "region": string}`, the
+     * config {@see \TAW\Core\Integrations\Hubspot::render()} needs to embed
+     * a form. `region` defaults to HubSpot's own default region ('na1') when
+     * blank, since an empty region breaks the embed silently rather than
+     * loudly.
+     *
+     * Static for the same cross-class-sharing reason as
+     * {@see self::sanitizeGradientTextValue()}.
+     */
+    public static function sanitizeHubspotFormValue(mixed $value): string
+    {
+        $config = is_string($value) ? (json_decode($value, true) ?: []) : $value;
+        if (!is_array($config)) {
+            $config = [];
+        }
+
+        $clean = [
+            'portal_id' => sanitize_text_field((string) ($config['portal_id'] ?? '')),
+            'form_id'   => sanitize_text_field((string) ($config['form_id'] ?? '')),
+            'region'    => sanitize_text_field((string) ($config['region'] ?? '')) ?: 'na1',
+        ];
+
         return (string) wp_json_encode($clean, JSON_UNESCAPED_UNICODE);
     }
 
@@ -3267,6 +3478,64 @@ class Metabox
     }
 
     /**
+     * Retrieve gradient_text data as an array of `{text, highlighted}` segments.
+     *
+     * Usage:
+     * $segments = Metabox::get_gradient_text($post->ID, 'hero_heading');
+     * echo Metabox::renderGradientText($segments, 'bg-clip-text text-transparent bg-gradient-to-r from-cyan-500 to-blue-500');
+     *
+     * @param int    $post_id  The post/page ID.
+     * @param string $field_id Field ID (without prefix).
+     * @param string $prefix   Meta key prefix. Default '_taw_'.
+     * @return array[] Array of `{text: string, highlighted: bool}` segments.
+     */
+    public static function get_gradient_text(int $post_id, string $field_id, string $prefix = '_taw_'): array
+    {
+        $raw = get_post_meta($post_id, $prefix . $field_id, true);
+        if (empty($raw)) return [];
+
+        $segments = json_decode($raw, true);
+        return is_array($segments) ? $segments : [];
+    }
+
+    /**
+     * Render a gradient_text value (a JSON string or already-decoded array
+     * of `{text, highlighted}` segments) as HTML: plain segments pass
+     * through `esc_html()` untouched, highlighted segments are wrapped in a
+     * `<span>` carrying `$highlightClass` — the caller's own gradient
+     * utility classes (e.g. a Tailwind `bg-clip-text text-transparent
+     * bg-gradient-to-r ...` stack), since the actual gradient is a per-theme
+     * design decision this framework method has no business hard-coding.
+     *
+     * Pure formatter — no WordPress post lookup, so it's usable directly on
+     * a value already read via {@see self::get_gradient_text()} or
+     * {@see \TAW\Core\OptionsPage\OptionsPage::get()}.
+     *
+     * @param array|string $value          Segments array, or the raw JSON string.
+     * @param string       $highlightClass Class(es) applied to each highlighted segment's `<span>`.
+     */
+    public static function renderGradientText(array|string $value, string $highlightClass): string
+    {
+        $segments = is_string($value) ? json_decode($value, true) : $value;
+        if (!is_array($segments)) {
+            return '';
+        }
+
+        $html = '';
+        foreach ($segments as $segment) {
+            if (!is_array($segment)) {
+                continue;
+            }
+            $text = esc_html((string) ($segment['text'] ?? ''));
+            $html .= !empty($segment['highlighted'])
+                ? sprintf('<span class="%s">%s</span>', esc_attr($highlightClass), $text)
+                : $text;
+        }
+
+        return $html;
+    }
+
+    /**
      * Sanitize a repeater value (array of rows) from the visual editor.
      * Each row's sub-fields are sanitized individually using sanitizeValue().
      * Returns a JSON string ready for update_post_meta().
@@ -3353,10 +3622,12 @@ class Metabox
     public static function sanitizeForStorage(array $fieldConfig, mixed $value): mixed
     {
         return match ($fieldConfig['type'] ?? 'text') {
-            'repeater'    => self::sanitizeRepeaterRows($fieldConfig, $value),
-            'files'       => self::sanitizeFilesValue($value),
-            'post_select' => self::sanitizePostSelectValue($fieldConfig, $value),
-            default       => self::sanitizeValue($fieldConfig, $value),
+            'repeater'      => self::sanitizeRepeaterRows($fieldConfig, $value),
+            'files'         => self::sanitizeFilesValue($value),
+            'post_select'   => self::sanitizePostSelectValue($fieldConfig, $value),
+            'gradient_text' => self::sanitizeGradientTextValue($value),
+            'hubspot_form'  => self::sanitizeHubspotFormValue($value),
+            default         => self::sanitizeValue($fieldConfig, $value),
         };
     }
 
