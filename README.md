@@ -532,12 +532,16 @@ Form::register([
 
 ```php
 'email' => [
-    'to_self'   => ['subject' => 'New submission',     'template' => 'contact-self'],
+    'to_self'   => [
+        'subject'  => 'New submission',
+        'template' => 'contact-self',
+        'to'       => ['ops@example.com', 'sales@example.com'], // optional — defaults to admin_email
+    ],
     'to_client' => ['subject' => 'Got your message!',  'template' => 'contact-client'],
 ],
 ```
 
-No `template` → plain-text fallback via `wp_mail()`. `to_client` requires an `email` field in the form.
+No `template` → plain-text fallback via `wp_mail()`. `to_client` requires an `email` field in the form and always goes only to the submitter — it has no `to` override. `to_self.to` accepts a single address, an array of addresses, or a pre-joined comma-separated string; omit it to keep sending to `admin_email` as before.
 
 ### Field Types
 

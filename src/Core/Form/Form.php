@@ -755,9 +755,20 @@ class Form
 
         $shared = array_merge($replacements, ['site_url' => get_site_url()]);
 
+        // 'to' accepts a single address, an array of addresses, or a
+        // pre-joined comma-separated string — wp_mail() (which Mailer::send()
+        // forwards to unmodified) already treats a comma-separated string as
+        // multiple recipients, so an array is just joined here for callers'
+        // convenience. Falls back to admin_email, same as before this option
+        // existed, so every existing form config keeps working unchanged.
+        $toSelf = $emailConfig['to_self']['to'] ?? get_option('admin_email');
+        if (is_array($toSelf)) {
+            $toSelf = implode(', ', array_filter($toSelf));
+        }
+
         try {
             (new Mailer())
-                ->to(get_option('admin_email'))
+                ->to((string) $toSelf)
                 ->subject($emailConfig['to_self']['subject'] ?? 'New Form Submission')
                 ->template($emailConfig['to_self']['template'])
                 ->setVariables($shared)
