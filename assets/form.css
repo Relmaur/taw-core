@@ -179,6 +179,25 @@
     transform: translateX(-50%);
 }
 
+/*
+ * Invisible hit-area bridging the gap between the trigger and the popup
+ * (the `bottom: calc(100% + 0.5rem)` offset above). Without this, moving
+ * the pointer from the trigger toward the popup crosses dead space that
+ * belongs to neither element, dropping `.taw-help:hover` and hiding the
+ * popup before the pointer ever reaches it — impossible to hover into,
+ * let alone scroll. As a ::before of .taw-help-popup it's still a DOM
+ * descendant of .taw-help, so hovering it keeps the parent :hover (and
+ * thus the popup) alive across the gap.
+ */
+.taw-help-popup::before {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: -1rem;
+    right: -1rem;
+    height: 0.75rem;
+}
+
 .taw-help:hover .taw-help-popup,
 .taw-help-trigger:focus-visible + .taw-help-popup,
 .taw-help-trigger:focus + .taw-help-popup {
