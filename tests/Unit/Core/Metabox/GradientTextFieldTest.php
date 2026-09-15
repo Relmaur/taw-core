@@ -38,10 +38,66 @@ final class GradientTextFieldTest extends TestCase
         $stored = Metabox::sanitizeGradientTextValue($input);
 
         $this->assertSame([
-            ['text' => 'How can', 'highlighted' => false],
+            ['text' => 'How can ', 'highlighted' => false],
             ['text' => 'we help', 'highlighted' => true],
             ['text' => '?', 'highlighted' => false],
         ], json_decode($stored, true));
+    }
+
+    /**
+     * Regression: sanitize_text_field()'s own trim() destroyed the word-
+     * boundary space between a highlighted phrase and its neighbor — the
+     * field type's primary use case (a highlighted phrase mid-sentence, not
+     * only ever the trailing segment). Reproduced and reported against
+     * v1.37.0 while migrating real heading+highlight pairs to gradient_text.
+     */
+    public function test_boundary_space_between_a_highlighted_phrase_and_its_neighbor_survives(): void
+    {
+        $input = json_encode([
+            ['text' => 'Three ways', 'highlighted' => true],
+            ['text' => ' we help you own more and rent less.', 'highlighted' => false],
+        ]);
+
+        $sanitized = json_decode(Metabox::sanitizeGradientTextValue($input), true);
+        $rendered = Metabox::renderGradientText($sanitized, 'hl');
+
+        $this->assertSame('Three ways', $sanitized[0]['text']);
+        $this->assertSame(' we help you own more and rent less.', $sanitized[1]['text']);
+        $this->assertSame(
+            '<span class="hl">Three ways</span> we help you own more and rent less.',
+            $rendered
+        );
+    }
+
+    public function test_a_trailing_boundary_space_on_a_highlighted_segment_survives(): void
+    {
+        $input = json_encode([
+            ['text' => 'Save time ', 'highlighted' => true],
+            ['text' => 'and money', 'highlighted' => false],
+        ]);
+
+        $sanitized = json_decode(Metabox::sanitizeGradientTextValue($input), true);
+
+        $this->assertSame(
+            '<span class="hl">Save time </span>and money',
+            Metabox::renderGradientText($sanitized, 'hl')
+        );
+    }
+
+    public function test_a_whitespace_only_segment_is_still_dropped_not_padded(): void
+    {
+        $input = json_encode([
+            ['text' => 'A', 'highlighted' => false],
+            ['text' => '   ', 'highlighted' => false],
+            ['text' => 'B', 'highlighted' => false],
+        ]);
+
+        $stored = json_decode(Metabox::sanitizeGradientTextValue($input), true);
+
+        $this->assertSame([
+            ['text' => 'A', 'highlighted' => false],
+            ['text' => 'B', 'highlighted' => false],
+        ], $stored);
     }
 
     public function test_segment_with_empty_text_is_dropped(): void

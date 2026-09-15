@@ -3160,9 +3160,26 @@ class Metabox
                 continue;
             }
 
-            $text = sanitize_text_field((string) ($segment['text'] ?? ''));
+            $rawText = (string) ($segment['text'] ?? '');
+            $text = sanitize_text_field($rawText);
             if ($text === '') {
                 continue;
+            }
+
+            // sanitize_text_field() trims the string — fine for almost every
+            // other field type, but a gradient_text segment's boundary
+            // whitespace is often the literal space between it and its
+            // neighbor (e.g. a highlighted word/phrase sitting mid-sentence,
+            // the field type's primary use case), and renderGradientText()
+            // concatenates segments with no separator of its own. Restore a
+            // single boundary space wherever the original text had one —
+            // never anything else from the original string, so this can't
+            // reopen whatever sanitize_text_field() just closed.
+            if (preg_match('/^\s/', $rawText)) {
+                $text = ' ' . $text;
+            }
+            if (preg_match('/\s$/', $rawText)) {
+                $text .= ' ';
             }
 
             $clean[] = [
