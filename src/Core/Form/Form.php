@@ -992,6 +992,14 @@ class Form
         Turnstile::enqueueScript();
 
         echo '<div class="cf-turnstile" data-sitekey="' . esc_attr($siteKey) . '" data-theme="light"></div>';
+        // Explicit-mode render call for this specific widget — see the doc
+        // comment on Turnstile::enqueueScript() for why implicit
+        // (auto-scanning) mode doesn't work once a page-transition library
+        // is in the picture. Inline (no `src`), so it's covered by the
+        // same "re-run inline scripts after a client-side navigation"
+        // fix (whatever form it takes on a given site) as Form's own
+        // submit-handler script below.
+        echo '<script>window.TAWTurnstile.render(document.currentScript.previousElementSibling);</script>';
     }
 
     /* -------------------------------------------------------------------------
@@ -1015,6 +1023,17 @@ class Form
      * nothing, and the popup opens/closes only via the click handling in
      * renderScript(), tracked through the trigger's aria-expanded state
      * (also what form.css keys off of for the click variant).
+     *
+     * 'help_modal' => true goes a step further: instead of a popover
+     * anchored to the trigger, the help text opens as a centered modal
+     * dialog over a backdrop — for cases where an anchored popup still
+     * reads as "attached to one small icon" rather than as its own piece
+     * of content. Implies click triggering regardless of
+     * 'trigger_on_click' (a full-screen backdrop opening/closing on
+     * hover would be unusable), and renders an extra inner
+     * .taw-help-popup-card + close button that plain click mode doesn't
+     * need — .taw-help-popup itself becomes the fixed, centering backdrop
+     * rather than the visible surface.
      */
     private function renderHelp(array $field): void
     {
@@ -1022,16 +1041,43 @@ class Form
             return;
         }
 
-        $clickTriggered = !empty($field['trigger_on_click']);
-        $wrapperClass   = $clickTriggered ? 'taw-help taw-help--click' : 'taw-help';
-        $triggerAttrs   = $clickTriggered ? ' aria-haspopup="true" aria-expanded="false"' : '';
+        $isModal        = !empty($field['help_modal']);
+        $clickTriggered = $isModal || !empty($field['trigger_on_click']);
+
+        $wrapperClasses = ['taw-help'];
+        if ($clickTriggered) {
+            $wrapperClasses[] = 'taw-help--click';
+        }
+        if ($isModal) {
+            $wrapperClasses[] = 'taw-help--modal';
+        }
+
+        $triggerAttrs = $clickTriggered
+            ? ' aria-haspopup="' . ($isModal ? 'dialog' : 'true') . '" aria-expanded="false"'
+            : '';
+
+        $helpText = nl2br(esc_html($field['help']));
+
+        if ($isModal) {
+            printf(
+                '<span class="%s"><button type="button" class="taw-help-trigger" aria-label="%s"%s>?</button>'
+                    . '<span class="taw-help-popup"><span class="taw-help-popup-card" role="dialog" aria-modal="true">'
+                    . '<button type="button" class="taw-help-close" aria-label="%s">&times;</button>%s</span></span></span>',
+                esc_attr(implode(' ', $wrapperClasses)),
+                esc_attr__('More information', 'taw'),
+                $triggerAttrs,
+                esc_attr__('Close', 'taw'),
+                $helpText
+            );
+            return;
+        }
 
         printf(
             '<span class="%s"><button type="button" class="taw-help-trigger" aria-label="%s"%s>?</button><span class="taw-help-popup" role="tooltip">%s</span></span>',
-            esc_attr($wrapperClass),
+            esc_attr(implode(' ', $wrapperClasses)),
             esc_attr__('More information', 'taw'),
             $triggerAttrs,
-            nl2br(esc_html($field['help']))
+            $helpText
         );
     }
 
@@ -1410,16 +1456,46 @@ class Form
             form.addEventListener('input',  evaluateConditions);
 
             // ── Click-triggered help popovers ────────────────────────
-            // Fields with 'trigger_on_click' => true render a
-            // .taw-help--click wrapper instead of the default hover/focus
-            // one; form.css keys the popup's visibility purely off the
-            // trigger's aria-expanded attribute, which this toggles.
+            // Fields with 'trigger_on_click' (or 'help_modal') => true
+            // render a .taw-help--click wrapper instead of the default
+            // hover/focus one; form.css keys the popup's visibility purely
+            // off the trigger's aria-expanded attribute, which this
+            // toggles. 'help_modal' additionally renders a
+            // .taw-help--modal backdrop + .taw-help-popup-card + close
+            // button, handled by the same open/close plumbing below.
 
             var helpTriggers = form.querySelectorAll('.taw-help--click > .taw-help-trigger');
+            var openHelpModals = 0; // how many currently-open triggers are modal — locks body scroll while > 0
+
+            function setHelpOpen(trigger, open) {
+                var wasOpen = trigger.getAttribute('aria-expanded') === 'true';
+                if (wasOpen === open) return;
+
+                trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+
+                var isModal = trigger.parentElement.classList.contains('taw-help--modal');
+                if (!isModal) return;
+
+                openHelpModals += open ? 1 : -1;
+                document.documentElement.style.overflow = openHelpModals > 0 ? 'hidden' : '';
+
+                // Move focus into the dialog on open. Deliberately NOT
+                // returning focus to the trigger here on close — a generic
+                // outside click (e.g. onto some other field) already gives
+                // that other element focus, and forcing it back to the
+                // trigger would yank focus away from what was actually
+                // clicked. The paths where returning focus IS correct
+                // (close button, backdrop click, Escape) call trigger.focus()
+                // themselves, right where they call this with open=false.
+                if (open) {
+                    var closeBtn = trigger.parentElement.querySelector('.taw-help-close');
+                    if (closeBtn) closeBtn.focus();
+                }
+            }
 
             function closeAllHelpPopovers(except) {
                 helpTriggers.forEach(function (btn) {
-                    if (btn !== except) btn.setAttribute('aria-expanded', 'false');
+                    if (btn !== except) setHelpOpen(btn, false);
                 });
             }
 
@@ -1428,16 +1504,54 @@ class Form
                     e.stopPropagation();
                     var isOpen = trigger.getAttribute('aria-expanded') === 'true';
                     closeAllHelpPopovers(trigger);
-                    trigger.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+                    setHelpOpen(trigger, !isOpen);
+                });
+
+                var popup = trigger.nextElementSibling; // .taw-help-popup
+                if (!popup) return;
+
+                var closeBtn = popup.querySelector('.taw-help-close');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        setHelpOpen(trigger, false);
+                        trigger.focus();
+                    });
+                }
+
+                // Modal only: .taw-help-popup is the full backdrop, with
+                // .taw-help-popup-card centered inside it — a click that
+                // lands on the backdrop itself (not the card) dismisses,
+                // same convention as clicking outside any modal.
+                popup.addEventListener('click', function (e) {
+                    if (e.target !== popup) return;
+                    setHelpOpen(trigger, false);
+                    trigger.focus();
                 });
             });
 
             if (helpTriggers.length) {
-                document.addEventListener('click', function () {
+                // Only closes for a click that actually lands outside every
+                // trigger/popup — without this guard, any click inside an
+                // open popup (selecting text, scrolling) bubbles to
+                // document and closes it before the click's own intent
+                // (e.g. hitting the close button) even registers. No forced
+                // trigger.focus() here: whatever else was clicked already
+                // has focus, and a real modal's backdrop would have caught
+                // the click before it got this far anyway (see above) — this
+                // branch is only reachable at all for the anchored,
+                // non-modal popover.
+                document.addEventListener('click', function (e) {
+                    if (e.target.closest('.taw-help--click')) return;
                     closeAllHelpPopovers(null);
                 });
                 document.addEventListener('keydown', function (e) {
-                    if (e.key === 'Escape') closeAllHelpPopovers(null);
+                    if (e.key !== 'Escape') return;
+                    var openTrigger = Array.prototype.find.call(helpTriggers, function (btn) {
+                        return btn.getAttribute('aria-expanded') === 'true';
+                    });
+                    closeAllHelpPopovers(null);
+                    if (openTrigger) openTrigger.focus();
                 });
             }
 

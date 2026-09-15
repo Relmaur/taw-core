@@ -219,23 +219,37 @@
     transform: translateX(-50%) translateY(0);
 }
 
-/* Click-triggered variant: shown purely off aria-expanded, set by JS. */
-.taw-help--click .taw-help-trigger[aria-expanded="true"] + .taw-help-popup {
+/*
+ * Click-triggered variant: shown purely off aria-expanded, set by JS.
+ * Anchored (non-modal) popup only — the modal variant below only ever
+ * needs opacity/visibility/pointer-events toggled; the backdrop itself
+ * is never translated (transform: none in .taw-help--modal .taw-help-popup),
+ * and the .taw-help-popup-card's own transform is handled by its own rule
+ * further down. This selector has higher specificity than that base
+ * transform: none, so it must exclude modal to avoid fighting it.
+ */
+.taw-help--click:not(.taw-help--modal) .taw-help-trigger[aria-expanded="true"] + .taw-help-popup {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
     transform: translateX(-50%) translateY(0);
 }
 
+.taw-help--modal .taw-help-trigger[aria-expanded="true"] + .taw-help-popup {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
 @media (max-width: 639px) {
-    .taw-help-popup {
+    .taw-help:not(.taw-help--modal) .taw-help-popup {
         left: auto;
         right: 0;
         max-width: 240px;
         transform: translateX(0) translateY(4px);
     }
 
-    .taw-help-popup::after {
+    .taw-help:not(.taw-help--modal) .taw-help-popup::after {
         left: auto;
         right: 0.5rem;
         transform: none;
@@ -244,9 +258,95 @@
     .taw-help:not(.taw-help--click):hover .taw-help-popup,
     .taw-help:not(.taw-help--click) .taw-help-trigger:focus-visible + .taw-help-popup,
     .taw-help:not(.taw-help--click) .taw-help-trigger:focus + .taw-help-popup,
-    .taw-help--click .taw-help-trigger[aria-expanded="true"] + .taw-help-popup {
+    .taw-help--click:not(.taw-help--modal) .taw-help-trigger[aria-expanded="true"] + .taw-help-popup {
         transform: translateX(0) translateY(0);
     }
+}
+
+/*
+ * Modal variant ('help_modal' => true): instead of a popover anchored to
+ * the trigger, .taw-help-popup becomes a fixed, full-viewport, centering
+ * backdrop, and the visible surface moves to the .taw-help-popup-card
+ * nested inside it (plus a close button — a full-screen backdrop needs an
+ * explicit, discoverable way to dismiss beyond "hope the user clicks
+ * outside"). No caret/gap-bridge here; those only make sense for a popup
+ * anchored to a specific point.
+ */
+.taw-help--modal .taw-help-popup {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    left: auto;
+    bottom: auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(20, 18, 15, 0.6);
+    border-radius: 0;
+    box-shadow: none;
+    transform: none;
+}
+
+.taw-help--modal .taw-help-popup::after,
+.taw-help--modal .taw-help-popup::before {
+    content: none;
+}
+
+.taw-help-popup-card {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    max-height: 80vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    padding: 1.75rem 1.5rem 1.5rem;
+    border-radius: 0.5rem;
+    background: #1c1917;
+    color: #fafaf9;
+    font-size: 0.9375rem;
+    font-weight: 400;
+    line-height: 1.6;
+    text-align: left;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    transform: translateY(8px) scale(0.98);
+    transition: transform .2s ease;
+}
+
+.taw-help--modal .taw-help-trigger[aria-expanded="true"] + .taw-help-popup .taw-help-popup-card {
+    transform: translateY(0) scale(1);
+}
+
+.taw-help-close {
+    position: absolute;
+    top: 0.625rem;
+    right: 0.625rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    color: inherit;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background .15s;
+}
+
+.taw-help-close:hover,
+.taw-help-close:focus-visible {
+    background: rgba(255, 255, 255, 0.18);
 }
 
 /* ── Field error ────────────────────────────────────────────────────────── */

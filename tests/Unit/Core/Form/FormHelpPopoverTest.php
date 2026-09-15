@@ -121,4 +121,50 @@ final class FormHelpPopoverTest extends TestCase
         $this->assertStringContainsString('aria-haspopup="true"', $output);
         $this->assertStringContainsString('aria-expanded="false"', $output);
     }
+
+    public function test_help_modal_renders_card_and_close_button(): void
+    {
+        $form = $this->makeForm();
+
+        ob_start();
+        $this->callMethod($form, 'renderHelp', [
+            'id'          => 'consent',
+            'help'        => 'Summary.',
+            'help_modal'  => true,
+        ]);
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('taw-help--modal', $output);
+        $this->assertStringContainsString('taw-help-popup-card', $output);
+        $this->assertStringContainsString('taw-help-close', $output);
+        $this->assertStringContainsString('role="dialog"', $output);
+        $this->assertStringContainsString('aria-modal="true"', $output);
+    }
+
+    public function test_help_modal_implies_click_triggering_even_without_the_flag(): void
+    {
+        $form = $this->makeForm();
+
+        ob_start();
+        $this->callMethod($form, 'renderHelp', ['id' => 'consent', 'help' => 'Summary.', 'help_modal' => true]);
+        $output = ob_get_clean();
+
+        // A full-screen backdrop opening on hover would be unusable — the
+        // modal variant must always be click-triggered, whether or not
+        // 'trigger_on_click' was explicitly set alongside it.
+        $this->assertStringContainsString('taw-help--click', $output);
+        $this->assertStringContainsString('aria-haspopup="dialog"', $output);
+    }
+
+    public function test_non_modal_click_trigger_uses_generic_aria_haspopup(): void
+    {
+        $form = $this->makeForm();
+
+        ob_start();
+        $this->callMethod($form, 'renderHelp', ['id' => 'consent', 'help' => 'Summary.', 'trigger_on_click' => true]);
+        $output = ob_get_clean();
+
+        $this->assertStringNotContainsString('taw-help--modal', $output);
+        $this->assertStringContainsString('aria-haspopup="true"', $output);
+    }
 }

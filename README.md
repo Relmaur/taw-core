@@ -550,6 +550,12 @@ For a `checkbox`/`radio` field specifically, the trigger renders *outside* the `
 ['id' => 'privacy_consent', 'type' => 'checkbox', 'help' => '...', 'trigger_on_click' => true],
 ```
 
+**`help_modal`** — add `'help_modal' => true` to open the help text as a centered modal dialog over a backdrop, instead of a popover anchored to the trigger icon. For longer or more prominent content, an anchored popup can still read as "a tooltip on a small icon" rather than its own piece of content — a modal makes it unambiguous. Implies click triggering regardless of `trigger_on_click`'s value (a full-screen backdrop opening on hover isn't usable), and renders an explicit close button in addition to the usual backdrop-click / outside-click / Escape dismissal.
+
+```php
+['id' => 'privacy_consent', 'type' => 'checkbox', 'help' => '...', 'help_modal' => true],
+```
+
 ### Multi-column Layout
 
 Fields live in a 12-column CSS grid. `width` is a percentage; all fields collapse to full width on mobile.
