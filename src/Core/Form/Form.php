@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core\Form;
 
+use TAW\Core\Icons\Lucide;
 use TAW\Core\Log\Logger;
 use TAW\Core\Mail\Mailer;
 use TAW\Helpers\Framework;
@@ -46,6 +47,7 @@ if (!defined('ABSPATH')) {
  *   Form::register([
  *       'id'           => 'contact',
  *       'submit_label' => 'Send Message',
+ *       'submit_icon'  => 'send', // optional — a Lucide icon name (via Lucide::render()), or raw '<svg>...</svg>'
  *       'rate_limit'   => ['max' => 5, 'window' => 60], // optional — this is the default; pass false to disable
  *       'turnstile'    => true, // optional — requires TAW_TURNSTILE_SITE_KEY/SECRET_KEY in wp-config.php
  *       'fields'       => [
@@ -971,7 +973,47 @@ class Form
             . '<path class="taw-spinner-fill" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>'
             . '</svg>';
         echo '<span data-taw-submit-label>' . esc_html($label) . '</span>';
+        $this->renderSubmitIcon();
         echo '</button>';
+    }
+
+    /**
+     * Render an optional icon inside the submit button, after the label —
+     * `'submit_icon' => 'send'` (a Lucide icon name, via `Lucide::render()`)
+     * or `'submit_icon' => '<svg>...</svg>'` (raw SVG/HTML, printed as-is).
+     * No config, no output — the default submit button is unchanged.
+     *
+     * No `Lucide::isEnabled()` gate: per Lucide's own docblock, `render()`
+     * needs no `enable()` call — only the admin *picker* (the `icon`
+     * metabox field type) is gated behind it. `submit_icon` is a direct,
+     * developer-authored `Lucide::render()` call, same as a template
+     * echoing an icon by hand, so it follows that same rule; an unknown
+     * icon name (Lucide never vendored, or the icon system never enabled)
+     * makes `Lucide::render()` itself return `''`, which this method
+     * already treats as "render nothing."
+     *
+     * `'submit_icon'` is developer-authored config (the same trust level as
+     * every other `Form::register()` option, e.g. Metabox's own `icon`
+     * metabox-config key), not end-user input, so raw HTML is printed
+     * without `wp_kses_post()` — same trust model as that field.
+     *
+     * Wrapped in `aria-hidden="true"`: the button's accessible name already
+     * comes from the label span, so the icon is decorative.
+     */
+    private function renderSubmitIcon(): void
+    {
+        $icon = $this->config['submit_icon'] ?? '';
+        if ($icon === '' || !is_string($icon)) {
+            return;
+        }
+
+        $markup = str_starts_with(ltrim($icon), '<') ? $icon : Lucide::render($icon);
+
+        if ($markup === '') {
+            return;
+        }
+
+        echo '<span class="taw-btn-icon" aria-hidden="true">' . $markup . '</span>';
     }
 
     /**

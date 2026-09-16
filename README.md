@@ -463,6 +463,21 @@ public static function boot(): void
 
 Render in a template: `Form::display('contact');`
 
+### Submit Button
+
+`submit_label` sets the button text (default `'Send Message'`, or `'Submit'` for a multi-step form's final step). `submit_icon` optionally renders an icon after the label — a Lucide icon name (via `Lucide::render()` — no `Lucide::enable()` needed, same as any other direct template call to it) or raw `'<svg>...</svg>'`/HTML, printed as-is:
+
+```php
+Form::register([
+    'id'           => 'contact',
+    'submit_label' => 'Send message',
+    'submit_icon'  => 'send',
+    'fields'       => [...],
+]);
+```
+
+The icon renders inside its own `<span class="taw-btn-icon" aria-hidden="true">` (decorative — the button's accessible name already comes from the label), after the label span, alongside the button's existing loading spinner. Nothing renders when `submit_icon` is unset, empty, or an icon name `Lucide::render()` doesn't recognize.
+
 ### Security
 
 Every form has CSRF (nonce) protection and honeypot spam filtering by default, no configuration needed. Two more layers are available:
