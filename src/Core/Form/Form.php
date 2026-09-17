@@ -365,7 +365,10 @@ class Form
 
             $sanitized = $this->sanitize($value, $field['type'] ?? 'text');
 
-            if (($field['type'] ?? '') === 'email' && !empty($sanitized) && !is_email($sanitized)) {
+            // Check the raw value's blankness, not the sanitized value's — sanitize_email()
+            // reduces an unfixable value (e.g. missing "@") to '', which would otherwise look
+            // like "nothing to validate" and let a malformed, non-blank input through as blank.
+            if (($field['type'] ?? '') === 'email' && '' !== trim((string) $value) && !is_email($sanitized)) {
                 $errors[$fieldId] = $this->emailMessage($field);
             }
 
