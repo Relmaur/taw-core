@@ -90,7 +90,24 @@ class EmailConfig
             return null;
         }
 
-        $to      = is_array($atts['to']) ? implode(', ', $atts['to']) : (string) ($atts['to'] ?? '');
+        // wp_mail()'s 'to' is either an array or a single string that may itself be
+        // comma-separated (both are valid WordPress/PHPMailer conventions, which
+        // splits a comma-joined string back into individual recipients itself).
+        // Emailit's API has no such convention — it only understands a plain
+        // string (one recipient) or a real string[] (multiple recipients) — so a
+        // naive implode(', ', ...)/cast here would hand it a single string
+        // containing several "@"s, which Emailit's own address parsing can't
+        // split back apart correctly.
+        $toList = is_array($atts['to'])
+            ? $atts['to']
+            : explode(',', (string) ($atts['to'] ?? ''));
+        $toList = array_values(array_filter(array_map('trim', $toList), fn($v) => $v !== ''));
+        $to     = match (count($toList)) {
+            0       => '',
+            1       => $toList[0],
+            default => $toList,
+        };
+
         $subject = (string) ($atts['subject'] ?? '');
         $message = (string) ($atts['message'] ?? '');
         $headers = (array)  ($atts['headers'] ?? []);

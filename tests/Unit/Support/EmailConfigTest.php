@@ -185,6 +185,123 @@ final class EmailConfigTest extends TestCase
         $this->assertSame('Body', $capturedParams['text']);
     }
 
+    /**
+     * Regression test: a real 2-recipient array used to be collapsed into a
+     * single comma-joined string ("a@x.com, b@y.com") before reaching the
+     * SDK. Emailit's API has no WP/PHPMailer-style "comma string means
+     * multiple recipients" convention — it only understands a plain string
+     * (one recipient) or a real string[] — so that joined string was handed
+     * to Emailit as if it were one address, and Emailit's own address
+     * parsing extracted "everything after the first @" as the domain,
+     * producing exactly the malformed "gmail.com, comercializacion@..."
+     * domain seen in production delivery failures. 'to' must arrive at the
+     * SDK as a real array when there's more than one recipient.
+     */
+    public function test_multiple_recipients_as_array_are_sent_as_a_real_array_not_joined(): void
+    {
+        $capturedParams = null;
+
+        $emailService = \Mockery::mock();
+        $emailService->shouldReceive('send')->once()->andReturnUsing(
+            function (array $params) use (&$capturedParams) {
+                $capturedParams = $params;
+                return (object) [];
+            }
+        );
+
+        $client = \Mockery::mock('overload:' . \Emailit\EmailitClient::class);
+        $client->shouldReceive('emails')->once()->andReturn($emailService);
+
+        EmailConfig::useEmailit('fake-api-key', 'hello@example.com');
+
+        $result = EmailConfig::interceptForEmailit(null, [
+            'to'      => ['chcapitalmexico@gmail.com', 'comercializacion@chcapital.mx'],
+            'subject' => 'Test',
+            'message' => 'Body',
+            'headers' => [],
+        ]);
+
+        $this->assertTrue($result);
+        $this->assertNotNull($capturedParams);
+        $this->assertSame(
+            ['chcapitalmexico@gmail.com', 'comercializacion@chcapital.mx'],
+            $capturedParams['to']
+        );
+    }
+
+    /**
+     * Same bug, reached via the other call shape: Form::sendWithTemplate()
+     * pre-joins a multi-recipient array into a single comma-separated
+     * string before it ever reaches wp_mail()/this filter. That string must
+     * still be split back into a real array here, not passed through as-is.
+     */
+    public function test_comma_separated_string_is_split_into_a_real_array(): void
+    {
+        $capturedParams = null;
+
+        $emailService = \Mockery::mock();
+        $emailService->shouldReceive('send')->once()->andReturnUsing(
+            function (array $params) use (&$capturedParams) {
+                $capturedParams = $params;
+                return (object) [];
+            }
+        );
+
+        $client = \Mockery::mock('overload:' . \Emailit\EmailitClient::class);
+        $client->shouldReceive('emails')->once()->andReturn($emailService);
+
+        EmailConfig::useEmailit('fake-api-key', 'hello@example.com');
+
+        $result = EmailConfig::interceptForEmailit(null, [
+            'to'      => 'chcapitalmexico@gmail.com, comercializacion@chcapital.mx',
+            'subject' => 'Test',
+            'message' => 'Body',
+            'headers' => [],
+        ]);
+
+        $this->assertTrue($result);
+        $this->assertNotNull($capturedParams);
+        $this->assertSame(
+            ['chcapitalmexico@gmail.com', 'comercializacion@chcapital.mx'],
+            $capturedParams['to']
+        );
+    }
+
+    /**
+     * A single recipient — whether passed as a one-element array or a plain
+     * string — must still be sent as a plain string, not a one-element
+     * array, matching the SDK's documented to: string|string[] contract and
+     * the pre-existing single-recipient tests above.
+     */
+    public function test_single_recipient_is_still_sent_as_a_plain_string(): void
+    {
+        $capturedParams = null;
+
+        $emailService = \Mockery::mock();
+        $emailService->shouldReceive('send')->once()->andReturnUsing(
+            function (array $params) use (&$capturedParams) {
+                $capturedParams = $params;
+                return (object) [];
+            }
+        );
+
+        $client = \Mockery::mock('overload:' . \Emailit\EmailitClient::class);
+        $client->shouldReceive('emails')->once()->andReturn($emailService);
+
+        EmailConfig::useEmailit('fake-api-key', 'hello@example.com');
+
+        $result = EmailConfig::interceptForEmailit(null, [
+            'to'      => ['someone@example.com'],
+            'subject' => 'Test',
+            'message' => 'Body',
+            'headers' => [],
+        ]);
+
+        $this->assertTrue($result);
+        $this->assertNotNull($capturedParams);
+        $this->assertSame('someone@example.com', $capturedParams['to']);
+    }
+
     public function test_sdk_exception_during_send_falls_back_to_null_gracefully(): void
     {
         $emailService = \Mockery::mock();
