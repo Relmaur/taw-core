@@ -86,6 +86,15 @@ if (!defined('ABSPATH')) {
  *                    'conditions' => ['relation' => 'any', 'rules' => [
  *                        ['field' => 'estado_civil', 'operator' => '==', 'value' => 'married'],
  *                    ]]],
+ *                   // 'required_if' takes the same rule syntax as 'conditions', but the
+ *                   // field always stays visible/submitted — only its required-ness
+ *                   // toggles. Use this instead of 'conditions' when a field should
+ *                   // remain in view either way (e.g. an open-ended "message" box that's
+ *                   // optional in general but mandatory for one specific dropdown choice).
+ *                   ['id' => 'other_details', 'label' => 'Please specify', 'type' => 'textarea',
+ *                    'required_if' => [
+ *                        ['field' => 'category', 'operator' => '==', 'value' => 'other'],
+ *                    ]],
  *               ],
  *           ],
  *       ],
@@ -348,7 +357,14 @@ class Form
             $value = $raw[$fieldId];
             $label = $field['label'] ?? $fieldId;
 
-            if (!empty($field['required']) && $this->isBlank((string) $value, $field['type'] ?? 'text')) {
+            // 'required_if' reuses the same rule syntax as 'conditions', but only
+            // governs whether blankness is an error — unlike 'conditions', it never
+            // hides or skips the field, since the whole point is a field that stays
+            // visible/submitted either way and is only sometimes mandatory.
+            $isRequired = !empty($field['required'])
+                || (!empty($field['required_if']) && $this->conditionsMet($field['required_if'], $raw));
+
+            if ($isRequired && $this->isBlank((string) $value, $field['type'] ?? 'text')) {
                 $errors[$fieldId] = $this->requiredMessage($field, $label);
                 continue;
             }
@@ -1188,6 +1204,15 @@ class Form
         $conditions  = $field['conditions'] ?? [];
         $inputClass  = 'taw-input';
 
+        // Unlike $conditions (which hides the whole field), 'required_if' only
+        // toggles this asterisk — the field itself always renders. Starts
+        // `hidden`; renderScript()'s evaluateRequiredIf() reveals it once the
+        // rule is met, mirroring the server-side check in process().
+        $requiredIf       = $field['required_if'] ?? [];
+        $requiredIfMarker = !empty($requiredIf)
+            ? ' <span class="taw-required" aria-hidden="true" hidden data-taw-required-if="' . esc_attr(wp_json_encode($requiredIf)) . '">*</span>'
+            : '';
+
         $width = max(1, min(100, (int) ($field['width'] ?? 100)));
         $span  = max(1, min(12, (int) round($width / 100 * 12)));
 
@@ -1208,6 +1233,8 @@ class Form
             echo esc_html($label);
             if ($required) {
                 echo ' <span class="taw-required" aria-hidden="true">*</span>';
+            } elseif ($requiredIfMarker !== '') {
+                echo $requiredIfMarker;
             }
             echo '</label>';
             $this->renderHelp($field);
@@ -1240,6 +1267,8 @@ class Form
                     echo '<span class="taw-field-label">' . esc_html($label);
                     if ($required) {
                         echo ' <span class="taw-required" aria-hidden="true">*</span>';
+                    } elseif ($requiredIfMarker !== '') {
+                        echo $requiredIfMarker;
                     }
                     echo '</span>';
                     $this->renderHelp($field);
@@ -1269,6 +1298,8 @@ class Form
                     echo '<span class="taw-field-label">' . esc_html($label);
                     if ($required) {
                         echo ' <span class="taw-required" aria-hidden="true">*</span>';
+                    } elseif ($requiredIfMarker !== '') {
+                        echo $requiredIfMarker;
                     }
                     echo '</span>';
                     $this->renderHelp($field);
@@ -1493,25 +1524,27 @@ class Form
                 }
             }
 
+            // Shared by evaluateConditions()/evaluateRequiredIf() — 'defaultWhenEmpty'
+            // differs between them: an empty 'conditions' means "always show" (true),
+            // but an empty 'required_if' would be a no-op config and should never
+            // itself make a field required (false).
+            function rulesMet(cfg, defaultWhenEmpty) {
+                var relation = cfg.relation || 'all';
+                var rules    = Array.isArray(cfg.rules) ? cfg.rules
+                             : Array.isArray(cfg)       ? cfg
+                             : [];
+                rules = rules.filter(function(r) { return r && r.field; });
+
+                if (!rules.length) return defaultWhenEmpty;
+                return relation === 'any' ? rules.some(evalRule) : rules.every(evalRule);
+            }
+
             function evaluateConditions() {
                 form.querySelectorAll('[data-taw-conditions]').forEach(function (wrap) {
                     var cfg;
                     try { cfg = JSON.parse(wrap.getAttribute('data-taw-conditions')); } catch (e) { return; }
 
-                    var relation = cfg.relation || 'all';
-                    var rules    = Array.isArray(cfg.rules) ? cfg.rules
-                                 : Array.isArray(cfg)       ? cfg
-                                 : [];
-                    rules = rules.filter(function(r) { return r && r.field; });
-
-                    var met;
-                    if (!rules.length) {
-                        met = true;
-                    } else if (relation === 'any') {
-                        met = rules.some(evalRule);
-                    } else {
-                        met = rules.every(evalRule);
-                    }
+                    var met = rulesMet(cfg, true);
 
                     wrap.hidden = !met;
                     wrap.querySelectorAll('input, select, textarea').forEach(function (el) {
@@ -1520,9 +1553,22 @@ class Form
                 });
             }
 
+            function evaluateRequiredIf() {
+                form.querySelectorAll('[data-taw-required-if]').forEach(function (marker) {
+                    var cfg;
+                    try { cfg = JSON.parse(marker.getAttribute('data-taw-required-if')); } catch (e) { return; }
+
+                    marker.hidden = !rulesMet(cfg, false);
+                });
+            }
+
             evaluateConditions();
             form.addEventListener('change', evaluateConditions);
             form.addEventListener('input',  evaluateConditions);
+
+            evaluateRequiredIf();
+            form.addEventListener('change', evaluateRequiredIf);
+            form.addEventListener('input',  evaluateRequiredIf);
 
             // ── Click-triggered help popovers ────────────────────────
             // Fields with 'trigger_on_click' (or 'help_modal') => true
@@ -1777,6 +1823,7 @@ class Form
                     if (json.success) {
                         form.reset();
                         evaluateConditions();
+                        evaluateRequiredIf();
 
                         if (isMultiStep) {
                             form.querySelectorAll('[data-taw-step-panel], .taw-step-indicator, .taw-step-progress, [data-taw-form-actions]')
