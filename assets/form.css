@@ -26,9 +26,16 @@
     gap: 1rem;
 }
 
+/* Every cell's width arrives as the --taw-span custom property (1–12), set
+   inline by Form::renderField() — never as an inline grid-column, so a
+   theme can override `grid-column` with a plain selector, no !important. */
+.taw-form-grid > * {
+    grid-column: span var(--taw-span, 12) / span var(--taw-span, 12);
+}
+
 @media (max-width: 639px) {
-    .taw-form-grid .taw-form-field {
-        grid-column: 1 / -1 !important;
+    .taw-form-grid > * {
+        grid-column: 1 / -1;
     }
 }
 
