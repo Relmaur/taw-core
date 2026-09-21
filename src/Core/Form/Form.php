@@ -48,6 +48,8 @@ if (!defined('ABSPATH')) {
  *       'id'           => 'contact',
  *       'submit_label' => 'Send Message',
  *       'submit_icon'  => 'send', // optional — a Lucide icon name (via Lucide::render()), or raw '<svg>...</svg>'
+ *       'class'        => 'contact-form', // optional — extra class(es) on the <form>, appended to `taw-form`
+ *       'button_class' => 'btn-black',    // optional — extra class(es) on the primary buttons, appended to `taw-btn taw-btn-primary`
  *       'rate_limit'   => ['max' => 5, 'window' => 60], // optional — this is the default; pass false to disable
  *       'turnstile'    => true, // optional — requires TAW_TURNSTILE_SITE_KEY/SECRET_KEY in wp-config.php
  *       'fields'       => [
@@ -862,7 +864,7 @@ class Form
 
         echo '<form method="post"'
             . ' action="' . $ajaxUrl . '"'
-            . ' class="taw-form"'
+            . ' class="taw-form' . $this->extraClasses('class') . '"'
             . ' data-taw-form="' . $formId . '"'
             . ($isMultiStep ? ' data-taw-multistep' : '')
             . ($hasImageField ? ' enctype="multipart/form-data"' : '')
@@ -970,7 +972,7 @@ class Form
         echo esc_html($prevLabel);
         echo '</button>';
 
-        echo '<button type="button" class="taw-btn taw-btn-primary" data-taw-next>';
+        echo '<button type="button" class="taw-btn taw-btn-primary' . $this->extraClasses('button_class') . '" data-taw-next>';
         echo esc_html($nextLabel);
         echo '</button>';
 
@@ -981,11 +983,37 @@ class Form
         echo '</div>';
     }
 
+    /**
+     * Extra CSS class(es) a form's own config appends to one of the
+     * framework's fixed class lists — `'class'` on the `<form>`,
+     * `'button_class'` on the primary buttons (submit, and Next on a
+     * multi-step form). Returns a leading-space, attribute-escaped string
+     * ready to concatenate after the built-in classes (or `''` when unset),
+     * so the defaults are never replaced — only added to. That's the
+     * per-form styling hook: a theme scopes overrides to `.my-form
+     * .taw-input` instead of an ancestor wrapper it has to invent, and
+     * different forms on one site can carry different button treatments.
+     *
+     * Developer-authored config (same trust level as every other
+     * `Form::register()` option), escaped for attribute context only.
+     */
+    private function extraClasses(string $key): string
+    {
+        $classes = $this->config[$key] ?? '';
+        if (!is_string($classes)) {
+            return '';
+        }
+
+        $classes = trim($classes);
+
+        return $classes === '' ? '' : ' ' . esc_attr($classes);
+    }
+
     private function renderSubmitButton(string $label, string $loadingLabel): void
     {
         echo '<button type="submit" data-taw-submit'
             . ' data-loading-label="' . esc_attr($loadingLabel) . '"'
-            . ' class="taw-btn taw-btn-primary">';
+            . ' class="taw-btn taw-btn-primary' . $this->extraClasses('button_class') . '">';
         echo '<svg class="taw-hidden taw-btn-spinner" data-taw-spinner'
             . ' xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">'
             . '<circle class="taw-spinner-track" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>'
@@ -1166,15 +1194,29 @@ class Form
         );
     }
 
+    /**
+     * A field's `'width'` (percent, 1–100) as its span across the form
+     * grid's 12 columns. Emitted as the `--taw-span` custom property on the
+     * field's wrapper — `form.css` turns it into `grid-column`. It used to
+     * be an inline `grid-column: span N / span N`, which no stylesheet rule
+     * can beat without `!important`; a custom property leaves `grid-column`
+     * itself free for a theme to override (e.g. full-width on mobile) with
+     * an ordinary selector.
+     */
+    private static function columnSpan(array $field): int
+    {
+        $width = max(1, min(100, (int) ($field['width'] ?? 100)));
+
+        return max(1, min(12, (int) round($width / 100 * 12)));
+    }
+
     private function renderField(array $field): void
     {
         $type = $field['type'] ?? 'text';
 
         // ── Structural types ──────────────────────────────────────
         if (in_array($type, self::STRUCTURAL_TYPES, true)) {
-            $width = max(1, min(100, (int) ($field['width'] ?? 100)));
-            $span  = max(1, min(12, (int) round($width / 100 * 12)));
-            $style = 'grid-column: span ' . $span . ' / span ' . $span . ';';
+            $style = '--taw-span: ' . self::columnSpan($field) . ';';
 
             switch ($type) {
                 case 'html':
@@ -1213,11 +1255,8 @@ class Form
             ? ' <span class="taw-required" aria-hidden="true" hidden data-taw-required-if="' . esc_attr(wp_json_encode($requiredIf)) . '">*</span>'
             : '';
 
-        $width = max(1, min(100, (int) ($field['width'] ?? 100)));
-        $span  = max(1, min(12, (int) round($width / 100 * 12)));
-
         $wrapAttrs = 'class="taw-form-field"'
-            . ' style="grid-column: span ' . $span . ' / span ' . $span . ';"'
+            . ' style="--taw-span: ' . self::columnSpan($field) . ';"'
             . ' data-taw-field-wrap="' . esc_attr($id) . '"';
 
         if (!empty($conditions)) {
