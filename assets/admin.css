@@ -79,6 +79,16 @@ div[id*="taw_"] .postbox-header h2.hndle:has(img) {
   }
 }
 
+/* Metabox tabs live inside the metabox's own 100-column .fields-container
+   (so fields no tab claims can sit above them) — span the whole grid. */
+.fields-container > .taw-tabbed {
+  grid-column: 1 / -1;
+
+  .tab-content--wrapper {
+    padding-top: var(--fields-container-gap);
+  }
+}
+
 .fields-container {
   display: grid;
   grid-template-columns: repeat(100, 1fr);
