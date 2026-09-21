@@ -211,6 +211,8 @@ new Metabox([
 ]);
 ```
 
+Each tab lists field IDs from `fields`; fields keep their declared order inside a tab, and `width` / `conditions` work as in a flat metabox. Every tab's inputs stay in the DOM (only the active panel is shown), so the whole metabox still posts and saves as one form. Fields that no tab lists are **not** dropped — they render above the tab bar, so a shared field (e.g. a section heading) needs no tab of its own. A tab whose `fields` match nothing is skipped; if no tab resolves to any field, the metabox renders flat. An optional `icon` (image URL) shows beside the tab label.
+
 ### Repeater
 
 ```php

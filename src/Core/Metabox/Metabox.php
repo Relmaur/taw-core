@@ -1815,37 +1815,103 @@ class Metabox
             });
          ">
 
-            <?php foreach ($this->fields as $field):
-                $field_id = $this->prefix . $field['id'];
-                $value    = get_post_meta($post->ID, $field_id, true);
-                $has_conditions = !empty($field['conditions']);
+            <?php
+            $tab_groups = $this->resolve_tab_groups();
+
+            if ($tab_groups === []) {
+                foreach ($this->fields as $field) {
+                    $this->render_field_row($field, $post);
+                }
+            } else {
+                // Fields no tab claims stay visible above the tab bar — never
+                // silently dropped, since save() still walks every field and
+                // would blank the ones the form didn't post.
+                $tabbed_ids = array_merge(...array_map(
+                    static fn (array $group): array => array_column($group['fields'], 'id'),
+                    $tab_groups
+                ));
+
+                foreach ($this->fields as $field) {
+                    if (!in_array($field['id'], $tabbed_ids, true)) {
+                        $this->render_field_row($field, $post);
+                    }
+                }
+
+                $this->render_tabs($tab_groups, $post);
+            }
             ?>
-
-                <div class="field"
-                    style="--span: <?php echo esc_attr($field['width'] ?? '100'); ?>;"
-                    <?php if ($has_conditions): ?>
-                    x-show="<?php echo esc_attr($this->build_conditions_expression($field['conditions'])); ?>"
-                    x-cloak
-                    <?php endif; ?>>
-
-                    <div class="field-and-label">
-                        <label for="<?php echo esc_attr($field_id); ?>" class="field-label">
-                            <?php echo esc_html($field['label'] ?? ''); ?>
-                            <?php if (!empty($field['required'])): ?>
-                                <span class="taw-required">*</span>
-                            <?php endif; ?>
-                            <?php $this->render_readonly_lock_icon($field); ?>
-                        </label>
-                        <?php $this->render_field($field, $field_id, $value, $post->ID); ?>
-                    </div>
-
-                    <?php if (!empty($field['description'])): ?>
-                        <p class="description"><?php echo esc_html($field['description']); ?></p>
-                    <?php endif; ?>
-                </div>
-
-            <?php endforeach; ?>
         </div>
+        <?php
+    }
+
+    /**
+     * Pair each configured tab with the field definitions it lists.
+     *
+     * Fields are matched against `$this->fields` by ID and keep their declared
+     * order. Tabs that resolve to no fields (e.g. a mistyped field ID) are
+     * dropped so the bar never shows an empty tab. An empty result means the
+     * metabox has no usable tabs and renders as a flat list.
+     *
+     * @return array<int, array{tab: array<string, mixed>, fields: array<int, array<string, mixed>>}>
+     */
+    private function resolve_tab_groups(): array
+    {
+        $groups = [];
+
+        foreach ($this->tabs as $tab) {
+            $listed = (array) ($tab['fields'] ?? []);
+            $fields = array_values(array_filter(
+                $this->fields,
+                static fn (array $field): bool => in_array($field['id'], $listed, true)
+            ));
+
+            if ($fields !== []) {
+                $groups[] = ['tab' => $tab, 'fields' => $fields];
+            }
+        }
+
+        return $groups;
+    }
+
+    /**
+     * Render one field's grid cell: label, control, conditions, description.
+     *
+     * Shared by the flat and tabbed layouts so both stay identical.
+     *
+     * @param array<string, mixed> $field Field definition.
+     * @param \WP_Post             $post  The post currently being edited.
+     * @return void
+     */
+    private function render_field_row(array $field, \WP_Post $post): void
+    {
+        $field_id       = $this->prefix . $field['id'];
+        $value          = get_post_meta($post->ID, $field_id, true);
+        $has_conditions = !empty($field['conditions']);
+        ?>
+
+        <div class="field"
+            style="--span: <?php echo esc_attr($field['width'] ?? '100'); ?>;"
+            <?php if ($has_conditions): ?>
+            x-show="<?php echo esc_attr($this->build_conditions_expression($field['conditions'])); ?>"
+            x-cloak
+            <?php endif; ?>>
+
+            <div class="field-and-label">
+                <label for="<?php echo esc_attr($field_id); ?>" class="field-label">
+                    <?php echo esc_html($field['label'] ?? ''); ?>
+                    <?php if (!empty($field['required'])): ?>
+                        <span class="taw-required">*</span>
+                    <?php endif; ?>
+                    <?php $this->render_readonly_lock_icon($field); ?>
+                </label>
+                <?php $this->render_field($field, $field_id, $value, $post->ID); ?>
+            </div>
+
+            <?php if (!empty($field['description'])): ?>
+                <p class="description"><?php echo esc_html($field['description']); ?></p>
+            <?php endif; ?>
+        </div>
+
         <?php
     }
 
@@ -2612,73 +2678,40 @@ class Metabox
     /**
      * Render an Alpine.js-powered tabbed interface grouping metabox fields.
      *
-     * Each tab definition may include an `id`, `label`, `icon`, and a `fields`
-     * array of field IDs that should be displayed under that tab. Fields are
-     * matched against `$this->fields` and rendered in their declared order.
+     * Called from render() inside the metabox's own `x-data` scope, so the
+     * nested `activeTab` scope inherits the `fields` state that conditional
+     * fields (`conditions`) read. Every tab's inputs stay in the DOM (only
+     * `x-show` toggles them), so the whole metabox still posts and saves as
+     * one form.
      *
-     * @param array<int, array<string, mixed>> $tabs            Tab definition arrays.
-     * @param string                           $field_id_prefix Prefix applied to field meta keys.
-     * @param \WP_Post                         $post            The post currently being edited.
+     * @param array<int, array{tab: array<string, mixed>, fields: array<int, array<string, mixed>>}> $groups Tabs paired with their fields, from resolve_tab_groups().
+     * @param \WP_Post $post The post currently being edited.
      * @return void
      */
-    private function render_tabs(array $tabs, string $field_id_prefix, \WP_Post $post): void
+    private function render_tabs(array $groups, \WP_Post $post): void
     {
-
         ?>
         <div class="taw-tabbed" x-data="{ activeTab: 0 }">
             <div class="tabs">
-                <?php foreach ($tabs as $index => $tab): ?>
-                    <?php
-                    $tab_id = $field_id_prefix . '_' . $tab['id'];
-                    $tab_label = $tab['label'] ?? 'Tab';
-                    $tab_fields = $tab['fields'] ?? [];
-                    $tab_icon = isset($tab['icon']) ? $tab['icon'] : '';
-                    ?>
-                    <div class="tab-title" :class="activeTab === <?php echo $index; ?> ? 'active' : ''" @click="activeTab = <?php echo $index; ?>">
-                        <?php if ($tab_icon): ?>
-                            <img src="<?php echo $tab_icon ?>" alt="Tab Icon">
+                <?php foreach ($groups as $index => $group): ?>
+                    <div class="tab-title"
+                        :class="activeTab === <?php echo (int) $index; ?> ? 'active' : ''"
+                        @click="activeTab = <?php echo (int) $index; ?>">
+                        <?php if (!empty($group['tab']['icon'])): ?>
+                            <img src="<?php echo esc_url($group['tab']['icon']); ?>" alt="">
                         <?php endif; ?>
-                        <p><?php echo esc_html($tab_label); ?></p>
+                        <p><?php echo esc_html($group['tab']['label'] ?? __('Tab', 'taw-theme')); ?></p>
                     </div>
                 <?php endforeach; ?>
             </div>
             <div class="tab-content--wrapper">
-                <?php foreach ($tabs as $index => $tab):
-                    $tab_id = $field_id_prefix . '_' . $tab['id'];
-                    $tab_label = $tab['label'] ?? 'Tab';
-                    $tab_fields = $tab['fields'] ?? []; // Array of field IDs
-                ?>
-                    <div class="fields-container tab-content-<?php echo $index ?>" x-show="activeTab === <?php echo $index; ?>" x-cloak>
-                        <?php $matches = array_filter($this->fields, function ($field) use ($tab_fields) {
-                            return in_array($field['id'], $tab_fields);
-                        }) ?>
-                        <?php foreach ($matches as $field_index => $field): ?>
-                            <?php
-                            $field_id = $field_id_prefix . $field['id'];
-                            $value    = get_post_meta($post->ID, $field_id, true);
-                            $label    = $field['label'] ?? '';
-                            $desc     = $field['description'] ?? '';
-                            $width    = (int) ($field['width'] ?? 100);
-                            $border   = '';
-                            // If it's the last field and its width is less than 100%, add a right border
-                            if ($field_index === array_key_last($matches) && $width < 100) {
-                                $border = 'border-right: 0.5px solid rgb(195, 196, 199);';
-                            }
-                            ?>
-
-                            <div class="tab-field field" style="--span: <?php echo esc_attr((string) $width) ?>; <?php echo esc_attr($border); ?>">
-
-                                <div class="field-and-label">
-                                    <label for="<?php echo esc_attr($field_id); ?>" class="tab-field-label"><?php echo esc_html($label); ?><?php $this->render_readonly_lock_icon($field); ?></label>
-                                    <?php $this->render_field($field, $field_id, $value, $post->ID); ?>
-                                </div>
-
-                                <?php if ($desc): ?>
-                                    <p class="description"><?php echo esc_html($desc); ?></p>
-                                <?php endif; ?>
-                            </div>
-                        <?php
-                        endforeach; ?>
+                <?php foreach ($groups as $index => $group): ?>
+                    <div class="fields-container tab-content-<?php echo (int) $index; ?>"
+                        x-show="activeTab === <?php echo (int) $index; ?>"
+                        x-cloak>
+                        <?php foreach ($group['fields'] as $field) {
+                            $this->render_field_row($field, $post);
+                        } ?>
                     </div>
                 <?php endforeach; ?>
             </div>

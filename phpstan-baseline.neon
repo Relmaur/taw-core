@@ -79,12 +79,6 @@ parameters:
 			path: src/Core/Menu/MenuItem.php
 
 		-
-			message: '#^Method TAW\\Core\\Metabox\\Metabox\:\:render_tabs\(\) is unused\.$#'
-			identifier: method.unused
-			count: 1
-			path: src/Core/Metabox/Metabox.php
-
-		-
 			message: '#^PHPDoc tag @param references unknown parameter\: \$args$#'
 			identifier: parameter.notFound
 			count: 2
@@ -111,12 +105,6 @@ parameters:
 		-
 			message: '#^PHPDoc tag @param references unknown parameter\: \$menu_id$#'
 			identifier: parameter.notFound
-			count: 1
-			path: src/Core/Metabox/Metabox.php
-
-		-
-			message: '#^Property TAW\\Core\\Metabox\\Metabox\:\:\$tabs is never read, only written\.$#'
-			identifier: property.onlyWritten
 			count: 1
 			path: src/Core/Metabox/Metabox.php
 
