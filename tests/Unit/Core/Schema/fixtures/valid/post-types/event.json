@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "kind": "post_type",
+  "key": "event",
+  "labels": { "singular": "Event", "plural": "Events" },
+  "editing": { "level": "guided", "lock": "insert", "template": [["core/paragraph"]] }
+}

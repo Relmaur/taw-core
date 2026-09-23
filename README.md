@@ -456,6 +456,20 @@ to the engine, like `->with()`.
 - **Permalinks:** when post types or taxonomies change, rewrite rules are flushed once, on the next admin
   request (fingerprint stored in the `taw_schema_rewrite_hash` option). The front end never flushes.
 
+### Editing policies (in progress)
+
+An editing policy declares how far the block editor is locked down, layer by layer: content (per post
+type), site structure, design tokens and editor features. The presets are `open` → `guided` →
+`structured` → `locked`, and any layer or setting can be overridden ([ADR-0005](docs/adr/0005-editing-policies.md)).
+Since v1.45.0 it can be **defined and validated**: `Schema::editing()`, `PostType::editing()`, and the
+JSON kind `editing` (key `site`). `Editing\Resolver` computes the effective policy. It **isn't applied
+yet**: `Boot::editing()` arrives in v1.46.0.
+
+```json
+{ "version": 1, "kind": "editing", "key": "site", "preset": "structured",
+  "layers": { "features": { "customHtml": true }, "content": { "post": "open" } } }
+```
+
 ---
 
 ## Options Page

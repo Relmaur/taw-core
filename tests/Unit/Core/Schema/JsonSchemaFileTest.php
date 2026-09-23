@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Tests\Unit\Core\Schema;
 
 use PHPUnit\Framework\TestCase;
+use TAW\Core\Editing\Presets;
 use TAW\Core\Schema\Validator;
 
 /**
@@ -55,5 +56,26 @@ final class JsonSchemaFileTest extends TestCase
 
             $this->assertEqualsCanonicalizing([...$common, ...$allowed[$kind]], $keys, "branch for {$kind}");
         }
+    }
+
+    public function test_editing_levels_match_the_presets(): void
+    {
+        $this->assertSame(Presets::LEVELS, $this->schema['$defs']['level']['enum']);
+    }
+
+    public function test_editing_layer_settings_match_the_presets(): void
+    {
+        foreach (Presets::SETTINGS as $layer => $keys) {
+            $properties = $this->schema['$defs'][$layer . 'Layer']['oneOf'][1]['properties'];
+            $this->assertSame(['level', ...$keys], array_keys($properties), "{$layer} layer");
+        }
+    }
+
+    public function test_content_rule_keys_match_the_presets(): void
+    {
+        $properties = $this->schema['$defs']['contentRule']['oneOf'][1]['properties'];
+
+        $this->assertSame(['level', ...Presets::CONTENT_KEYS], array_keys($properties));
+        $this->assertSame([false, ...Presets::LOCKS], $properties['lock']['enum']);
     }
 }

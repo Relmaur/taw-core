@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Core\Schema\Definition;
 
+use TAW\Core\Editing\Rules;
+
 // No ABSPATH guard: pure class, loadable by bin/taw before WordPress boots.
 
 /**
@@ -44,6 +46,9 @@ final class PostType extends Definition
     /** @var array<string, mixed> */
     private array $args = [];
 
+    /** @var string|array<string, mixed>|null */
+    private string|array|null $editing = null;
+
     /**
      * Singular and plural names; the rest of WordPress's labels are
      * generated from them. Pass an explicit 'labels' array in args() to
@@ -68,6 +73,42 @@ final class PostType extends Definition
         $this->args = array_replace($this->args, $args);
 
         return $this;
+    }
+
+    /**
+     * How the block editor is locked down for this post type (ADR-0005): a
+     * level ('structured') or a content rule (['allow' => ['core/*'],
+     * 'lock' => 'contentOnly', 'template' => [...]]). The site's editing
+     * policy can still override it. Only applied when the theme calls
+     * Boot::editing(); never passed to register_post_type().
+     *
+     * @param string|array<string, mixed> $rule
+     */
+    public function editing(string|array $rule): self
+    {
+        $this->editing = $rule;
+
+        return $this;
+    }
+
+    /**
+     * @return string|array<string, mixed>|null
+     */
+    public function editingRule(): string|array|null
+    {
+        return $this->editing;
+    }
+
+    public function problems(): array
+    {
+        if ($this->editing === null) {
+            return [];
+        }
+
+        return array_map(
+            fn (string $error): string => sprintf('Post type "%s" %s', $this->key(), $error),
+            Rules::validateContentRule($this->editing, '/editing')
+        );
     }
 
     /**
