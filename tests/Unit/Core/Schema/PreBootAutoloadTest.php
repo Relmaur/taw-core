@@ -33,6 +33,9 @@ final class PreBootAutoloadTest extends TestCase
             ['\\TAW\\Core\\Schema\\Validator::validate(["version" => 1, "kind" => "post_type", "key" => "book"])'],
             ['\\TAW\\Core\\Schema\\JsonLoader::readFile(' . var_export(__DIR__ . '/fixtures/valid/genre.json', true) . ')'],
             ['new \\TAW\\CLI\\SchemaValidateCommand("/tmp")'],
+            ['\\TAW\\Core\\Schema\\Schema::editing()->preset("guided")->content("page", "locked")->problems()'],
+            ['\\TAW\\Core\\Editing\\Resolver::resolve(\\TAW\\Core\\Schema\\Schema::editing()->preset("structured"))->toArray()'],
+            ['\\TAW\\Core\\Editing\\Presets::layer("design", "locked")'],
         ];
     }
 

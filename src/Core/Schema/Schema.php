@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core\Schema;
 
+use TAW\Core\Schema\Definition\EditingPolicy;
 use TAW\Core\Schema\Definition\Fieldset;
 use TAW\Core\Schema\Definition\OptionsPage;
 use TAW\Core\Schema\Definition\PostType;
@@ -52,5 +53,14 @@ final class Schema
     public static function optionsPage(string $key): OptionsPage
     {
         return new OptionsPage($key);
+    }
+
+    /**
+     * The site's editing policy (ADR-0005). There's one per site, so the key
+     * is always "site".
+     */
+    public static function editing(): EditingPolicy
+    {
+        return new EditingPolicy(EditingPolicy::KEY);
     }
 }

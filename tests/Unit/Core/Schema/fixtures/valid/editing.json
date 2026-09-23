@@ -1,0 +1,21 @@
+{
+  "$schema": "https://taw.mlizardo.com/schema/taw-schema-1.0.json",
+  "version": 1,
+  "kind": "editing",
+  "key": "site",
+  "preset": "structured",
+  "bypass": { "capability": "manage_layouts" },
+  "layers": {
+    "design": "guided",
+    "features": { "customHtml": true },
+    "site": { "level": "locked", "navigation": true },
+    "content": {
+      "page": {
+        "allow": ["core/*", "taw-gutenberg/*"],
+        "template": [["core/heading", { "level": 1 }], ["core/group", {}, [["core/paragraph"]]]],
+        "lock": "contentOnly"
+      },
+      "post": "open"
+    }
+  }
+}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\Schema;
 
 use TAW\Core\Schema\Definition\Definition;
+use TAW\Core\Schema\Definition\EditingPolicy;
 use TAW\Core\Schema\Definition\Fieldset;
 use TAW\Core\Schema\Definition\OptionsPage;
 use TAW\Core\Schema\Definition\PostType;
@@ -151,6 +152,16 @@ final class Registry
     public function optionsPages(): array
     {
         return $this->ofKind(OptionsPage::class);
+    }
+
+    /**
+     * The site's editing policy, or null when none is defined. There is at
+     * most one: its key is always "site", so a second definition replaces
+     * the first through the usual precedence rules.
+     */
+    public function editing(): ?EditingPolicy
+    {
+        return $this->ofKind(EditingPolicy::class)[0] ?? null;
     }
 
     /**

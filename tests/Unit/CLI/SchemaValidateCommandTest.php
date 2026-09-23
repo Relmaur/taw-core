@@ -43,7 +43,7 @@ final class SchemaValidateCommandTest extends TestCase
         $exit = $tester->execute(['paths' => [self::FIXTURES]]);
 
         $this->assertSame(Command::SUCCESS, $exit);
-        $this->assertStringContainsString('4 file(s) valid', $tester->getDisplay());
+        $this->assertStringContainsString('6 file(s) valid', $tester->getDisplay());
     }
 
     public function test_defaults_to_the_theme_taw_schema_folder(): void

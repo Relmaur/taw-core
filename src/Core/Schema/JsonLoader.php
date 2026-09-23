@@ -151,10 +151,11 @@ final class JsonLoader
         $key = (string) $data['key'];
 
         $definition = match ($data['kind']) {
-            'post_type' => Schema::postType($key)->args($data['args'] ?? []),
+            'post_type' => self::postType($key, $data),
             'taxonomy'  => Schema::taxonomy($key)->for(...$data['for'])->args($data['args'] ?? []),
             'fieldset'  => self::fieldset($key, $data),
             'options_page' => self::optionsPage($key, $data),
+            'editing'   => self::editing($data),
             default     => throw new \InvalidArgumentException('Unknown kind: ' . (string) $data['kind']),
         };
 
@@ -163,6 +164,40 @@ final class JsonLoader
         }
 
         return $definition->override((bool) ($data['override'] ?? false));
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function postType(string $key, array $data): Definition
+    {
+        $postType = Schema::postType($key)->args($data['args'] ?? []);
+
+        if (isset($data['editing'])) {
+            $postType->editing($data['editing']);
+        }
+
+        return $postType;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function editing(array $data): Definition
+    {
+        $policy = Schema::editing();
+
+        if (isset($data['preset'])) {
+            $policy->preset((string) $data['preset']);
+        }
+        if (isset($data['bypass']['capability'])) {
+            $policy->bypass((string) $data['bypass']['capability']);
+        }
+        foreach ($data['layers'] ?? [] as $layer => $value) {
+            $policy->layer((string) $layer, $value);
+        }
+
+        return $policy;
     }
 
     /**

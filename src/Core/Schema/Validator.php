@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace TAW\Core\Schema;
 
+use TAW\Core\Editing\Rules;
+use TAW\Core\Schema\Definition\EditingPolicy;
+
 // No ABSPATH guard: `bin/taw schema:validate` runs this before (and without)
 // WordPress.
 
@@ -30,7 +33,7 @@ final class Validator
 {
     public const VERSION = 1;
 
-    public const KINDS = ['post_type', 'taxonomy', 'fieldset', 'options_page'];
+    public const KINDS = ['post_type', 'taxonomy', 'fieldset', 'options_page', 'editing'];
 
     /** Field types — exactly those the Metabox engine renders. */
     public const FIELD_TYPES = Field::TYPES;
@@ -40,10 +43,11 @@ final class Validator
      * "feilds" should fail loudly, not silently produce an empty fieldset.
      */
     private const ALLOWED_KEYS = [
-        'post_type'    => ['labels', 'args'],
+        'post_type'    => ['labels', 'args', 'editing'],
         'taxonomy'     => ['for', 'labels', 'args'],
         'fieldset'     => ['title', 'on', 'fields', 'context', 'priority', 'prefix', 'config'],
         'options_page' => ['title', 'menu_title', 'capability', 'fields', 'config'],
+        'editing'      => Rules::POLICY_KEYS,
     ];
 
     private const COMMON_KEYS = ['$schema', 'version', 'kind', 'key', 'override'];
@@ -77,6 +81,8 @@ final class Validator
 
         if (!is_string($data['key'] ?? null) || $data['key'] === '') {
             $errors[] = '/key: must be a non-empty string';
+        } elseif ($kind === 'editing' && $data['key'] !== EditingPolicy::KEY) {
+            $errors[] = '/key: must be "site" (a site has one editing policy)';
         }
 
         if (array_key_exists('override', $data) && !is_bool($data['override'])) {
@@ -85,7 +91,8 @@ final class Validator
 
         foreach (array_keys($data) as $name) {
             if (!in_array($name, self::COMMON_KEYS, true) && !in_array($name, self::ALLOWED_KEYS[$kind], true)) {
-                $errors[] = sprintf('/%s: unknown key for a %s (allowed: %s)', $name, $kind, implode(', ', self::ALLOWED_KEYS[$kind]));
+                $article = in_array($kind[0], ['a', 'e', 'i', 'o', 'u'], true) ? 'an' : 'a';
+                $errors[] = sprintf('/%s: unknown key for %s %s (allowed: %s)', $name, $article, $kind, implode(', ', self::ALLOWED_KEYS[$kind]));
             }
         }
 
@@ -106,6 +113,9 @@ final class Validator
         }
 
         return match ($kind) {
+            'post_type'    => array_key_exists('editing', $data)
+                ? [...$errors, ...Rules::validateContentRule($data['editing'], '/editing')]
+                : $errors,
             'taxonomy'     => [...$errors, ...self::validateStringList($data, 'for')],
             'fieldset'     => [
                 ...$errors,
@@ -115,7 +125,7 @@ final class Validator
                 ...self::validateFieldList($data['fields'] ?? null, '/fields'),
             ],
             'options_page' => [...$errors, ...self::validateFieldList($data['fields'] ?? null, '/fields')],
-            default        => $errors,
+            'editing'      => [...$errors, ...Rules::validatePolicy($data)],
         };
     }
 
