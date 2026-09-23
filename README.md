@@ -461,14 +461,23 @@ to the engine, like `->with()`.
 An editing policy declares how far the block editor is locked down, layer by layer: content (per post
 type), site structure, design tokens and editor features. The presets are `open` → `guided` →
 `structured` → `locked`, and any layer or setting can be overridden ([ADR-0005](docs/adr/0005-editing-policies.md)).
-Since v1.45.0 it can be **defined and validated**: `Schema::editing()`, `PostType::editing()`, and the
-JSON kind `editing` (key `site`). `Editing\Resolver` computes the effective policy. It **isn't applied
-yet**: `Boot::editing()` arrives in v1.46.0.
+It's defined with `Schema::editing()`, `PostType::editing()`, or the JSON kind `editing` (key `site`),
+and applied only when the theme calls **`\TAW\Core\Boot::editing()`** (never through `Boot::data()`
+or `Theme::boot()`):
 
 ```json
 { "version": 1, "kind": "editing", "key": "site", "preset": "structured",
   "layers": { "features": { "customHtml": true }, "content": { "post": "open" } } }
 ```
+
+- **Applied since v1.46.0:** the **content** layer (allowed blocks per post type, a starting template for
+  new posts, `templateLock`) and the **features** layer (code editor, block lock UI, Openverse, block
+  directory, core and remote patterns, Custom HTML). A save that *adds* a block the rule doesn't allow
+  is rejected with a 400 (`taw_editing_block_not_allowed`), while blocks already in the post still
+  save. The **site** and **design** layers come in v1.47.0.
+- **Per install (`wp-config.php`):** `TAW_EDITING_PRESET` switches the preset. `TAW_EDITING_BYPASS_USERS`
+  (an array or a comma-separated list of logins) names who stays unlocked, even if clients are
+  Administrators. `TAW_EDITING_OFF` turns everything off, as the recovery switch.
 
 ---
 

@@ -1,0 +1,254 @@
+<?php
+
+declare(strict_types=1);
+
+namespace TAW\Tests\Unit\Core\Editing;
+
+use Brain\Monkey\Functions;
+use TAW\Core\Editing\Bypass;
+use TAW\Core\Editing\ContentLayer;
+use TAW\Core\Editing\Policy;
+use TAW\Core\Editing\Resolver;
+use TAW\Core\Schema\Definition\EditingPolicy;
+use TAW\Core\Schema\Schema;
+use TAW\Tests\TestCase;
+
+/**
+ * The reference cases come from ml-theme--custom-gutenberg's ThemeMode tests
+ * (limitToThemeBlocks / lockLayout), generalized to per-post-type rules.
+ */
+final class ContentLayerTest extends TestCase
+{
+    private const REGISTERED = ['core/paragraph', 'core/heading', 'core/html', 'core/image', 'acme/hero', 'acme/slider'];
+
+    /** @var array<string, array<int, array<string, mixed>>> content => parse_blocks() result */
+    private array $parsed = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Functions\when('__')->returnArg();
+        Functions\when('current_user_can')->justReturn(false);
+        Functions\when('parse_blocks')->alias(fn (string $content): array => $this->parsed[$content] ?? []);
+    }
+
+    private function layer(EditingPolicy $definition, array $postTypeRules = []): ContentLayer
+    {
+        return $this->layerFor(Resolver::resolve($definition, $postTypeRules));
+    }
+
+    private function layerFor(Policy $policy): ContentLayer
+    {
+        return new ContentLayer($policy, new Bypass('taw_unlock_editing', []), static fn (): array => self::REGISTERED);
+    }
+
+    private static function context(string $postType, string $status = 'publish'): object
+    {
+        return (object) ['post' => new \WP_Post(['ID' => 7, 'post_type' => $postType, 'post_status' => $status])];
+    }
+
+    // --- allowed_block_types_all --------------------------------------
+
+    public function test_open_policy_leaves_the_allow_list_alone(): void
+    {
+        $layer = $this->layer(Schema::editing());
+
+        $this->assertTrue($layer->allowedBlockTypes(true, self::context('page')));
+        $this->assertSame(['x/y'], $layer->allowedBlockTypes(['x/y'], self::context('page')));
+    }
+
+    public function test_globs_expand_against_the_registry(): void
+    {
+        $layer = $this->layer(Schema::editing()->content('page', ['allow' => ['core/heading', 'acme/*']]));
+
+        $this->assertSame(['core/heading', 'acme/hero', 'acme/slider'], $layer->allowedBlockTypes(true, self::context('page')));
+    }
+
+    public function test_a_narrower_list_from_another_filter_is_respected(): void
+    {
+        $layer = $this->layer(Schema::editing()->content('page', ['allow' => ['core/*']]));
+
+        $this->assertSame(['core/paragraph'], $layer->allowedBlockTypes(['core/paragraph', 'acme/hero'], self::context('page')));
+    }
+
+    public function test_false_stays_false(): void
+    {
+        $layer = $this->layer(Schema::editing()->preset('locked'));
+
+        $this->assertFalse($layer->allowedBlockTypes(false, self::context('page')));
+    }
+
+    public function test_only_the_rules_post_type_is_restricted(): void
+    {
+        $layer = $this->layer(Schema::editing()->content('page', ['allow' => ['core/heading']]));
+
+        $this->assertTrue($layer->allowedBlockTypes(true, self::context('post')));
+    }
+
+    public function test_custom_html_off_removes_core_html_everywhere_even_without_a_post(): void
+    {
+        $layer = $this->layer(Schema::editing()->layer('features', ['customHtml' => false]));
+
+        $expected = ['core/paragraph', 'core/heading', 'core/image', 'acme/hero', 'acme/slider'];
+        $this->assertSame($expected, $layer->allowedBlockTypes(true, self::context('post')));
+        $this->assertSame($expected, $layer->allowedBlockTypes(true, (object) ['name' => 'core/edit-site']));
+    }
+
+    public function test_bypass_users_get_every_block(): void
+    {
+        Functions\when('current_user_can')->justReturn(true);
+        $layer = $this->layer(Schema::editing()->preset('locked'));
+
+        $this->assertTrue($layer->allowedBlockTypes(true, self::context('page')));
+    }
+
+    // --- block_editor_settings_all -------------------------------------
+
+    public function test_template_goes_to_new_posts_only_by_default(): void
+    {
+        $layer = $this->layer(Schema::editing()->content('page', ['template' => [['acme/hero']], 'lock' => 'all']));
+
+        $new = $layer->editorSettings([], self::context('page', 'auto-draft'));
+        $this->assertSame([['acme/hero']], $new['template']);
+        $this->assertSame('all', $new['templateLock']);
+
+        $existing = $layer->editorSettings([], self::context('page'));
+        $this->assertArrayNotHasKey('template', $existing, 'Existing posts must not be compared against the template.');
+        $this->assertSame('all', $existing['templateLock']);
+    }
+
+    public function test_template_on_every_post_when_new_posts_only_is_false(): void
+    {
+        $layer = $this->layer(Schema::editing()->content('page', ['template' => [['acme/hero']], 'newPostsOnly' => false]));
+
+        $this->assertSame([['acme/hero']], $layer->editorSettings([], self::context('page'))['template']);
+    }
+
+    public function test_presets_set_the_lock_on_pages(): void
+    {
+        $this->assertSame('contentOnly', $this->layer(Schema::editing()->preset('structured'))->editorSettings([], self::context('page'))['templateLock']);
+        $this->assertSame('all', $this->layer(Schema::editing()->preset('locked'))->editorSettings([], self::context('page'))['templateLock']);
+        $this->assertSame([], $this->layer(Schema::editing()->preset('guided'))->editorSettings([], self::context('page')));
+    }
+
+    public function test_post_type_rules_apply_to_their_post_type(): void
+    {
+        $layer = $this->layer(Schema::editing(), ['event' => ['lock' => 'insert']]);
+
+        $this->assertSame(['templateLock' => 'insert'], $layer->editorSettings([], self::context('event')));
+        $this->assertSame([], $layer->editorSettings([], self::context('page')));
+    }
+
+    public function test_settings_outside_the_post_editor_are_untouched(): void
+    {
+        $layer = $this->layer(Schema::editing()->preset('locked'));
+
+        $this->assertSame(['x' => 1], $layer->editorSettings(['x' => 1], (object) ['name' => 'core/edit-site']));
+    }
+
+    public function test_bypass_users_get_no_lock_or_template(): void
+    {
+        Functions\when('current_user_can')->justReturn(true);
+        $layer = $this->layer(Schema::editing()->content('page', ['template' => [['acme/hero']], 'lock' => 'all']));
+
+        $this->assertSame([], $layer->editorSettings([], self::context('page', 'auto-draft')));
+    }
+
+    // --- rest_pre_insert_{post_type} -----------------------------------
+
+    public function test_save_adding_a_disallowed_block_is_refused(): void
+    {
+        $this->parsed['NEW'] = [
+            ['blockName' => 'core/heading', 'innerHTML' => '<h2>a</h2>', 'innerBlocks' => []],
+            ['blockName' => 'acme/slider', 'innerHTML' => '', 'innerBlocks' => []],
+        ];
+        Functions\when('get_post_field')->justReturn('');
+
+        $layer = $this->layer(Schema::editing()->content('page', ['allow' => ['core/*']]));
+        $result = $layer->checkSave((object) ['post_content' => 'NEW'], 'page');
+
+        $this->assertInstanceOf(\WP_Error::class, $result);
+        $this->assertSame('taw_editing_block_not_allowed', $result->get_error_code());
+        $this->assertStringContainsString('acme/slider', $result->get_error_message());
+        $this->assertSame(['status' => 400, 'blocks' => ['acme/slider']], $result->error_data['taw_editing_block_not_allowed']);
+    }
+
+    public function test_blocks_already_in_the_saved_post_still_save(): void
+    {
+        $this->parsed['OLD'] = [['blockName' => 'acme/slider', 'innerHTML' => '', 'innerBlocks' => []]];
+        $this->parsed['EDITED'] = [
+            ['blockName' => 'acme/slider', 'innerHTML' => '', 'innerBlocks' => []],
+            ['blockName' => 'core/paragraph', 'innerHTML' => '<p>new</p>', 'innerBlocks' => []],
+        ];
+        Functions\expect('get_post_field')->once()->with('post_content', 42)->andReturn('OLD');
+
+        $layer = $this->layer(Schema::editing()->content('page', ['allow' => ['core/*']]));
+        $prepared = (object) ['ID' => 42, 'post_content' => 'EDITED'];
+
+        $this->assertSame($prepared, $layer->checkSave($prepared, 'page'));
+    }
+
+    public function test_raw_html_can_not_sneak_in_as_freeform(): void
+    {
+        $this->parsed['RAW'] = [['blockName' => null, 'innerHTML' => '<iframe src="x"></iframe>', 'innerBlocks' => []]];
+        Functions\when('get_post_field')->justReturn('');
+
+        $layer = $this->layer(Schema::editing()->preset('guided'));
+
+        $this->assertInstanceOf(\WP_Error::class, $layer->checkSave((object) ['post_content' => 'RAW'], 'page'));
+    }
+
+    public function test_custom_html_off_is_enforced_on_save_for_every_post_type(): void
+    {
+        $this->parsed['HTML'] = [['blockName' => 'core/html', 'innerHTML' => '<b>x</b>', 'innerBlocks' => []]];
+        Functions\when('get_post_field')->justReturn('');
+
+        $layer = $this->layer(Schema::editing()->layer('features', ['customHtml' => false]));
+
+        $this->assertInstanceOf(\WP_Error::class, $layer->checkSave((object) ['post_content' => 'HTML'], 'post'));
+    }
+
+    public function test_saves_without_content_or_under_an_open_rule_are_untouched(): void
+    {
+        $layer = $this->layer(Schema::editing()->content('page', ['allow' => ['core/*']]));
+
+        $titleOnly = (object) ['ID' => 3, 'post_title' => 'x'];
+        $this->assertSame($titleOnly, $layer->checkSave($titleOnly, 'page'));
+
+        $error = new \WP_Error('earlier', 'x');
+        $this->assertSame($error, $layer->checkSave($error, 'page'));
+
+        $open = (object) ['post_content' => 'ANY'];
+        $this->assertSame($open, $layer->checkSave($open, 'post'), 'post has an open rule');
+    }
+
+    public function test_bypass_users_can_save_anything(): void
+    {
+        Functions\when('current_user_can')->justReturn(true);
+        $layer = $this->layer(Schema::editing()->preset('locked'));
+        $prepared = (object) ['post_content' => 'NEW'];
+
+        $this->assertSame($prepared, $layer->checkSave($prepared, 'page'));
+    }
+
+    public function test_save_checks_hook_every_rest_post_type(): void
+    {
+        Functions\expect('get_post_types')->once()->with(['show_in_rest' => true])->andReturn(['page' => 'page', 'book' => 'book']);
+
+        $this->layer(Schema::editing())->registerSaveChecks();
+
+        $this->assertNotFalse(has_filter('rest_pre_insert_page'));
+        $this->assertNotFalse(has_filter('rest_pre_insert_book'));
+    }
+
+    public function test_register_hooks_the_editor_and_rest(): void
+    {
+        $layer = $this->layer(Schema::editing());
+        $layer->register();
+
+        $this->assertSame(20, has_filter('allowed_block_types_all', [$layer, 'allowedBlockTypes']));
+        $this->assertSame(20, has_filter('block_editor_settings_all', [$layer, 'editorSettings']));
+        $this->assertSame(10, has_action('rest_api_init', [$layer, 'registerSaveChecks']));
+    }
+}

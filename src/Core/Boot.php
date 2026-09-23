@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core;
 
 use TAW\Core\Content\ContentAdminScreen;
+use TAW\Core\Editing\Editing;
 use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\FieldMetaRegistrar;
 use TAW\Core\Schema\Compiler;
@@ -45,6 +46,9 @@ final class Boot
      */
     private static bool $dataBooted = false;
 
+    /** Whether editing() has already run in this request. */
+    private static bool $editingBooted = false;
+
     /**
      * Boot the data layer only.
      *
@@ -73,6 +77,43 @@ final class Boot
     }
 
     /**
+     * Boot editing policies (ADR-0005): lock the block editor down per the
+     * site's editing policy (schema kind "editing", PostType::editing(), and
+     * the TAW_EDITING_PRESET constant). Also boots the data layer, because
+     * the policy lives in the schema registry.
+     *
+     * Deliberately separate from data(): a data-only site must never get its
+     * editor locked by accident. Theme::boot() doesn't call it either.
+     *
+     * TAW_EDITING_OFF (wp-config.php) turns it into a no-op — the recovery
+     * switch if a policy ever locks the wrong people out.
+     */
+    public static function editing(): void
+    {
+        if (self::$editingBooted) {
+            return;
+        }
+
+        self::$editingBooted = true;
+
+        if (defined('TAW_EDITING_OFF') && constant('TAW_EDITING_OFF')) {
+            return;
+        }
+
+        self::data();
+        Editing::register();
+    }
+
+    /**
+     * Whether editing() has run in this request (true even when
+     * TAW_EDITING_OFF made it a no-op).
+     */
+    public static function isEditingBooted(): bool
+    {
+        return self::$editingBooted;
+    }
+
+    /**
      * Whether the data layer has been booted in this request.
      */
     public static function isDataBooted(): bool
@@ -89,5 +130,7 @@ final class Boot
     public static function resetForTests(): void
     {
         self::$dataBooted = false;
+        self::$editingBooted = false;
+        Editing::resetForTests();
     }
 }
