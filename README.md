@@ -22,7 +22,7 @@ Theme::boot();
 
 Auto-discovers blocks, initializes Vite, registers REST endpoints, enables the visual editor, and applies performance config.
 
-**Data layer only** (a block/hybrid theme, or a site plugin) — after requiring the Composer autoloader:
+**Data layer only** (taw-gutenberg, or another TAW theme that needs only data) — after requiring the Composer autoloader:
 
 ```php
 \TAW\Core\Boot::data();
@@ -375,7 +375,7 @@ Both this resolution and the `screens` template matching in `Metabox` share one 
 ## Schema — post types, taxonomies, fieldsets, options pages
 
 Define your data model in one place and let taw/core register it ([ADR-0004](docs/adr/0004-schema-registry-php-and-json.md)).
-Works with both entry points (`Theme::boot()` and `Boot::data()`). JSON definitions arrive in v1.44.0.
+Works with both entry points (`Theme::boot()` and `Boot::data()`). Define in PHP, in JSON files, or both.
 
 ```php
 use TAW\Core\Schema\{Field, Registry, Schema};
@@ -393,6 +393,46 @@ add_action('taw_schema_register', function (Registry $schema): void {
     $schema->add(Schema::optionsPage('library')->title('Library settings')->fields([Field::text('library_phone')]));
 });
 ```
+
+**Or as JSON** (v1.44.0+): one entity per file in a `taw-schema/` folder. It's scanned one level deep, so
+`taw-schema/post-types/book.json` works too. Same words as the PHP API:
+
+```json
+{
+  "$schema": "https://taw.mlizardo.com/schema/taw-schema-1.0.json",
+  "version": 1,
+  "kind": "fieldset",
+  "key": "book_details",
+  "title": "Book details",
+  "on": ["book"],
+  "fields": [
+    { "id": "subtitle", "type": "text", "label": "Subtitle", "required": true },
+    { "id": "awards", "type": "repeater", "fields": [{ "id": "name", "type": "text" }] }
+  ]
+}
+```
+
+| `kind` | Keys (besides `version`, `kind`, `key`, optional `override`) |
+|---|---|
+| `post_type` | `labels` `{singular, plural}`, `args` (→ `register_post_type`) |
+| `taxonomy` | `for` (post types, required), `labels`, `args` (→ `register_taxonomy`) |
+| `fieldset` | `on` (required), `fields` (required), `title`, `context`, `priority`, `prefix`, `config` (other Metabox keys) |
+| `options_page` | `fields` (required), `title`, `menu_title`, `capability`, `config` (other OptionsPage keys) |
+
+Unknown top-level keys are errors, which catches typos. Unknown *field* keys (`conditions`, `width`, …) pass through
+to the engine, like `->with()`.
+
+- **Where, and what wins:** folders are scanned in the child theme, then the parent theme, then
+  `wp-content/taw-schema/` (site level), plus the `taw_schema_paths` filter. PHP definitions outrank every
+  file, a child theme outranks its parent, and the theme outranks wp-content. An invalid file is skipped
+  with a `_doing_it_wrong()` notice, and the others still load.
+- **Caching:** in production (`wp_get_environment_type()`), validated files are cached in a transient keyed
+  by each file's path, mtime and size plus the taw/core version, so editing a file invalidates the cache.
+  Elsewhere they're re-read on every request.
+- **Validate without WordPress:** `php bin/taw schema:validate [paths…] [--json]`. It exits non-zero on
+  errors, each reported with a JSON pointer (`/fields/2/type`). It warns about duplicates and about targets
+  that aren't defined post types. Editors get autocomplete from `"$schema"` →
+  `resources/schema/taw-schema-1.0.json`.
 
 - **Fieldsets compile into a regular `Metabox`, and options pages into an `OptionsPage`.** Storage, the admin UI,
   REST meta and content export all work exactly as for hand-written ones: `_taw_subtitle` post meta, read with

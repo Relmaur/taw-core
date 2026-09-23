@@ -30,6 +30,9 @@ final class PreBootAutoloadTest extends TestCase
             ['\\TAW\\Core\\Schema\\Source::json("/x.json", \\TAW\\Core\\Schema\\Source::RANK_WP_CONTENT)->describe()'],
             ['(new \\ReflectionClass(\\TAW\\Core\\Schema\\Compiler::class))->getName()'],
             ['\\TAW\\Core\\Schema\\CollisionReport::collisions()'],
+            ['\\TAW\\Core\\Schema\\Validator::validate(["version" => 1, "kind" => "post_type", "key" => "book"])'],
+            ['\\TAW\\Core\\Schema\\JsonLoader::readFile(' . var_export(__DIR__ . '/fixtures/valid/genre.json', true) . ')'],
+            ['new \\TAW\\CLI\\SchemaValidateCommand("/tmp")'],
         ];
     }
 

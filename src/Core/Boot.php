@@ -25,7 +25,7 @@ use TAW\Core\Schema\Compiler;
  *     SEO output.
  *
  * Boot::data() turns on only the first. A data-only consumer — a block or
- * hybrid theme (taw-gutenberg), or a site plugin — calls it after requiring
+ * hybrid TAW theme (taw-gutenberg) — calls it after requiring
  * its Composer autoloader and gets no presentation side effects at all: no
  * dequeued block CSS, no Vite, no frontend output.
  *
@@ -39,7 +39,7 @@ final class Boot
      * Whether data() has already run in this request.
      *
      * Two consumers can legitimately both ask for the data layer (a theme's
-     * Theme::boot() plus a site plugin's Boot::data()); registering the REST
+     * Theme::boot() plus an explicit Boot::data() call); registering the REST
      * routes, admin screen and meta twice would duplicate hooks, so every call
      * after the first is a no-op.
      */

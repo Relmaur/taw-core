@@ -146,3 +146,28 @@ and REST can reach:
 developer expecting raw `register_post_type()` behavior. It's accepted because every default can be
 overridden through `args`, except `custom-fields`, where overriding would only produce a silent bug.
 
+## Addendum: JSON format as built, and one deferral (2026-09-23, v1.44.0)
+
+**Format.** Decision 4 fixed the envelope (`version`, `kind`, `key`). The body mirrors the PHP API, so
+there's one mental model:
+- Post types: `labels {singular, plural}` and `args`.
+- Taxonomies: `for` (required), `labels`, `args`.
+- Fieldsets: `on` and `fields` (both required), plus `title`, `context`, `priority`, `prefix`, and
+  `config` (other Metabox keys, like `->with()`).
+- Options pages: `fields` (required), plus `title`, `menu_title`, `capability`, `config`.
+
+Unknown top-level keys are errors, so a typo like `"feilds"` fails loudly instead of producing an empty
+fieldset. Unknown field keys pass through to the engine, because Metabox has many options, like
+`conditions`, `width` and `layout`, that the format doesn't list. WordPress name rules (length limits,
+reserved names) are enforced by the same Definition constructors the PHP API uses, so the CLI and
+runtime agree.
+
+**Deferral: legacy-vs-legacy collisions are not reported by `schema:validate`.** Decision 7 said they
+would be. By the time anything can inspect Metabox's bare-id registry, the earlier of two colliding
+entries has already been overwritten, so reporting would need a change inside Metabox itself. It would
+also need WordPress booted from `bin/taw`, which doesn't work on symlinked theme installs. The Phase 2
+qualified registry (`metabox_id.field_id`) removes the root cause, so detection there is the right fix.
+`schema:validate` stays WordPress-free: it reports format errors, duplicate definitions across files,
+and targets that aren't post types defined in those files (as warnings, since PHP definitions and page
+slugs aren't visible without WordPress).
+

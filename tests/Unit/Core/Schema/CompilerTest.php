@@ -36,6 +36,9 @@ final class CompilerTest extends SchemaTestCase
 
     public function test_collect_hands_the_registry_to_taw_schema_register(): void
     {
+        // collect() also scans taw-schema/ folders; point them nowhere.
+        Functions\when('get_template_directory')->justReturn('/nonexistent/theme');
+        Functions\when('get_stylesheet_directory')->justReturn('/nonexistent/theme');
         Actions\expectDone('taw_schema_register')->once()->with(Registry::instance());
 
         Compiler::collect();

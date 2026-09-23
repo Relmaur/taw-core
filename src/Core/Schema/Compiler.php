@@ -13,7 +13,7 @@ use TAW\Core\OptionsPage\OptionsPage as OptionsPageEngine;
  * Turns the schema registry into real WordPress registrations, each at the
  * init priority it needs (ADR-0004 § Decision 3):
  *
- *   init:1   collect   fire taw_schema_register so PHP code can add definitions
+ *   init:1   collect   fire taw_schema_register (PHP), then load taw-schema/*.json
  *   init:5   freeze    then register_post_type()
  *   init:6             register_taxonomy() — post types now exist to attach to
  *   init:8   compile   fieldsets → new Metabox, options pages → new OptionsPage
@@ -41,10 +41,16 @@ final class Compiler
         add_action('init', [self::class, 'maybeFlushRewriteRules'], 99);
     }
 
-    /** @internal init:1 */
+    /**
+     * init:1. PHP definitions first, then JSON files. Arrival order doesn't
+     * decide who wins a duplicate — Source ranks do (PHP outranks JSON).
+     *
+     * @internal
+     */
     public static function collect(): void
     {
         do_action('taw_schema_register', Registry::instance());
+        JsonLoader::loadInto(Registry::instance());
     }
 
     /** @internal init:5 */
