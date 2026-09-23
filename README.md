@@ -372,6 +372,52 @@ Both this resolution and the `screens` template matching in `Metabox` share one 
 
 ---
 
+## Schema — post types, taxonomies, fieldsets, options pages
+
+Define your data model in one place and let taw/core register it ([ADR-0004](docs/adr/0004-schema-registry-php-and-json.md)).
+Works with both entry points (`Theme::boot()` and `Boot::data()`). JSON definitions arrive in v1.44.0.
+
+```php
+use TAW\Core\Schema\{Field, Registry, Schema};
+
+add_action('taw_schema_register', function (Registry $schema): void {
+    $schema->add(Schema::postType('book')->labels('Book', 'Books')->args(['menu_icon' => 'dashicons-book']));
+    $schema->add(Schema::taxonomy('genre')->for('book')->labels('Genre', 'Genres'));
+    $schema->add(
+        Schema::fieldset('book_details')->title('Book details')->on('book')->fields([
+            Field::text('subtitle')->label('Subtitle'),
+            Field::image('cover')->label('Cover'),
+            Field::repeater('awards')->fields([Field::text('name')->label('Award')]),
+        ])
+    );
+    $schema->add(Schema::optionsPage('library')->title('Library settings')->fields([Field::text('library_phone')]));
+});
+```
+
+- **Fieldsets compile into a regular `Metabox`, and options pages into an `OptionsPage`.** Storage, the admin UI,
+  REST meta and content export all work exactly as for hand-written ones: `_taw_subtitle` post meta, read with
+  `Metabox::get()`. `Field::*` builders produce the same arrays `new Metabox([...])` accepts. Raw arrays are
+  accepted too, and `->with([...])` passes through any key the builder has no method for.
+- **Post type defaults:** `public` and `show_in_rest` are on, and `custom-fields` is **always** added to
+  `supports`. WordPress hides registered meta from REST otherwise, so TAW fields would silently vanish from
+  `wp/v2`. Taxonomies default to `show_in_rest`. Anything in `->args([...])` overrides the defaults (except
+  `custom-fields`).
+- **Timing:** `taw_schema_register` fires on `init:1`, so `__()` is safe. The registry freezes at `init:5`,
+  and a later `add()` is refused with a `_doing_it_wrong()` notice. Post types register at `init:5`,
+  taxonomies at `init:6`, and fieldsets/options pages at `init:8`.
+- **Validation:** invalid keys throw immediately. These include reserved names like `post`, keys over the
+  WordPress length limits, and taxonomies named like query vars such as `year`. Definitions missing a
+  required part (a fieldset with no `->on()`, a taxonomy with no `->for()`) are skipped with a notice.
+- **Duplicates:** the same entity defined twice keeps the higher-precedence source (PHP beats JSON). The
+  later one wins on a tie. Mark a deliberate replacement with `->override()` to silence the notice.
+- **Field id collisions:** Metabox's field registry is keyed by bare field id. A schema field sharing an
+  id with another field (in another fieldset or a hand-written metabox) is reported via
+  `_doing_it_wrong()`, plus an admin notice when `WP_DEBUG` is on.
+- **Permalinks:** when post types or taxonomies change, rewrite rules are flushed once, on the next admin
+  request (fingerprint stored in the `taw_schema_rewrite_hash` option). The front end never flushes.
+
+---
+
 ## Options Page
 
 Same field types, tabs, groups, repeaters, and conditional fields as Metabox. Backed by `wp_options` instead of post meta.

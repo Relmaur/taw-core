@@ -7,6 +7,7 @@ namespace TAW\Core;
 use TAW\Core\Content\ContentAdminScreen;
 use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\FieldMetaRegistrar;
+use TAW\Core\Schema\Compiler;
 
 // Deliberately NO `if (!defined('ABSPATH')) exit;` guard: this is a pure class
 // definition, and `bin/taw` commands may autoload it before WordPress boots —
@@ -53,6 +54,9 @@ final class Boot
      *   2. GET taw/v1/content/export (capability-gated).
      *   3. REST-registered field meta for every TAW field (opt out with the
      *      taw_register_meta_in_rest filter).
+     *   4. The schema registry (ADR-0004): post types, taxonomies, fieldsets
+     *      and options pages defined through the taw_schema_register action.
+     *      Added last so the three registrations above keep their positions.
      */
     public static function data(): void
     {
@@ -65,6 +69,7 @@ final class Boot
         (new ContentAdminScreen())->register();
         new ContentEndpoint();
         FieldMetaRegistrar::register();
+        Compiler::register();
     }
 
     /**

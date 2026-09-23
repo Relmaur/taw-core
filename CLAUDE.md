@@ -30,6 +30,7 @@
 ## Key Conventions
 
 - **Two entry points (ADR-0003).** `Theme::boot()` is the classic-theme entry point — it wires every subsystem, including the data layer. `TAW\Core\Boot::data()` is the data-only entry point for block/hybrid themes and site plugins: content interchange screen + REST route + REST-registered field meta, nothing presentational. `Theme::boot()` calls `Boot::data()` at step 13; both are idempotent. Anything that dequeues/injects frontend output (Performance, Vite, blocks) must never be wired into `Boot::data()`.
+- **Schema (`TAW\Core\Schema\*`, ADR-0004)** — post types/taxonomies/fieldsets/options pages defined on the `taw_schema_register` action (init:1), frozen at init:5, compiled at init:5/6/8 into `register_post_type`/`register_taxonomy`/`new Metabox`/`new OptionsPage` — never a second field engine. Wired by `Boot::data()` (`Compiler::register()`). Schema classes omit the ABSPATH guard (`bin/taw` loads them pre-boot; `Schema\PreBootAutoloadTest`). Keep `Field::TYPES` in sync with the Metabox renderer.
 - Blocks auto-discovered from theme's `/Blocks` directory at `after_setup_theme`.
 - `registerMetaboxes()` is deferred to `init` by the framework — `__()` calls are always safe inside it.
 - `getData(int|false $postId)` — `$postId` is `false` on 404 pages; all meta helpers (`getMeta`, `getImageUrl`, `getRepeater`) return safe empty values for `false`.
