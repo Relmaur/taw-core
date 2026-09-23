@@ -44,6 +44,9 @@ final class Editing
 
         (new ContentLayer($policy, $bypass))->register();
         (new FeaturesLayer($policy, $bypass))->register();
+        (new SiteLayer($policy, $bypass))->register();
+        (new DesignLayer($policy))->register();
+        (new EditingAdminScreen($policy, $bypass))->register();
     }
 
     /**

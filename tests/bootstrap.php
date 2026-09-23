@@ -101,6 +101,29 @@ if (!class_exists('WP_User')) {
     }
 }
 
+/**
+ * Minimal stand-in for WP_REST_Request: the method and route, which is all
+ * the editing policy's REST guard reads.
+ */
+if (!class_exists('WP_REST_Request')) {
+    class WP_REST_Request
+    {
+        public function __construct(private string $method = '', private string $route = '')
+        {
+        }
+
+        public function get_method(): string
+        {
+            return $this->method;
+        }
+
+        public function get_route(): string
+        {
+            return $this->route;
+        }
+    }
+}
+
 if (!class_exists('WP_Error')) {
     class WP_Error
     {
