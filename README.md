@@ -1,14 +1,18 @@
 # TAW Core
 
-A configuration-driven WordPress theme framework. Block system, metabox engine, Vite asset pipeline, frontend visual editor, forms, and performance tools — wired up with a single call.
+The data layer of TAW, packaged for Composer. It covers **data**: a config-driven field engine
+(metaboxes, options pages), typed storage, fields exposed over the REST API, and portable content
+import/export. Alongside it is an **optional classic-theme toolkit**: PHP block system, Vite asset
+pipeline, frontend visual editor, forms and performance tools. You boot either the data layer alone or
+both, with one call.
 
-**PHP 8.1+ · GPL-2.0-or-later · `composer require taw/core`**
+**PHP 8.2+ · GPL-2.0-or-later · `composer require taw/core`**
 
 ---
 
 ## Quickstart
 
-In your theme's `functions.php`:
+**Classic theme (the full toolkit)** — in your theme's `functions.php`:
 
 ```php
 use TAW\Core\Theme\Theme;
@@ -17,6 +21,18 @@ Theme::boot();
 ```
 
 Auto-discovers blocks, initializes Vite, registers REST endpoints, enables the visual editor, and applies performance config.
+
+**Data layer only** (a block/hybrid theme, or a site plugin) — after requiring the Composer autoloader:
+
+```php
+\TAW\Core\Boot::data();
+```
+
+Boots only the data layer: the Tools → TAW Data import/export screen, `GET taw/v1/content/export`, and
+REST-registered field meta. It adds nothing presentational — no Vite, no block discovery, and no
+Performance optimizations (so your theme's block library CSS is left alone). `Theme::boot()` calls
+`Boot::data()` itself, and calling both is harmless: it only runs once per request. See
+[ADR-0003](docs/adr/0003-data-layer-and-boot-split.md).
 
 ---
 
@@ -1052,6 +1068,11 @@ Icons are Lucide's raw `stroke="currentColor"` SVGs, so CSS/Tailwind text-color 
 
 ## Performance
 
+Performance hooks are registered by `Theme::boot()` / `Theme::bootstrapFullSite()` — **not** by
+`Boot::data()`, and (since v1.42.0) no longer by merely loading the Composer autoloader. A consumer
+that relied on the old load-time registration without ever calling `boot()` can restore it with
+`define('TAW_PERFORMANCE_AUTOLOAD', true);` in `wp-config.php`.
+
 ```php
 use TAW\Support\Performance;
 
@@ -1635,7 +1656,7 @@ Dump::log($value);
 
 | Package | Purpose |
 |---------|---------|
-| `ext-pdo_sqlite` | The RAG chatbot's SQLite knowledge-base files (see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot)) and reference-corpus files (see [Bible Reader Corpus](#bible-reader-corpus)) |
+| `ext-pdo_sqlite` _(optional, suggested)_ | The RAG chatbot's SQLite knowledge-base files (see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot)) and reference-corpus files (see [Bible Reader Corpus](#bible-reader-corpus)). Not required to install taw/core — each feature checks for it at runtime, and the corpus readers fall back to MySQL. |
 | `symfony/console ^7.4` | CLI commands |
 | `symfony/process ^7.4` | `wp` command — shells out to the real WP-CLI binary |
 | `enshrined/svg-sanitize ^0.22.0` | SVG XSS prevention on upload |
@@ -1664,7 +1685,7 @@ composer run test   # tests/Unit/ — also runs in CI
 
 Uses [Brain Monkey](https://brain-wp.github.io/BrainMonkey/) to stub individual WordPress functions (`add_action`, `get_transient`, `wp_remote_post`, etc.) per test rather than booting a real WordPress install — fast, no MySQL, no network. This is a deliberate division of labor with `taw-theme`'s `bin/ci/smoke-test.php`, which boots a real WordPress + MySQL environment and exercises the full render path against a live theme: this suite covers `taw-core`'s own logic in isolation (validation rule precedence, rate limiting, Turnstile verification), the smoke test covers "does this actually work end-to-end against a real site."
 
-Every file in `src/` starts with `if (!defined('ABSPATH')) exit;` (the standard WordPress direct-access guard) — `tests/bootstrap.php` defines a dummy `ABSPATH` before the autoloader ever loads a class, or the test process would exit the moment one is included. Documented exceptions: `Content\*` (autoloaded by `content:*` commands before WordPress boots — see "Content Interchange"), and `TAW\Core\Corpus\Storage`/`TAW\Core\Storage\ProtectedSqlite` (autoloaded by `CorpusInstallCommand` before `require $wpLoad` — see "Reading the corpus"). Each has neither a WordPress dependency of its own nor the guard, and a subprocess regression test (`PreBootAutoloadTest`) asserting it loads with no `ABSPATH` defined at all.
+Every file in `src/` starts with `if (!defined('ABSPATH')) exit;` (the standard WordPress direct-access guard) — `tests/bootstrap.php` defines a dummy `ABSPATH` before the autoloader ever loads a class, or the test process would exit the moment one is included. Documented exceptions: `TAW\Core\Boot` (the data-layer entry point — `BootTest` covers it), `Content\*` (autoloaded by `content:*` commands before WordPress boots — see "Content Interchange"), and `TAW\Core\Corpus\Storage`/`TAW\Core\Storage\ProtectedSqlite` (autoloaded by `CorpusInstallCommand` before `require $wpLoad` — see "Reading the corpus"). Each has neither a WordPress dependency of its own nor the guard, and a subprocess regression test (`PreBootAutoloadTest`) asserting it loads with no `ABSPATH` defined at all.
 
 **Reflection is used deliberately** for testing private methods (`Form::validateRules()`, `Form::requiredMessage()`, `Form::emailMessage()`) — see `tests/TestCase::callMethod()`. These stay private by design (internal details of a public API), reflection lets tests verify that logic without widening the class's real surface just to make it testable.
 

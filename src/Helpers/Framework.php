@@ -72,8 +72,24 @@ class Framework
      * Get the URL to a file inside the taw/core package.
      *
      * This converts a package filesystem path into a URL that WordPress
-     * can serve. It works by calculating the relative path from the
-     * theme root to the file, then prepending the theme URI.
+     * can serve, by finding which web-served directory the package lives
+     * under and swapping that directory's path for its URL.
+     *
+     * WHERE THE PACKAGE CAN LIVE (ADR-0003):
+     * taw/core is installed by `composer require` into whichever project
+     * consumes it — usually the active parent theme's vendor/ (taw-theme,
+     * taw-gutenberg), but it can also be a child theme's vendor/, a site
+     * plugin's, or an mu-plugin's. Resolution order:
+     *   1. The active parent theme — the original and most common case,
+     *      checked first and resolved exactly as before, so existing sites
+     *      get byte-identical URLs.
+     *   2. Otherwise the longest matching known WordPress location: child
+     *      theme (stylesheet dir), mu-plugins, plugins, wp-content, site root.
+     *   3. If nothing matches (e.g. a symlinked plugin whose real path is
+     *      outside the web root), the pre-ADR-0003 result is returned
+     *      unchanged — use the `taw_core_package_url` filter to fix it for
+     *      that setup.
+     * Every result passes through `taw_core_package_url`.
      *
      * Only works in WordPress context (web requests), not CLI.
      *
@@ -81,6 +97,18 @@ class Framework
      * @return string               Full URL to the asset
      */
     public static function url(string $relativePath = ''): string
+    {
+        $url = self::resolveUrl($relativePath);
+
+        return function_exists('apply_filters')
+            ? (string) apply_filters('taw_core_package_url', $url, $relativePath)
+            : $url;
+    }
+
+    /**
+     * The unfiltered URL for a package file — see url() for the resolution order.
+     */
+    private static function resolveUrl(string $relativePath): string
     {
         $absPath   = self::path($relativePath);
 
@@ -101,9 +129,83 @@ class Framework
         // Strip the theme path prefix to get a theme-relative path
         // e.g., /var/www/.../themes/my-theme/vendor/taw/core/assets/admin.css
         //     → vendor/taw/core/assets/admin.css
-        $relative = str_replace($themePath . '/', '', $absPath);
+        $legacyUrl = get_template_directory_uri() . '/' . str_replace($themePath . '/', '', $absPath);
 
-        return get_template_directory_uri() . '/' . $relative;
+        // 1. Inside the active parent theme: return exactly what this method
+        //    always returned. Checked before anything else so the common case
+        //    never touches another WordPress function.
+        if (self::isInside($absPath, $themePath)) {
+            return $legacyUrl;
+        }
+
+        // 2. Longest matching known location wins. Longest, because these
+        //    roots nest (a plugin dir is inside wp-content, which is inside
+        //    the site root) — the most specific one has the right base URL.
+        $bestRoot = '';
+        $bestUrl  = '';
+        foreach (self::locationRoots() as [$rootPath, $rootUrl]) {
+            foreach (array_unique([rtrim($rootPath, '/'), rtrim(realpath($rootPath) ?: $rootPath, '/')]) as $candidate) {
+                if (strlen($candidate) > strlen($bestRoot) && self::isInside($absPath, $candidate)) {
+                    $bestRoot = $candidate;
+                    $bestUrl  = $rootUrl;
+                }
+            }
+        }
+
+        if ($bestRoot !== '') {
+            return rtrim($bestUrl, '/') . '/' . ltrim(substr($absPath, strlen($bestRoot)), '/');
+        }
+
+        // 3. Unknown location — keep the old behavior rather than guess.
+        return $legacyUrl;
+    }
+
+    /**
+     * Web-served WordPress locations the package can be vendored under, as
+     * [filesystem path, base URL] pairs. Each is read only if WordPress has
+     * defined it, so this also works in partially-booted contexts.
+     *
+     * The parent theme isn't listed: url() checks it first, separately.
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    private static function locationRoots(): array
+    {
+        $roots = [];
+
+        if (function_exists('get_stylesheet_directory') && function_exists('get_stylesheet_directory_uri')) {
+            $roots[] = [get_stylesheet_directory(), get_stylesheet_directory_uri()];
+        }
+        // URLs come from WordPress's own functions, not the *_URL constants:
+        // the functions apply the site's scheme (http/https) and URL filters.
+        if (defined('WPMU_PLUGIN_DIR') && function_exists('plugins_url')) {
+            // plugins_url() maps any file inside mu-plugins to the mu-plugins URL.
+            $roots[] = [(string) WPMU_PLUGIN_DIR, plugins_url('', WPMU_PLUGIN_DIR . '/index.php')];
+        }
+        if (defined('WP_PLUGIN_DIR') && function_exists('plugins_url')) {
+            $roots[] = [(string) WP_PLUGIN_DIR, plugins_url()];
+        }
+        if (defined('WP_CONTENT_DIR') && function_exists('content_url')) {
+            $roots[] = [(string) WP_CONTENT_DIR, content_url()];
+        }
+        if (function_exists('site_url')) {
+            $roots[] = [(string) ABSPATH, site_url()];
+        }
+
+        return $roots;
+    }
+
+    /**
+     * Whether $path is $dir itself or somewhere underneath it.
+     *
+     * Compares with a trailing slash so /themes/foo-child never counts as
+     * being inside /themes/foo.
+     */
+    private static function isInside(string $path, string $dir): bool
+    {
+        $dir = rtrim($dir, '/');
+
+        return $dir !== '' && ($path === $dir || str_starts_with($path, $dir . '/'));
     }
 
     /**

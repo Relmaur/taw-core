@@ -26,6 +26,9 @@ class Performance
     /** Tracks whether wp_head has already fired. */
     private static bool $head_fired = false;
 
+    /** Tracks whether register() has already added the hooks. */
+    private static bool $registered = false;
+
     private static array $config = [
         /**
          * Strip Gutenberg block library CSS, classic-theme-styles, and global-styles
@@ -150,16 +153,30 @@ class Performance
     }
 
     /**
-     * Register all WordPress hooks.
+     * Register all WordPress hooks. Idempotent — only the first call registers.
      *
-     * Called automatically at the bottom of this file via the Composer `files` entry.
-     * Do not call this yourself.
+     * Called by Theme::boot() / Theme::bootstrapFullSite() — the classic-theme
+     * toolkit — and deliberately NOT by Boot::data(). Until ADR-0003 this ran
+     * at autoload time, which meant any theme that merely installed taw/core
+     * (e.g. a block theme wanting only the data layer) had its block library
+     * CSS dequeued by removeBloat(). A consumer that relied on the old
+     * autoload behavior without ever calling boot() can restore it with
+     * define('TAW_PERFORMANCE_AUTOLOAD', true) in wp-config.php.
      */
     public static function register(): void
     {
+        // Several entry points call this (boot(), bootstrapFullSite(), the
+        // autoload escape hatch below); registering twice would run every
+        // optimization twice and double-print the <head> preloads.
+        if (self::$registered) {
+            return;
+        }
+
         if (!function_exists('add_action')) {
             return;
         }
+
+        self::$registered = true;
 
         add_action('wp_head', [self::class, 'renderPreconnects'], 1);
         add_action('wp_enqueue_scripts', [self::class, 'removeBloat'], 100);
@@ -469,8 +486,11 @@ class Performance
 
 }
 
-// Bootstrap — runs once when Composer loads this file via the `files` autoload entry.
-// The class is already defined above, so calling register() here is safe.
-if (defined('ABSPATH')) {
+// Escape hatch only (ADR-0003). This file is still a Composer `files` entry
+// because it defines the class, but it no longer registers hooks on load:
+// Theme::boot() / bootstrapFullSite() do that. A consumer that depended on the
+// old load-time registration (without ever booting) can opt back in by
+// defining TAW_PERFORMANCE_AUTOLOAD before the autoloader runs (wp-config.php).
+if (defined('ABSPATH') && defined('TAW_PERFORMANCE_AUTOLOAD') && TAW_PERFORMANCE_AUTOLOAD) {
     Performance::register();
 }

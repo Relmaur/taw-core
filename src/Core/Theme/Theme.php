@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\Theme;
 
 use TAW\Core\Block\BlockLoader;
+use TAW\Core\Boot;
 use TAW\Core\Block\BlockRegistry;
 use TAW\Core\Editor\VisualEditor;
 use TAW\Core\Form\SubmissionsHandler;
@@ -12,15 +13,12 @@ use TAW\Core\Icons\Lucide;
 use TAW\Core\Media\MediaFolders;
 use TAW\Core\Metabox\MetaboxOrder;
 use TAW\Core\OptionsPage\OptionsPage;
-use TAW\Core\Content\ContentAdminScreen;
 use TAW\Core\Rag\Ingestion\PostIndexer;
 use TAW\Core\Rag\KnowledgeBase\KnowledgeBaseAdminScreen;
 use TAW\Core\Rag\RagSettings;
 use TAW\Core\Rest\BibleEndpoint;
 use TAW\Core\Rest\CatechismEndpoint;
-use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\Cors;
-use TAW\Core\Rest\FieldMetaRegistrar;
 use TAW\Core\Rest\RagChatEndpoint;
 use TAW\Core\Rest\SearchEndpoints;
 use TAW\Core\Rest\VisualEditorEndpoint;
@@ -37,9 +35,11 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Theme — the single entry point for wiring TAW Core into a WordPress theme.
+ * Theme — the classic-theme entry point for wiring TAW Core into a WordPress theme.
  *
- * Drop one line in your functions.php (after requiring the Composer autoloader)
+ * Data-only consumers (block/hybrid themes, site plugins) call
+ * TAW\Core\Boot::data() instead — see that class. For a classic theme, drop
+ * one line in your functions.php (after requiring the Composer autoloader)
  * and the entire framework boots itself:
  *
  *   TAW\Core\Theme\Theme::boot();
@@ -63,6 +63,7 @@ class Theme
      * Boot the TAW Core framework.
      *
      * Wires up, in order:
+     *   0. Performance optimizations (see TAW\Support\Performance)
      *   1. Block auto-discovery from the theme's /Blocks directory
      *   2. Theme asset pipeline (Vite HMR in dev, hashed manifest in prod)
      *   3. Queued block asset enqueuing (for FAUC-free above-the-fold blocks)
@@ -76,7 +77,7 @@ class Theme
      *  11. TAW Media (opt-in — no-op unless MediaFolders::enable() was called)
      *  12. Security hardening (default-on — hides the public /wp/v2/users REST
      *      routes from anonymous requests; filter taw_security_hide_users_endpoint to opt out)
-     *  13. Content interchange (default-on, cap-gated — Tools → TAW Data screen,
+     *  13. The data layer via Boot::data(): content interchange (default-on, cap-gated — Tools → TAW Data screen,
      *      GET taw/v1/content/export, and REST-registered field meta; filter
      *      taw_register_meta_in_rest to opt out of the REST meta)
      *  14. Sovereign Hybrid-RAG Chatbot (opt-in — no-op unless RagSettings::enable()
@@ -92,6 +93,15 @@ class Theme
         }
 
         self::$booted = true;
+
+        // ── 0. Performance ─────────────────────────────────────────────────────
+        // Frontend optimizations (dequeue block library CSS, strip emoji and
+        // legacy <head> tags, preloads). This used to register the moment
+        // Composer loaded performance.php; it now registers only for consumers
+        // that boot the classic-theme toolkit, because a block theme that
+        // installs taw/core just for data must keep its block CSS (ADR-0003).
+        // Idempotent, so bootstrapFullSite() calling it first is harmless.
+        Performance::register();
 
         // ── 1. Blocks ──────────────────────────────────────────────────────────
         // Auto-discover and register every block found under the theme's /Blocks
@@ -175,9 +185,11 @@ class Theme
         //  - Every registered TAW field exposed over wp/v2 (register_post_meta
         //    + register_rest_field). Opt out of the REST-meta half with:
         //      add_filter('taw_register_meta_in_rest', '__return_false');
-        (new ContentAdminScreen())->register();
-        new ContentEndpoint();
-        FieldMetaRegistrar::register();
+        // These three registrations ARE the data layer, so they live in
+        // Boot::data() — the entry point data-only consumers (block/hybrid
+        // themes) call without any of the presentation above. Calling it here,
+        // at this exact position, keeps classic themes' hook order unchanged.
+        Boot::data();
 
         // ── 14. Sovereign Hybrid-RAG Chatbot ──────────────────────────────────
         // Opt-in only — no-op unless RagSettings::enable() was called.
@@ -272,6 +284,12 @@ class Theme
      */
     public static function bootstrapFullSite(string $themeDir): void
     {
+        // First statement on purpose: Performance used to register at autoload
+        // time, i.e. before anything below. Registering it here, first, keeps
+        // its callbacks ahead of everything this method (and customizations.php)
+        // adds at the same hook and priority — same order as before ADR-0003.
+        Performance::register();
+
         // WordPress's _load_textdomain_just_in_time() only warns when a
         // translation function fires before after_setup_theme has started
         // (WP_DEBUG-only doing_it_wrong, added 6.7) — not "before init" as

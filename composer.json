@@ -1,6 +1,6 @@
 {
     "name": "taw/core",
-    "description": "TAW Theme Framework — block system, metabox engine, Vite asset pipeline for WordPress",
+    "description": "TAW — data layer framework for WordPress (fields, options, REST-exposed meta, content interchange), plus an optional classic-theme toolkit (block system, Vite asset pipeline)",
     "type": "library",
     "license": "GPL-2.0-or-later",
     "authors": [
@@ -11,7 +11,6 @@
     ],
     "require": {
         "php": ">=8.2",
-        "ext-pdo_sqlite": "*",
         "symfony/console": "^7.4",
         "symfony/process": "^7.4",
         "enshrined/svg-sanitize": "^0.22.0"
@@ -25,6 +24,7 @@
         "emailit/emailit-php": "^2.0"
     },
     "suggest": {
+        "ext-pdo_sqlite": "Required for the SQLite-backed features only (RAG knowledge bases, the Bible/Catechism SQLite readers, corpus:export). Everything else — including the whole data layer — works without it; the corpus readers fall back to MySQL (ADR-0002).",
         "emailit/emailit-php": "Required for EmailConfig::useEmailit() — route all wp_mail() through the Emailit REST API"
     },
     "config": {

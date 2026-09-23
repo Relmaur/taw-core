@@ -52,13 +52,24 @@ if (! function_exists('taw_editor_section')) {
 \TAW\Helpers\Dump::skipFile(__FILE__);
 
 /**
- * Dump helper functions
+ * Dump helper functions.
+ *
+ * Guarded like the helpers above: dump()/dd() are common names (Symfony
+ * VarDumper, Laravel, Ray, other plugins all define them). taw/core now runs
+ * on sites it doesn't fully control (ADR-0003), where an unguarded
+ * declaration would be a fatal "cannot redeclare" error. If another library
+ * got there first, its dump() is used — same intent, different output.
  */
-function dump(mixed $value, string $label = ''): void
-{
-    \TAW\Helpers\Dump::dump($value, $label);
+if (! function_exists('dump')) {
+    function dump(mixed $value, string $label = ''): void
+    {
+        \TAW\Helpers\Dump::dump($value, $label);
+    }
 }
-function dd(mixed $value, string $label = ''): void
-{
-    \TAW\Helpers\Dump::dd($value, $label);
+
+if (! function_exists('dd')) {
+    function dd(mixed $value, string $label = ''): void
+    {
+        \TAW\Helpers\Dump::dd($value, $label);
+    }
 }
