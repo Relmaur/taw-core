@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://taw.mlizardo.com/schema/taw-schema-1.0.json",
+  "title": "TAW Schema definition 1.0",
+  "description": "One post type, taxonomy, fieldset or options page for the TAW schema registry (ADR-0004). Put files in a taw-schema/ folder in the theme (or wp-content/taw-schema/). The authoritative check is TAW\\Core\\Schema\\Validator (php bin/taw schema:validate); this file mirrors it for editor autocomplete.",
+  "type": "object",
+  "required": ["version", "kind", "key"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "kind": { "enum": ["post_type", "taxonomy", "fieldset", "options_page"] },
+    "key": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
+    "override": {
+      "type": "boolean",
+      "description": "Set when this definition deliberately replaces a lower-precedence one of the same kind and key."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "post_type" } } },
+      "then": {
+        "properties": {
+          "$schema": true, "version": true, "kind": true, "key": { "maxLength": 20 }, "override": true,
+          "labels": { "$ref": "#/$defs/labels" },
+          "args": { "type": "object", "description": "Passed to register_post_type(). Defaults: public + show_in_rest on; custom-fields is always added to supports." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "taxonomy" } } },
+      "then": {
+        "required": ["for"],
+        "properties": {
+          "$schema": true, "version": true, "kind": true, "key": { "maxLength": 32 }, "override": true,
+          "for": { "$ref": "#/$defs/stringList", "description": "Post types this taxonomy attaches to." },
+          "labels": { "$ref": "#/$defs/labels" },
+          "args": { "type": "object", "description": "Passed to register_taxonomy(). Default: show_in_rest on." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "fieldset" } } },
+      "then": {
+        "required": ["on", "fields"],
+        "properties": {
+          "$schema": true, "version": true, "kind": true, "key": true, "override": true,
+          "title": { "type": "string" },
+          "on": { "$ref": "#/$defs/stringList", "description": "Post types, page slugs or template filenames (e.g. page-about.php) — same as Metabox screens." },
+          "fields": { "$ref": "#/$defs/fieldList" },
+          "context": { "enum": ["normal", "side", "advanced"] },
+          "priority": { "enum": ["high", "default", "low"] },
+          "prefix": { "type": "string", "description": "Meta key prefix. Default _taw_." },
+          "config": { "type": "object", "description": "Any other Metabox config key (tabs, icon, …)." }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "options_page" } } },
+      "then": {
+        "required": ["fields"],
+        "properties": {
+          "$schema": true, "version": true, "kind": true, "key": true, "override": true,
+          "title": { "type": "string" },
+          "menu_title": { "type": "string" },
+          "capability": { "type": "string" },
+          "fields": { "$ref": "#/$defs/fieldList" },
+          "config": { "type": "object", "description": "Any other OptionsPage config key (prefix, tabs, icon, position, …)." }
+        },
+        "additionalProperties": false
+      }
+    }
+  ],
+  "$defs": {
+    "labels": {
+      "type": "object",
+      "required": ["singular", "plural"],
+      "properties": {
+        "singular": { "type": "string", "minLength": 1 },
+        "plural": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "stringList": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "fieldList": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/field" }
+    },
+    "field": {
+      "type": "object",
+      "required": ["id", "type"],
+      "description": "A Metabox field. Keys not listed here (conditions, width, layout, editor, …) are passed through as-is.",
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+        "type": {
+          "enum": [
+            "text", "url", "number", "textarea", "wysiwyg", "select", "checkbox",
+            "color", "datepicker", "range", "image", "icon", "files", "gradient_text",
+            "hubspot_form", "group", "post_select", "repeater"
+          ]
+        },
+        "label": { "type": "string" },
+        "description": { "type": "string" },
+        "placeholder": { "type": "string" },
+        "required": { "type": "boolean" },
+        "readonly": { "type": "boolean" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number" },
+        "options": { "type": "object", "additionalProperties": { "type": "string" } },
+        "fields": { "$ref": "#/$defs/fieldList" }
+      },
+      "if": { "properties": { "type": { "enum": ["group", "repeater"] } } },
+      "then": { "required": ["fields"] },
+      "else": { "not": { "required": ["fields"] } }
+    }
+  }
+}

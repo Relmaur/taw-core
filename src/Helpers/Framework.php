@@ -76,10 +76,12 @@ class Framework
      * under and swapping that directory's path for its URL.
      *
      * WHERE THE PACKAGE CAN LIVE (ADR-0003):
-     * taw/core is installed by `composer require` into whichever project
-     * consumes it — usually the active parent theme's vendor/ (taw-theme,
-     * taw-gutenberg), but it can also be a child theme's vendor/, a site
-     * plugin's, or an mu-plugin's. Resolution order:
+     * taw/core is installed by `composer require` into the TAW theme that
+     * consumes it — the active parent theme's vendor/ (taw-theme,
+     * taw-gutenberg), or a child theme's. taw/core is for TAW sites only
+     * (ADR-0003 addendum); the plugin/mu-plugin roots below are kept because
+     * they cost nothing, not because other consumers are supported.
+     * Resolution order:
      *   1. The active parent theme — the original and most common case,
      *      checked first and resolved exactly as before, so existing sites
      *      get byte-identical URLs.

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "kind": "fieldset",
+  "key": "book_details",
+  "title": "Book details",
+  "on": ["book"],
+  "context": "normal",
+  "fields": [
+    { "id": "subtitle", "type": "text", "label": "Subtitle", "required": true },
+    { "id": "cover", "type": "image", "label": "Cover" },
+    { "id": "format", "type": "select", "label": "Format", "options": { "hardcover": "Hardcover", "ebook": "E-book" } },
+    { "id": "publisher", "type": "group", "fields": [
+      { "id": "name", "type": "text" },
+      { "id": "year", "type": "number", "min": 1450 }
+    ] },
+    { "id": "awards", "type": "repeater", "fields": [ { "id": "name", "type": "text" } ], "conditions": [] }
+  ]
+}

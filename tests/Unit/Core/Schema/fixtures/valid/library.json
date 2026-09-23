@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "kind": "options_page",
+  "key": "library",
+  "title": "Library settings",
+  "fields": [ { "id": "library_phone", "type": "text", "label": "Phone" } ]
+}

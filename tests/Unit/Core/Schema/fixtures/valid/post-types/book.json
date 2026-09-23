@@ -1,0 +1,8 @@
+{
+  "$schema": "https://taw.mlizardo.com/schema/taw-schema-1.0.json",
+  "version": 1,
+  "kind": "post_type",
+  "key": "book",
+  "labels": { "singular": "Book", "plural": "Books" },
+  "args": { "menu_icon": "dashicons-book", "has_archive": true }
+}

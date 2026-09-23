@@ -114,3 +114,21 @@ behavior?
   cost; revisit only if a real conflict appears.
 - Not done (YAGNI): moving `Performance` to PSR-4 and out of `autoload.files` (it still has to be
   a `files` entry today because the file defines the class); a guard for multiple copies.
+
+## Addendum: taw/core serves TAW sites only (2026-09-23, v1.44.0)
+
+Decided by the user after v1.43.0: **taw/core is exclusively for TAW sites.** Its consumers are
+taw-theme (classic, `Theme::bootstrapFullSite()`), taw-gutenberg (hybrid, `Boot::data()`), and child
+themes of those. Nothing in core is meant to be used by external or third-party plugins and themes
+for now.
+
+This narrows the wording above, not the code:
+
+- Decision 1's "any other theme or site plugin" and the Trade-offs mention of a site-specific
+  mu-plugin no longer describe supported setups.
+- `Framework::url()` keeps its plugin, mu-plugin, wp-content and site-root roots (Decision 4). They're
+  shipped, tested and cost nothing, and the child-theme root is still needed. They just aren't
+  advertised as extension points.
+- Backward compatibility (the "public API") has to hold for taw-theme, taw-gutenberg and their child
+  themes, not for unknown consumers. When a choice is general vs. TAW-specific, prefer TAW-specific.
+
