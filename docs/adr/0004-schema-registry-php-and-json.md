@@ -125,3 +125,24 @@ Constraints from the existing code:
 - Phase 2 builds on this: a qualified registry, term and user fieldsets, and options over REST.
   Later phases hang the typed value API, Block Bindings, the loop block and native editor panels
   off the same registry.
+
+## Addendum: post type and taxonomy defaults (2026-09-23, v1.43.0)
+
+Decision 4 says `args` are passed through untouched. That still holds, but the PHP builders apply
+**defaults underneath** them, because a schema post type exists to hold data that the block editor
+and REST can reach:
+
+- Post types: `public` and `show_in_rest` default to true, and `supports` defaults to
+  `title, editor, thumbnail`.
+- **`custom-fields` is always added to `supports`, even when `args` sets `supports`.** WordPress only
+  exposes registered post meta over REST for post types that support `custom-fields`.
+  `FieldMetaRegistrar` registers every TAW field with `show_in_rest`, so without this rule a schema
+  post type's fields would silently be missing from `wp/v2` and, in Phase 4, from Block Bindings.
+- Taxonomies: `show_in_rest` defaults to true (the block editor's taxonomy panel needs it).
+- Reserved keys are rejected at construction: core post types, core taxonomies, and taxonomy names
+  that shadow public query vars (`year`, `author`, …).
+
+*Trade-off:* this differs from WordPress's own defaults (`public` false), which is a surprise for a
+developer expecting raw `register_post_type()` behavior. It's accepted because every default can be
+overridden through `args`, except `custom-fields`, where overriding would only produce a silent bug.
+
