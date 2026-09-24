@@ -120,3 +120,27 @@ Constraints and facts (WordPress 7.1.2, checked in core):
   - `allowBound` (Phase 4)
   - checking structural locks on save
   - adoption by taw-theme (it can opt in later by calling `Boot::editing()`)
+
+## Addendum: site-structure enforcement is a REST guard, not capability re-mapping (v1.47.0)
+
+Decision 5 said the site-structure layer would re-map the FSE post types' capabilities to
+`taw_edit_site_<area>` through `register_post_type_args`. Building it showed that can't work:
+
+- `wp_template`, `wp_template_part`, `wp_global_styles` and `wp_navigation` are registered by
+  `create_initial_post_types()` at `init:0`, before the policy can be resolved (the schema registry
+  freezes at `init:5`).
+- The REST controllers that the Site Editor saves through check `current_user_can('edit_theme_options')`
+  directly for writes (for example `WP_REST_Templates_Controller::permissions_check()`), not the post
+  type's capabilities.
+
+**What's built instead:** `Editing\SiteLayer` refuses **writes** (anything but GET/HEAD/OPTIONS) to
+`/wp/v2/templates`, `/wp/v2/template-parts`, `/wp/v2/global-styles` and `/wp/v2/navigation` at
+`rest_pre_dispatch`, which also runs for every request inside a `/batch/v1` call. It returns 403
+`taw_editing_site_locked`. Reads are never blocked. `templateMode` sets `supportsTemplateMode: false`,
+and `siteEditor: false` hides Appearance → Editor / Patterns and refuses `site-editor.php`.
+
+**Consequences:**
+- The public names `taw_edit_site_{templates,template_parts,global_styles,navigation}` are **not**
+  introduced. The bypass is still the one capability (`taw_unlock_editing` by default).
+- Non-REST ways to change the same things (the Customizer's Additional CSS, direct DB edits, WP-CLI)
+  aren't covered. The Site Editor itself only saves through REST.

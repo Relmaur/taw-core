@@ -474,7 +474,16 @@ or `Theme::boot()`):
   new posts, `templateLock`) and the **features** layer (code editor, block lock UI, Openverse, block
   directory, core and remote patterns, Custom HTML). A save that *adds* a block the rule doesn't allow
   is rejected with a 400 (`taw_editing_block_not_allowed`), while blocks already in the post still
-  save. The **site** and **design** layers come in v1.47.0.
+  save.
+- **Applied since v1.47.0:** the **site** layer and the **design** layer.
+  - **Site:** for locked users, writes to templates, template parts, Global Styles and Navigation are
+    refused at REST (403 `taw_editing_site_locked`). The post editor's "edit template" can be switched
+    off, and at `locked` the Site Editor is hidden.
+  - **Design:** custom colors, gradients, font sizes, drop cap, spacing sizes, line height, border,
+    default shadow presets and custom duotone are switched off in theme.json. This is site-wide and
+    applies to everyone.
+  - **Tools → TAW Editing** shows the policy in effect: the preset and where it's set, whether you
+    bypass, each layer's values, and warnings.
 - **Per install (`wp-config.php`):** `TAW_EDITING_PRESET` switches the preset. `TAW_EDITING_BYPASS_USERS`
   (an array or a comma-separated list of logins) names who stays unlocked, even if clients are
   Administrators. `TAW_EDITING_OFF` turns everything off, as the recovery switch.
