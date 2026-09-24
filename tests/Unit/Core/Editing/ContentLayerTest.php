@@ -127,7 +127,8 @@ final class ContentLayerTest extends TestCase
 
     public function test_presets_set_the_lock_on_pages(): void
     {
-        $this->assertSame('contentOnly', $this->layer(Schema::editing()->preset('structured'))->editorSettings([], self::context('page'))['templateLock']);
+        // contentOnly is enforced as "all" + the content-only editor script (WP 7.1 ignores a root contentOnly lock).
+        $this->assertSame('all', $this->layer(Schema::editing()->preset('structured'))->editorSettings([], self::context('page'))['templateLock']);
         $this->assertSame('all', $this->layer(Schema::editing()->preset('locked'))->editorSettings([], self::context('page'))['templateLock']);
         $this->assertSame([], $this->layer(Schema::editing()->preset('guided'))->editorSettings([], self::context('page')));
     }
@@ -242,6 +243,58 @@ final class ContentLayerTest extends TestCase
         $this->assertNotFalse(has_filter('rest_pre_insert_book'));
     }
 
+    public function test_insert_lock_is_passed_through_unchanged(): void
+    {
+        $layer = $this->layer(Schema::editing()->content('page', ['lock' => 'insert']));
+
+        $this->assertSame('insert', $layer->editorSettings([], self::context('page'))['templateLock']);
+    }
+
+    // --- content-only editor script ------------------------------------
+
+    private static function screen(string $base, string $postType): void
+    {
+        Functions\when('get_current_screen')->justReturn((object) ['base' => $base, 'post_type' => $postType]);
+    }
+
+    public function test_content_only_script_is_enqueued_for_locked_users_on_content_only_post_types(): void
+    {
+        self::screen('post', 'page');
+        Functions\when('get_template_directory')->justReturn(\TAW\Helpers\Framework::path());
+        Functions\when('get_template_directory_uri')->justReturn('https://example.test/wp-content/themes/t');
+        Functions\when('get_stylesheet_directory')->justReturn(\TAW\Helpers\Framework::path());
+        Functions\expect('wp_enqueue_script')->once()->with(
+            ContentLayer::CONTENT_ONLY_HANDLE,
+            'https://example.test/wp-content/themes/t/assets/editing-content-only.js',
+            ['wp-data', 'wp-block-editor'],
+            \Mockery::type('string'),
+            true
+        );
+
+        $this->layer(Schema::editing()->preset('structured'))->enqueueContentOnly();
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_content_only_script_is_not_enqueued_elsewhere(): void
+    {
+        Functions\expect('wp_enqueue_script')->never();
+
+        self::screen('post', 'post');   // post is open under the structured preset
+        $this->layer(Schema::editing()->preset('structured'))->enqueueContentOnly();
+
+        self::screen('post', 'page');   // locked (all), not contentOnly
+        $this->layer(Schema::editing()->preset('locked'))->enqueueContentOnly();
+
+        self::screen('site-editor', 'page');
+        $this->layer(Schema::editing()->preset('structured'))->enqueueContentOnly();
+
+        self::screen('post', 'page');   // bypass
+        Functions\when('current_user_can')->justReturn(true);
+        $this->layer(Schema::editing()->preset('structured'))->enqueueContentOnly();
+
+        $this->addToAssertionCount(1);
+    }
+
     public function test_register_hooks_the_editor_and_rest(): void
     {
         $layer = $this->layer(Schema::editing());
@@ -250,5 +303,6 @@ final class ContentLayerTest extends TestCase
         $this->assertSame(20, has_filter('allowed_block_types_all', [$layer, 'allowedBlockTypes']));
         $this->assertSame(20, has_filter('block_editor_settings_all', [$layer, 'editorSettings']));
         $this->assertSame(10, has_action('rest_api_init', [$layer, 'registerSaveChecks']));
+        $this->assertSame(10, has_action('enqueue_block_editor_assets', [$layer, 'enqueueContentOnly']));
     }
 }

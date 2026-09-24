@@ -105,6 +105,7 @@ final class SiteLayerTest extends TestCase
     public function test_site_editor_is_hidden_and_refused_at_locked(): void
     {
         Functions\expect('remove_submenu_page')->twice();
+        Functions\expect('remove_action')->once()->with('welcome_panel', 'wp_welcome_panel');
         Functions\expect('wp_die')->once();
 
         $layer = $this->layer(Schema::editing()->preset('locked'));
@@ -115,6 +116,7 @@ final class SiteLayerTest extends TestCase
     public function test_site_editor_stays_below_locked_and_for_bypass(): void
     {
         Functions\expect('remove_submenu_page')->never();
+        Functions\expect('remove_action')->never();
         Functions\expect('wp_die')->never();
 
         foreach ([$this->layer(Schema::editing()->preset('structured')), $this->layer(Schema::editing()->preset('locked'), true)] as $layer) {
