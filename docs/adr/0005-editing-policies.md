@@ -144,3 +144,35 @@ and `siteEditor: false` hides Appearance → Editor / Patterns and refuses `site
   introduced. The bypass is still the one capability (`taw_unlock_editing` by default).
 - Non-REST ways to change the same things (the Customizer's Additional CSS, direct DB edits, WP-CLI)
   aren't covered. The Site Editor itself only saves through REST.
+
+## Addendum: `lock: contentOnly` is enforced as `all` plus an editor script on WordPress 7.1 (v1.48.0)
+
+The first browser check (on WordPress 7.1.2) showed that the `structured` preset didn't lock layout. The
+editor received `templateLock: contentOnly`, but 7.1 **exempts** a page-level `contentOnly` lock:
+`canRemoveBlock()` and `canInsertBlockType()` only refuse when `rootTemplateLock && rootTemplateLock !== "contentOnly"`.
+In 7.1, `contentOnly` only applies to "section" blocks: patterns, template parts, and blocks that carry
+their own `contentOnly` lock under an unlocked parent. So `structured` pages could still be restructured
+freely.
+
+**Decision (owner's choice among three):** keep `lock: contentOnly` as the policy's meaning (edit text
+and media, nothing else), and implement it directly:
+
+1. `ContentLayer` sends `templateLock: all`, which 7.1 enforces: no inserting, removing or moving blocks.
+2. For a locked user in the post editor on a post type whose rule is `contentOnly`, `ContentLayer`
+   enqueues `assets/editing-content-only.js` (handle `taw-editing-content-only`, depends on `wp-data` and
+   `wp-block-editor`). It puts every block in the `contentOnly` **editing mode** through the public
+   `core/block-editor` action `setBlockEditingMode()`, which hides block design tools and movers.
+3. The editor resets editing modes while it mounts the canvas, so the script re-applies them whenever a
+   block isn't `contentOnly`, capped at 10 attempts per block so it can't fight a deliberate override.
+
+Rejected alternatives:
+- `structured` = `insert`: clients could still reorder blocks.
+- `structured` = `all`: the same as `locked` for pages.
+
+**Verified in the browser:** every block is in `contentOnly` mode, groups included; text stays editable;
+the toolbar is down to formatting; the sidebar is down to Typography; blocks can't be removed or moved;
+no console errors.
+
+**Consequences:** taw/core now ships a small plain-JS editor asset (no build step). It relies on
+`setBlockEditingMode()`, so a future WordPress change to editing modes needs a browser re-check.
+`Blocks`, the REST save check and the policy format are unchanged.

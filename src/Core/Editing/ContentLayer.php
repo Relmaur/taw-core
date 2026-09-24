@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Core\Editing;
 
+use TAW\Helpers\Framework;
+
 // No ABSPATH guard: pure class definition (see Editing\Presets).
 
 /**
@@ -17,9 +19,16 @@ namespace TAW\Core\Editing;
  * rule doesn't allow is rejected. Blocks already in the saved post are left
  * alone, so tightening a policy never makes existing content unsaveable.
  * Template locks are editor guardrails only (ADR-0005 § 5).
+ *
+ * `lock: contentOnly` is sent as templateLock "all" plus an editor script
+ * that puts every block in the contentOnly editing mode: since WordPress
+ * 7.1 the editor ignores a page-level contentOnly lock (it only applies
+ * inside "section" blocks), so the setting alone locks nothing.
  */
 final class ContentLayer
 {
+    public const CONTENT_ONLY_HANDLE = 'taw-editing-content-only';
+
     /** @var \Closure(): list<string> */
     private \Closure $registeredBlocks;
 
@@ -40,6 +49,7 @@ final class ContentLayer
         add_filter('allowed_block_types_all', [$this, 'allowedBlockTypes'], 20, 2);
         add_filter('block_editor_settings_all', [$this, 'editorSettings'], 20, 2);
         add_action('rest_api_init', [$this, 'registerSaveChecks']);
+        add_action('enqueue_block_editor_assets', [$this, 'enqueueContentOnly']);
     }
 
     /**
@@ -96,10 +106,34 @@ final class ContentLayer
         }
 
         if ($rule['lock'] !== false) {
-            $settings['templateLock'] = $rule['lock'];
+            // contentOnly is enforced as "all" + enqueueContentOnly() (see the class docblock).
+            $settings['templateLock'] = $rule['lock'] === 'contentOnly' ? 'all' : $rule['lock'];
         }
 
         return $settings;
+    }
+
+    /**
+     * enqueue_block_editor_assets: the content-only script, for a locked user
+     * editing a post whose rule is lock: contentOnly.
+     */
+    public function enqueueContentOnly(): void
+    {
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+        if ($screen === null || $screen->base !== 'post' || $screen->post_type === '') {
+            return;
+        }
+        if ($this->policy->content($screen->post_type)['lock'] !== 'contentOnly' || $this->bypass->active()) {
+            return;
+        }
+
+        wp_enqueue_script(
+            self::CONTENT_ONLY_HANDLE,
+            Framework::url('assets/editing-content-only.js'),
+            ['wp-data', 'wp-block-editor'],
+            Framework::version(),
+            true
+        );
     }
 
     /**

@@ -484,6 +484,11 @@ or `Theme::boot()`):
     applies to everyone.
   - **Tools → TAW Editing** shows the policy in effect: the preset and where it's set, whether you
     bypass, each layer's values, and warnings.
+- **Since v1.48.0, `lock: contentOnly` really means content-only on WordPress 7.1** (which ignores a
+  page-level `contentOnly` lock). The editor gets `templateLock: all`, and a small script
+  (`assets/editing-content-only.js`) puts every block in `contentOnly` editing mode: text and media can
+  be edited, but blocks can't be added, removed or moved, and the design tools are hidden. At `locked`,
+  the dashboard welcome panel (which links into the Site Editor) is removed too.
 - **Per install (`wp-config.php`):** `TAW_EDITING_PRESET` switches the preset. `TAW_EDITING_BYPASS_USERS`
   (an array or a comma-separated list of logins) names who stays unlocked, even if clients are
   Administrators. `TAW_EDITING_OFF` turns everything off, as the recovery switch.

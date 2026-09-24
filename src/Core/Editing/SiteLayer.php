@@ -15,7 +15,8 @@ namespace TAW\Core\Editing;
  *   globalStyles   → /wp/v2/global-styles     (wp_global_styles)
  *   navigation     → /wp/v2/navigation        (wp_navigation)
  *   templateMode   → the post editor's "edit template" (supportsTemplateMode)
- *   siteEditor     → Appearance → Editor / Patterns and site-editor.php
+ *   siteEditor     → Appearance → Editor / Patterns, site-editor.php and the
+ *                    dashboard welcome panel (its links point into the Site Editor)
  *
  * Writes are refused at REST dispatch: every Site Editor save goes through
  * REST (rest_pre_dispatch also runs for each request in a batch), and the
@@ -108,6 +109,10 @@ final class SiteLayer
 
         remove_submenu_page('themes.php', 'site-editor.php');
         remove_submenu_page('themes.php', 'site-editor.php?p=/pattern');
+        // The welcome panel's "Open site editor" / "Edit styles" links would
+        // lead straight to the refusal page. This is WordPress's documented
+        // way to remove it (wp-admin/index.php).
+        remove_action('welcome_panel', 'wp_welcome_panel');
     }
 
     public function refuseSiteEditor(): void
