@@ -49,15 +49,51 @@ final class Fieldset extends Definition
     }
 
     /**
-     * Where the fieldset appears: post type keys, page slugs, or template
-     * filenames (`page-about.php`) — the same values Metabox's `screens`
-     * accepts.
+     * Where the fieldset appears: post type keys, page slugs, template
+     * filenames (`page-about.php`), or a taxonomy's terms (`term:genre`,
+     * ADR-0008) — the same values Metabox's `screens` accepts. Targets can
+     * be mixed.
      */
     public function on(string ...$screens): self
     {
+        foreach ($screens as $screen) {
+            $problem = self::targetProblem($screen);
+            if ($problem !== null) {
+                throw new \InvalidArgumentException(sprintf('Invalid fieldset "%s" target "%s": %s', $this->key(), $screen, $problem));
+            }
+        }
+
         $this->screens = array_values(array_unique([...$this->screens, ...$screens]));
 
         return $this;
+    }
+
+    /**
+     * What's wrong with one `on` entry, or null. Only term targets have a
+     * format: `term:` plus a taxonomy key.
+     */
+    public static function targetProblem(string $screen): ?string
+    {
+        if (!str_starts_with($screen, 'term:')) {
+            return null;
+        }
+
+        return preg_match('/^term:[a-z0-9_-]{1,32}$/', $screen) === 1
+            ? null
+            : 'a term target is "term:" plus a taxonomy key (1–32 lowercase letters, numbers, underscores or dashes)';
+    }
+
+    /**
+     * The taxonomies of this fieldset's term targets.
+     *
+     * @return list<string>
+     */
+    public function taxonomies(): array
+    {
+        return array_values(array_map(
+            static fn (string $screen): string => substr($screen, 5),
+            array_filter($this->screens, static fn (string $screen): bool => str_starts_with($screen, 'term:'))
+        ));
     }
 
     /**

@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace TAW\Core\Metabox;
 
 use TAW\Core\Icons\Lucide;
+use TAW\Core\Metabox\Store\MetaStore;
+use TAW\Core\Metabox\Store\PostMetaStore;
+use TAW\Core\Metabox\Store\TermMetaStore;
 use TAW\Helpers\Framework;
 use TAW\Support\Alpine;
 
@@ -122,6 +125,9 @@ class Metabox
     /** @var bool Guards against enqueuing the multi-file picker script more than once. */
     private static bool $files_script_enqueued = false;
 
+    /** @var bool Guards against printing the term Add-screen script more than once. */
+    private static bool $term_add_script_printed = false;
+
     /** @var bool Guards against enqueuing the datepicker script more than once. */
     private static bool $datepicker_script_enqueued = false;
 
@@ -140,6 +146,13 @@ class Metabox
 
     /** Where it shows in the block editor ('panel' | 'metabox'), or null for the site default (ADR-0007). */
     private ?string $ui;
+
+    /**
+     * The store the render or save in progress reads and writes through
+     * (ADR-0008 decision 4). Every entry point (render(), save(), the term
+     * screens) sets it before touching a value; posts by default.
+     */
+    private MetaStore $store;
 
     /** @var list<self> Post-type metaboxes, in construction order (the data panel reads them). */
     private static array $instances = [];
@@ -176,6 +189,7 @@ class Metabox
 
         $this->type = $config['type'] ?? 'post_type';
         $this->ui   = isset($config['ui']) && is_string($config['ui']) ? $config['ui'] : null;
+        $this->store = new PostMetaStore();
 
         if ($this->type === 'nav_menu') {
             add_action('wp_nav_menu_item_custom_fields', [$this, 'render_for_nav_menu'], 10, 5);
@@ -184,6 +198,15 @@ class Metabox
             add_action('add_meta_boxes', [$this, 'register']);
             add_action('save_post', [$this, 'save'], 10, 2);
             self::$instances[] = $this;
+
+            // Term targets ("term:<taxonomy>" in screens): the taxonomy's Add
+            // and Edit screens, saved when the term is created or edited.
+            foreach ($this->termTaxonomies() as $taxonomy) {
+                add_action("{$taxonomy}_add_form_fields", [$this, 'render_term_add']);
+                add_action("{$taxonomy}_edit_form_fields", [$this, 'render_term_edit']);
+                add_action("created_{$taxonomy}", [$this, 'save_term']);
+                add_action("edited_{$taxonomy}", [$this, 'save_term']);
+            }
         }
 
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
@@ -378,6 +401,9 @@ class Metabox
         $slugs     = [];
 
         foreach ($this->screens() as $screen) {
+            if (self::isTermScreen($screen)) {
+                continue;
+            }
             if (str_ends_with($screen, '.php')) {
                 $templates[] = $screen;
             } elseif (post_type_exists($screen)) {
@@ -748,7 +774,11 @@ class Metabox
             ? ['nav-menus.php']
             : ['post.php', 'post-new.php'];
 
-        if (!in_array($hook, $allowed_hooks, true)) {
+        $term_screen = $this->type !== 'nav_menu'
+            && in_array($hook, ['edit-tags.php', 'term.php'], true)
+            && in_array($this->currentTaxonomy(), $this->termTaxonomies(), true);
+
+        if (!in_array($hook, $allowed_hooks, true) && !$term_screen) {
             return;
         }
 
@@ -765,7 +795,7 @@ class Metabox
 
         // A fieldset in the data panel (ADR-0007) has no metabox on this
         // screen, so its admin scripts and styles would be dead weight.
-        $post = get_post();
+        $post = $term_screen ? null : get_post();
         if ($post instanceof \WP_Post && apply_filters('taw_metabox_ui', 'metabox', $this, $post) === 'panel') {
             return;
         }
@@ -781,6 +811,17 @@ class Metabox
 
         self::enqueue_field_scripts($this->fields);
     }
+    /** The taxonomy of the current Categories/Tags-style admin screen, or ''. */
+    private function currentTaxonomy(): string
+    {
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+        if ($screen !== null && $screen->taxonomy !== '') {
+            return (string) $screen->taxonomy;
+        }
+
+        return isset($_GET['taxonomy']) ? sanitize_key(wp_unslash($_GET['taxonomy'])) : '';
+    }
+
     /**
      * Outputs the image-upload JS exactly once, using event delegation so it
      * handles any number of image fields across multiple metabox instances.
@@ -1875,7 +1916,7 @@ class Metabox
                         // the form is sent so that debounce lag never causes stale data.
                         // Repeaters are triggered in reverse DOM order (innermost first)
                         // so each child updates its hidden input before its parent reads it.
-                        $('form#post, form#post-new, form[action="options.php"]').one('submit.tawRepeater', function() {
+                        $('form#post, form#post-new, form[action="options.php"], form#edittag').one('submit.tawRepeater', function() {
                             var $all = $(this).find('.taw-repeater').get().reverse();
                             $.each($all, function(_, el) {
                                 $(el).trigger('taw-flush-serialize');
@@ -1932,11 +1973,24 @@ class Metabox
 
         wp_nonce_field($this->id . '_nonce_action', $this->id . '_nonce');
 
+        $this->store = new PostMetaStore();
+        $this->render_fields_container($post->ID);
+    }
+
+    /**
+     * The fields grid shared by every screen (post metabox, term Add/Edit):
+     * an Alpine.js reactive object pre-populated with the stored values, then
+     * every field row, flat or in tabs. Reads through {@see self::$store}.
+     *
+     * @param int $object_id The post or term being edited; 0 on a term's Add screen.
+     */
+    private function render_fields_container(int $object_id): void
+    {
         // Build initial field values for Alpine.js reactive state
         $initial_values = [];
         foreach ($this->fields as $field) {
             $field_id = $this->prefix . $field['id'];
-            $raw = get_post_meta($post->ID, $field_id, true) ?: '';
+            $raw = $this->read_value($object_id, $field_id) ?: '';
             // Rich-text meta (wysiwyg, etc.) is stored with HTML entities baked in
             // (e.g. a literal " saved as &quot;) — decode before JSON-encoding so
             // this mirrors what a <textarea>/<input> actually exposes via .value,
@@ -1965,7 +2019,7 @@ class Metabox
 
             if ($tab_groups === []) {
                 foreach ($this->fields as $field) {
-                    $this->render_field_row($field, $post);
+                    $this->render_field_row($field, $object_id);
                 }
             } else {
                 // Fields no tab claims stay visible above the tab bar — never
@@ -1978,11 +2032,11 @@ class Metabox
 
                 foreach ($this->fields as $field) {
                     if (!in_array($field['id'], $tabbed_ids, true)) {
-                        $this->render_field_row($field, $post);
+                        $this->render_field_row($field, $object_id);
                     }
                 }
 
-                $this->render_tabs($tab_groups, $post);
+                $this->render_tabs($tab_groups, $object_id);
             }
             ?>
         </div>
@@ -2023,14 +2077,14 @@ class Metabox
      *
      * Shared by the flat and tabbed layouts so both stay identical.
      *
-     * @param array<string, mixed> $field Field definition.
-     * @param \WP_Post             $post  The post currently being edited.
+     * @param array<string, mixed> $field     Field definition.
+     * @param int                  $object_id The post or term being edited (0: a term's Add screen).
      * @return void
      */
-    private function render_field_row(array $field, \WP_Post $post): void
+    private function render_field_row(array $field, int $object_id): void
     {
         $field_id       = $this->prefix . $field['id'];
-        $value          = get_post_meta($post->ID, $field_id, true);
+        $value          = $this->read_value($object_id, $field_id);
         $has_conditions = !empty($field['conditions']);
         ?>
 
@@ -2049,7 +2103,7 @@ class Metabox
                     <?php endif; ?>
                     <?php $this->render_readonly_lock_icon($field); ?>
                 </label>
-                <?php $this->render_field($field, $field_id, $value, $post->ID); ?>
+                <?php $this->render_field($field, $field_id, $value, $object_id); ?>
             </div>
 
             <?php if (!empty($field['description'])): ?>
@@ -2808,7 +2862,7 @@ class Metabox
                 <div class="field-and-label">
                     <label for="<?php echo esc_attr($field_id); ?>" class="field-label"><?php echo esc_html($field['label'] ?? ''); ?><?php $this->render_readonly_lock_icon($field); ?></label>
                     <?php
-                    $value = $post_id ? get_post_meta($post_id, $field_id, true) : '';
+                    $value = $post_id ? $this->store->get($post_id, $field_id) : '';
                     $this->render_field($field, $field_id, $value, $post_id);
                     ?>
                 </div>
@@ -2830,10 +2884,10 @@ class Metabox
      * one form.
      *
      * @param array<int, array{tab: array<string, mixed>, fields: array<int, array<string, mixed>>}> $groups Tabs paired with their fields, from resolve_tab_groups().
-     * @param \WP_Post $post The post currently being edited.
+     * @param int $object_id The post or term being edited.
      * @return void
      */
-    private function render_tabs(array $groups, \WP_Post $post): void
+    private function render_tabs(array $groups, int $object_id): void
     {
         ?>
         <div class="taw-tabbed" x-data="{ activeTab: 0 }">
@@ -2855,7 +2909,7 @@ class Metabox
                         x-show="activeTab === <?php echo (int) $index; ?>"
                         x-cloak>
                         <?php foreach ($group['fields'] as $field) {
-                            $this->render_field_row($field, $post);
+                            $this->render_field_row($field, $object_id);
                         } ?>
                     </div>
                 <?php endforeach; ?>
@@ -3012,6 +3066,28 @@ class Metabox
             return;
         }
 
+        $this->store = new PostMetaStore();
+        $errors = $this->save_fields($post_id);
+
+        // Display validation errors as admin notices
+        if (!empty($errors)) {
+            // Stores errors transiently - they'll be displayed on the next page load
+            set_transient(
+                'taw_validation_errors_' . $post_id,
+                $errors,
+                30 // Expires in 30 seconds
+            );
+        }
+    }
+
+    /**
+     * Validate, sanitize and store every posted field of this metabox on one
+     * object, through {@see self::$store}. Shared by posts and terms.
+     *
+     * @return list<string> Validation messages (values are stored anyway, as before).
+     */
+    private function save_fields(int $post_id): array
+    {
         $errors = [];
 
         foreach ($this->fields as $field) {
@@ -3039,7 +3115,7 @@ class Metabox
 
             if (!empty($field['conditions']) && !$this->evaluate_conditions($field['conditions'])) {
                 // Conditions not met — clean up any stale value
-                delete_post_meta($post_id, $field_id);
+                $this->store->delete($post_id, $field_id);
                 continue;
             }
 
@@ -3064,12 +3140,12 @@ class Metabox
                     }
 
                     if (!isset($_POST[$group_field_id])) {
-                        delete_post_meta($post_id, $group_field_id);
+                        $this->store->delete($post_id, $group_field_id);
                         continue;
                     }
                     // Sanitize the unslashed value — NOT the raw $_POST value
                     $value = $this->sanitize_field($group_field, $this->getPostValue($group_field_id));
-                    update_post_meta($post_id, $group_field_id, wp_slash($value));
+                    $this->store->set($post_id, $group_field_id, wp_slash($value));
                 }
 
                 continue;
@@ -3089,29 +3165,170 @@ class Metabox
                 // refuse to save entirely, but losing user input is worse.
                 if (isset($_POST[$field_id])) {
                     $value = $this->sanitize_field($field, $this->getPostValue($field_id));
-                    update_post_meta($post_id, $field_id, wp_slash($value));
+                    $this->store->set($post_id, $field_id, wp_slash($value));
                 }
                 continue;
             }
 
             if (!isset($_POST[$field_id])) {
-                delete_post_meta($post_id, $field_id);
+                $this->store->delete($post_id, $field_id);
                 continue;
             }
 
             // Sanitize the unslashed value — NOT the raw $_POST value
             $value = $this->sanitize_field($field, $this->getPostValue($field_id));
-            update_post_meta($post_id, $field_id, wp_slash($value));
+            $this->store->set($post_id, $field_id, wp_slash($value));
         }
 
-        // Display validation errors as admin notices
+        return $errors;
+    }
+
+    /**
+     * A stored value through {@see self::$store}; '' when there is no object
+     * yet (a term's Add screen).
+     */
+    private function read_value(int $object_id, string $key): mixed
+    {
+        return $object_id > 0 ? $this->store->get($object_id, $key) : '';
+    }
+
+    /* 
+     * MARK: Terms
+     * 
+     */
+
+    /**
+     * The fieldset on a taxonomy's Add screen (`{taxonomy}_add_form_fields`).
+     * That form submits over AJAX; save_term() stores the values once
+     * `created_{taxonomy}` fires.
+     */
+    public function render_term_add(string $taxonomy = ''): void
+    {
+        $this->store = new TermMetaStore();
+        ?>
+        <div class="form-field taw-term-fields taw-term-fields--add" id="taw-term-<?php echo esc_attr($this->id); ?>">
+            <h3 class="taw-term-fields__title"><?php echo $this->buildTitleWithIcon(); ?></h3>
+            <?php
+            wp_nonce_field($this->id . '_nonce_action', $this->id . '_nonce');
+            $this->render_fields_container(0);
+            ?>
+        </div>
+        <?php
+        self::print_term_add_script();
+    }
+
+    /**
+     * The Add term form posts over AJAX (wp-admin/js/tags.js), which a
+     * metabox form never does. Once per page:
+     *  - repeaters and TinyMCE write their hidden inputs before tags.js
+     *    serializes the form (a capture-phase click runs before its handler);
+     *  - an empty required field blocks the submit, marked the way WordPress
+     *    marks an empty name (`form-required` / validateForm(), which tags.js
+     *    itself no longer runs first); hidden conditional fields don't count;
+     *  - after a successful add the screen reloads with WordPress's
+     *    "added" message: tags.js only clears visible text inputs, so images,
+     *    checkboxes, colors and repeater rows would carry over to the next term.
+     */
+    private static function print_term_add_script(): void
+    {
+        if (self::$term_add_script_printed) {
+            return;
+        }
+        self::$term_add_script_printed = true;
+
+        add_action('admin_footer', static function (): void {
+            ?>
+            <script>
+                (function($) {
+                    'use strict';
+                    var $wraps = $('.taw-term-fields--add');
+                    if (!$wraps.length) return;
+
+                    $wraps.find('.taw-required').closest('.field').addClass('form-required');
+
+                    // Capture phase on the document: runs before tags.js's click handler.
+                    document.addEventListener('click', function(event) {
+                        if (!event.target.closest || !event.target.closest('#addtag #submit')) return;
+                        // tags.js (WP 7.1) no longer runs validateForm() before posting.
+                        if (typeof window.validateForm === 'function' && !window.validateForm($wraps)) {
+                            event.preventDefault();
+                            event.stopImmediatePropagation();
+                            $wraps.find('.form-invalid :input:visible').first().trigger('focus');
+                            return;
+                        }
+                        $($wraps.find('.taw-repeater').get().reverse()).each(function() {
+                            $(this).trigger('taw-flush-serialize');
+                        });
+                        if (window.tinymce) {
+                            window.tinymce.triggerSave();
+                        }
+                    }, true);
+
+                    $(document).ajaxSuccess(function(event, xhr, settings) {
+                        var data = typeof settings.data === 'string' ? settings.data : '';
+                        if (data.indexOf('action=add-tag') === -1 || (xhr.responseText || '').indexOf('<wp_error') !== -1) return;
+                        var url = new URL(window.location.href);
+                        url.searchParams.set('message', '1');
+                        window.location.assign(url.toString());
+                    });
+                })(jQuery);
+            </script>
+            <?php
+        });
+    }
+
+    /**
+     * The fieldset on a term's Edit screen (`{taxonomy}_edit_form_fields`),
+     * as one row of the form table.
+     */
+    public function render_term_edit(\WP_Term $term): void
+    {
+        $this->store = new TermMetaStore();
+        ?>
+        <tr class="form-field taw-term-fields taw-term-fields--edit" id="taw-term-<?php echo esc_attr($this->id); ?>">
+            <th scope="row"><?php echo $this->buildTitleWithIcon(); ?></th>
+            <td>
+                <?php
+                wp_nonce_field($this->id . '_nonce_action', $this->id . '_nonce');
+                $this->render_fields_container((int) $term->term_id);
+                ?>
+            </td>
+        </tr>
+        <?php
+    }
+
+    /**
+     * Store the fieldset's values on a term (`created_{taxonomy}` /
+     * `edited_{taxonomy}`): the same nonce, validation and sanitizing as a
+     * post, gated on `edit_term`. Programmatic `wp_insert_term()` calls carry
+     * no nonce and are left alone.
+     */
+    public function save_term(int $term_id): void
+    {
+        if (
+            !isset($_POST[$this->id . '_nonce']) ||
+            !wp_verify_nonce(
+                sanitize_text_field(wp_unslash($_POST[$this->id . '_nonce'])),
+                $this->id . '_nonce_action'
+            )
+        ) {
+            return;
+        }
+
+        if (!current_user_can('edit_term', $term_id)) {
+            return;
+        }
+
+        $term = get_term($term_id);
+        if (!$term instanceof \WP_Term || !in_array($term->taxonomy, $this->termTaxonomies(), true)) {
+            return;
+        }
+
+        $this->store = new TermMetaStore();
+        $errors = $this->save_fields($term_id);
+
         if (!empty($errors)) {
-            // Stores errors transiently - they'll be displayed on the next page load
-            set_transient(
-                'taw_validation_errors_' . $post_id,
-                $errors,
-                30 // Expires in 30 seconds
-            );
+            set_transient('taw_validation_errors_term_' . $term_id, $errors, 30);
         }
     }
 
@@ -3549,6 +3766,26 @@ class Metabox
     }
 
     /**
+     * A term's stored field value — {@see self::get()} for terms.
+     *
+     * @param string $prefix Meta key prefix. Default '_taw_'.
+     * @return mixed The raw meta value, or empty string if not set.
+     */
+    public static function get_term(int $term_id, string $field_id, string $prefix = '_taw_'): mixed
+    {
+        return self::term($term_id, $prefix)->get($field_id);
+    }
+
+    /**
+     * Typed reads of a term's fields (`->bool()`, `->repeater()`,
+     * `->imageUrl()`, …), shaped like the post helpers.
+     */
+    public static function term(int $term_id, string $prefix = '_taw_'): FieldReader
+    {
+        return new FieldReader(new TermMetaStore(), $term_id, $prefix);
+    }
+
+    /**
      * Retrieve a checkbox/toggle meta value as a boolean.
      *
      * Usage:
@@ -3814,11 +4051,21 @@ class Metabox
      */
     public static function writeMeta(int $postId, array $fieldConfig, mixed $value): mixed
     {
-        $metaKey = self::metaKeyOf($fieldConfig);
+        return self::writeTo(new PostMetaStore(), $postId, $fieldConfig, $value);
+    }
 
+    /**
+     * {@see self::writeMeta()} for any store: the same sanitize + wp_slash +
+     * write sequence on post, term or user meta (ADR-0008).
+     *
+     * @param array<string, mixed> $fieldConfig
+     * @return mixed The value actually stored (post-sanitization).
+     */
+    public static function writeTo(MetaStore $store, int $objectId, array $fieldConfig, mixed $value): mixed
+    {
         $sanitized = self::sanitizeForStorage($fieldConfig, $value);
 
-        update_post_meta($postId, $metaKey, wp_slash($sanitized));
+        $store->set($objectId, self::metaKeyOf($fieldConfig), wp_slash($sanitized));
 
         return $sanitized;
     }
@@ -3893,13 +4140,13 @@ class Metabox
      * included. When two metaboxes on the same post type store the same meta
      * key, the later one wins, as in the bare registry.
      *
-     * @param string $objectType 'post' (terms and users come with their storage contexts).
-     * @param string $subtype    The post type.
+     * @param string $objectType 'post' or 'term' (users come in Step 3 of Phase 2).
+     * @param string $subtype    The post type, or the taxonomy.
      * @return array<string, array<string, mixed>> meta key → config (with `qualified_id`, `field_key`, `meta_key`).
      */
     public static function fieldsFor(string $objectType, string $subtype): array
     {
-        if ($objectType !== 'post' || $subtype === '') {
+        if (!in_array($objectType, ['post', 'term'], true) || $subtype === '') {
             return [];
         }
 
@@ -3908,8 +4155,9 @@ class Metabox
             if (($config['type'] ?? 'text') === 'group') {
                 continue;
             }
-            $screens = is_array($config['screens'] ?? null) ? $config['screens'] : [];
-            if (!in_array($subtype, self::screensToPostTypes($screens), true)) {
+            $screens = is_array($config['screens'] ?? null) ? array_map('strval', $config['screens']) : [];
+            $targets = $objectType === 'term' ? self::screensToTaxonomies($screens) : self::screensToPostTypes($screens);
+            if (!in_array($subtype, $targets, true)) {
                 continue;
             }
             $fields[(string) $config['meta_key']] = $config;
@@ -4001,7 +4249,7 @@ class Metabox
         $types = [];
         foreach ($screens as $screen) {
             $screen = (string) $screen;
-            if ($screen === '') {
+            if ($screen === '' || self::isTermScreen($screen)) {
                 continue;
             }
             if (str_ends_with($screen, '.php')) {
@@ -4014,6 +4262,41 @@ class Metabox
         }
 
         return array_keys($types);
+    }
+
+    /**
+     * The taxonomies of a raw `screens` list's term targets
+     * (`"term:genre"` → `genre`).
+     *
+     * @param list<string> $screens
+     * @return list<string>
+     */
+    public static function screensToTaxonomies(array $screens): array
+    {
+        $taxonomies = [];
+        foreach ($screens as $screen) {
+            $screen = (string) $screen;
+            if (self::isTermScreen($screen) && strlen($screen) > 5) {
+                $taxonomies[substr($screen, 5)] = true;
+            }
+        }
+
+        return array_keys($taxonomies);
+    }
+
+    private static function isTermScreen(string $screen): bool
+    {
+        return str_starts_with($screen, 'term:');
+    }
+
+    /**
+     * The taxonomies this metabox shows on (its `"term:<taxonomy>"` screens).
+     *
+     * @return list<string>
+     */
+    public function termTaxonomies(): array
+    {
+        return self::screensToTaxonomies($this->screens);
     }
 
     /**
@@ -4078,12 +4361,19 @@ class Metabox
     public static function displayValidationErrors(): void
     {
         global $post;
-        if (!$post) return;
+        if ($post) {
+            $key = 'taw_validation_errors_' . $post->ID;
+        } elseif (isset($_GET['tag_ID'])) {
+            // A term's Edit screen, after save_term() found errors.
+            $key = 'taw_validation_errors_term_' . absint($_GET['tag_ID']);
+        } else {
+            return;
+        }
 
-        $errors = get_transient('taw_validation_errors_' . $post->ID);
+        $errors = get_transient($key);
         if (!$errors) return;
 
-        delete_transient('taw_validation_errors_' . $post->ID);
+        delete_transient($key);
 
         foreach ($errors as $error) {
             printf(

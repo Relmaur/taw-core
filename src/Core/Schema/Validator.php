@@ -7,6 +7,7 @@ namespace TAW\Core\Schema;
 use TAW\Core\Editing\Rules;
 use TAW\Core\DataPanel\Ui;
 use TAW\Core\Schema\Definition\EditingPolicy;
+use TAW\Core\Schema\Definition\Fieldset;
 use TAW\Core\Schema\Definition\SiteSettings;
 
 // No ABSPATH guard: `bin/taw schema:validate` runs this before (and without)
@@ -125,6 +126,7 @@ final class Validator
             'fieldset'     => [
                 ...$errors,
                 ...self::validateStringList($data, 'on'),
+                ...self::validateTargets($data['on'] ?? null),
                 ...self::validateEnum($data, 'context', ['normal', 'side', 'advanced']),
                 ...self::validateEnum($data, 'priority', ['high', 'default', 'low']),
                 ...self::validateEnum($data, 'ui', Ui::VALUES),
@@ -173,6 +175,24 @@ final class Validator
         foreach ($value as $i => $item) {
             if (!is_string($item) || $item === '') {
                 $errors[] = "/{$key}/{$i}: must be a non-empty string";
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Fieldset `on` entries with a format of their own (`term:<taxonomy>`).
+     *
+     * @return list<string>
+     */
+    private static function validateTargets(mixed $on): array
+    {
+        $errors = [];
+        foreach (is_array($on) ? $on : [] as $i => $item) {
+            $problem = is_string($item) ? Fieldset::targetProblem($item) : null;
+            if ($problem !== null) {
+                $errors[] = "/on/{$i}: {$problem}";
             }
         }
 

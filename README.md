@@ -297,6 +297,31 @@ $value = Metabox::get($post_id, 'field_id');
 $rows  = json_decode(Metabox::get($post_id, 'team'), true); // repeater
 ```
 
+### Term fields (v1.53.0+)
+
+A fieldset can target a taxonomy's terms with `term:<taxonomy>` in its screens (JSON/PHP `on`), alone or mixed
+with post types ([ADR-0008](docs/adr/0008-qualified-registry-and-storage-contexts.md)):
+
+```php
+Schema::fieldset('genre_details')->on('term:genre')->fields([...]);      // or 'screens' => ['book', 'term:genre']
+```
+
+- **Where:** the taxonomy's Add and Edit screens (`{taxonomy}_add_form_fields` / `_edit_form_fields`), saved
+  on `created_{taxonomy}` / `edited_{taxonomy}` with the same nonce, validation, conditions, read-only rules and
+  sanitizing as a post, gated on `edit_term`. It's the same engine: every field type works. Values are term
+  meta with the fieldset's prefix. Validation messages show on the Edit screen.
+- **Add screen (AJAX):** an empty required field blocks the submit, repeaters and rich text are serialized
+  before WordPress posts the form, and after a successful add the screen reloads with WordPress's "added"
+  notice so no value carries over to the next term.
+- **Read:** `Metabox::get_term($termId, 'genre_tagline')`, or `Metabox::term($termId)` for typed reads
+  shaped like the post helpers: `->bool()`, `->repeater()`, `->imageUrl()`, `->color()`, `->posts()`,
+  `->gradientText()`.
+- **REST:** `register_term_meta()` per taxonomy (edit: `edit_term`); repeater/files/post_select also get the
+  decoded `taw_<id>` field on the term (on `post_tag` its REST object type is `tag`).
+- **Content snapshots:** term records of a taxonomy with term fieldsets gain `fields` (decoded, keyed like post
+  fields); taxonomies without them keep their row shape.
+- The data panel stays post-only (it's a block-editor feature).
+
 ### Readonly Fields
 
 Set `'readonly' => true` on any field whose value is authoritatively written by something other than the wp-admin form — an external sync pipeline, a computed value, etc. — so the metabox stops implying it's editable there:
@@ -480,6 +505,10 @@ to the engine, like `->with()`.
   id. REST meta, content export/import, the data panel, the visual editor and `fields:get`/`fields:set`
   use them, so two fieldsets can share a field id (on different post types, or with different prefixes)
   and each keeps its own type and sanitizer. `Metabox::getQualifiedRegistry()` lists them all.
+  `Metabox::fieldsFor('term', 'genre')` does the same for [term fieldsets](#term-fields-v1530).
+- **Term targets:** `on` entries of the form `term:<taxonomy>` are checked (a taxonomy key, 1–32 lowercase
+  letters, numbers, `_` or `-`); `schema:validate` warns when the taxonomy isn't defined in the schema files
+  or by WordPress core.
 - **Field id collisions:** the bare-id lookups (`Metabox::get_field_config()`, `getFieldRegistry()`) still
   hold one entry per id, the later one. A schema field sharing an id with another field (in another
   fieldset or a hand-written metabox) is reported via `_doing_it_wrong()`, plus an admin notice when
@@ -1609,7 +1638,7 @@ Also, in wp-admin: **Tools → TAW Data** (Export with option checkboxes + Impor
 |---|---|
 | `meta` | `schema`, `generated_at`, `source` (url, `taw/core` version, theme), and a `registry_fingerprint` (block IDs + a `field_id → type` map) so the importer can warn on drift |
 | `options` | every `_taw_*` option (repeater/files **decoded to arrays**), plus an allowlisted core set — `blogname`, `blogdescription`, `show_on_front`, `page_on_front`/`page_for_posts` **resolved to slugs**. Filter: `taw_content_export_core_options`. With `--with-settings`, also a **second** allowlist of environment settings (`permalink_structure`, `timezone_string`, `sticky_posts` → slugs, …). Filter: `taw_content_export_settings_options` |
-| `terms` | per public taxonomy (except `nav_menu`): `{slug, name, description, parent (by slug), meta}` |
+| `terms` | per public taxonomy (except `nav_menu`): `{slug, name, description, parent (by slug), meta}`, plus `fields` (decoded, keyed like post fields) when the taxonomy has term fieldsets (v1.53.0+) |
 | `posts` | `page`/`post`, every **public** CPT, **and** every CPT with a `Metabox` attached (so `public => false` content CPTs export without a manual filter) — except `taw_submission` and framework-internal types. Filter: `taw_content_export_post_types` (runs last). Per post: `type, slug, status, title, excerpt, content, menu_order, date, author ({login,email}), comment_status, ping_status, parent (by slug), template, terms, featured_media (filename), fields`. A slug-less draft also carries a composite `match_key` |
 | `users` | opt-in (`--with-users`): `{login, email, display_name, roles[], meta{first_name,last_name,description,nickname,locale}, user_registered}`. Password hashes only with the second flag `--with-user-passwords` |
 | `comments` | opt-in (`--with-comments`): comments on exported posts, with `parent_ref` threading |

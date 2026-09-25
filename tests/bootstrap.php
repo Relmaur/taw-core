@@ -76,6 +76,28 @@ if (!class_exists('WP_Post')) {
     }
 }
 
+/**
+ * Minimal WP_Term stand-in for term fieldset tests (ADR-0008).
+ */
+if (!class_exists('WP_Term')) {
+    #[\AllowDynamicProperties]
+    class WP_Term
+    {
+        public int $term_id = 0;
+        public string $taxonomy = '';
+        public string $slug = '';
+        public string $name = '';
+
+        /** @param array<string, mixed>|object $props */
+        public function __construct(array|object $props = [])
+        {
+            foreach ($props as $key => $value) {
+                $this->{$key} = $value;
+            }
+        }
+    }
+}
+
 if (!class_exists('WP_User')) {
     #[\AllowDynamicProperties]
     class WP_User

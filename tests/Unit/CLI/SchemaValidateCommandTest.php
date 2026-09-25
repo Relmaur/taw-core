@@ -94,6 +94,25 @@ final class SchemaValidateCommandTest extends TestCase
         $this->assertStringNotContainsString('page-about.php', $warnings, 'template filenames are not post types');
     }
 
+    public function test_term_targets_warn_only_for_unknown_taxonomies(): void
+    {
+        copy(self::FIXTURES . '/genre.json', $this->tmp . '/taw-schema/genre.json');
+        file_put_contents($this->tmp . '/taw-schema/fs.json', json_encode([
+            'version' => 1, 'kind' => 'fieldset', 'key' => 'fs', 'on' => ['term:genre', 'term:category', 'term:mood'],
+            'fields'  => [['id' => 'a', 'type' => 'text']],
+        ]));
+        $tester = new CommandTester(new SchemaValidateCommand($this->tmp));
+
+        $exit = $tester->execute(['--json' => true]);
+        $warnings = implode("\n", json_decode($tester->getDisplay(), true)['warnings']);
+
+        $this->assertSame(Command::SUCCESS, $exit);
+        $this->assertStringContainsString('targets terms of "mood"', $warnings);
+        $this->assertStringNotContainsString('terms of "genre"', $warnings, 'defined in these files');
+        $this->assertStringNotContainsString('terms of "category"', $warnings, 'a core taxonomy');
+        $this->assertStringNotContainsString('targets "term:', $warnings, 'term targets are not post types');
+    }
+
     public function test_the_same_entity_in_two_files_is_a_warning(): void
     {
         copy(self::FIXTURES . '/genre.json', $this->tmp . '/taw-schema/a.json');

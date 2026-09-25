@@ -348,6 +348,40 @@ final class ImporterTest extends TestCase
         $this->assertContains(['hello'], array_column($queries, 'post_name__in'), 'comment post_refs');
     }
 
+    public function test_term_fields_diff_and_write_through_term_meta(): void
+    {
+        new \TAW\Core\Metabox\Metabox([
+            'id' => 'genre_details', 'title' => 'Genre', 'screens' => ['term:genre'],
+            'fields' => [['id' => 'genre_rank', 'type' => 'number'], ['id' => 'genre_tagline', 'type' => 'text']],
+        ]);
+        $existing = new \WP_Term(['term_id' => 5, 'taxonomy' => 'genre', 'slug' => 'fantasy', 'name' => 'Fantasy', 'description' => '']);
+        Functions\when('get_term_by')->justReturn($existing);
+        Functions\when('get_term_meta')->alias(static fn (int $id, string $key) => ['_taw_genre_rank' => '3', '_taw_genre_tagline' => 'Old'][$key] ?? '');
+        $input = ['meta' => ['schema' => '1.2'], 'terms' => ['genre' => [
+            ['slug' => 'fantasy', 'name' => 'Fantasy', 'description' => '', 'fields' => ['genre_rank' => 3, 'genre_tagline' => 'New']],
+        ]]];
+
+        $changes = (new Importer())->plan($input)['records'][0]['changes'];
+        $this->assertSame(['fields.genre_tagline' => ['status' => 'changed', 'old' => 'Old', 'new' => 'New']], $changes, '3 ↔ "3" is unchanged');
+
+        Functions\when('taxonomy_exists')->justReturn(true);
+        Functions\when('wp_update_term')->justReturn(['term_id' => 5]);
+        Functions\when('wp_json_encode')->alias(static fn ($v) => json_encode($v));
+        Functions\when('apply_filters')->alias(static fn (string $h, $v = null) => $v);
+        Functions\when('wp_slash')->returnArg(1);
+        Functions\when('sanitize_text_field')->returnArg(1);
+        $written = [];
+        Functions\when('update_term_meta')->alias(static function (int $id, string $key, $value) use (&$written): bool {
+            $written["{$id}|{$key}"] = $value;
+            return true;
+        });
+
+        (new Importer())->apply($input, ['rollback' => false]);
+
+        $this->assertSame('New', $written['5|_taw_genre_tagline']);
+        $this->assertArrayHasKey('5|_taw_genre_rank', $written);
+    }
+
     public function test_with_users_sanitizes_roles_against_the_target_and_writes_no_password(): void
     {
         Functions\when('get_user_by')->justReturn(false);

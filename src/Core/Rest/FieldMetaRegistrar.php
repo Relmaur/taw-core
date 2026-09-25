@@ -6,6 +6,7 @@ namespace TAW\Core\Rest;
 
 use TAW\Core\Content\FieldCodec;
 use TAW\Core\Metabox\Metabox;
+use TAW\Core\Metabox\Store\TermMetaStore;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -73,16 +74,7 @@ final class FieldMetaRegistrar
         }
 
         foreach ($byPostType as $postType => $fields) {
-            // The computed field `taw_<id>` is named by bare id; when fields
-            // with different prefixes share one on a post type, the `_taw_`
-            // field owns it (the others stay readable as raw meta).
-            $restOwner = [];
-            foreach ($fields as $metaKey => $config) {
-                $name = (string) ($config['field_key'] ?? $config['id'] ?? '');
-                if (!isset($restOwner[$name]) || ($config['prefix'] ?? '_taw_') === '_taw_') {
-                    $restOwner[$name] = $metaKey;
-                }
-            }
+            $restOwner = self::restOwners($fields);
 
             foreach ($fields as $metaKey => $config) {
                 $type = (string) ($config['type'] ?? 'text');
@@ -95,6 +87,86 @@ final class FieldMetaRegistrar
                 }
             }
         }
+
+        // Called from here rather than hooked on its own, so a site without
+        // term fieldsets gains no hook (the golden hook snapshot).
+        self::registerTermMeta();
+    }
+
+    /**
+     * Term fieldsets (`"term:<taxonomy>"`, ADR-0008): the same registration
+     * as posts, per taxonomy, gated on `edit_term`.
+     */
+    public static function registerTermMeta(): void
+    {
+        $taxonomies = [];
+        foreach (Metabox::getQualifiedRegistry() as $config) {
+            foreach (Metabox::screensToTaxonomies(is_array($config['screens'] ?? null) ? array_map('strval', $config['screens']) : []) as $taxonomy) {
+                $taxonomies[$taxonomy] = true;
+            }
+        }
+
+        foreach (array_keys($taxonomies) as $taxonomy) {
+            $fields = Metabox::fieldsFor('term', (string) $taxonomy);
+            $restOwner = self::restOwners($fields);
+            // The terms controller names its object type after the taxonomy, except post_tag.
+            $restType = $taxonomy === 'post_tag' ? 'tag' : (string) $taxonomy;
+
+            foreach ($fields as $metaKey => $config) {
+                $type = (string) ($config['type'] ?? 'text');
+                $structured = in_array($type, FieldCodec::STRUCTURED_TYPES, true);
+                $auth = static fn ($allowed, $meta, $objectId): bool => current_user_can('edit_term', (int) $objectId);
+
+                register_term_meta((string) $taxonomy, (string) $metaKey, $structured
+                    ? ['type' => 'string', 'single' => true, 'show_in_rest' => true, 'auth_callback' => $auth]
+                    : [
+                        'type'              => self::SCALAR_REST_TYPE[$type] ?? 'string',
+                        'single'            => true,
+                        'show_in_rest'      => true,
+                        'sanitize_callback' => static fn ($value) => Metabox::sanitizeForStorage($config, $value),
+                        'auth_callback'     => $auth,
+                    ]);
+
+                $fieldId = (string) $config['field_key'];
+                if (!$structured || $restOwner[$fieldId] !== $metaKey) {
+                    continue;
+                }
+
+                register_rest_field($restType, 'taw_' . $fieldId, [
+                    'get_callback'    => static function (array $object) use ($metaKey, $config) {
+                        return FieldCodec::decode($config, get_term_meta((int) $object['id'], (string) $metaKey, true));
+                    },
+                    'update_callback' => static function ($value, \WP_Term $term) use ($config): void {
+                        if (!current_user_can('edit_term', $term->term_id)) {
+                            return;
+                        }
+                        Metabox::writeTo(new TermMetaStore(), (int) $term->term_id, $config, $value);
+                    },
+                    'schema'          => self::structuredSchema($type),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * The computed field `taw_<id>` is named by bare id; when fields with
+     * different prefixes share one on an object type, the `_taw_` field owns
+     * it (the others stay readable as raw meta).
+     *
+     * @param array<string, array<string, mixed>> $fields meta key → config
+     * @return array<string, string> field key → owning meta key
+     */
+    private static function restOwners(array $fields): array
+    {
+        $restOwner = [];
+        foreach ($fields as $metaKey => $config) {
+            $name = (string) ($config['field_key'] ?? $config['id'] ?? '');
+            if (!isset($restOwner[$name]) || ($config['prefix'] ?? '_taw_') === '_taw_') {
+                $restOwner[$name] = (string) $metaKey;
+            }
+        }
+
+        return $restOwner;
     }
 
     /**

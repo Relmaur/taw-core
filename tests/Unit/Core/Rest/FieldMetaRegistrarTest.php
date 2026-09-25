@@ -34,6 +34,10 @@ final class FieldMetaRegistrarTest extends TestCase
             $this->restFields["{$type}:{$name}"] = $args;
             return true;
         });
+        Functions\when('register_term_meta')->alias(function (string $taxonomy, string $key, array $args): bool {
+            $this->byType["term:{$taxonomy}:{$key}"] = $args;
+            return true;
+        });
         Functions\when('register_post_meta')->alias(function (string $type, string $key, array $args): bool {
             $this->registered[$key] = $args;
             $this->byType["{$type}:{$key}"] = $args;
@@ -106,5 +110,24 @@ final class FieldMetaRegistrarTest extends TestCase
         $this->assertArrayHasKey('book:_taw_gallery', $this->byType);
         $this->assertSame(['book:taw_gallery'], array_keys($this->restFields));
         $this->assertSame(['type' => 'array', 'items' => ['type' => 'object']], $this->restFields['book:taw_gallery']['schema'], 'the repeater, not the files field');
+    }
+
+    public function test_term_fieldsets_register_per_taxonomy_and_not_on_posts(): void
+    {
+        new Metabox(['id' => 'tag_details', 'title' => 'Tag', 'screens' => ['book', 'term:post_tag'], 'fields' => [
+            ['id' => 'tag_rank', 'type' => 'number'],
+            ['id' => 'tag_links', 'type' => 'repeater', 'fields' => [['id' => 'href', 'type' => 'url']]],
+        ]]);
+        Functions\when('current_user_can')->alias(static fn (string $cap, int $id): bool => $cap === 'edit_term' && $id === 3);
+
+        FieldMetaRegistrar::registerPostMeta();
+
+        $this->assertSame('number', $this->byType['term:post_tag:_taw_tag_rank']['type']);
+        $this->assertSame('string', $this->byType['term:post_tag:_taw_tag_links']['type']);
+        $this->assertTrue(($this->byType['term:post_tag:_taw_tag_rank']['auth_callback'])(false, '_taw_tag_rank', 3));
+        $this->assertFalse(($this->byType['term:post_tag:_taw_tag_rank']['auth_callback'])(false, '_taw_tag_rank', 4));
+        $this->assertArrayHasKey('tag:taw_tag_links', $this->restFields, 'post_tag\'s REST object type is "tag"');
+        $this->assertArrayHasKey('book:_taw_tag_rank', $this->byType);
+        $this->assertArrayNotHasKey('page:_taw_tag_rank', $this->byType, 'the term target is not a page slug');
     }
 }

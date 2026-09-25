@@ -25,8 +25,9 @@ use TAW\Core\Schema\Source;
  * JSON pointer), reserved or over-long WordPress names.
  *
  * Warnings (the command still passes): the same entity defined in two
- * files, and a fieldset/taxonomy pointing at a post type these files don't
- * define. That one is only a warning because the post type may be
+ * files, a fieldset/taxonomy pointing at a post type these files don't
+ * define, and a fieldset's `term:<taxonomy>` target naming a taxonomy they
+ * don't define. That one is only a warning because the post type may be
  * registered in PHP, by WordPress itself, or — for fieldsets — be a page
  * slug or template filename, none of which is visible without WordPress.
  */
@@ -34,6 +35,8 @@ class SchemaValidateCommand extends Command
 {
     /** Post types WordPress always has; targeting these is never suspicious. */
     private const CORE_POST_TYPES = ['post', 'page', 'attachment'];
+
+    private const CORE_TAXONOMIES = ['category', 'post_tag', 'post_format', 'link_category', 'wp_pattern_category'];
 
     public function __construct(private readonly string $themeDir)
     {
@@ -146,6 +149,8 @@ class SchemaValidateCommand extends Command
         $warnings = [];
         $postTypes = self::CORE_POST_TYPES;
         $targets = [];       // [file, what, post type]
+        $taxonomies = self::CORE_TAXONOMIES;
+        $termTargets = [];   // [file, what, taxonomy]
 
         foreach ($files as $path) {
             $result = JsonLoader::readFile($path);
@@ -167,13 +172,17 @@ class SchemaValidateCommand extends Command
             if ($definition instanceof PostType) {
                 $postTypes[] = $definition->key();
             } elseif ($definition instanceof Taxonomy) {
+                $taxonomies[] = $definition->key();
                 foreach ($definition->objectTypes() as $type) {
                     $targets[] = [$path, sprintf('taxonomy "%s"', $definition->key()), $type];
                 }
             } elseif ($definition instanceof Fieldset) {
+                foreach ($definition->taxonomies() as $taxonomy) {
+                    $termTargets[] = [$path, sprintf('fieldset "%s"', $definition->key()), $taxonomy];
+                }
                 foreach ($definition->screens() as $screen) {
-                    // Template filenames (page-about.php) are never post types.
-                    if (!str_ends_with($screen, '.php')) {
+                    // Template filenames (page-about.php) are never post types; term targets are checked above.
+                    if (!str_ends_with($screen, '.php') && !str_starts_with($screen, 'term:')) {
                         $targets[] = [$path, sprintf('fieldset "%s"', $definition->key()), $screen];
                     }
                 }
@@ -183,6 +192,12 @@ class SchemaValidateCommand extends Command
         foreach ($targets as [$path, $what, $type]) {
             if (!in_array($type, $postTypes, true)) {
                 $warnings[] = sprintf('%s (%s) targets "%s", which these files don\'t define as a post type. Fine if it\'s registered in PHP or is a page slug.', $what, $path, $type);
+            }
+        }
+
+        foreach ($termTargets as [$path, $what, $taxonomy]) {
+            if (!in_array($taxonomy, $taxonomies, true)) {
+                $warnings[] = sprintf('%s (%s) targets terms of "%s", which these files don\'t define as a taxonomy. Fine if it\'s registered in PHP or by a plugin.', $what, $path, $taxonomy);
             }
         }
 

@@ -11,6 +11,7 @@ namespace TAW\Core\Content;
 // TAW\Helpers\Framework and TAW\CLI\WpLoader, which omit it too.
 
 use TAW\Core\Metabox\Metabox;
+use TAW\Core\Metabox\Store\TermMetaStore;
 
 /**
  * Consumes a content snapshot ({@see Exporter} output) or a change-set
@@ -269,7 +270,7 @@ class Importer
             $result = match ($kind) {
                 'post'    => $this->applyPost($op, $policy, $idMap),
                 'option'  => $this->applyOption($op, $policy),
-                'term'    => $this->applyTerm($op, $policy),
+                'term'    => $this->applyTerm($op, $policy, $idMap),
                 'user'    => $this->applyUser($op, $policy),
                 'comment' => $this->applyComment($op, $policy),
                 default   => ['bucket' => 'skipped', 'label' => "unknown:{$kind}"],
@@ -489,6 +490,20 @@ class Importer
             } elseif ((string) $existing->{$prop} !== (string) $fields[$prop]) {
                 $changes[$prop] = ['status' => 'changed', 'old' => $existing->{$prop}, 'new' => $fields[$prop]];
             }
+        }
+
+        // Term fieldsets (ADR-0008): same key rules and normalized diff as post fields.
+        $registered = Metabox::fieldsFor('term', $taxonomy);
+        foreach (is_array($fields['fields'] ?? null) ? $fields['fields'] : [] as $fieldKey => $newVal) {
+            $target = FieldKeys::forKey((string) $fieldKey, $registered, self::bareConfigLookup());
+            $oldDecoded = FieldCodec::decode($target['config'], $existing ? get_term_meta($existing->term_id, $target['meta_key'], true) : '');
+            $newDecoded = FieldCodec::decode($target['config'], $newVal);
+            if (self::valueKey($oldDecoded) === self::valueKey($newDecoded)) {
+                continue;
+            }
+            $changes['fields.' . $fieldKey] = ($existing && !self::isEmptyValue($oldDecoded))
+                ? ['status' => 'changed', 'old' => $oldDecoded, 'new' => $newDecoded]
+                : ['status' => 'new', 'new' => $newDecoded];
         }
 
         return ['kind' => 'term', 'type' => $taxonomy, 'slug' => $slug,
@@ -762,9 +777,10 @@ class Importer
 
     /**
      * @param array<string, mixed> $op
+     * @param array<int, int>      $idMap
      * @return array{bucket: string, label: string}
      */
-    private function applyTerm(array $op, string $policy): array
+    private function applyTerm(array $op, string $policy, array $idMap = []): array
     {
         $taxonomy = (string) ($op['target']['type'] ?? '');
         $slug = (string) ($op['target']['slug'] ?? '');
@@ -811,6 +827,13 @@ class Importer
                 return ['bucket' => 'skipped', 'label' => $label];
             }
             $bucket = 'created';
+        }
+
+        $termId = $existing ? (int) $existing->term_id : (int) $created['term_id'];
+        $registered = Metabox::fieldsFor('term', $taxonomy);
+        foreach (is_array($fields['fields'] ?? null) ? $fields['fields'] : [] as $fieldKey => $value) {
+            $config = FieldKeys::forKey((string) $fieldKey, $registered, self::bareConfigLookup())['config'];
+            Metabox::writeTo(new TermMetaStore(), $termId, $config, FieldCodec::rewriteAttachmentIds($config, $value, $idMap));
         }
 
         return ['bucket' => $bucket, 'label' => $label];
