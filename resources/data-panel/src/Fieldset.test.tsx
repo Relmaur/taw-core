@@ -55,8 +55,11 @@ describe('a fieldset', () => {
 
     it('says which types are not in the panel yet', () => {
         render(
-            <Fieldset fieldset={{ ...base, fields: [{ id: 'cover', type: 'image', label: 'Cover' }] }} initialOpen />,
+            <Fieldset
+                fieldset={{ ...base, fields: [{ id: 'links', type: 'repeater', label: 'Links' }] }}
+                initialOpen
+            />,
         );
-        expect(screen.getByRole('note')).toHaveTextContent('Cover (image) can’t be edited in the panel yet.');
+        expect(screen.getByRole('note')).toHaveTextContent('Links (repeater) can’t be edited in the panel yet.');
     });
 });

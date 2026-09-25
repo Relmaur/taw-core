@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\DataPanel;
 
 use TAW\Core\Assets\Vite;
+use TAW\Core\Icons\Lucide;
 use TAW\Core\Metabox\Metabox;
 use TAW\Core\Schema\Registry;
 use TAW\Helpers\Framework;
@@ -44,7 +45,11 @@ final class DataPanel
     public const SCRIPT_SOURCE = 'src/index.tsx';
 
     /** WordPress scripts the panel imports (see resources/data-panel/src). */
-    public const SCRIPT_DEPS = ['react', 'wp-plugins', 'wp-editor', 'wp-data', 'wp-components', 'wp-element', 'wp-i18n'];
+    public const SCRIPT_DEPS = [
+        'react', 'wp-plugins', 'wp-editor', 'wp-data', 'wp-components', 'wp-element', 'wp-i18n',
+        // Media, post search, icons and the wysiwyg mini block editor.
+        'wp-block-editor', 'wp-blocks', 'wp-core-data', 'wp-api-fetch', 'wp-autop', 'wp-html-entities',
+    ];
 
     private static ?Vite $vite = null;
 
@@ -160,6 +165,7 @@ final class DataPanel
                 'postType'  => $post->post_type,
                 'fieldsets' => $fieldsets,
                 'warnings'  => self::$warnings,
+                'icons'     => Lucide::isEnabled(),
             ];
         }
 

@@ -3,10 +3,15 @@ import { sprintf, __ } from '@wordpress/i18n';
 import type { ControlProps, FieldDescriptor } from './types';
 import { useBinding } from './useValues';
 import { Checkbox, Range, Select } from './controls/ChoiceControls';
+import { GradientText, HubspotForm } from './controls/CompositeControls';
+import { IconField } from './controls/IconControl';
+import { Files, Image } from './controls/MediaControls';
 import { Color, DateField } from './controls/PickerControls';
+import { PostSelect } from './controls/PostSelect';
+import { Wysiwyg } from './controls/RichContent';
 import { NumberInput, Text, Textarea } from './controls/TextControls';
 
-/** Field type → control. Media, rich and structured types arrive in later steps (plan P3/P4). */
+/** Field type → control. group and repeater arrive in the next step (plan P4). */
 export const CONTROLS: Record<string, React.ComponentType<ControlProps>> = {
     text: Text,
     url: Text,
@@ -17,6 +22,13 @@ export const CONTROLS: Record<string, React.ComponentType<ControlProps>> = {
     checkbox: Checkbox,
     color: Color,
     datepicker: DateField,
+    image: Image,
+    files: Files,
+    icon: IconField,
+    post_select: PostSelect,
+    wysiwyg: Wysiwyg,
+    gradient_text: GradientText,
+    hubspot_form: HubspotForm,
 };
 
 export default function FieldControl({ field }: { field: FieldDescriptor }) {

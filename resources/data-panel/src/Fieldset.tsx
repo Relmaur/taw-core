@@ -11,15 +11,16 @@ function dashicon(icon: string): React.JSX.Element | undefined {
     return <Dashicon icon={icon.slice('dashicons-'.length) as React.ComponentProps<typeof Dashicon>['icon']} />;
 }
 
+/** One column of fields with the panel's spacing (PanelBody has no content wrapper of its own). */
 function Fields({ fields, values }: { fields: FieldDescriptor[]; values: Record<string, unknown> }) {
+    const shown = fields.filter((field) => conditionsMet(field.conditions, values));
+    if (shown.length === 0) return null;
     return (
-        <>
-            {fields
-                .filter((field) => conditionsMet(field.conditions, values))
-                .map((field) => (
-                    <FieldControl key={field.id} field={field} />
-                ))}
-        </>
+        <div className="taw-data-panel__fields">
+            {shown.map((field) => (
+                <FieldControl key={field.id} field={field} />
+            ))}
+        </div>
     );
 }
 
