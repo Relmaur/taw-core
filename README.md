@@ -89,6 +89,8 @@ src/
     ├── MakeBlockCommand.php
     ├── ImportBlockCommand.php
     └── ExportBlockCommand.php
+languages/              # taw-core's translations (.pot, <locale>.po, <locale>.l10n.php)
+tools/i18n.php          # builds them (composer run i18n:*); not shipped
 ```
 
 **Namespace:** `TAW\` → `src/` (PSR-4). `src/Support/utilities.php` is file-autoloaded (global scope).
@@ -652,6 +654,29 @@ Schema::optionsPage('site')->rest('public')->fields([/* … */]);   // JSON: "re
 - **`public`**: also `GET /wp-json/taw/v1/options/<page id>`, **readable by anyone, no login**. It returns every field on the page, keyed by field id (group sub-fields by their compound id), decoded like REST post fields: checkbox `bool`, image `int`, repeater/files as arrays. Read-only. **Never put anything private on a public page** (API keys, internal emails…): the whole page is published.
 
 Options are otherwise not readable over REST; keep secrets in `wp-config.php` constants regardless (as `TAW_TURNSTILE_SECRET_KEY` does).
+
+---
+
+## Translations
+
+taw-core's own strings (admin screens, field UI, form and password-gate messages, the data panel) use the **`taw-core`** text domain since v1.56.0. Before, most used the theme's `taw-theme` domain (and the form messages an unloaded `taw` domain).
+
+- **Bundled:** `languages/taw-core-<locale>.l10n.php` ships in the package and loads on its own in the site's (or the user's) locale. `Boot::data()` (so also `Theme::boot()`) registers it with `TAW\Core\I18n\Translations::register()`, the way `load_plugin_textdomain()` does: nothing loads until a `taw-core` string is used. Spanish (`es_MX`) is seeded from the TAW sites' own translations.
+- **The theme's translation wins.** When the theme's `taw-theme` domain translates a taw-core string (sites did, in their `languages/es_MX.po`, while taw-core used that domain), that wording is used; the bundled one fills in the rest. So a site's existing translations keep working unchanged, and you can still override any taw-core string from the theme's `.po`.
+- **The data panel** gets the same translations as `wp.i18n` locale data.
+- Theme code keeps using its own domain (`__('Phone', 'taw-theme')` in `inc/options.php`); only taw-core's code uses `taw-core`.
+
+Working on taw-core's strings:
+
+```bash
+composer run i18n:pot       # languages/taw-core.pot from src/ (PHP) and resources/data-panel/src/ (TSX)
+composer run i18n:po        # merge each languages/taw-core-<locale>.po with the .pot
+# translate in the .po (Poedit or by hand), then:
+composer run i18n:compile   # .po → .l10n.php, the file WordPress loads
+composer run i18n:check     # CI: all three current, every call uses 'taw-core' with literal strings
+```
+
+No wp-cli or gettext needed. To add a language, copy `taw-core.pot` to `taw-core-<locale>.po`, set its `Language` and `Plural-Forms` headers, translate, and compile.
 
 ---
 

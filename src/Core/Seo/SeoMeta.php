@@ -239,34 +239,34 @@ final class SeoMeta
     {
         new Metabox([
             'id' => 'taw_seo_meta',
-            'title' => __('SEO & Social', 'taw-theme'),
+            'title' => __('SEO & Social', 'taw-core'),
             'screens' => ['page', 'post'],
             'context' => 'normal',
             'priority' => 'low',
             'fields' => [
                 [
                     'id' => self::TITLE_FIELD,
-                    'label' => __('Meta Title', 'taw-theme'),
+                    'label' => __('Meta Title', 'taw-core'),
                     'type' => 'text',
-                    'description' => __('Falls back to the post title when empty. Also used as the <title> tag itself, not just social previews.', 'taw-theme'),
+                    'description' => __('Falls back to the post title when empty. Also used as the <title> tag itself, not just social previews.', 'taw-core'),
                 ],
                 [
                     'id' => self::DESCRIPTION_FIELD,
-                    'label' => __('Meta Description', 'taw-theme'),
+                    'label' => __('Meta Description', 'taw-core'),
                     'type' => 'textarea',
-                    'description' => __('Shown in search results and link previews. ~155 characters is the practical limit before truncation.', 'taw-theme'),
+                    'description' => __('Shown in search results and link previews. ~155 characters is the practical limit before truncation.', 'taw-core'),
                 ],
                 [
                     'id' => self::OG_IMAGE_FIELD,
-                    'label' => __('Social Share Image', 'taw-theme'),
+                    'label' => __('Social Share Image', 'taw-core'),
                     'type' => 'image',
-                    'description' => __('Used for Open Graph/Twitter card previews. Falls back to the featured image when empty.', 'taw-theme'),
+                    'description' => __('Used for Open Graph/Twitter card previews. Falls back to the featured image when empty.', 'taw-core'),
                 ],
                 [
                     'id' => self::NOINDEX_FIELD,
-                    'label' => __('Hide from search engines', 'taw-theme'),
+                    'label' => __('Hide from search engines', 'taw-core'),
                     'type' => 'checkbox',
-                    'description' => __('Adds noindex — the page stays live but search engines are asked not to list it.', 'taw-theme'),
+                    'description' => __('Adds noindex — the page stays live but search engines are asked not to list it.', 'taw-core'),
                 ],
             ],
         ]);
@@ -413,7 +413,7 @@ final class SeoMeta
 
         if (is_archive() || is_search()) {
             $title = is_search()
-                ? sprintf(__('Search results for "%s"', 'taw-theme'), get_search_query())
+                ? sprintf(__('Search results for "%s"', 'taw-core'), get_search_query())
                 : (string) get_the_archive_title();
 
             return [

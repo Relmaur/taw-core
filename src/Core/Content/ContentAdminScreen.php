@@ -64,57 +64,57 @@ final class ContentAdminScreen
     public function renderPage(): void
     {
         if (!current_user_can('export')) {
-            wp_die(esc_html__('You do not have permission to access this page.', 'taw-theme'));
+            wp_die(esc_html__('You do not have permission to access this page.', 'taw-core'));
         }
 
         $pending = $this->readPending();
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e('TAW Data', 'taw-theme'); ?></h1>
+            <h1><?php esc_html_e('TAW Data', 'taw-core'); ?></h1>
             <p class="description">
-                <?php esc_html_e('Portable content interchange — export a reviewable snapshot of this site\'s posts, TAW fields, options, terms and referenced media, or import one into it.', 'taw-theme'); ?>
+                <?php esc_html_e('Portable content interchange — export a reviewable snapshot of this site\'s posts, TAW fields, options, terms and referenced media, or import one into it.', 'taw-core'); ?>
             </p>
 
             <?php $this->renderNotices(); ?>
 
-            <h2><?php esc_html_e('Export', 'taw-theme'); ?></h2>
+            <h2><?php esc_html_e('Export', 'taw-core'); ?></h2>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <?php wp_nonce_field('taw_content_export'); ?>
                 <input type="hidden" name="action" value="taw_content_export">
                 <p>
                     <label><input type="checkbox" name="include_media" value="1" checked>
-                        <?php esc_html_e('Include referenced media (URLs + metadata)', 'taw-theme'); ?></label><br>
+                        <?php esc_html_e('Include referenced media (URLs + metadata)', 'taw-core'); ?></label><br>
                     <label><input type="checkbox" name="all_media" value="1">
-                        <?php esc_html_e('Include unreferenced media (orphans, widget images)', 'taw-theme'); ?></label><br>
+                        <?php esc_html_e('Include unreferenced media (orphans, widget images)', 'taw-core'); ?></label><br>
                     <label><input type="checkbox" name="include_drafts" value="1">
-                        <?php esc_html_e('Include draft / pending posts', 'taw-theme'); ?></label><br>
+                        <?php esc_html_e('Include draft / pending posts', 'taw-core'); ?></label><br>
                     <label><input type="checkbox" name="with_users" value="1">
-                        <?php esc_html_e('Include users (login, email, roles, profile — no passwords)', 'taw-theme'); ?></label><br>
+                        <?php esc_html_e('Include users (login, email, roles, profile — no passwords)', 'taw-core'); ?></label><br>
                     <label><input type="checkbox" name="with_settings" value="1">
-                        <?php esc_html_e('Include environment settings (permalinks, timezone, sticky posts, …)', 'taw-theme'); ?></label>
+                        <?php esc_html_e('Include environment settings (permalinks, timezone, sticky posts, …)', 'taw-core'); ?></label>
                 </p>
                 <details>
-                    <summary><?php esc_html_e('Advanced', 'taw-theme'); ?></summary>
+                    <summary><?php esc_html_e('Advanced', 'taw-core'); ?></summary>
                     <p class="description" style="color:#b32d2e">
-                        <?php esc_html_e('These carry sensitive or bulky data — only for a deliberate full-site migration.', 'taw-theme'); ?>
+                        <?php esc_html_e('These carry sensitive or bulky data — only for a deliberate full-site migration.', 'taw-core'); ?>
                     </p>
                     <p>
                         <label><input type="checkbox" name="with_user_passwords" value="1">
-                            <?php esc_html_e('Include portable password hashes', 'taw-theme'); ?></label><br>
+                            <?php esc_html_e('Include portable password hashes', 'taw-core'); ?></label><br>
                         <label><input type="checkbox" name="with_comments" value="1">
-                            <?php esc_html_e('Include comments on exported posts', 'taw-theme'); ?></label>
+                            <?php esc_html_e('Include comments on exported posts', 'taw-core'); ?></label>
                     </p>
                 </details>
-                <?php submit_button(__('Download snapshot', 'taw-theme'), 'primary', 'submit', false); ?>
+                <?php submit_button(__('Download snapshot', 'taw-core'), 'primary', 'submit', false); ?>
             </form>
 
             <hr>
 
-            <h2><?php esc_html_e('Import', 'taw-theme'); ?></h2>
+            <h2><?php esc_html_e('Import', 'taw-core'); ?></h2>
 
             <?php if ($pending === null): ?>
                 <?php if (!current_user_can(self::IMPORT_CAP)): ?>
-                    <p><?php esc_html_e('You do not have permission to import content.', 'taw-theme'); ?></p>
+                    <p><?php esc_html_e('You do not have permission to import content.', 'taw-core'); ?></p>
                 <?php else: ?>
                     <form method="post" enctype="multipart/form-data" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                         <?php wp_nonce_field('taw_content_import_preview'); ?>
@@ -122,8 +122,8 @@ final class ContentAdminScreen
                         <p>
                             <input type="file" name="snapshot" accept="application/json,.json" required>
                         </p>
-                        <p class="description"><?php esc_html_e('A snapshot or change-set JSON file. The next screen shows exactly what would change — nothing is written yet.', 'taw-theme'); ?></p>
-                        <?php submit_button(__('Review changes', 'taw-theme'), 'secondary', 'submit', false); ?>
+                        <p class="description"><?php esc_html_e('A snapshot or change-set JSON file. The next screen shows exactly what would change — nothing is written yet.', 'taw-core'); ?></p>
+                        <?php submit_button(__('Review changes', 'taw-core'), 'secondary', 'submit', false); ?>
                     </form>
                 <?php endif; ?>
             <?php else: ?>
@@ -140,7 +140,7 @@ final class ContentAdminScreen
     public function handleExport(): void
     {
         if (!current_user_can('export')) {
-            wp_die(esc_html__('Unauthorized', 'taw-theme'));
+            wp_die(esc_html__('Unauthorized', 'taw-core'));
         }
         check_admin_referer('taw_content_export');
 
@@ -168,7 +168,7 @@ final class ContentAdminScreen
     public function handleImportPreview(): void
     {
         if (!current_user_can(self::IMPORT_CAP)) {
-            wp_die(esc_html__('Unauthorized', 'taw-theme'));
+            wp_die(esc_html__('Unauthorized', 'taw-core'));
         }
         check_admin_referer('taw_content_import_preview');
 
@@ -190,7 +190,7 @@ final class ContentAdminScreen
     public function handleImportApply(): void
     {
         if (!current_user_can(self::IMPORT_CAP)) {
-            wp_die(esc_html__('Unauthorized', 'taw-theme'));
+            wp_die(esc_html__('Unauthorized', 'taw-core'));
         }
         check_admin_referer('taw_content_import_apply');
 
@@ -232,20 +232,20 @@ final class ContentAdminScreen
         }
 
         if (!empty($plan['registry_drift'])) {
-            echo '<div class="notice notice-warning"><p><strong>' . esc_html__('Registry drift', 'taw-theme') . ':</strong></p><ul style="list-style:disc;margin-left:20px">';
+            echo '<div class="notice notice-warning"><p><strong>' . esc_html__('Registry drift', 'taw-core') . ':</strong></p><ul style="list-style:disc;margin-left:20px">';
             foreach ($plan['registry_drift'] as $note) {
                 echo '<li>' . esc_html((string) $note) . '</li>';
             }
             echo '</ul></div>';
         }
         ?>
-        <p><?php printf(esc_html__('%d of %d records would change. Nothing has been written.', 'taw-theme'), (int) $changeCount, count($records)); ?></p>
+        <p><?php printf(esc_html__('%d of %d records would change. Nothing has been written.', 'taw-core'), (int) $changeCount, count($records)); ?></p>
 
         <table class="widefat striped">
             <thead><tr>
-                <th><?php esc_html_e('Record', 'taw-theme'); ?></th>
-                <th><?php esc_html_e('Op', 'taw-theme'); ?></th>
-                <th><?php esc_html_e('Field-level changes', 'taw-theme'); ?></th>
+                <th><?php esc_html_e('Record', 'taw-core'); ?></th>
+                <th><?php esc_html_e('Op', 'taw-core'); ?></th>
+                <th><?php esc_html_e('Field-level changes', 'taw-core'); ?></th>
             </tr></thead>
             <tbody>
             <?php foreach ($records as $record): ?>
@@ -279,21 +279,21 @@ final class ContentAdminScreen
             <?php wp_nonce_field('taw_content_import_apply'); ?>
             <input type="hidden" name="action" value="taw_content_import_apply">
             <p>
-                <label><?php esc_html_e('When a record already exists:', 'taw-theme'); ?>
+                <label><?php esc_html_e('When a record already exists:', 'taw-core'); ?>
                     <select name="policy">
-                        <option value="update"><?php esc_html_e('update it (overwrite)', 'taw-theme'); ?></option>
-                        <option value="create"><?php esc_html_e('skip it (only create new)', 'taw-theme'); ?></option>
-                        <option value="skip"><?php esc_html_e('skip everything (no writes)', 'taw-theme'); ?></option>
+                        <option value="update"><?php esc_html_e('update it (overwrite)', 'taw-core'); ?></option>
+                        <option value="create"><?php esc_html_e('skip it (only create new)', 'taw-core'); ?></option>
+                        <option value="skip"><?php esc_html_e('skip everything (no writes)', 'taw-core'); ?></option>
                     </select>
                 </label>
             </p>
             <p>
                 <label><input type="checkbox" name="with_settings" value="1">
-                    <?php esc_html_e('Also apply environment-settings options (permalinks, timezone, sticky posts, …)', 'taw-theme'); ?></label>
+                    <?php esc_html_e('Also apply environment-settings options (permalinks, timezone, sticky posts, …)', 'taw-core'); ?></label>
             </p>
-            <?php submit_button(sprintf(__('Apply %d changes', 'taw-theme'), (int) $changeCount), 'primary', 'submit', false); ?>
-            <a class="button" href="<?php echo esc_url(admin_url('tools.php?page=taw-data&cancel=1')); ?>"><?php esc_html_e('Cancel', 'taw-theme'); ?></a>
-            <p class="description"><?php esc_html_e('A full rollback snapshot is written to wp-content/uploads/taw-private/ before anything changes.', 'taw-theme'); ?></p>
+            <?php submit_button(sprintf(__('Apply %d changes', 'taw-core'), (int) $changeCount), 'primary', 'submit', false); ?>
+            <a class="button" href="<?php echo esc_url(admin_url('tools.php?page=taw-data&cancel=1')); ?>"><?php esc_html_e('Cancel', 'taw-core'); ?></a>
+            <p class="description"><?php esc_html_e('A full rollback snapshot is written to wp-content/uploads/taw-private/ before anything changes.', 'taw-core'); ?></p>
         </form>
         <?php
     }
@@ -305,9 +305,9 @@ final class ContentAdminScreen
         }
 
         $errors = [
-            'no_file'  => __('No file was uploaded.', 'taw-theme'),
-            'bad_json' => __('That file is not valid JSON.', 'taw-theme'),
-            'expired'  => __('The pending import expired — please upload the file again.', 'taw-theme'),
+            'no_file'  => __('No file was uploaded.', 'taw-core'),
+            'bad_json' => __('That file is not valid JSON.', 'taw-core'),
+            'expired'  => __('The pending import expired — please upload the file again.', 'taw-core'),
         ];
         $err = sanitize_key((string) ($_GET['taw_error'] ?? ''));
         if (isset($errors[$err])) {
@@ -318,13 +318,13 @@ final class ContentAdminScreen
             $report = get_transient('taw_content_import_report_' . get_current_user_id());
             delete_transient('taw_content_import_report_' . get_current_user_id());
             if (is_array($report)) {
-                echo '<div class="notice notice-success"><p><strong>' . esc_html__('Import applied.', 'taw-theme') . '</strong></p><ul style="list-style:disc;margin-left:20px">';
+                echo '<div class="notice notice-success"><p><strong>' . esc_html__('Import applied.', 'taw-core') . '</strong></p><ul style="list-style:disc;margin-left:20px">';
                 foreach (['created', 'updated', 'skipped', 'deleted'] as $bucket) {
                     echo '<li>' . esc_html(ucfirst($bucket) . ': ' . count((array) ($report[$bucket] ?? []))) . '</li>';
                 }
-                echo '<li>' . esc_html__('Media sideloaded', 'taw-theme') . ': ' . (int) ($report['media_sideloaded'] ?? 0) . '</li>';
+                echo '<li>' . esc_html__('Media sideloaded', 'taw-core') . ': ' . (int) ($report['media_sideloaded'] ?? 0) . '</li>';
                 if (!empty($report['rollback_path'])) {
-                    echo '<li>' . esc_html__('Rollback snapshot', 'taw-theme') . ': <code>' . esc_html((string) $report['rollback_path']) . '</code></li>';
+                    echo '<li>' . esc_html__('Rollback snapshot', 'taw-core') . ': <code>' . esc_html((string) $report['rollback_path']) . '</code></li>';
                 }
                 foreach ((array) ($report['warnings'] ?? []) as $w) {
                     echo '<li style="color:#b32d2e">' . esc_html((string) $w) . '</li>';

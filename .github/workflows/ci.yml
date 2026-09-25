@@ -39,6 +39,9 @@ jobs:
       - name: PHPUnit unit tests
         run: composer run test
 
+      - name: Translations current (.pot, .po, .l10n.php)
+        run: composer run i18n:check
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:

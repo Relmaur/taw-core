@@ -1,3 +1,4 @@
 # Kept out of the Composer package (GitHub's dist archives honour export-ignore).
 # Installs only need the committed build in assets/data-panel/.
 /resources/data-panel export-ignore
+/tools export-ignore

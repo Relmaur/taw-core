@@ -457,7 +457,7 @@ class OptionsPage
                         <?php if (!empty($tab['icon'])): ?>
                             <img src="<?php echo esc_url($tab['icon']); ?>" alt="">
                         <?php endif; ?>
-                        <p><?php echo esc_html($tab['label'] ?? __('Tab', 'taw-theme')); ?></p>
+                        <p><?php echo esc_html($tab['label'] ?? __('Tab', 'taw-core')); ?></p>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -684,11 +684,11 @@ class OptionsPage
                         <?php endif; ?>
                     </div>
                     <button type="button" class="button taw-upload-image">
-                        <?php esc_html_e('Select Image', 'taw-theme'); ?>
+                        <?php esc_html_e('Select Image', 'taw-core'); ?>
                     </button>
                     <button type="button" class="button taw-remove-image"
                         style="<?php echo $value ? '' : 'display:none;'; ?>">
-                        <?php esc_html_e('Remove Image', 'taw-theme'); ?>
+                        <?php esc_html_e('Remove Image', 'taw-core'); ?>
                     </button>
                 </div>
             <?php
@@ -735,12 +735,12 @@ class OptionsPage
                                     <span class="taw-files-icon dashicons dashicons-media-default"></span>
                                     <span class="taw-files-name"><?php echo esc_html($att['name']); ?></span>
                                 <?php endif; ?>
-                                <button type="button" class="taw-files-remove" title="<?php esc_attr_e('Remove', 'taw-theme'); ?>">&times;</button>
+                                <button type="button" class="taw-files-remove" title="<?php esc_attr_e('Remove', 'taw-core'); ?>">&times;</button>
                             </div>
                         <?php endforeach; ?>
                     </div>
                     <button type="button" class="button taw-files-add">
-                        <?php echo esc_html($field['button_label'] ?? __('Add Files', 'taw-theme')); ?>
+                        <?php echo esc_html($field['button_label'] ?? __('Add Files', 'taw-core')); ?>
                     </button>
                 </div>
             <?php
@@ -794,7 +794,7 @@ class OptionsPage
                     <div class="taw-post-selector-search-wrap">
                         <input type="text"
                             class="taw-post-selector-search regular-text"
-                            placeholder="<?php echo esc_attr($multiple ? __('Search to add posts…', 'taw-theme') : __('Search for a post…', 'taw-theme')); ?>"
+                            placeholder="<?php echo esc_attr($multiple ? __('Search to add posts…', 'taw-core') : __('Search for a post…', 'taw-core')); ?>"
                             autocomplete="off">
                         <div class="taw-post-selector-results"></div>
                     </div>
@@ -807,7 +807,7 @@ class OptionsPage
                 $sub_fields   = $field['fields']       ?? [];
                 $max_rows     = $field['max']           ?? 0;
                 $min_rows     = $field['min']           ?? 0;
-                $button_label = $field['button_label']  ?? __('Add Row', 'taw-theme');
+                $button_label = $field['button_label']  ?? __('Add Row', 'taw-core');
                 $layout       = $field['layout']        ?? '';
 
                 $rows = $value ? json_decode($value, true) : [];
@@ -908,12 +908,12 @@ class OptionsPage
     ?>
         <div class="taw-repeater-row" data-index="<?php echo esc_attr((string) $index); ?>">
             <div class="taw-repeater-row-header">
-                <span class="taw-repeater-row-drag" title="<?php esc_attr_e('Drag to reorder', 'taw-theme'); ?>">☰</span>
+                <span class="taw-repeater-row-drag" title="<?php esc_attr_e('Drag to reorder', 'taw-core'); ?>">☰</span>
                 <span class="taw-repeater-row-title">
                     <?php echo esc_html('#' . (is_int($index) ? $index + 1 : '')); ?>
                 </span>
-                <button type="button" class="taw-repeater-row-toggle" title="<?php esc_attr_e('Collapse', 'taw-theme'); ?>">▾</button>
-                <button type="button" class="taw-repeater-row-remove" title="<?php esc_attr_e('Remove row', 'taw-theme'); ?>">&times;</button>
+                <button type="button" class="taw-repeater-row-toggle" title="<?php esc_attr_e('Collapse', 'taw-core'); ?>">▾</button>
+                <button type="button" class="taw-repeater-row-remove" title="<?php esc_attr_e('Remove row', 'taw-core'); ?>">&times;</button>
             </div>
             <div class="taw-repeater-row-content">
                 <div class="fields-container"

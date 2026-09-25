@@ -1,0 +1,1167 @@
+# Spanish (Mexico) translations for taw/core. Seeded from the TAW sites' own translations.
+msgid ""
+msgstr ""
+"Project-Id-Version: taw/core\n"
+"Language: es_MX\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: taw-core\n"
+
+#. translators: 1: block name or glob, 2: post type.
+#: src/Core/Editing/EditingAdminScreen.php
+#, php-format
+msgid "\"%1$s\" in the %2$s allow list matches no registered block."
+msgstr ""
+
+#. translators: %s: block name or glob.
+#: src/Core/Editing/EditingAdminScreen.php
+#, php-format
+msgid "\"%s\" in themeBlocks matches no registered block."
+msgstr ""
+
+#. translators: %d: post ID.
+#: resources/data-panel/src/controls/PostSelect.tsx
+#, php-format
+msgid "#%d (not published)"
+msgstr ""
+
+#. translators: 1: files chosen, 2: most allowed.
+#. translators: 1: items, 2: most allowed.
+#: resources/data-panel/src/controls/MediaControls.tsx resources/data-panel/src/controls/Repeater.tsx
+#, php-format
+msgid "%1$d of %2$d"
+msgstr ""
+
+#. translators: 1: field label, 2: field type.
+#: resources/data-panel/src/FieldControl.tsx
+#, php-format
+msgid "%1$s (%2$s) can’t be edited in the panel yet."
+msgstr ""
+
+#. translators: 1: field label, 2: minimum length
+#: src/Core/Form/Form.php
+#, php-format
+msgid "%1$s must be at least %2$d characters."
+msgstr ""
+
+#. translators: 1: field label, 2: minimum value
+#: src/Core/Form/Form.php
+#, php-format
+msgid "%1$s must be at least %2$s."
+msgstr ""
+
+#. translators: 1: field label, 2: maximum length
+#: src/Core/Form/Form.php
+#, php-format
+msgid "%1$s must be no more than %2$d characters."
+msgstr ""
+
+#. translators: 1: field label, 2: maximum value
+#: src/Core/Form/Form.php
+#, php-format
+msgid "%1$s must be no more than %2$s."
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+#, php-format
+msgid "%d block"
+msgid_plural "%d blocks"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "%d of %d records would change. Nothing has been written."
+msgstr ""
+
+#. translators: %s: field label
+#: src/Core/Form/Form.php
+#, php-format
+msgid "%s could not be uploaded. Please try a different file."
+msgstr ""
+
+#: src/Core/Form/Form.php
+#, php-format
+msgid "%s could not be validated."
+msgstr ""
+
+#. translators: %s: field label
+#: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+#, php-format
+msgid "%s is invalid."
+msgstr "%s no es válido."
+
+#: src/Core/Form/Form.php
+#, php-format
+msgid "%s is not in the correct format."
+msgstr ""
+
+#. translators: %s: field label
+#. translators: %s: field label.
+#: resources/data-panel/src/DataPanel.tsx src/Core/Form/Form.php src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+#, php-format
+msgid "%s is required."
+msgstr "%s es requerido."
+
+#: src/Core/OptionsPage/OptionsPage.php
+#, php-format
+msgid "%s must be a valid URL."
+msgstr ""
+
+#. translators: %s: field label
+#: src/Core/Form/Form.php
+#, php-format
+msgid "%s must be an image file."
+msgstr ""
+
+#: src/Core/OptionsPage/OptionsPage.php
+#, php-format
+msgid "%s must be at least %s."
+msgstr ""
+
+#: src/Core/OptionsPage/OptionsPage.php
+#, php-format
+msgid "%s must be at most %s."
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "(added to every allow list)"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "(no title)"
+msgstr "(sin título)"
+
+#. translators: %d: post ID.
+#: resources/data-panel/src/controls/PostSelect.tsx
+#, php-format
+msgid "(no title) #%d"
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid ".sqlite file"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "A full rollback snapshot is written to wp-content/uploads/taw-private/ before anything changes."
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "A network error occurred. Please try again."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "A snapshot or change-set JSON file. The next screen shows exactly what would change — nothing is written yet."
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+msgid "Add Files"
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Add Knowledge Base"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Add Profile"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+msgid "Add Row"
+msgstr "Agregar Renglón"
+
+#: src/Core/Metabox/Metabox.php
+msgid "Add Segment"
+msgstr ""
+
+#: resources/data-panel/src/controls/MediaControls.tsx
+msgid "Add files"
+msgstr ""
+
+#: resources/data-panel/src/controls/Repeater.tsx
+msgid "Add item"
+msgstr ""
+
+#: resources/data-panel/src/controls/CompositeControls.tsx
+msgid "Add segment"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "Add selected"
+msgstr ""
+
+#: src/Core/Seo/SeoMeta.php
+msgid "Adds noindex — the page stays live but search engines are asked not to list it."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Advanced"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "All Files"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "All folders"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Allowed blocks"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Also apply environment-settings options (permalinks, timezone, sticky posts, …)"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Always off — defer entirely to another SEO plugin"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Always on — ignore detection, always use TAW's own SEO output"
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Any .sqlite file uploaded here becomes searchable by the chatbot — every table and text column is chunked, embedded, and semantically searched. No particular schema is required."
+msgstr ""
+
+#: resources/data-panel/src/rich/MiniEditor.tsx
+msgid "Apply"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Apply %d changes"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Automatic detection can be unreliable for plugins with no stable version constant (e.g. some SmartCrawl installs) — this overrides it explicitly. Controls SeoMeta's <title>/meta/OG tags and this page's JSON-LD together."
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Automatic — detect Yoast/RankMath/SmartCrawl and stand down if one is active"
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "Back"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Bypass"
+msgstr ""
+
+#: resources/data-panel/src/rich/MiniEditor.tsx src/Core/Content/ContentAdminScreen.php
+msgid "Cancel"
+msgstr ""
+
+#: resources/data-panel/src/controls/PostSelect.tsx
+msgid "Change"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "Choose Icon"
+msgstr ""
+
+#: resources/data-panel/src/controls/PickerControls.tsx
+msgid "Choose a color"
+msgstr ""
+
+#: resources/data-panel/src/controls/PickerControls.tsx
+msgid "Choose a date"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Choose a folder…"
+msgstr ""
+
+#: resources/data-panel/src/controls/IconControl.tsx
+msgid "Choose an icon"
+msgstr ""
+
+#: resources/data-panel/src/controls/MediaControls.tsx
+msgid "Choose an image"
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Chunks"
+msgstr ""
+
+#: resources/data-panel/src/controls/PickerControls.tsx src/Core/Media/MediaFolders.php
+msgid "Clear"
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "Close"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+msgid "Collapse"
+msgstr "Contraer"
+
+#: resources/data-panel/src/controls/Repeater.tsx
+msgid "Collapse all"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Content, per post type"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Delete"
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Delete this knowledge base?"
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Description"
+msgstr "Descripción"
+
+#: resources/data-panel/src/rich/MiniEditor.tsx
+msgid "Discard your changes to this field?"
+msgstr ""
+
+#: src/Support/performance.php
+msgid "Dismiss"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Display folder IDs"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Download snapshot"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+msgid "Drag to reorder"
+msgstr "Arrastre para reordenar"
+
+#: src/Core/Media/MediaFolders.php
+msgid "Drop to upload here"
+msgstr ""
+
+#: resources/data-panel/src/controls/RichContent.tsx
+msgid "Edit"
+msgstr ""
+
+#: src/Core/Editor/VisualEditor.php
+msgid "Edit Visually"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "Empty"
+msgstr ""
+
+#: src/Core/Auth/PagePassword.php
+msgid "Enter"
+msgstr ""
+
+#: src/Core/Editor/VisualEditor.php
+msgid "Exit Editor"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Expand"
+msgstr ""
+
+#: resources/data-panel/src/controls/Repeater.tsx src/Core/Media/MediaFolders.php
+msgid "Expand all"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Export"
+msgstr ""
+
+#: src/Core/Seo/SeoMeta.php
+msgid "Falls back to the post title when empty. Also used as the <title> tag itself, not just social previews."
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Falls back to the site title when empty."
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Feeds the \"sameAs\" entity signal — link every profile that represents this same organization/brand (LinkedIn, Instagram, etc.)."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Field-level changes"
+msgstr ""
+
+#. translators: %d: attachment ID.
+#: resources/data-panel/src/controls/MediaControls.tsx
+#, php-format
+msgid "File #%d (missing)"
+msgstr ""
+
+#. translators: %s: field labels.
+#: resources/data-panel/src/SaveLock.tsx
+#, php-format
+msgid "Fill in the required data before saving: %s."
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Folder"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Folders"
+msgstr ""
+
+#: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
+msgid "Form ID"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Hide folder IDs"
+msgstr ""
+
+#: src/Core/Seo/SeoMeta.php
+msgid "Hide from search engines"
+msgstr ""
+
+#: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
+msgid "Highlighted"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Home"
+msgstr ""
+
+#: resources/data-panel/src/controls/IconControl.tsx
+msgid "Icons"
+msgstr ""
+
+#: resources/data-panel/src/controls/IconControl.tsx
+msgid "Icons aren’t switched on for this site (Lucide::enable())."
+msgstr ""
+
+#: resources/data-panel/src/controls/IconControl.tsx
+msgid "Icons couldn’t be loaded."
+msgstr ""
+
+#. translators: %d: attachment ID.
+#: resources/data-panel/src/controls/MediaControls.tsx
+#, php-format
+msgid "Image #%d is no longer in the media library"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Import"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Import applied."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Include comments on exported posts"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Include draft / pending posts"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Include environment settings (permalinks, timezone, sticky posts, …)"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Include portable password hashes"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Include referenced media (URLs + metadata)"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Include unreferenced media (orphans, widget images)"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Include users (login, email, roles, profile — no passwords)"
+msgstr ""
+
+#: src/Core/Auth/PagePassword.php
+msgid "Incorrect password. Please try again."
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "Invalid email address."
+msgstr ""
+
+#: src/Core/OptionsPage/OptionsPage.php
+#, php-format
+msgid "Invalid parameter(s): %s"
+msgstr ""
+
+#. translators: %d: item number.
+#: resources/data-panel/src/controls/Repeater.tsx
+#, php-format
+msgid "Item %d"
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Knowledge Bases"
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Knowledge base deleted."
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Load more"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Local Business"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Lock"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Logo"
+msgstr "Logo"
+
+#: src/Core/Metabox/Metabox.php
+msgid "Lucide icons aren't enabled for this site — call TAW\\Core\\Icons\\Lucide::enable() in customizations.php before Theme::boot()."
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "Managed externally — read-only"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Media sideloaded"
+msgstr ""
+
+#: src/Core/Seo/SeoMeta.php
+msgid "Meta Description"
+msgstr ""
+
+#: src/Core/Seo/SeoMeta.php
+msgid "Meta Title"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "More"
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "More information"
+msgstr ""
+
+#. translators: %s: item title.
+#: resources/data-panel/src/controls/Repeater.tsx
+#, php-format
+msgid "Move %s down"
+msgstr ""
+
+#. translators: %s: item title.
+#: resources/data-panel/src/controls/Repeater.tsx
+#, php-format
+msgid "Move %s up"
+msgstr ""
+
+#: resources/data-panel/src/controls/MediaControls.tsx resources/data-panel/src/controls/PostSelect.tsx
+msgid "Move down"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Move to folder…"
+msgstr ""
+
+#: resources/data-panel/src/controls/MediaControls.tsx resources/data-panel/src/controls/PostSelect.tsx
+msgid "Move up"
+msgstr ""
+
+#. translators: %d: number of files moved
+#: src/Core/Media/MediaFolders.php
+#, php-format
+msgid "Moved %d file to the selected folder."
+msgid_plural "Moved %d files to the selected folder."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Name"
+msgstr "Nombre"
+
+#: src/Core/Media/MediaFolders.php
+msgid "Name (A–Z)"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Name (Z–A)"
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Name and description are required."
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "New Folder"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Newest first"
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "Next"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "No"
+msgstr ""
+
+#: resources/data-panel/src/controls/RichContent.tsx
+msgid "No content yet"
+msgstr ""
+
+#: resources/data-panel/src/DataPanel.tsx
+msgid "No data fields apply to this template."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "No file was uploaded."
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "No files"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "No files in this folder."
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "No icon selected"
+msgstr ""
+
+#: resources/data-panel/src/controls/IconControl.tsx
+msgid "No icons found."
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "No image"
+msgstr ""
+
+#: resources/data-panel/src/controls/Repeater.tsx
+msgid "No items yet."
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "No posts found."
+msgstr "No se encontraron publicaciones."
+
+#: resources/data-panel/src/controls/CompositeControls.tsx
+msgid "No segments yet."
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "None selected"
+msgstr ""
+
+#: resources/data-panel/src/controls/PostSelect.tsx
+msgid "Nothing found."
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Oldest first"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Op"
+msgstr ""
+
+#: resources/data-panel/src/SaveLock.tsx
+msgid "Open TAW Data"
+msgstr ""
+
+#: src/Core/Editor/VisualEditor.php
+msgid "Open the visual content editor"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Organization"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Organization Name"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Organization Type"
+msgstr ""
+
+#: src/Core/Auth/PagePassword.php
+msgid "Password"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Phone"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Portable content interchange — export a reviewable snapshot of this site's posts, TAW fields, options, terms and referenced media, or import one into it."
+msgstr ""
+
+#. translators: 1: HubSpot portal ID, 2: HubSpot form ID, 3: HubSpot region
+#: src/Core/Metabox/Metabox.php
+#, php-format
+msgid "Portal %1$s / Form %2$s (%3$s)"
+msgstr ""
+
+#: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
+msgid "Portal ID"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Post type"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Post types not listed keep the normal editor."
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Preset"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Profile URL"
+msgstr ""
+
+#: src/Core/Auth/PagePassword.php
+msgid "Protected Page"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Record"
+msgstr ""
+
+#: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
+msgid "Region"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Registry drift"
+msgstr ""
+
+#: resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+msgid "Remove"
+msgstr "Eliminar"
+
+#. translators: %s: icon name.
+#. translators: %s: file name.
+#. translators: %s: post title.
+#. translators: %s: item title.
+#: resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx resources/data-panel/src/controls/PostSelect.tsx resources/data-panel/src/controls/Repeater.tsx
+#, php-format
+msgid "Remove %s"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+msgid "Remove Image"
+msgstr "Remover imagen"
+
+#: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+msgid "Remove row"
+msgstr "Quitar fila"
+
+#. translators: %d: segment number.
+#: resources/data-panel/src/controls/CompositeControls.tsx
+#, php-format
+msgid "Remove segment %d"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Rename"
+msgstr ""
+
+#: resources/data-panel/src/controls/MediaControls.tsx
+msgid "Replace"
+msgstr ""
+
+#: resources/data-panel/src/controls/MediaControls.tsx
+msgid "Replace image"
+msgstr ""
+
+#: src/Core/Editor/VisualEditor.php
+msgid "Return to normal view"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Review changes"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Rollback snapshot"
+msgstr ""
+
+#. translators: 1: the build command, 2: the dev-server command.
+#: src/Core/Assets/Vite.php
+#, php-format
+msgid "Run %1$s in that folder (%2$s while developing)."
+msgstr ""
+
+#: src/Core/Seo/SeoMeta.php
+msgid "SEO & Social"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "SEO Output"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "SEO Schema"
+msgstr ""
+
+#: src/Helpers/Svg.php
+msgid "SVG Images"
+msgstr ""
+
+#: resources/data-panel/src/controls/PostSelect.tsx
+msgid "Search failed."
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "Search failed. Please try again."
+msgstr "La búsqueda no ha tenido éxito. Inténtalo de nuevo."
+
+#: resources/data-panel/src/controls/PostSelect.tsx src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+msgid "Search for a post…"
+msgstr "Buscar una publicación…"
+
+#: resources/data-panel/src/controls/IconControl.tsx
+msgid "Search icons"
+msgstr ""
+
+#: src/Core/Seo/SeoMeta.php
+#, php-format
+msgid "Search results for \"%s\""
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+msgid "Search to add posts…"
+msgstr "Buscar para agregar publicaciones…"
+
+#: resources/data-panel/src/controls/PostSelect.tsx
+msgid "Search to add…"
+msgstr ""
+
+#. translators: %d: segment number.
+#: resources/data-panel/src/controls/CompositeControls.tsx
+#, php-format
+msgid "Segment %d"
+msgstr ""
+
+#: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
+msgid "Segment text"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+msgid "Select Image"
+msgstr "Seleccionar imagen"
+
+#: src/Core/Form/Form.php
+msgid "Select an option…"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "Select or Upload Files"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "Select or Upload Image"
+msgstr "Seleccionar o Subir Imagen"
+
+#: src/Core/Form/Form.php
+msgid "Send Message"
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "Sending..."
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "Sending…"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Set by"
+msgstr ""
+
+#: src/Core/Seo/SeoMeta.php
+msgid "Shown in search results and link previews. ~155 characters is the practical limit before truncation."
+msgstr ""
+
+#: src/Core/Editing/SiteLayer.php
+msgid "Site Editor locked"
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Social Profile Links"
+msgstr ""
+
+#: src/Core/Seo/SeoMeta.php
+msgid "Social Share Image"
+msgstr ""
+
+#. translators: %s: folder name of the theme or package.
+#: src/Core/Assets/Vite.php
+#, php-format
+msgid "Some assets in “%s” aren’t built, so they aren’t loaded."
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "Something went wrong. Please try again."
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Sort folders"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Starting template"
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Status"
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "Submit"
+msgstr ""
+
+#: resources/data-panel/src/DataPanel.tsx src/Core/Content/ContentAdminScreen.php
+msgid "TAW Data"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "TAW Editing"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "TAW Media"
+msgstr ""
+
+#. translators: %s: capability name.
+#: src/Core/Editing/EditingAdminScreen.php
+#, php-format
+msgid "TAW_EDITING_BYPASS_USERS is empty, so only users granted the %s capability are exempt. Add your developer logins to it in wp-config.php."
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+msgid "Tab"
+msgstr "Pestaña"
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Tells the chatbot when to use this knowledge base — be specific about what it contains."
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "Thank you! Your message has been sent."
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "That file is not a valid SQLite database."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "That file is not valid JSON."
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "The built-in \"This site's content\" knowledge base cannot be deleted."
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "The editing policy in effect for this site (read-only). Change it in the theme's taw-schema/editing.json, or pick a preset for this install with TAW_EDITING_PRESET in wp-config.php."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "The pending import expired — please upload the file again."
+msgstr ""
+
+#: src/Core/Editing/SiteLayer.php
+msgid "The site's editing policy doesn't allow changing this part of the site design."
+msgstr ""
+
+#: src/Core/Editing/SiteLayer.php
+msgid "The site's editing policy doesn't allow using the Site Editor."
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "The upload failed — please try again."
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Theme blocks"
+msgstr ""
+
+#. translators: 1: comma-separated block names, 2: post type.
+#: src/Core/Editing/ContentLayer.php
+#, php-format
+msgid "These blocks can't be added here: %1$s. The editing policy for \"%2$s\" doesn't allow them."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "These carry sensitive or bulky data — only for a deliberate full-site migration."
+msgstr ""
+
+#: src/Helpers/Svg.php
+msgid "This SVG file could not be safely sanitized and was rejected."
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "This field is required."
+msgstr ""
+
+#: src/Core/Auth/PagePassword.php
+msgid "This page is not available."
+msgstr ""
+
+#: src/Core/Auth/PagePassword.php
+msgid "Too many attempts. Please wait a few minutes and try again."
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "Too many attempts. Please wait a moment and try again."
+msgstr ""
+
+#: src/Core/Seo/Schema.php
+msgid "Twitter / X Handle"
+msgstr ""
+
+#: resources/data-panel/src/rich/MiniEditor.tsx
+msgid "Type / to choose a block"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Unauthorized"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Unfiled"
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Upload"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Upload Files"
+msgstr ""
+
+#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "Uploaded — indexing runs in the background and may take a few minutes."
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php
+msgid "Uploading"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "Use this image"
+msgstr "Usar esta imagen"
+
+#: src/Core/Seo/SeoMeta.php
+msgid "Used for Open Graph/Twitter card previews. Falls back to the featured image when empty."
+msgstr ""
+
+#: src/Core/Form/Form.php
+msgid "We could not verify you are human. Please try again."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "When a record already exists:"
+msgstr ""
+
+#: resources/data-panel/src/controls/RichContent.tsx
+msgid "Write"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "Yes"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "You"
+msgstr ""
+
+#: resources/data-panel/src/controls/MediaControls.tsx
+msgid "You can’t upload or choose media."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php src/Core/Editing/EditingAdminScreen.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+msgid "You do not have permission to access this page."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "You do not have permission to import content."
+msgstr ""
+
+#: src/Support/performance.php
+msgid "Your build assets aren't getting cache headers — this site appears to run nginx, which doesn't read .htaccess. Add this to your nginx server block:"
+msgstr ""
+
+#: src/Core/Auth/PagePassword.php
+msgid "Your session expired. Please try again."
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "all"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "allowed"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "are exempt (bypass)"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "are locked like everyone else"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "default (no editing policy sets one)"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "locked"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "none"
+msgstr ""
+
+#: src/Core/Media/MediaFolders.php src/Core/Metabox/Metabox.php
+msgid "selected"
+msgstr "seleccionado"
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "skip everything (no writes)"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "skip it (only create new)"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "update it (overwrite)"
+msgstr ""
+
+#: resources/data-panel/src/controls/ChoiceControls.tsx
+msgid "— Select —"
+msgstr ""

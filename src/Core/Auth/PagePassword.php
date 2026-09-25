@@ -59,7 +59,7 @@ final class PagePassword
         // rainbow table) to recover anything about the password itself.
         $id       = (string) ($config['id'] ?? substr(hash_hmac('sha256', $password, wp_salt('auth')), 0, 12));
         $duration = (int) ($config['duration'] ?? (30 * DAY_IN_SECONDS));
-        $title    = (string) ($config['title'] ?? __('Protected Page', 'taw'));
+        $title    = (string) ($config['title'] ?? __('Protected Page', 'taw-core'));
 
         if ($password === '') {
             if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -70,7 +70,7 @@ final class PagePassword
                     E_USER_WARNING
                 );
             }
-            self::renderGate($id, $title, __('This page is not available.', 'taw'));
+            self::renderGate($id, $title, __('This page is not available.', 'taw-core'));
             // renderGate() always exits.
         }
 
@@ -90,14 +90,14 @@ final class PagePassword
             $ip = SubmissionsHandler::getUserIp();
 
             if (RateLimiter::tooManyAttempts($nonceAction, $ip, 5, 300)) {
-                self::renderGate($id, $title, __('Too many attempts. Please wait a few minutes and try again.', 'taw'));
+                self::renderGate($id, $title, __('Too many attempts. Please wait a few minutes and try again.', 'taw-core'));
             }
 
             $nonceOk = isset($_POST['taw_page_password_nonce'])
                 && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['taw_page_password_nonce'])), $nonceAction);
 
             if (!$nonceOk) {
-                self::renderGate($id, $title, __('Your session expired. Please try again.', 'taw'));
+                self::renderGate($id, $title, __('Your session expired. Please try again.', 'taw-core'));
             }
 
             $submitted = isset($_POST['taw_page_password']) ? (string) wp_unslash($_POST['taw_page_password']) : '';
@@ -107,7 +107,7 @@ final class PagePassword
                 // grantAccess() always exits.
             }
 
-            self::renderGate($id, $title, __('Incorrect password. Please try again.', 'taw'));
+            self::renderGate($id, $title, __('Incorrect password. Please try again.', 'taw-core'));
         }
 
         self::renderGate($id, $title, null);
@@ -233,12 +233,12 @@ final class PagePassword
     <form method="post" class="taw-form" novalidate>
         <?php wp_nonce_field($nonceAction, 'taw_page_password_nonce'); ?>
         <div class="taw-form-field">
-            <label class="taw-field-label" for="taw_page_password"><?php esc_html_e('Password', 'taw'); ?></label>
+            <label class="taw-field-label" for="taw_page_password"><?php esc_html_e('Password', 'taw-core'); ?></label>
             <input type="password" id="taw_page_password" name="taw_page_password" class="taw-input" autofocus required>
         </div>
         <div class="taw-form-actions">
             <button type="submit" name="taw_page_password_submit" value="1" class="taw-btn taw-btn-primary">
-                <?php esc_html_e('Enter', 'taw'); ?>
+                <?php esc_html_e('Enter', 'taw-core'); ?>
             </button>
         </div>
     </form>
