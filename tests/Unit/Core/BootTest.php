@@ -72,6 +72,29 @@ final class BootTest extends TestCase
         $this->addToAssertionCount(\Mockery::getContainer()->mockery_getExpectationCount());
     }
 
+    public function test_data_registers_the_icon_endpoint_once_lucide_is_enabled(): void
+    {
+        // The content endpoint, plus the icon endpoint block themes need.
+        Actions\expectAdded('rest_api_init')->twice();
+
+        \TAW\Core\Icons\Lucide::enable();
+        Boot::data();
+
+        $this->addToAssertionCount(\Mockery::getContainer()->mockery_getExpectationCount());
+    }
+
+    public function test_lucide_init_registers_the_icon_endpoint_once(): void
+    {
+        // Theme::boot() and Boot::data() both call it.
+        Actions\expectAdded('rest_api_init')->once();
+
+        \TAW\Core\Icons\Lucide::enable();
+        \TAW\Core\Icons\Lucide::init();
+        \TAW\Core\Icons\Lucide::init();
+
+        $this->addToAssertionCount(\Mockery::getContainer()->mockery_getExpectationCount());
+    }
+
     public function test_boot_class_loads_without_wordpress(): void
     {
         // Boot deliberately has no `if (!defined('ABSPATH')) exit;` guard, so

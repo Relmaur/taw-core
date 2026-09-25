@@ -1263,6 +1263,8 @@ TAW\Core\Icons\Lucide::enable();
 
 Without it, an `'type' => 'icon'` field renders an inline notice instead of the picker, telling you to call `enable()`.
 
+Block themes that boot only the data layer call it before `Boot::data()` runs (it does at `after_setup_theme` priority 0 in TAW Gutenberg), for example in `functions.php` or a site plugin. Since v1.51.1, `Boot::data()` registers the picker's search endpoint too, so the metabox picker and the [data panel](#data-panel-fields-in-a-block-editor-sidebar-v1510) work there without `Theme::boot()`.
+
 Once enabled, use it like any other Metabox/OptionsPage field:
 
 ```php

@@ -52,9 +52,13 @@ class Lucide
      */
     private static bool $picker_assets_enqueued = false;
 
+    /** Whether init() already registered the REST endpoint this request. */
+    private static bool $initialized = false;
+
     /**
      * Opt-in to the Lucide icon picker.
-     * Call this in the theme's customizations.php before Theme::boot().
+     * Call this in the theme's customizations.php before Theme::boot(), or
+     * (block themes) before Boot::data() runs at after_setup_theme:0.
      */
     public static function enable(): void
     {
@@ -70,16 +74,26 @@ class Lucide
     }
 
     /**
-     * Boot the Lucide icon picker.
-     * No-op unless enable() was called first.
+     * Boot the Lucide icon picker: registers the taw/v1/icons endpoint the
+     * metabox picker and the data panel search.
+     * No-op unless enable() was called first, and idempotent: Theme::boot()
+     * and Boot::data() both call it, so block themes get the endpoint too.
      */
     public static function init(): void
     {
-        if (!self::$enabled) {
+        if (!self::$enabled || self::$initialized) {
             return;
         }
 
+        self::$initialized = true;
         new IconsEndpoint();
+    }
+
+    /** @internal Tests only. */
+    public static function resetForTests(): void
+    {
+        self::$enabled     = false;
+        self::$initialized = false;
     }
 
     /**
