@@ -88,7 +88,7 @@ final class FieldMetaRegistrar
             'type'              => self::SCALAR_REST_TYPE[$type] ?? 'string',
             'single'            => true,
             'show_in_rest'      => true,
-            'sanitize_callback' => static fn ($value) => Metabox::sanitizeValue($config, $value),
+            'sanitize_callback' => static fn ($value) => Metabox::sanitizeForStorage($config, $value),
             'auth_callback'     => static fn ($allowed, $meta, $objectId): bool => current_user_can('edit_post', (int) $objectId),
         ]);
     }

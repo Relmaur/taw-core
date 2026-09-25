@@ -28,13 +28,15 @@ final class Validation
      * @param array<string, mixed> $meta   The request's `meta` object.
      * @param array<string, mixed> $fields The request's top-level `taw_<id>` values that are present.
      * @param callable(string $kind, string $key): mixed $stored Current value: ('meta', key) or ('field', 'taw_<id>').
-     * @return array{errors: list<array{field: string, message: string}>, clear: list<string>} `clear` = meta keys to delete.
+     * @return array{errors: list<array{field: string, message: string}>, clear: list<string>, drop: list<array{meta: string}|array{field: string}>}
+     *         `clear` = meta keys to delete; `drop` = read-only bindings the request resends unchanged (leave them out of the write).
      */
     public static function check(Metabox $box, array $meta, array $fields, callable $stored): array
     {
         $prefix = $box->prefix();
         $errors = [];
         $clear  = [];
+        $drop   = [];
 
         $present = static function (array $binding) use ($meta, $fields): bool {
             return isset($binding['meta']) ? array_key_exists($binding['meta'], $meta) : array_key_exists($binding['field'], $fields);
@@ -76,8 +78,16 @@ final class Validation
                 $name = ($field['type'] ?? 'text') === 'group' ? (string) ($target['label'] ?? $target['id']) : $label;
 
                 if (!empty($target['readonly']) || !empty($field['readonly'])) {
+                    // The block editor sends the whole meta object with every
+                    // save, so an unchanged read-only value is normal: it's
+                    // left out of the write. Only a change is refused.
                     if ($present($binding)) {
-                        $errors[] = ['field' => self::key($binding), 'message' => sprintf('%s is read-only.', $name)];
+                        $kind = isset($binding['meta']) ? 'meta' : 'field';
+                        if (self::unchanged($value($binding), $stored($kind, self::key($binding)))) {
+                            $drop[] = $binding;
+                        } else {
+                            $errors[] = ['field' => self::key($binding), 'message' => sprintf('%s is read-only.', $name)];
+                        }
                     }
                     continue;
                 }
@@ -100,7 +110,7 @@ final class Validation
             }
         }
 
-        return ['errors' => $errors, 'clear' => array_values(array_unique($clear))];
+        return ['errors' => $errors, 'clear' => array_values(array_unique($clear)), 'drop' => $drop];
     }
 
     /**
@@ -151,6 +161,26 @@ final class Validation
     /**
      * The value as a form would have posted it: true → '1', false/null → ''.
      */
+    /**
+     * Whether a sent value is what's stored, comparing as a form would post
+     * them. REST reports an unset value as its type's default (0, false, ''),
+     * so all empty forms count as the same.
+     */
+    public static function unchanged(mixed $sent, mixed $stored): bool
+    {
+        $blank = static fn (mixed $v): bool => in_array($v, ['', '0', 0, 0.0, false, null, []], true);
+        if ($blank($sent) && $blank($stored)) {
+            return true;
+        }
+        if (is_array($sent) || is_array($stored)) {
+            $sent   = is_string($sent) ? json_decode($sent, true) : $sent;
+            $stored = is_string($stored) ? json_decode($stored, true) : $stored;
+            return $sent == $stored;
+        }
+
+        return self::asPosted($sent) === self::asPosted($stored);
+    }
+
     private static function asPosted(mixed $value): string
     {
         return match (true) {

@@ -370,6 +370,29 @@ Template resolution mirrors WordPress's own hierarchy, not just the raw Page Att
 
 Both this resolution and the `screens` template matching in `Metabox` share one code path (`Metabox::templateCandidatesForPost()`), so they can't drift apart.
 
+### Data panel: fields in a block-editor sidebar (v1.51.0+)
+
+In the block editor, a fieldset can show in a **"TAW Data" sidebar** instead of as a metabox under the canvas: one place for a post's data, opened and closed (and pinned) from its own icon in the editor header, with an entry in the ⋮ menu. It's **off by default**: nothing changes until you switch it on (ADR-0007).
+
+Switch it on per fieldset, for the whole site, or per install. The first one set wins:
+
+```php
+Schema::fieldset('book_details')->on('book')->ui('panel');   // this fieldset (or new Metabox(['ui' => 'panel', …]))
+Schema::settings()->fieldsetUi('panel');                      // site default (JSON: {"kind": "settings", "key": "site", "fieldsetUi": "panel"})
+define('TAW_DATA_UI', 'panel');                               // wp-config.php: replaces only the site default
+```
+
+Values are `panel` or `metabox`; unset means `metabox`. So `->ui('metabox')` keeps one fieldset as a metabox on a panel site.
+
+- **One place, never both.** A `panel` fieldset gets no metabox in the block editor (a metabox would post stale values after the panel's save). The classic editor and nav-menu metaboxes are unchanged, and when every fieldset on a screen is in the panel, WordPress's iframed editor canvas comes back.
+- **Every field type**, with the metabox's rules: conditions (live), tabs, `group`, `repeater` (add, remove, reorder, collapse, `min`/`max`, nested repeaters), read-only, and the theme's color palette. A fieldset with a type the panel can't show (an unknown custom type, or a `group` inside a `repeater`) stays a metabox as a whole.
+- **`wysiwyg`** opens a small block editor in a modal (paragraphs, headings, lists, quotes, images, buttons, separators, tables; `teeny` fields get text blocks only; `'blocks' => [...]` sets the list, `media_buttons => false` drops images). It loads existing HTML the way "Convert to blocks" does and saves in `wp_editor()`'s own format, so templates render values exactly as before. Opening it never changes anything.
+- **Saving** happens with the post (Save, autosave, the unsaved-changes warning) through the REST fields taw/core already registers, so values are stored exactly as the metabox stores them.
+- **The server checks REST saves too:** `required` and `validate` callbacks run for panel fieldsets (a refused save names the fields, and the panel marks them); read-only fields can't be changed; values of fields hidden by their conditions are cleared, as `Metabox::save()` does. Autosaves are never refused.
+- **In the editor:** while a required field is empty, saving is locked and a notice names the field, with a button that opens the panel.
+
+The panel is a prebuilt React bundle in `assets/data-panel/` (Composer installs need no Node). To work on it: `cd resources/data-panel && npm ci && npm run dev` (Vite on port 5175; WordPress switches to it through `assets/data-panel/hot`), and `npm run check` before committing — CI fails if the committed build doesn't match the source.
+
 ---
 
 ## Schema — post types, taxonomies, fieldsets, options pages
