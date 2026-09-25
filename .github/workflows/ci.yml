@@ -38,3 +38,11 @@ jobs:
 
       - name: PHPUnit unit tests
         run: composer run test
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Shared Vite config tests (node:test, no npm deps)
+        run: node --test tests/js/*.test.mjs
