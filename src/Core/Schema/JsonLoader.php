@@ -253,6 +253,9 @@ final class JsonLoader
         if (isset($data['capability'])) {
             $page->capability((string) $data['capability']);
         }
+        if (isset($data['rest'])) {
+            $page->rest((string) $data['rest']);
+        }
 
         return $page;
     }

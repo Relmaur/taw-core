@@ -23,6 +23,9 @@ final class OptionsPage extends Definition
 {
     public const KIND = 'options_page';
 
+    /** Values of `rest` (the engine reads them from here: this class loads before boot). */
+    public const REST_MODES = ['private', 'public'];
+
     private string $title = '';
 
     /** @var list<Field|array<string, mixed>> */
@@ -50,6 +53,16 @@ final class OptionsPage extends Definition
     }
 
     /**
+     * Expose the page over REST (off by default): 'private' adds its options
+     * to /wp/v2/settings (manage_options); 'public' also serves them
+     * read-only at GET taw/v1/options/<key>, to anyone — every field.
+     */
+    public function rest(string $mode): self
+    {
+        return $this->with(['rest' => $mode]);
+    }
+
+    /**
      * @param list<Field|array<string, mixed>> $fields
      */
     public function fields(array $fields): self
@@ -74,9 +87,16 @@ final class OptionsPage extends Definition
 
     public function problems(): array
     {
-        return $this->fields === []
+        $problems = $this->fields === []
             ? [sprintf('Options page "%s" has no fields.', $this->key())]
             : [];
+
+        $rest = $this->extra['rest'] ?? null;
+        if ($rest !== null && !in_array($rest, self::REST_MODES, true)) {
+            $problems[] = sprintf('Options page "%s": rest must be "private" or "public".', $this->key());
+        }
+
+        return $problems;
     }
 
     /**

@@ -8,6 +8,7 @@ use TAW\Core\Editing\Rules;
 use TAW\Core\DataPanel\Ui;
 use TAW\Core\Schema\Definition\EditingPolicy;
 use TAW\Core\Schema\Definition\Fieldset;
+use TAW\Core\Schema\Definition\OptionsPage;
 use TAW\Core\Schema\Definition\SiteSettings;
 
 // No ABSPATH guard: `bin/taw schema:validate` runs this before (and without)
@@ -49,7 +50,7 @@ final class Validator
         'post_type'    => ['labels', 'args', 'editing'],
         'taxonomy'     => ['for', 'labels', 'args'],
         'fieldset'     => ['title', 'on', 'fields', 'context', 'priority', 'prefix', 'ui', 'config'],
-        'options_page' => ['title', 'menu_title', 'capability', 'fields', 'config'],
+        'options_page' => ['title', 'menu_title', 'capability', 'rest', 'fields', 'config'],
         'editing'      => Rules::POLICY_KEYS,
         'settings'     => SiteSettings::KEYS,
     ];
@@ -132,7 +133,11 @@ final class Validator
                 ...self::validateEnum($data, 'ui', Ui::VALUES),
                 ...self::validateFieldList($data['fields'] ?? null, '/fields'),
             ],
-            'options_page' => [...$errors, ...self::validateFieldList($data['fields'] ?? null, '/fields')],
+            'options_page' => [
+                ...$errors,
+                ...self::validateEnum($data, 'rest', OptionsPage::REST_MODES),
+                ...self::validateFieldList($data['fields'] ?? null, '/fields'),
+            ],
             'editing'      => [...$errors, ...Rules::validatePolicy($data)],
             'settings'     => [...$errors, ...SiteSettings::validate($data)],
         };

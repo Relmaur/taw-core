@@ -16,9 +16,8 @@ if (!defined('ABSPATH')) {
  *
  * Keys are read from PHP constants defined in wp-config.php, the same
  * pattern used for DB credentials — never stored in the options table
- * (unlike OptionsPage fields, which are readable via the REST API by
- * anyone with edit_posts). A secret key belongs in wp-config.php, not a
- * metabox field.
+ * (an OptionsPage with `rest` publishes its fields over the REST API). A
+ * secret key belongs in wp-config.php, not a metabox field.
  *
  *   define('TAW_TURNSTILE_SITE_KEY', '0x...');
  *   define('TAW_TURNSTILE_SECRET_KEY', '0x...');
