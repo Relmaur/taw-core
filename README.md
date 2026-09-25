@@ -325,6 +325,16 @@ $book->field('book_awards')->raw();                   // the stored value, like 
 
 In a `MetaBlock`: `$this->fields($postId)` (safe with `false` on a 404).
 
+Terms, users and options (v1.58.0+) read the same way:
+
+```php
+Taw::term($termId)->field('genre_tagline');           // or Taw::term() on a category/tag/taxonomy archive
+Taw::user($userId)->field('author_links')->rows();
+echo Taw::option('company_phone');                    // whichever options page registers it (`_taw_` first)
+Taw::option('_taw_company_phone');                    // or by option name
+Taw::options('site')->field('social')->field('x');    // one page's fields; a group's sub-field
+```
+
 - **`field()`** takes a bare id, a qualified id (`book_details.book_subtitle`) or a meta key, resolved per post type
   through the qualified registry. A field no metabox registers is still read from `_taw_<id>`, untyped.
 - **`echo`** by type: `esc_html()` for plain values; `esc_url()` for `url`; `wp_kses_post()` for `wysiwyg` (no

@@ -11,7 +11,7 @@ if (!defined('ABSPATH')) {
 /**
  * A post's TAW fields: `Taw::post($id)->field('cover')->image()`.
  */
-final class PostFields extends Fields
+final class PostFields extends MetaFields
 {
     public function __construct(private readonly ?\WP_Post $post)
     {
@@ -37,8 +37,8 @@ final class PostFields extends Fields
         return $this->post !== null ? (string) $this->post->post_type : '';
     }
 
-    protected function read(string $metaKey): mixed
+    protected function read(string $key): mixed
     {
-        return get_post_meta($this->id(), $metaKey, true);
+        return get_post_meta($this->id(), $key, true);
     }
 }

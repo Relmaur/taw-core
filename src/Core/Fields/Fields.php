@@ -4,38 +4,53 @@ declare(strict_types=1);
 
 namespace TAW\Core\Fields;
 
-use TAW\Core\Metabox\Metabox;
-
 if (!defined('ABSPATH')) {
     exit;
 }
 
 /**
- * The TAW fields of one object (a post; terms, users and options in later
- * steps), read as typed {@see Value}s (ADR-0009). Fields resolve through the
- * qualified registry (ADR-0008), so `field()` takes a bare id, a qualified
- * id (`fieldset.field`) or a meta key.
+ * The TAW fields of one object (a post, term or user, or the site's
+ * options), read as typed {@see Value}s (ADR-0009). `field()` takes a bare
+ * id, a qualified id (`fieldset.field`) or a meta key / option name.
  */
 abstract class Fields
 {
     /** @var array<string, Value> */
     private array $values = [];
 
-    /** 'post', 'term' or 'user'. */
-    abstract protected function objectType(): string;
+    /** Whether there's anything to read (a missing object reads every field as empty). */
+    abstract public function exists(): bool;
 
-    /** The post type or taxonomy ('' for users). */
-    abstract protected function subtype(): string;
+    /**
+     * The config of the field `$ref` means here, or null.
+     *
+     * @return array<string, mixed>|null
+     */
+    abstract protected function lookup(string $ref): ?array;
 
-    abstract public function id(): int;
+    /**
+     * The group field `$ref` means here, or null. Groups own no stored value;
+     * their sub-fields are stored as `{prefix}{group}_{sub}`.
+     *
+     * @return array<string, mixed>|null
+     */
+    abstract protected function lookupGroup(string $ref): ?array;
 
-    abstract protected function read(string $metaKey): mixed;
+    /**
+     * The reference that reaches a group's sub-field.
+     *
+     * @param array<string, mixed> $group
+     */
+    abstract protected function subFieldRef(array $group, string $sub): string;
 
-    /** Whether the object exists (a missing one reads every field as empty). */
-    public function exists(): bool
-    {
-        return $this->id() > 0;
-    }
+    /**
+     * Where a field config stores its value (meta key or option name).
+     *
+     * @param array<string, mixed> $config
+     */
+    abstract protected function keyOf(array $config): string;
+
+    abstract protected function read(string $key): mixed;
 
     public function field(string $ref): Value
     {
@@ -48,51 +63,32 @@ abstract class Fields
             return Value::none($ref);
         }
 
-        $config = Metabox::fieldFor($this->objectType(), $this->subtype(), $ref);
+        $config = $this->lookup($ref);
         if ($config !== null) {
-            return new Value($config, $this->read(Metabox::metaKeyOf($config)), null, $ref);
+            return new Value($config, $this->read($this->keyOf($config)), null, $ref);
         }
 
-        $group = $this->group($ref);
+        $group = $this->lookupGroup($ref);
         if ($group !== null) {
-            $box = (string) ($group['metabox_id'] ?? '');
-            $key = (string) $group['field_key'];
-
-            return new Value($group, '', fn (string $sub): Value => $this->field($box . '.' . $key . '_' . $sub), $ref);
+            return new Value($group, '', fn (string $sub): Value => $this->field($this->subFieldRef($group, $sub)), $ref);
         }
 
-        // Not registered for this object: read `_taw_<id>` (or the meta key given), untyped.
-        $metaKey = str_starts_with($ref, '_') ? $ref : '_taw_' . (str_contains($ref, '.') ? substr($ref, (int) strrpos($ref, '.') + 1) : $ref);
+        // Not registered here: read `_taw_<id>` (or the key given), untyped.
+        $key = str_starts_with($ref, '_') ? $ref : '_taw_' . (str_contains($ref, '.') ? substr($ref, (int) strrpos($ref, '.') + 1) : $ref);
 
-        return new Value(null, $this->read($metaKey), null, $ref);
+        return new Value(null, $this->read($key), null, $ref);
     }
 
     /**
-     * A group field on this object: group parents own no meta, so they're
-     * found through their sub-fields.
+     * The `_taw_` field first, when several prefixes share an id (ADR-0008).
      *
-     * @return array<string, mixed>|null
+     * @param list<array<string, mixed>> $configs
+     * @return list<array<string, mixed>>
      */
-    private function group(string $ref): ?array
+    protected static function tawFirst(array $configs): array
     {
-        $registry = Metabox::getQualifiedRegistry();
-        $fields = Metabox::fieldsFor($this->objectType(), $this->subtype());
-        $candidates = [];
+        usort($configs, static fn (array $a, array $b): int => (($b['prefix'] ?? '') === '_taw_') <=> (($a['prefix'] ?? '') === '_taw_'));
 
-        foreach ($registry as $config) {
-            if (($config['type'] ?? '') !== 'group' || ($config['qualified_id'] !== $ref && $config['field_key'] !== $ref)) {
-                continue;
-            }
-            foreach ($fields as $sub) {
-                if (($sub['parent_group'] ?? null) === $config['field_key'] && ($sub['metabox_id'] ?? null) === ($config['metabox_id'] ?? null)) {
-                    $candidates[] = $config;
-                    break;
-                }
-            }
-        }
-        // As for other fields, the `_taw_` one first.
-        usort($candidates, static fn (array $a, array $b): int => (($b['prefix'] ?? '') === '_taw_') <=> (($a['prefix'] ?? '') === '_taw_'));
-
-        return $candidates[0] ?? null;
+        return $configs;
     }
 }
