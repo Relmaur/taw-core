@@ -55,8 +55,8 @@ if (!class_exists('WP_Post')) {
         public string $post_name = '';
         public string $post_type = 'page';
 
-        /** @param array<string, mixed> $props */
-        public function __construct(array $props = [])
+        /** @param array<string, mixed>|object $props (the real class takes an object) */
+        public function __construct(array|object $props = [])
         {
             foreach ($props as $key => $value) {
                 $this->{$key} = $value;
@@ -106,9 +106,11 @@ if (!class_exists('WP_User')) {
  * the editing policy's REST guard reads.
  */
 if (!class_exists('WP_REST_Request')) {
-    class WP_REST_Request
+    /** @implements \ArrayAccess<string, mixed> */
+    class WP_REST_Request implements \ArrayAccess
     {
-        public function __construct(private string $method = '', private string $route = '')
+        /** @param array<string, mixed> $params */
+        public function __construct(private string $method = '', private string $route = '', private array $params = [])
         {
         }
 
@@ -120,6 +122,32 @@ if (!class_exists('WP_REST_Request')) {
         public function get_route(): string
         {
             return $this->route;
+        }
+
+        /** @return array<string, mixed> */
+        public function get_params(): array
+        {
+            return $this->params;
+        }
+
+        public function offsetExists(mixed $offset): bool
+        {
+            return isset($this->params[$offset]);
+        }
+
+        public function offsetGet(mixed $offset): mixed
+        {
+            return $this->params[$offset] ?? null;
+        }
+
+        public function offsetSet(mixed $offset, mixed $value): void
+        {
+            $this->params[$offset] = $value;
+        }
+
+        public function offsetUnset(mixed $offset): void
+        {
+            unset($this->params[$offset]);
         }
     }
 }

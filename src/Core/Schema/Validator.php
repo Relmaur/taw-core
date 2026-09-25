@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace TAW\Core\Schema;
 
 use TAW\Core\Editing\Rules;
+use TAW\Core\DataPanel\Ui;
 use TAW\Core\Schema\Definition\EditingPolicy;
+use TAW\Core\Schema\Definition\SiteSettings;
 
 // No ABSPATH guard: `bin/taw schema:validate` runs this before (and without)
 // WordPress.
@@ -33,7 +35,7 @@ final class Validator
 {
     public const VERSION = 1;
 
-    public const KINDS = ['post_type', 'taxonomy', 'fieldset', 'options_page', 'editing'];
+    public const KINDS = ['post_type', 'taxonomy', 'fieldset', 'options_page', 'editing', 'settings'];
 
     /** Field types — exactly those the Metabox engine renders. */
     public const FIELD_TYPES = Field::TYPES;
@@ -45,9 +47,10 @@ final class Validator
     private const ALLOWED_KEYS = [
         'post_type'    => ['labels', 'args', 'editing'],
         'taxonomy'     => ['for', 'labels', 'args'],
-        'fieldset'     => ['title', 'on', 'fields', 'context', 'priority', 'prefix', 'config'],
+        'fieldset'     => ['title', 'on', 'fields', 'context', 'priority', 'prefix', 'ui', 'config'],
         'options_page' => ['title', 'menu_title', 'capability', 'fields', 'config'],
         'editing'      => Rules::POLICY_KEYS,
+        'settings'     => SiteSettings::KEYS,
     ];
 
     private const COMMON_KEYS = ['$schema', 'version', 'kind', 'key', 'override'];
@@ -83,6 +86,8 @@ final class Validator
             $errors[] = '/key: must be a non-empty string';
         } elseif ($kind === 'editing' && $data['key'] !== EditingPolicy::KEY) {
             $errors[] = '/key: must be "site" (a site has one editing policy)';
+        } elseif ($kind === 'settings' && $data['key'] !== SiteSettings::KEY) {
+            $errors[] = '/key: must be "site" (a site has one settings definition)';
         }
 
         if (array_key_exists('override', $data) && !is_bool($data['override'])) {
@@ -122,10 +127,12 @@ final class Validator
                 ...self::validateStringList($data, 'on'),
                 ...self::validateEnum($data, 'context', ['normal', 'side', 'advanced']),
                 ...self::validateEnum($data, 'priority', ['high', 'default', 'low']),
+                ...self::validateEnum($data, 'ui', Ui::VALUES),
                 ...self::validateFieldList($data['fields'] ?? null, '/fields'),
             ],
             'options_page' => [...$errors, ...self::validateFieldList($data['fields'] ?? null, '/fields')],
             'editing'      => [...$errors, ...Rules::validatePolicy($data)],
+            'settings'     => [...$errors, ...SiteSettings::validate($data)],
         };
     }
 

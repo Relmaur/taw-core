@@ -83,6 +83,15 @@ final class Fieldset extends Definition
     }
 
     /**
+     * Where the fieldset shows in the block editor: "panel" (the TAW Data
+     * sidebar) or "metabox". Unset, the site default applies (ADR-0007).
+     */
+    public function ui(string $ui): self
+    {
+        return $this->with(['ui' => $ui]);
+    }
+
+    /**
      * Meta key prefix for this fieldset's fields. Defaults to Metabox's
      * `_taw_`; change it only for a reason (e.g. matching an existing key
      * scheme), since REST keys and content export follow it.
@@ -126,6 +135,9 @@ final class Fieldset extends Definition
         }
         if ($this->fields === []) {
             $problems[] = sprintf('Fieldset "%s" has no fields.', $this->key());
+        }
+        if (array_key_exists('ui', $this->extra) && !\TAW\Core\DataPanel\Ui::isValue($this->extra['ui'])) {
+            $problems[] = sprintf('Fieldset "%s" ui must be one of %s.', $this->key(), implode(', ', \TAW\Core\DataPanel\Ui::VALUES));
         }
 
         return $problems;

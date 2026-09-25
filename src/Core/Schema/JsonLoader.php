@@ -156,6 +156,7 @@ final class JsonLoader
             'fieldset'  => self::fieldset($key, $data),
             'options_page' => self::optionsPage($key, $data),
             'editing'   => self::editing($data),
+            'settings'  => self::settings($data),
             default     => throw new \InvalidArgumentException('Unknown kind: ' . (string) $data['kind']),
         };
 
@@ -206,6 +207,20 @@ final class JsonLoader
     /**
      * @param array<string, mixed> $data
      */
+    private static function settings(array $data): Definition
+    {
+        $settings = Schema::settings();
+
+        if (isset($data['fieldsetUi'])) {
+            $settings->fieldsetUi((string) $data['fieldsetUi']);
+        }
+
+        return $settings;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
     private static function fieldset(string $key, array $data): Definition
     {
         $fieldset = Schema::fieldset($key)
@@ -213,7 +228,7 @@ final class JsonLoader
             ->fields($data['fields'])
             ->with($data['config'] ?? []);
 
-        foreach (['title', 'context', 'priority', 'prefix'] as $name) {
+        foreach (['title', 'context', 'priority', 'prefix', 'ui'] as $name) {
             if (isset($data[$name])) {
                 $fieldset->{$name}((string) $data[$name]);
             }

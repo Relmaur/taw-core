@@ -6,6 +6,7 @@ namespace TAW\Core\Schema;
 
 use TAW\Core\Schema\Definition\Definition;
 use TAW\Core\Schema\Definition\EditingPolicy;
+use TAW\Core\Schema\Definition\SiteSettings;
 use TAW\Core\Schema\Definition\Fieldset;
 use TAW\Core\Schema\Definition\OptionsPage;
 use TAW\Core\Schema\Definition\PostType;
@@ -162,6 +163,15 @@ final class Registry
     public function editing(): ?EditingPolicy
     {
         return $this->ofKind(EditingPolicy::class)[0] ?? null;
+    }
+
+    /**
+     * The site's data-layer settings (ADR-0007), or null when none are
+     * defined. At most one, like the editing policy.
+     */
+    public function settings(): ?SiteSettings
+    {
+        return $this->ofKind(SiteSettings::class)[0] ?? null;
     }
 
     /**

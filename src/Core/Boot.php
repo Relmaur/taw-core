@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core;
 
 use TAW\Core\Content\ContentAdminScreen;
+use TAW\Core\DataPanel\DataPanel;
 use TAW\Core\Editing\Editing;
 use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\FieldMetaRegistrar;
@@ -61,6 +62,8 @@ final class Boot
      *   4. The schema registry (ADR-0004): post types, taxonomies, fieldsets
      *      and options pages defined through the taw_schema_register action.
      *      Added last so the three registrations above keep their positions.
+     *   5. The data panel (ADR-0007): one init check that removes itself
+     *      unless a fieldset shows in the panel.
      */
     public static function data(): void
     {
@@ -74,6 +77,9 @@ final class Boot
         new ContentEndpoint();
         FieldMetaRegistrar::register();
         Compiler::register();
+        // Last, so the hooks above keep their positions. It removes its only
+        // hook on init unless a fieldset uses the panel (ADR-0007).
+        DataPanel::register();
     }
 
     /**
@@ -132,5 +138,6 @@ final class Boot
         self::$dataBooted = false;
         self::$editingBooted = false;
         Editing::resetForTests();
+        DataPanel::resetForTests();
     }
 }
