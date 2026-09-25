@@ -48,7 +48,7 @@
         "properties": {
           "$schema": true, "version": true, "kind": true, "key": true, "override": true,
           "title": { "type": "string" },
-          "on": { "$ref": "#/$defs/stringList", "items": { "if": { "pattern": "^term:" }, "then": { "pattern": "^term:[a-z0-9_-]{1,32}$" } }, "description": "Post types, page slugs, template filenames (e.g. page-about.php), or a taxonomy's terms as term:<taxonomy> (e.g. term:genre) — same as Metabox screens. Targets can be mixed." },
+          "on": { "$ref": "#/$defs/stringList", "items": { "if": { "pattern": "^term:" }, "then": { "pattern": "^term:[a-z0-9_-]{1,32}$" } }, "description": "Post types, page slugs, template filenames (e.g. page-about.php), a taxonomy's terms as term:<taxonomy> (e.g. term:genre), or user for the user screens (Profile, Edit User, Add New User) — same as Metabox screens. Targets can be mixed." },
           "fields": { "$ref": "#/$defs/fieldList" },
           "context": { "enum": ["normal", "side", "advanced"] },
           "priority": { "enum": ["high", "default", "low"] },

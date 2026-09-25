@@ -177,6 +177,21 @@ final class ExporterTest extends TestCase
         $this->assertSame([77], array_column($snapshot['media'], 'id'), 'a term image is a referenced attachment');
     }
 
+    public function test_user_fields_export_with_users_only_when_a_fieldset_targets_users(): void
+    {
+        Functions\when('get_users')->justReturn([(object) ['ID' => 3, 'user_login' => 'ada', 'user_email' => 'ada@x.test', 'display_name' => 'Ada', 'roles' => ['author'], 'user_registered' => '2026-01-01', 'user_pass' => 'h']]);
+        Functions\when('get_user_meta')->alias(static fn (int $id, string $key = '', bool $single = false) => $key === ''
+            ? ['_taw_author_rank' => ['2'], 'first_name' => ['Ada']]
+            : ($key === 'first_name' ? 'Ada' : ''));
+
+        $before = (new Exporter())->snapshot(['include_users' => true])['users'][0];
+        $this->assertArrayNotHasKey('fields', $before, 'no user fieldsets: the 1.1 record shape');
+
+        new \TAW\Core\Metabox\Metabox(['id' => 'author_details', 'title' => 'Author', 'screens' => ['user'], 'fields' => [['id' => 'author_rank', 'type' => 'number']]]);
+        $after = (new Exporter())->snapshot(['include_users' => true])['users'][0];
+        $this->assertSame(['author_rank' => 2], $after['fields']);
+    }
+
     public function test_options_include_taw_and_resolved_core_allowlist(): void
     {
         $options = (new Exporter())->snapshot()['options'];

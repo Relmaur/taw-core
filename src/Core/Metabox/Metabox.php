@@ -8,6 +8,7 @@ use TAW\Core\Icons\Lucide;
 use TAW\Core\Metabox\Store\MetaStore;
 use TAW\Core\Metabox\Store\PostMetaStore;
 use TAW\Core\Metabox\Store\TermMetaStore;
+use TAW\Core\Metabox\Store\UserMetaStore;
 use TAW\Helpers\Framework;
 use TAW\Support\Alpine;
 
@@ -207,6 +208,16 @@ class Metabox
                 add_action("created_{$taxonomy}", [$this, 'save_term']);
                 add_action("edited_{$taxonomy}", [$this, 'save_term']);
             }
+
+            // User target ("user" in screens): Profile, Edit User and Add New User.
+            if ($this->targetsUsers()) {
+                add_action('show_user_profile', [$this, 'render_user_edit']);
+                add_action('edit_user_profile', [$this, 'render_user_edit']);
+                add_action('user_new_form', [$this, 'render_user_new']);
+                add_action('personal_options_update', [$this, 'save_user']);
+                add_action('edit_user_profile_update', [$this, 'save_user']);
+                add_action('user_register', [$this, 'save_user']);
+            }
         }
 
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
@@ -401,7 +412,7 @@ class Metabox
         $slugs     = [];
 
         foreach ($this->screens() as $screen) {
-            if (self::isTermScreen($screen)) {
+            if (self::isTermScreen($screen) || self::isUserScreen($screen)) {
                 continue;
             }
             if (str_ends_with($screen, '.php')) {
@@ -778,7 +789,11 @@ class Metabox
             && in_array($hook, ['edit-tags.php', 'term.php'], true)
             && in_array($this->currentTaxonomy(), $this->termTaxonomies(), true);
 
-        if (!in_array($hook, $allowed_hooks, true) && !$term_screen) {
+        $user_screen = $this->type !== 'nav_menu'
+            && in_array($hook, ['profile.php', 'user-edit.php', 'user-new.php'], true)
+            && $this->targetsUsers();
+
+        if (!in_array($hook, $allowed_hooks, true) && !$term_screen && !$user_screen) {
             return;
         }
 
@@ -795,7 +810,7 @@ class Metabox
 
         // A fieldset in the data panel (ADR-0007) has no metabox on this
         // screen, so its admin scripts and styles would be dead weight.
-        $post = $term_screen ? null : get_post();
+        $post = $term_screen || $user_screen ? null : get_post();
         if ($post instanceof \WP_Post && apply_filters('taw_metabox_ui', 'metabox', $this, $post) === 'panel') {
             return;
         }
@@ -1916,7 +1931,7 @@ class Metabox
                         // the form is sent so that debounce lag never causes stale data.
                         // Repeaters are triggered in reverse DOM order (innermost first)
                         // so each child updates its hidden input before its parent reads it.
-                        $('form#post, form#post-new, form[action="options.php"], form#edittag').one('submit.tawRepeater', function() {
+                        $('form#post, form#post-new, form[action="options.php"], form#edittag, form#your-profile, form#createuser').one('submit.tawRepeater', function() {
                             var $all = $(this).find('.taw-repeater').get().reverse();
                             $.each($all, function(_, el) {
                                 $(el).trigger('taw-flush-serialize');
@@ -3335,6 +3350,74 @@ class Metabox
         }
     }
 
+    /* 
+     * MARK: Users
+     * 
+     */
+
+    /** The fieldset on Profile and Edit User (`show_user_profile` / `edit_user_profile`). */
+    public function render_user_edit(\WP_User $user): void
+    {
+        $this->store = new UserMetaStore();
+        $this->render_user_section((int) $user->ID);
+    }
+
+    /**
+     * The fieldset on Add New User (`user_new_form`). Multisite's "add
+     * existing user" form passes another context and gets nothing.
+     */
+    public function render_user_new(string $context = 'add-new-user'): void
+    {
+        if ($context !== 'add-new-user') {
+            return;
+        }
+        $this->store = new UserMetaStore();
+        $this->render_user_section(0);
+    }
+
+    private function render_user_section(int $user_id): void
+    {
+        ?>
+        <div class="taw-user-fields" id="taw-user-<?php echo esc_attr($this->id); ?>">
+            <h2 class="taw-user-fields__title"><?php echo $this->buildTitleWithIcon(); ?></h2>
+            <?php
+            wp_nonce_field($this->id . '_nonce_action', $this->id . '_nonce');
+            $this->render_fields_container($user_id);
+            ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Store the fieldset's values on a user (`personal_options_update`,
+     * `edit_user_profile_update`, `user_register`): the same nonce,
+     * validation and sanitizing as a post, gated on `edit_user`.
+     * Programmatic `wp_insert_user()` calls carry no nonce and are left alone.
+     */
+    public function save_user(int $user_id): void
+    {
+        if (
+            !isset($_POST[$this->id . '_nonce']) ||
+            !wp_verify_nonce(
+                sanitize_text_field(wp_unslash($_POST[$this->id . '_nonce'])),
+                $this->id . '_nonce_action'
+            )
+        ) {
+            return;
+        }
+
+        if (!current_user_can('edit_user', $user_id)) {
+            return;
+        }
+
+        $this->store = new UserMetaStore();
+        $errors = $this->save_fields($user_id);
+
+        if (!empty($errors)) {
+            set_transient('taw_validation_errors_user_' . $user_id, $errors, 30);
+        }
+    }
+
     /**
      * MARK: Helpers
      */
@@ -3780,6 +3863,23 @@ class Metabox
     }
 
     /**
+     * A user's stored field value — {@see self::get()} for users.
+     *
+     * @param string $prefix Meta key prefix. Default '_taw_'.
+     * @return mixed The raw meta value, or empty string if not set.
+     */
+    public static function get_user(int $user_id, string $field_id, string $prefix = '_taw_'): mixed
+    {
+        return self::user($user_id, $prefix)->get($field_id);
+    }
+
+    /** Typed reads of a user's fields, like {@see self::term()}. */
+    public static function user(int $user_id, string $prefix = '_taw_'): FieldReader
+    {
+        return new FieldReader(new UserMetaStore(), $user_id, $prefix);
+    }
+
+    /**
      * Typed reads of a term's fields (`->bool()`, `->repeater()`,
      * `->imageUrl()`, …), shaped like the post helpers.
      */
@@ -4143,13 +4243,13 @@ class Metabox
      * included. When two metaboxes on the same post type store the same meta
      * key, the later one wins, as in the bare registry.
      *
-     * @param string $objectType 'post' or 'term' (users come in Step 3 of Phase 2).
-     * @param string $subtype    The post type, or the taxonomy.
+     * @param string $objectType 'post', 'term' or 'user'.
+     * @param string $subtype    The post type, or the taxonomy; unused for users.
      * @return array<string, array<string, mixed>> meta key → config (with `qualified_id`, `field_key`, `meta_key`).
      */
-    public static function fieldsFor(string $objectType, string $subtype): array
+    public static function fieldsFor(string $objectType, string $subtype = ''): array
     {
-        if (!in_array($objectType, ['post', 'term'], true) || $subtype === '') {
+        if (!in_array($objectType, ['post', 'term', 'user'], true) || ($objectType !== 'user' && $subtype === '')) {
             return [];
         }
 
@@ -4159,9 +4259,15 @@ class Metabox
                 continue;
             }
             $screens = is_array($config['screens'] ?? null) ? array_map('strval', $config['screens']) : [];
-            $targets = $objectType === 'term' ? self::screensToTaxonomies($screens) : self::screensToPostTypes($screens);
-            if (!in_array($subtype, $targets, true)) {
-                continue;
+            if ($objectType === 'user') {
+                if (!self::screensTargetUsers($screens)) {
+                    continue;
+                }
+            } else {
+                $targets = $objectType === 'term' ? self::screensToTaxonomies($screens) : self::screensToPostTypes($screens);
+                if (!in_array($subtype, $targets, true)) {
+                    continue;
+                }
             }
             $fields[(string) $config['meta_key']] = $config;
         }
@@ -4252,7 +4358,7 @@ class Metabox
         $types = [];
         foreach ($screens as $screen) {
             $screen = (string) $screen;
-            if ($screen === '' || self::isTermScreen($screen)) {
+            if ($screen === '' || self::isTermScreen($screen) || self::isUserScreen($screen)) {
                 continue;
             }
             if (str_ends_with($screen, '.php')) {
@@ -4290,6 +4396,28 @@ class Metabox
     private static function isTermScreen(string $screen): bool
     {
         return str_starts_with($screen, 'term:');
+    }
+
+    /** `"user"` in screens targets the user screens (ADR-0008), never a page slug. */
+    private static function isUserScreen(string $screen): bool
+    {
+        return $screen === 'user';
+    }
+
+    /**
+     * Whether a raw `screens` list targets users.
+     *
+     * @param list<string> $screens
+     */
+    public static function screensTargetUsers(array $screens): bool
+    {
+        return in_array('user', array_map('strval', $screens), true);
+    }
+
+    /** Whether this metabox shows on the user screens. */
+    public function targetsUsers(): bool
+    {
+        return self::screensTargetUsers($this->screens);
     }
 
     /**
@@ -4361,6 +4489,22 @@ class Metabox
      * 'taw_validation_errors_{post_id}'. If found, it displays each error as
      * an admin notice and then deletes the transient.
      */
+    /**
+     * The user a user screen is about: Profile (you), Edit User (`user_id`),
+     * or the Users list right after Add New User (`update=add&id=`).
+     */
+    private static function noticeUserId(): int
+    {
+        global $pagenow;
+
+        return match ($pagenow ?? '') {
+            'profile.php'   => (int) get_current_user_id(),
+            'user-edit.php' => isset($_GET['user_id']) ? absint($_GET['user_id']) : 0,
+            'users.php'     => isset($_GET['update'], $_GET['id']) && $_GET['update'] === 'add' ? absint($_GET['id']) : 0,
+            default         => 0,
+        };
+    }
+
     public static function displayValidationErrors(): void
     {
         global $post;
@@ -4369,6 +4513,9 @@ class Metabox
         } elseif (isset($_GET['tag_ID'])) {
             // A term's Edit screen, after save_term() found errors.
             $key = 'taw_validation_errors_term_' . absint($_GET['tag_ID']);
+        } elseif (($userId = self::noticeUserId()) > 0) {
+            // A user screen, after save_user() found errors.
+            $key = 'taw_validation_errors_user_' . $userId;
         } else {
             return;
         }

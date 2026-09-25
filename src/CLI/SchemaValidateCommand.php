@@ -181,8 +181,9 @@ class SchemaValidateCommand extends Command
                     $termTargets[] = [$path, sprintf('fieldset "%s"', $definition->key()), $taxonomy];
                 }
                 foreach ($definition->screens() as $screen) {
-                    // Template filenames (page-about.php) are never post types; term targets are checked above.
-                    if (!str_ends_with($screen, '.php') && !str_starts_with($screen, 'term:')) {
+                    // Template filenames (page-about.php) are never post types; term targets are
+                    // checked above, and "user" targets the user screens.
+                    if (!str_ends_with($screen, '.php') && !str_starts_with($screen, 'term:') && $screen !== 'user') {
                         $targets[] = [$path, sprintf('fieldset "%s"', $definition->key()), $screen];
                     }
                 }

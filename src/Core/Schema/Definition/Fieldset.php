@@ -50,9 +50,9 @@ final class Fieldset extends Definition
 
     /**
      * Where the fieldset appears: post type keys, page slugs, template
-     * filenames (`page-about.php`), or a taxonomy's terms (`term:genre`,
-     * ADR-0008) — the same values Metabox's `screens` accepts. Targets can
-     * be mixed.
+     * filenames (`page-about.php`), a taxonomy's terms (`term:genre`), or
+     * `user` for the user screens (ADR-0008) — the same values Metabox's
+     * `screens` accepts. Targets can be mixed.
      */
     public function on(string ...$screens): self
     {
