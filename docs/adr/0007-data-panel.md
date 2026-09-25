@@ -155,3 +155,18 @@ Facts that shape the design (taw/core v1.50.0, WordPress 7.1):
 - The editing-policy content lock (`contentOnly`) doesn't affect the panel: it edits meta, not
   blocks. Whether locked clients should be able to edit data fields is left to WordPress's
   `edit_post` capability, as today.
+
+## Addendum 1 (2026-09-25, P3): wysiwyg saves in `wp_editor()`'s format
+
+Decision 9's "Saving" changes. The mini editor still serializes its blocks without the
+`<!-- wp: -->` delimiters, but it then runs **`removep()`**, the function the classic editor uses
+when it saves. Stored values therefore look exactly like `wp_editor()` output: paragraphs as blank
+lines, no `<p>`.
+
+**Why:** the P3 round-trip on 101 real values from fsspx, lsmexico and chcapital. Most of them
+(76) had no `<p>`, and some templates print the value raw (for example chcapital's FAQ answers,
+`echo wp_kses_post($answer)`). Storing `<p>` HTML would have changed 88 of 101 values and added
+paragraph margins in those templates. With `removep()`, no text changes; 79 values render
+identically through `wpautop()`, and the other 22 differ only by inert `wp-block-*` classes (14),
+whitespace (5), `&nbsp;` for a non-breaking space character (2), or a missing `</span>` being
+closed (1). The owner accepted this on 2026-09-25.

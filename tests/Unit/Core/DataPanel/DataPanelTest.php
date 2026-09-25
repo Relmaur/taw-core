@@ -137,6 +137,24 @@ final class DataPanelTest extends TestCase
         $this->assertSame([true, false], array_column($panel['fieldsets'], 'active'), 'template-scoped fieldsets come along, inactive');
         $this->assertSame([true, false], array_column($panel['fieldsets'], 'always'));
         $this->assertSame(['page-about.php'], $panel['fieldsets'][1]['templates']);
+        $this->assertFalse($panel['icons'], 'the icon picker is off unless Lucide::enable() was called');
+    }
+
+    public function test_editor_settings_say_when_the_icon_picker_is_on(): void
+    {
+        $this->box('book_details', [['id' => 'book_icon', 'type' => 'icon']], ['ui' => 'panel']);
+        Functions\when('get_post_meta')->justReturn('');
+        Functions\when('get_option')->justReturn(0);
+        $enabled = new \ReflectionProperty(\TAW\Core\Icons\Lucide::class, 'enabled');
+
+        \TAW\Core\Icons\Lucide::enable();
+        try {
+            $settings = DataPanel::editorSettings([], (object) ['post' => new \WP_Post(['ID' => 7, 'post_type' => 'book'])]);
+        } finally {
+            $enabled->setValue(null, false);
+        }
+
+        $this->assertTrue($settings[DataPanel::SETTINGS_KEY]['icons']);
     }
 
     public function test_editor_settings_are_untouched_without_a_post_or_panel_fieldsets(): void
