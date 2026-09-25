@@ -193,6 +193,9 @@ final class JsonLoader
         if (isset($data['bypass']['capability'])) {
             $policy->bypass((string) $data['bypass']['capability']);
         }
+        if (isset($data['themeBlocks']) && is_array($data['themeBlocks'])) {
+            $policy->themeBlocks(...array_map('strval', array_values($data['themeBlocks'])));
+        }
         foreach ($data['layers'] ?? [] as $layer => $value) {
             $policy->layer((string) $layer, $value);
         }

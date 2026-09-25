@@ -159,8 +159,39 @@ final class EditingDefinitionTest extends SchemaTestCase
             Validator::validate(['version' => 1, 'kind' => 'post_type', 'key' => 'event', 'editing' => ['allowBound' => true]])
         );
         $this->assertSame(
-            ['/rules: unknown key for an editing (allowed: preset, bypass, layers)'],
+            ['/rules: unknown key for an editing (allowed: preset, bypass, themeBlocks, layers)'],
             Validator::validate(['version' => 1, 'kind' => 'editing', 'key' => 'site', 'rules' => []])
+        );
+    }
+
+    public function test_theme_blocks_round_trip_through_json_and_the_validator(): void
+    {
+        $data = ['version' => 1, 'kind' => 'editing', 'key' => 'site', 'preset' => 'guided', 'themeBlocks' => ['taw-gutenberg/*', 'acme/hero']];
+
+        $this->assertSame([], Validator::validate($data));
+
+        $definition = JsonLoader::toDefinition($data);
+        $this->assertInstanceOf(EditingPolicy::class, $definition);
+        $this->assertSame(['taw-gutenberg/*', 'acme/hero'], $definition->themeBlockGlobs());
+        $this->assertSame(['taw-gutenberg/*', 'acme/hero'], $definition->toArray()['themeBlocks']);
+        $this->assertSame([], Schema::editing()->toArray(), 'absent unless set');
+    }
+
+    public function test_theme_blocks_must_be_a_list_of_globs(): void
+    {
+        $base = ['version' => 1, 'kind' => 'editing', 'key' => 'site'];
+
+        $this->assertSame(
+            ['/themeBlocks/1: must be a block name or glob such as "core/paragraph" or "core/*"'],
+            Validator::validate($base + ['themeBlocks' => ['taw-gutenberg/*', 'Not A Block']])
+        );
+        $this->assertSame(
+            ['/themeBlocks: must be a list of block names or globs (e.g. "acme/*")'],
+            Validator::validate($base + ['themeBlocks' => null])
+        );
+        $this->assertSame(
+            ['Editing policy /themeBlocks/0: must be a block name or glob such as "core/paragraph" or "core/*"'],
+            Schema::editing()->themeBlocks('nope')->problems()
         );
     }
 }

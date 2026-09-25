@@ -19,6 +19,7 @@ final class Policy
      * @param array<string, bool>                 $features
      * @param array<string, array<string, mixed>> $content  Resolved rules for every post type the policy names.
      * @param list<string>                        $warnings Problems found while resolving (e.g. a bad constant).
+     * @param list<string>                        $themeBlocks The theme's own blocks, already added to every allow list.
      */
     public function __construct(
         public readonly string $preset,
@@ -29,6 +30,7 @@ final class Policy
         public readonly array $features,
         private readonly array $content,
         public readonly array $warnings = [],
+        public readonly array $themeBlocks = [],
     ) {
     }
 
@@ -66,6 +68,7 @@ final class Policy
             'preset'       => $this->preset,
             'presetSource' => $this->presetSource,
             'bypass'       => ['capability' => $this->bypassCapability],
+            'themeBlocks'  => $this->themeBlocks,
             'site'         => $this->site,
             'design'       => $this->design,
             'features'     => $this->features,
