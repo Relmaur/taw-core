@@ -71,6 +71,16 @@ class OptionsPage
      */
     private static array $fieldRegistry = [];
 
+    /**
+     * Group fields, keyed by the group's own option name (prefix + group id):
+     * their sub-fields are stored as `{prefix}{group}_{sub}` and listed in
+     * the field registry, and this keeps the group itself for typed reads
+     * (`Taw::option('social')->field('x')`, ADR-0009).
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    private static array $groupRegistry = [];
+
     public function __construct(array $config)
     {
         $this->id         = $config['id'];
@@ -89,6 +99,14 @@ class OptionsPage
                 'option_page' => $this->id,
                 'prefix'      => $this->prefix,
             ]);
+        }
+        foreach ($this->fields as $field) {
+            if (($field['type'] ?? '') === 'group' && !empty($field['fields'])) {
+                self::$groupRegistry[$this->prefix . $field['id']] = array_merge($field, [
+                    'option_page' => $this->id,
+                    'prefix'      => $this->prefix,
+                ]);
+            }
         }
 
         add_action('admin_menu', [$this, 'register_page']);
@@ -109,6 +127,16 @@ class OptionsPage
     public static function getFieldRegistry(): array
     {
         return self::$fieldRegistry;
+    }
+
+    /**
+     * Group fields by the group's option name (see {@see self::$groupRegistry}).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function getGroupRegistry(): array
+    {
+        return self::$groupRegistry;
     }
 
     /**

@@ -18,6 +18,9 @@ use TAW\Core\Metabox\Store\MetaStore;
  * $genre->get('genre_tagline');
  * $genre->repeater('genre_awards');
  * ```
+ *
+ * For typed, escaped values (images, rows, posts), prefer `TAW\Taw::term()`
+ * and `Taw::user()` (ADR-0009); this reader stays as it is.
  */
 final class FieldReader
 {
