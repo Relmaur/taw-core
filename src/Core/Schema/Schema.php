@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\Schema;
 
 use TAW\Core\Schema\Definition\EditingPolicy;
+use TAW\Core\Schema\Definition\SiteSettings;
 use TAW\Core\Schema\Definition\Fieldset;
 use TAW\Core\Schema\Definition\OptionsPage;
 use TAW\Core\Schema\Definition\PostType;
@@ -62,5 +63,14 @@ final class Schema
     public static function editing(): EditingPolicy
     {
         return new EditingPolicy(EditingPolicy::KEY);
+    }
+
+    /**
+     * Site-wide data-layer settings (ADR-0007), e.g. where fieldsets show in
+     * the block editor. One per site, so the key is always "site".
+     */
+    public static function settings(): SiteSettings
+    {
+        return new SiteSettings(SiteSettings::KEY);
     }
 }
