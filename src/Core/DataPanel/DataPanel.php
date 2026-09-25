@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace TAW\Core\DataPanel;
 
+use TAW\Core\Assets\Vite;
 use TAW\Core\Metabox\Metabox;
 use TAW\Core\Schema\Registry;
+use TAW\Helpers\Framework;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -22,6 +24,7 @@ if (!defined('ABSPATH')) {
  *
  *   taw_metabox_ui              panel fieldsets get no metabox in the block editor
  *   block_editor_settings_all   the descriptor, as settings.tawDataPanel
+ *   enqueue_block_editor_assets the panel's script (assets/data-panel/, a committed build)
  *   rest_pre_insert_{type}      readonly / required / validate checks (400)
  *   rest_after_insert_{type}    clear values whose conditions aren't met
  *
@@ -34,6 +37,16 @@ final class DataPanel
     public const SETTINGS_KEY = 'tawDataPanel';
 
     public const ERROR_CODE = 'taw_data_invalid';
+
+    public const SCRIPT_HANDLE = 'taw-data-panel';
+
+    /** Source entry in resources/data-panel/ (its manifest key). */
+    public const SCRIPT_SOURCE = 'src/index.tsx';
+
+    /** WordPress scripts the panel imports (see resources/data-panel/src). */
+    public const SCRIPT_DEPS = ['react', 'wp-plugins', 'wp-editor', 'wp-data', 'wp-components', 'wp-element', 'wp-i18n'];
+
+    private static ?Vite $vite = null;
 
     private static bool $registered = false;
 
@@ -67,6 +80,7 @@ final class DataPanel
 
         add_filter('taw_metabox_ui', [self::class, 'placement'], 10, 3);
         add_filter('block_editor_settings_all', [self::class, 'editorSettings'], 10, 2);
+        add_action('enqueue_block_editor_assets', [self::class, 'enqueueAssets']);
 
         $postTypes = [];
         foreach ($panel as $box) {
@@ -139,18 +153,7 @@ final class DataPanel
             return $settings;
         }
 
-        $fieldsets = [];
-        foreach (self::panelMetaboxes() as $box) {
-            $applies = $box->appliesTo($post);
-            if (!$applies && $box->templateScreens() === []) {
-                continue;
-            }
-            $descriptor = Descriptor::fieldset($box);
-            if ($descriptor !== null) {
-                $fieldsets[] = $descriptor + ['active' => $applies];
-            }
-        }
-
+        $fieldsets = self::fieldsetsFor($post);
         if ($fieldsets !== []) {
             $settings[self::SETTINGS_KEY] = [
                 'version'   => 1,
@@ -161,6 +164,61 @@ final class DataPanel
         }
 
         return $settings;
+    }
+
+    /**
+     * The descriptors for a post: fieldsets that apply now, plus
+     * template-scoped ones (inactive) so a template change can show them.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function fieldsetsFor(\WP_Post $post): array
+    {
+        $fieldsets = [];
+        foreach (self::panelMetaboxes() as $box) {
+            $applies = $box->appliesTo($post);
+            if (!$applies && $box->templateScreens() === []) {
+                continue;
+            }
+            $descriptor = Descriptor::fieldset($box);
+            if ($descriptor !== null) {
+                // active: applies now. always: applies whatever the template
+                // (so the panel can re-check only the template when it changes).
+                $fieldsets[] = $descriptor + ['active' => $applies, 'always' => $box->appliesTo($post, false)];
+            }
+        }
+
+        return $fieldsets;
+    }
+
+    /**
+     * enqueue_block_editor_assets: the panel, in the post editor, for a post
+     * with panel fieldsets. Built into assets/data-panel/ (committed), or
+     * served by `npm run dev` in resources/data-panel/ while it runs.
+     */
+    public static function enqueueAssets(): void
+    {
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+        $post   = get_post();
+        if ($screen === null || $screen->base !== 'post' || !$post instanceof \WP_Post || !use_block_editor_for_post($post)) {
+            return;
+        }
+        if (self::fieldsetsFor($post) === []) {
+            return;
+        }
+
+        self::vite()->script(self::SCRIPT_HANDLE, self::SCRIPT_SOURCE, self::SCRIPT_DEPS);
+    }
+
+    /** @internal Tests swap in an adapter on a temp build. */
+    public static function useVite(?Vite $vite): void
+    {
+        self::$vite = $vite;
+    }
+
+    private static function vite(): Vite
+    {
+        return self::$vite ??= new Vite(Framework::path(), Framework::url(), 'assets/data-panel');
     }
 
     /**
@@ -217,6 +275,7 @@ final class DataPanel
     public static function resetForTests(): void
     {
         self::$registered = false;
+        self::$vite       = null;
         self::$panel      = null;
         self::$warnings   = [];
     }

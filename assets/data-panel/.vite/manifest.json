@@ -1,0 +1,11 @@
+{
+  "src/index.tsx": {
+    "file": "data-panel-BXy63LL0.js",
+    "name": "data-panel",
+    "src": "src/index.tsx",
+    "isEntry": true,
+    "css": [
+      "data-panel-DeXd_pJe.css"
+    ]
+  }
+}

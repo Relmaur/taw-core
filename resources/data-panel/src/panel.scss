@@ -1,0 +1,123 @@
+// The TAW Data sidebar. Matches the block editor's own sidebar controls.
+$gray-100: #f0f0f0;
+$gray-300: #ddd;
+$gray-600: #949494;
+$gray-700: #757575;
+$gray-900: #1e1e1e;
+$gap: 16px;
+
+.taw-data-panel {
+    // One rhythm for every field, in and out of tabs.
+    &__fieldset .components-panel__body-content,
+    &__tabs .components-tab-panel__tab-content {
+        display: flex;
+        flex-direction: column;
+        gap: $gap;
+    }
+
+    // Tabs span the sidebar, with a divider under them.
+    &__tabs {
+        margin: 0 (-$gap);
+
+        .components-tab-panel__tabs {
+            display: flex;
+            border-bottom: 1px solid $gray-300;
+            padding: 0 ($gap * 0.5);
+        }
+
+        .components-tab-panel__tabs-item {
+            flex: 1 1 0;
+            justify-content: center;
+        }
+
+        .components-tab-panel__tab-content {
+            padding: $gap $gap 0;
+        }
+    }
+
+    &__required {
+        color: #cc1818;
+    }
+
+    // Color and date: a full-width row that opens a popover.
+    &__picker {
+        display: block;
+        width: 100%;
+    }
+
+    &__picker-toggle.components-button {
+        width: 100%;
+        gap: 8px;
+        padding: 0 12px;
+        justify-content: flex-start;
+        border: 1px solid $gray-600;
+        border-radius: 2px;
+        color: $gray-900;
+        background: #fff;
+
+        &:hover:not(:disabled),
+        &.is-open {
+            border-color: var(--wp-admin-theme-color);
+            color: $gray-900;
+        }
+
+        &.is-empty .taw-data-panel__picker-value {
+            color: $gray-700;
+        }
+
+        .component-color-indicator {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+
+            &.is-empty {
+                background: linear-gradient(-45deg, transparent 48%, $gray-600 48%, $gray-600 52%, transparent 52%);
+                box-shadow: inset 0 0 0 1px $gray-600;
+            }
+        }
+    }
+
+    &__picker-value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__picker-icon {
+        color: $gray-700;
+    }
+
+    &__unit {
+        color: $gray-700;
+    }
+
+    // Field types the panel doesn't edit yet: a quiet note, not an alert.
+    &__pending {
+        padding: 8px 12px;
+        border: 1px dashed $gray-300;
+        border-radius: 2px;
+        background: $gray-100;
+        color: $gray-700;
+        font-size: 12px;
+    }
+
+    &__empty {
+        margin: 0;
+        padding: $gap;
+        color: $gray-700;
+    }
+}
+
+.taw-data-panel__picker-popover .components-popover__content {
+    width: 280px;
+}
+
+.taw-data-panel__popover-body {
+    padding: $gap;
+}
+
+.taw-data-panel__popover-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
