@@ -729,6 +729,13 @@ class Metabox
             return;
         }
 
+        // A fieldset in the data panel (ADR-0007) has no metabox on this
+        // screen, so its admin scripts and styles would be dead weight.
+        $post = get_post();
+        if ($post instanceof \WP_Post && apply_filters('taw_metabox_ui', 'metabox', $this, $post) === 'panel') {
+            return;
+        }
+
         Alpine::enqueue();
 
         wp_enqueue_style(
@@ -3690,8 +3697,15 @@ class Metabox
     }
 
     /**
-     * Sanitize a repeater value (array of rows) from the visual editor.
-     * Each row's sub-fields are sanitized individually using sanitizeValue().
+     * Sanitize a repeater value (array of rows) outside the metabox form: the
+     * REST field, the data panel, the visual editor, `fields:set` and
+     * Content\Importer. Stores what {@see self::sanitize_repeater()} stores
+     * for the same rows: each sub-field through
+     * {@see self::sanitizeForStorage()} (so files/post_select/gradient_text/
+     * hubspot_form inside a row keep their JSON, which the scalar-only
+     * sanitizeValue() used to blank), nested repeaters as decoded arrays
+     * inside the row (a JSON string would be double-encoded), `max` rows at
+     * most, and rows with no content dropped.
      * Returns a JSON string ready for update_post_meta().
      *
      * @param array $fieldConfig The repeater's full config (must include 'fields' sub-array).
@@ -3712,6 +3726,14 @@ class Metabox
             }
         }
 
+        if (!is_array($rows)) {
+            $rows = [];
+        }
+        $max = (int) ($fieldConfig['max'] ?? 0);
+        if ($max > 0) {
+            $rows = array_slice($rows, 0, $max);
+        }
+
         $sanitized = [];
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -3723,10 +3745,16 @@ class Metabox
                 if (str_starts_with((string) $key, '_')) {
                     continue;
                 }
-                $sf = $sfMap[$key] ?? ['type' => 'text', 'id' => $key];
-                $sanitizedRow[$key] = self::sanitizeValue($sf, $val);
+                $sf    = $sfMap[$key] ?? ['type' => 'text', 'id' => $key];
+                $clean = self::sanitizeForStorage($sf, $val);
+                if (($sf['type'] ?? 'text') === 'repeater') {
+                    $clean = json_decode((string) $clean, true) ?: [];
+                }
+                $sanitizedRow[$key] = $clean;
             }
-            if (!empty($sanitizedRow)) {
+            // Same rule as sanitize_repeater(): a row needs at least one value.
+            $hasContent = array_filter($sanitizedRow, static fn ($v) => $v !== '' && $v !== '0' && $v !== '[]' && $v !== [] && $v !== null);
+            if ($hasContent !== []) {
                 $sanitized[] = $sanitizedRow;
             }
         }

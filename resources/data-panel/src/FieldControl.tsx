@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { sprintf, __ } from '@wordpress/i18n';
 import type { ControlProps, FieldDescriptor } from './types';
+import { SaveErrors } from './context';
+import { bindingKey } from './required';
 import { useBinding } from './useValues';
+import { Group } from './controls/Group';
+import { Repeater } from './controls/Repeater';
 import { Checkbox, Range, Select } from './controls/ChoiceControls';
 import { GradientText, HubspotForm } from './controls/CompositeControls';
 import { IconField } from './controls/IconControl';
@@ -11,7 +15,7 @@ import { PostSelect } from './controls/PostSelect';
 import { Wysiwyg } from './controls/RichContent';
 import { NumberInput, Text, Textarea } from './controls/TextControls';
 
-/** Field type → control. group and repeater arrive in the next step (plan P4). */
+/** Field type → control. group isn't here: it has no value of its own (FieldControl renders it). */
 export const CONTROLS: Record<string, React.ComponentType<ControlProps>> = {
     text: Text,
     url: Text,
@@ -29,10 +33,11 @@ export const CONTROLS: Record<string, React.ComponentType<ControlProps>> = {
     wysiwyg: Wysiwyg,
     gradient_text: GradientText,
     hubspot_form: HubspotForm,
+    repeater: Repeater,
 };
 
-export default function FieldControl({ field }: { field: FieldDescriptor }) {
-    const [value, setValue] = useBinding(field.binding);
+/** The control for a field's type, on any value (bound or a repeater row's). */
+export function ControlFor({ field, value, onChange }: ControlProps) {
     const Control = CONTROLS[field.type];
 
     if (!Control) {
@@ -48,9 +53,41 @@ export default function FieldControl({ field }: { field: FieldDescriptor }) {
         );
     }
 
+    return <Control field={field} value={value} onChange={onChange} />;
+}
+
+/** The last failed save's message for this field, when there is one. */
+function FieldError({ message }: { message: string }) {
     return (
-        <div className={`taw-data-panel__field taw-data-panel__field--${field.type}`} data-field={field.id}>
-            <Control field={field} value={value} onChange={setValue} />
+        <p className="taw-data-panel__error" role="alert">
+            {message}
+        </p>
+    );
+}
+
+/** A field bound to the post (group: its sub-fields are). */
+export default function FieldControl({ field }: { field: FieldDescriptor }) {
+    const errors = useContext(SaveErrors);
+    const error = errors[bindingKey(field.binding)];
+    const className = `taw-data-panel__field taw-data-panel__field--${field.type}${error ? ' has-error' : ''}`;
+
+    if (field.type === 'group') {
+        return (
+            <div className={className} data-field={field.id}>
+                <Group field={field} />
+            </div>
+        );
+    }
+
+    return (
+        <div className={className} data-field={field.id}>
+            <BoundControl field={field} />
+            {error ? <FieldError message={error} /> : null}
         </div>
     );
+}
+
+function BoundControl({ field }: { field: FieldDescriptor }) {
+    const [value, setValue] = useBinding(field.binding);
+    return <ControlFor field={field} value={value} onChange={setValue} />;
 }

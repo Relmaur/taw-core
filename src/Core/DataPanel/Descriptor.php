@@ -162,13 +162,19 @@ final class Descriptor
     /**
      * @param array<mixed> $fields
      */
-    private static function allSupported(array $fields): bool
+    private static function allSupported(array $fields, bool $inRepeater = false): bool
     {
         foreach ($fields as $field) {
             if (!is_array($field) || !in_array($field['type'] ?? 'text', self::TYPES, true)) {
                 return false;
             }
-            if (is_array($field['fields'] ?? null) && !self::allSupported($field['fields'])) {
+            // A group inside a repeater row has no meta keys of its own to
+            // bind to; that fieldset stays a metabox.
+            if ($inRepeater && ($field['type'] ?? 'text') === 'group') {
+                return false;
+            }
+            $nested = $inRepeater || ($field['type'] ?? 'text') === 'repeater';
+            if (is_array($field['fields'] ?? null) && !self::allSupported($field['fields'], $nested)) {
                 return false;
             }
         }
