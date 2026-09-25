@@ -135,6 +135,7 @@ final class DataPanelTest extends TestCase
         $this->assertSame('book', $panel['postType']);
         $this->assertSame(['book_details', 'about_hero'], array_column($panel['fieldsets'], 'id'));
         $this->assertSame([true, false], array_column($panel['fieldsets'], 'active'), 'template-scoped fieldsets come along, inactive');
+        $this->assertSame([true, false], array_column($panel['fieldsets'], 'always'));
         $this->assertSame(['page-about.php'], $panel['fieldsets'][1]['templates']);
     }
 
@@ -192,5 +193,62 @@ final class DataPanelTest extends TestCase
         Functions\expect('delete_post_meta')->once()->with(7, '_taw_sale_price');
 
         DataPanel::clearHidden(new \WP_Post(['ID' => 7, 'post_type' => 'book']), new \WP_REST_Request('POST', '/wp/v2/book/7'), false);
+    }
+
+    public function test_the_panel_script_loads_in_the_post_editor_for_panel_posts_only(): void
+    {
+        $root = sys_get_temp_dir() . '/taw-data-panel-build-' . getmypid();
+        @mkdir($root . '/assets/data-panel/.vite', 0777, true);
+        file_put_contents($root . '/assets/data-panel/.vite/manifest.json', (string) json_encode([
+            DataPanel::SCRIPT_SOURCE => ['file' => 'data-panel-1.js', 'css' => ['data-panel-1.css']],
+        ]));
+        DataPanel::useVite(new \TAW\Core\Assets\Vite($root, 'https://site.test/vendor/taw/core', 'assets/data-panel'));
+        Functions\when('wp_cache_get')->justReturn(false);
+        Functions\when('wp_cache_set')->justReturn(true);
+        $scripts = [];
+        Functions\when('wp_register_script')->alias(static function (string $handle, string $src, array $deps) use (&$scripts): bool {
+            $scripts[$handle] = [$src, $deps];
+
+            return true;
+        });
+        Functions\when('wp_register_style')->justReturn(true);
+        Functions\when('wp_enqueue_style')->justReturn(null);
+        Functions\when('wp_enqueue_script')->justReturn(null);
+        $screen = new \stdClass();
+        Functions\when('get_current_screen')->alias(static function () use (&$screen): object {
+            return $screen;
+        });
+
+        try {
+            $this->box('book_details', [['id' => 'book_author', 'type' => 'text']], ['ui' => 'panel']);
+
+            $screen->base = 'edit';
+            Functions\when('get_post')->justReturn(new \WP_Post(['ID' => 7, 'post_type' => 'book']));
+            DataPanel::enqueueAssets();
+            $this->assertSame([], $scripts, 'not on the posts list');
+
+            $screen->base = 'post';
+            Functions\when('get_post')->justReturn(new \WP_Post(['ID' => 8, 'post_type' => 'page']));
+            DataPanel::enqueueAssets();
+            $this->assertSame([], $scripts, 'not for a post without panel fieldsets');
+
+            Functions\when('get_post')->justReturn(new \WP_Post(['ID' => 7, 'post_type' => 'book']));
+            DataPanel::enqueueAssets();
+            $this->assertSame(
+                ['https://site.test/vendor/taw/core/assets/data-panel/data-panel-1.js', DataPanel::SCRIPT_DEPS],
+                $scripts[DataPanel::SCRIPT_HANDLE]
+            );
+        } finally {
+            exec('rm -rf ' . escapeshellarg($root));
+        }
+    }
+
+    public function test_the_committed_build_has_the_entry_php_loads(): void
+    {
+        $manifest = json_decode((string) file_get_contents(dirname(__DIR__, 4) . '/assets/data-panel/.vite/manifest.json'), true);
+
+        $this->assertIsArray($manifest);
+        $this->assertArrayHasKey(DataPanel::SCRIPT_SOURCE, $manifest, 'run npm run build in resources/data-panel');
+        $this->assertFileExists(dirname(__DIR__, 4) . '/assets/data-panel/' . $manifest[DataPanel::SCRIPT_SOURCE]['file']);
     }
 }

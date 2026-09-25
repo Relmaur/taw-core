@@ -285,9 +285,11 @@ class Metabox
     /**
      * Whether this metabox belongs on $post's edit screen: its show_on
      * callback allows it, and a screen matches by post type, slug or
-     * template (the same rules register() and save() use).
+     * template (the same rules register() and save() use). With
+     * $includeTemplates false, template screens are ignored: "does it apply
+     * whatever template the post uses?"
      */
-    public function appliesTo(\WP_Post $post): bool
+    public function appliesTo(\WP_Post $post, bool $includeTemplates = true): bool
     {
         if (is_callable($this->show_on) && !call_user_func($this->show_on, $post)) {
             return false;
@@ -297,7 +299,7 @@ class Metabox
 
         return in_array($post->post_type, $postTypes, true)
             || ($slugs && in_array($post->post_name, $slugs, true))
-            || ($templates && $this->postMatchesTemplate($post, $templates));
+            || ($includeTemplates && $templates && $this->postMatchesTemplate($post, $templates));
     }
 
     /**
