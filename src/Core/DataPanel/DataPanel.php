@@ -243,12 +243,15 @@ final class DataPanel
         }
 
         $errors = [];
+        $drop   = [];
         foreach (self::applicable($post) as $box) {
             $result = Validation::check($box, self::requestMeta($request), self::requestFields($request), self::storedReader($post->ID));
             $errors = [...$errors, ...$result['errors']];
+            $drop   = [...$drop, ...$result['drop']];
         }
 
         if ($errors === []) {
+            self::leaveOut($request, $drop);
             return $prepared;
         }
 
@@ -257,6 +260,31 @@ final class DataPanel
             implode(' ', array_column($errors, 'message')),
             ['status' => 400, 'fields' => $errors]
         );
+    }
+
+    /**
+     * Take read-only values the request resent unchanged out of it, so the
+     * REST controller doesn't write them (the request object is shared with
+     * the controller, which updates meta and fields after this filter).
+     *
+     * @param list<array{meta: string}|array{field: string}> $bindings
+     */
+    private static function leaveOut(\WP_REST_Request $request, array $bindings): void
+    {
+        if ($bindings === []) {
+            return;
+        }
+        $meta = self::requestMeta($request);
+        foreach ($bindings as $binding) {
+            if (isset($binding['meta'])) {
+                unset($meta[$binding['meta']]);
+            } else {
+                $request->set_param($binding['field'], null);
+            }
+        }
+        if (is_array($request['meta'] ?? null)) {
+            $request->set_param('meta', $meta);
+        }
     }
 
     /**

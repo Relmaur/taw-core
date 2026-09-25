@@ -36,7 +36,7 @@ final class ValidationTest extends TestCase
     {
         $box = $this->box([['id' => 'book_author', 'type' => 'text', 'required' => true]]);
 
-        $this->assertSame(['errors' => [], 'clear' => []], Validation::check($box, ['_taw_book_author' => 'Ada'], [], $this->stored()));
+        $this->assertSame(['errors' => [], 'clear' => [], 'drop' => []], Validation::check($box, ['_taw_book_author' => 'Ada'], [], $this->stored()));
     }
 
     public function test_required_uses_the_stored_value_when_the_request_omits_it(): void
@@ -91,6 +91,31 @@ final class ValidationTest extends TestCase
 
         $this->assertSame([['field' => '_taw_book_code', 'message' => 'Code is read-only.']], Validation::check($box, ['_taw_book_code' => 'X'], [], $this->stored())['errors']);
         $this->assertSame([], Validation::check($box, [], [], $this->stored())['errors'], 'not sent: nothing to refuse, and required is not enforced');
+    }
+
+    public function test_readonly_values_resent_unchanged_are_dropped_not_refused(): void
+    {
+        // The block editor sends the whole meta object with every save.
+        $box = $this->box([
+            ['id' => 'code', 'type' => 'text', 'label' => 'Code', 'readonly' => true],
+            ['id' => 'count', 'type' => 'number', 'label' => 'Count', 'readonly' => true],
+            ['id' => 'flag', 'type' => 'checkbox', 'label' => 'Flag', 'readonly' => true],
+            ['id' => 'files', 'type' => 'files', 'label' => 'Files', 'readonly' => true],
+            ['id' => 'meta', 'type' => 'group', 'readonly' => true, 'fields' => [['id' => 'w', 'type' => 'number', 'label' => 'W']]],
+        ]);
+        $stored = $this->stored(['_taw_code' => 'L1', '_taw_count' => '3', '_taw_flag' => '1', 'taw_files' => [4, 5], '_taw_meta_w' => '']);
+
+        $same = Validation::check($box, ['_taw_code' => 'L1', '_taw_count' => 3, '_taw_flag' => true, '_taw_meta_w' => 0], ['taw_files' => [4, 5]], $stored);
+        $this->assertSame([], $same['errors']);
+        $this->assertSame(
+            [['meta' => '_taw_code'], ['meta' => '_taw_count'], ['meta' => '_taw_flag'], ['field' => 'taw_files'], ['meta' => '_taw_meta_w']],
+            $same['drop'],
+            'unset (0 for a number) matches an empty stored value'
+        );
+
+        $changed = Validation::check($box, ['_taw_code' => 'L2', '_taw_meta_w' => 7], ['taw_files' => [5]], $stored);
+        $this->assertSame(['_taw_code', 'taw_files', '_taw_meta_w'], array_column($changed['errors'], 'field'));
+        $this->assertSame([], $changed['drop']);
     }
 
     public function test_hidden_fields_are_skipped_and_cleared(): void

@@ -205,6 +205,21 @@ final class DataPanelTest extends TestCase
         $this->assertSame($prepared, DataPanel::validateRest($prepared, new \WP_REST_Request('POST', '/wp/v2/book/7/autosaves', ['id' => 7])));
     }
 
+    public function test_a_readonly_value_resent_unchanged_is_left_out_of_the_write(): void
+    {
+        $this->box('book_details', [
+            ['id' => 'book_author', 'type' => 'text', 'label' => 'Author'],
+            ['id' => 'book_code', 'type' => 'text', 'label' => 'Code', 'readonly' => true],
+        ], ['ui' => 'panel']);
+        Functions\when('get_post')->justReturn(new \WP_Post(['ID' => 7, 'post_type' => 'book']));
+        Functions\when('get_post_meta')->alias(static fn (int $id, string $key): string => $key === '_taw_book_code' ? 'L1' : '');
+        $prepared = (object) ['ID' => 7];
+        $request  = new \WP_REST_Request('POST', '/wp/v2/book/7', ['id' => 7, 'meta' => ['_taw_book_author' => 'Ada', '_taw_book_code' => 'L1']]);
+
+        $this->assertSame($prepared, DataPanel::validateRest($prepared, $request), 'the whole meta object comes back with every editor save');
+        $this->assertSame(['_taw_book_author' => 'Ada'], $request['meta'], 'the read-only key is not written');
+    }
+
     public function test_new_posts_are_checked_by_post_type(): void
     {
         $this->box('book_details', [['id' => 'book_author', 'type' => 'text', 'required' => true]], ['ui' => 'panel']);

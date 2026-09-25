@@ -130,6 +130,11 @@ if (!class_exists('WP_REST_Request')) {
             return $this->params;
         }
 
+        public function set_param(string $key, mixed $value): void
+        {
+            $this->params[$key] = $value;
+        }
+
         public function offsetExists(mixed $offset): bool
         {
             return isset($this->params[$offset]);
