@@ -68,6 +68,7 @@
           "title": { "type": "string" },
           "menu_title": { "type": "string" },
           "capability": { "type": "string" },
+          "rest": { "enum": ["private", "public"], "description": "Expose the page over REST (off by default). private: its options in /wp/v2/settings, for administrators. public: also read-only GET taw/v1/options/<key>, for anyone; every field on the page." },
           "fields": { "$ref": "#/$defs/fieldList" },
           "config": { "type": "object", "description": "Any other OptionsPage config key (prefix, tabs, icon, position, …)." }
         },

@@ -16,9 +16,9 @@ if (!defined('ABSPATH')) {
  *
  * The LLM API key is deliberately NOT one of these fields — see
  * {@see self::apiKey()}, which follows the same wp-config-constant-only
- * pattern as {@see \TAW\Core\Form\Turnstile}: OptionsPage fields are
- * readable via the REST API by anyone with `edit_posts`, which makes the
- * options table the wrong place for a secret.
+ * pattern as {@see \TAW\Core\Form\Turnstile}: the options table is the
+ * wrong place for a secret (an OptionsPage with `rest` publishes its fields
+ * over the REST API).
  *
  * Opt-in, same posture as {@see \TAW\Core\Icons\Lucide} and
  * {@see \TAW\Core\Media\MediaFolders} — the entire chatbot subsystem

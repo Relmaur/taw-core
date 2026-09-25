@@ -35,7 +35,8 @@ if (!defined('ABSPATH')) {
  */
 final class FieldMetaRegistrar
 {
-    private const SCALAR_REST_TYPE = [
+    /** REST schema type per scalar field type (options pages use it too). */
+    public const SCALAR_REST_TYPE = [
         'text' => 'string', 'textarea' => 'string', 'url' => 'string', 'select' => 'string',
         'color' => 'string', 'datepicker' => 'string', 'icon' => 'string', 'wysiwyg' => 'string',
         'number' => 'number', 'range' => 'number',

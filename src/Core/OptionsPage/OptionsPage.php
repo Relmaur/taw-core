@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace TAW\Core\OptionsPage;
 
+use TAW\Core\Content\FieldCodec;
 use TAW\Core\Metabox\Metabox;
+use TAW\Core\Rest\FieldMetaRegistrar;
+use TAW\Core\Schema\Definition\OptionsPage as OptionsPageDefinition;
 use TAW\Helpers\Framework;
 use TAW\Support\Alpine;
 
@@ -35,6 +38,13 @@ if (!defined('ABSPATH')) {
  *
  * Retrieval:
  *   OptionsPage::get('company_phone');
+ *
+ * REST (opt-in per page, off by default):
+ *   'rest' => 'private'  the page's options appear in /wp/v2/settings
+ *                        (manage_options; read and write, validated and
+ *                        sanitized like the form);
+ *   'rest' => 'public'   also GET taw/v1/options/<page id>, readable by
+ *                        anyone — every field on the page.
  */
 class OptionsPage
 {
@@ -47,6 +57,8 @@ class OptionsPage
     private array  $tabs;
     private string $icon;
     private ?int   $position;
+    private string $rest;
+    private bool   $settingsRegistered = false;
 
     /**
      * Flat registry of every options field ever registered, keyed by its
@@ -70,6 +82,7 @@ class OptionsPage
         $this->tabs       = $config['tabs']        ?? [];
         $this->icon       = $config['icon']        ?? 'dashicons-admin-generic';
         $this->position   = $config['position']    ?? null;
+        $this->rest       = in_array($config['rest'] ?? '', OptionsPageDefinition::REST_MODES, true) ? $config['rest'] : '';
 
         foreach ($this->get_all_fields() as $field) {
             self::$fieldRegistry[$this->prefix . $field['id']] = array_merge($field, [
@@ -81,6 +94,11 @@ class OptionsPage
         add_action('admin_menu', [$this, 'register_page']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
+
+        // Only pages that opt in touch REST, so other sites gain no hook.
+        if ($this->rest !== '') {
+            add_action('rest_api_init', [$this, 'register_rest']);
+        }
     }
 
     /**
@@ -187,26 +205,140 @@ class OptionsPage
      */
     public function register_settings(): void
     {
+        // A REST page registers on rest_api_init too; one registration per
+        // request, or the sanitize filter would run twice.
+        if ($this->settingsRegistered) {
+            return;
+        }
+        $this->settingsRegistered = true;
+
         foreach ($this->get_all_fields() as $field) {
             $option_name = $this->prefix . $field['id'];
 
-            register_setting($this->id, $option_name, [
+            $args = [
                 'sanitize_callback' => function ($value) use ($field, $option_name) {
                     $validation = $this->validate_field($field, $value);
                     if ($validation !== true) {
-                        add_settings_error(
-                            $option_name,
-                            $option_name . '_error',
-                            $validation,
-                            'error'
-                        );
+                        // Not loaded outside wp-admin (REST validates first, in validate_rest_settings()).
+                        if (function_exists('add_settings_error')) {
+                            add_settings_error(
+                                $option_name,
+                                $option_name . '_error',
+                                $validation,
+                                'error'
+                            );
+                        }
                         return get_option($option_name);
                     }
 
                     return $this->sanitize_field($field, $value);
                 },
+            ];
+
+            if ($this->rest !== '') {
+                $args['show_in_rest'] = ['schema' => self::restSchema($field)];
+            }
+
+            register_setting($this->id, $option_name, $args);
+        }
+    }
+
+    /**
+     * The field's schema in /wp/v2/settings: scalar types as in REST post
+     * meta, JSON-stored types as their raw string (the form's own format).
+     *
+     * @param array<string, mixed> $field
+     * @return array<string, mixed>
+     */
+    private static function restSchema(array $field): array
+    {
+        $type = (string) ($field['type'] ?? 'text');
+
+        return [
+            'type'        => in_array($type, FieldCodec::STRUCTURED_TYPES, true)
+                ? 'string'
+                : (FieldMetaRegistrar::SCALAR_REST_TYPE[$type] ?? 'string'),
+            'title'       => (string) ($field['label'] ?? ''),
+            'description' => (string) ($field['description'] ?? ''),
+        ];
+    }
+
+    /**
+     * rest_api_init, for pages with `rest` set.
+     */
+    public function register_rest(): void
+    {
+        $this->register_settings();
+
+        add_filter('rest_request_before_callbacks', [$this, 'validate_rest_settings'], 10, 3);
+
+        if ($this->rest === 'public' && preg_match('/^[A-Za-z0-9_-]+$/', $this->id)) {
+            register_rest_route('taw/v1', '/options/' . $this->id, [
+                'methods'             => 'GET',
+                'callback'            => [$this, 'rest_public_values'],
+                'permission_callback' => '__return_true',
             ]);
         }
+    }
+
+    /**
+     * Runs the form's validation (required, url, number min/max, custom
+     * `validate`) on writes to /wp/v2/settings, so a bad value is a 400
+     * naming the option, not a silent keep of the old value.
+     *
+     * @param mixed $response
+     * @param mixed $handler
+     * @return mixed
+     */
+    public function validate_rest_settings($response, $handler, \WP_REST_Request $request)
+    {
+        if (is_wp_error($response)
+            || $request->get_route() !== '/wp/v2/settings'
+            || !in_array($request->get_method(), ['POST', 'PUT', 'PATCH'], true)
+            // Unauthorized requests get the endpoint's own 401/403, never field messages.
+            || !current_user_can('manage_options')) {
+            return $response;
+        }
+
+        $params = $request->get_params();
+        $errors = [];
+        foreach ($this->get_all_fields() as $field) {
+            $option_name = $this->prefix . $field['id'];
+            if (!array_key_exists($option_name, $params) || $params[$option_name] === null) {
+                continue;
+            }
+
+            $validation = $this->validate_field($field, $params[$option_name]);
+            if ($validation !== true) {
+                $errors[$option_name] = $validation;
+            }
+        }
+
+        if ($errors === []) {
+            return $response;
+        }
+
+        return new \WP_Error(
+            'rest_invalid_param',
+            sprintf(__('Invalid parameter(s): %s', 'taw-core'), implode(', ', array_keys($errors))),
+            ['status' => 400, 'params' => $errors]
+        );
+    }
+
+    /**
+     * GET taw/v1/options/<page id>: every field on the page by field id
+     * (group sub-fields by their compound id), decoded like REST post fields.
+     *
+     * @return array<string, mixed>
+     */
+    public function rest_public_values(): array
+    {
+        $values = [];
+        foreach ($this->get_all_fields() as $field) {
+            $values[$field['id']] = FieldCodec::decode($field, get_option($this->prefix . $field['id'], $field['default'] ?? ''));
+        }
+
+        return $values;
     }
 
     /**

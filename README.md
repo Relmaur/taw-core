@@ -483,7 +483,7 @@ add_action('taw_schema_register', function (Registry $schema): void {
 | `post_type` | `labels` `{singular, plural}`, `args` (→ `register_post_type`) |
 | `taxonomy` | `for` (post types, required), `labels`, `args` (→ `register_taxonomy`) |
 | `fieldset` | `on` (required), `fields` (required), `title`, `context`, `priority`, `prefix`, `config` (other Metabox keys) |
-| `options_page` | `fields` (required), `title`, `menu_title`, `capability`, `config` (other OptionsPage keys) |
+| `options_page` | `fields` (required), `title`, `menu_title`, `capability`, `rest` (`private` \| `public`, [over REST](#rest)), `config` (other OptionsPage keys) |
 
 Unknown top-level keys are errors, which catches typos. Unknown *field* keys (`conditions`, `width`, …) pass through
 to the engine, like `->with()`.
@@ -638,6 +638,20 @@ Group sub-fields are each stored as their own option, named `{prefix}{group_id}_
 ### Validation
 
 `required`, `url`, and `number` (`min`/`max`) fields are validated on save; a custom `validate` callable may also be supplied per field. Failures are surfaced inline via WordPress's `settings_errors()` and the previous saved value is kept.
+
+### REST
+
+Off by default: a page is exposed only when it sets `rest` (since v1.55.0).
+
+```php
+new OptionsPage(['id' => 'site', 'rest' => 'private', 'fields' => [/* … */]]);
+Schema::optionsPage('site')->rest('public')->fields([/* … */]);   // JSON: "rest": "public"
+```
+
+- **`private`**: the page's options appear in core's `/wp/v2/settings`, keyed by option name (`_taw_company_phone`). That endpoint needs `manage_options`, whatever the page's own `capability`. Reads and writes; writes get the form's validation (`required`, `url`, `number` `min`/`max`, custom `validate`) as a `400 rest_invalid_param` listing each bad option under `data.params`, then the form's sanitizing. Types: checkbox `boolean`, number/range `number`, image `integer`, everything else `string`; repeater/files/post_select stay the JSON string the form stores. Unset options read as `null`.
+- **`public`**: also `GET /wp-json/taw/v1/options/<page id>`, **readable by anyone, no login**. It returns every field on the page, keyed by field id (group sub-fields by their compound id), decoded like REST post fields: checkbox `bool`, image `int`, repeater/files as arrays. Read-only. **Never put anything private on a public page** (API keys, internal emails…): the whole page is published.
+
+Options are otherwise not readable over REST; keep secrets in `wp-config.php` constants regardless (as `TAW_TURNSTILE_SECRET_KEY` does).
 
 ---
 
@@ -1684,7 +1698,7 @@ Scope options: `--types=`, `--since=`, `--posts=` (IDs or slugs), `--no-media`, 
 
 - **scalar fields** → `register_post_meta()` with `show_in_rest`, the field's own sanitizer, and an `auth_callback` gated on `edit_post` for that specific post. Since v1.52.0 each fieldset registers its own fields ([qualified ids](#schema--post-types-taxonomies-fieldsets-options-pages)): two fieldsets sharing a field id on different post types each get their own type and sanitizer.
 - **repeater / files / post_select** (stored as JSON strings) → the raw meta stays a string, **and** a `register_rest_field()` computed field `taw_<id>` exposes the decoded object/array shape (and re-encodes on write) — so `Metabox::get_repeater()`'s physical storage is untouched. If fields with different prefixes share an id on one post type, the `_taw_` field owns `taw_<id>`.
-- OptionsPage fields → `register_setting(..., 'show_in_rest' => …)`.
+- Options pages are not exposed here; a page opts in with [`rest`](#rest).
 
 This exposes field values over `wp/v2` for **headless front-ends and external integrations**. It does **not** add a mobile-app editing UI — classic metaboxes stay desktop-only; direct on-phone editing to the [Visual Editor](#visual-editor). Opt out with `add_filter('taw_register_meta_in_rest', '__return_false')`.
 
@@ -1718,7 +1732,7 @@ Uploading itself is wp-admin only, by design — there's no CLI import step; the
 
 ### Settings
 
-`Settings → TAW Chatbot` (`TAW\Core\Rag\RagSettings`): API base URL (default `https://api.openai.com/v1`), embedding/chat model names, indexed post types for the `wp-content` knowledge base (comma-separated, default `post,page`), chunk size/overlap, max tool-call iterations, and whether anonymous visitors can chat (default on). The LLM API key is **not** one of these fields — like `TAW_TURNSTILE_SECRET_KEY`, it's wp-config-constant-only, since OptionsPage fields are REST-readable by anyone with `edit_posts`:
+`Settings → TAW Chatbot` (`TAW\Core\Rag\RagSettings`): API base URL (default `https://api.openai.com/v1`), embedding/chat model names, indexed post types for the `wp-content` knowledge base (comma-separated, default `post,page`), chunk size/overlap, max tool-call iterations, and whether anonymous visitors can chat (default on). The LLM API key is **not** one of these fields — like `TAW_TURNSTILE_SECRET_KEY`, it's wp-config-constant-only: a secret doesn't belong in the options table, which an options page can [expose over REST](#rest):
 
 ```php
 // wp-config.php
