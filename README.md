@@ -559,7 +559,7 @@ Group sub-fields are each stored as their own option, named `{prefix}{group_id}_
 
 Dev mode detection: connects to the dev server host:port (default `localhost:5173`, or whatever the theme's `vite.config.js` hot-file plugin last wrote to `dist/hot` / `public/build/hot`, if present) and confirms it's actually Vite by requesting `GET /@vite/client` and checking for an HTTP 200 response — not just that *something* is listening on the port. A bare TCP-connect check is a false-positive trap: any unrelated process (another dev server, a Docker container, anything) can end up bound to that port for reasons that have nothing to do with this project, which would otherwise make the theme serve dead dev-server asset URLs in production with no assets loading at all, even though the production build and manifest are completely correct. Production reads `dist/.vite/manifest.json` (or `dist/manifest.json`, or the `public/build/` equivalents — checks all four), cached in the WP object cache keyed on the manifest file's own mtime — a new deploy always rewrites this file with a new mtime, so a stale cached manifest can't survive a rebuild even on a site with a persistent object cache (Redis/Memcached); no manual cache flush needed after deploying.
 
-**Hot-file convention (optional but recommended):** have the theme's `vite.config.js` write the dev server's actual URL to `dist/hot` or `public/build/hot` on startup and delete it on shutdown (Laravel Vite plugin-style). `ViteLoader` reads this to resolve the correct host:port before probing — this matters if the dev server ever binds a non-default port. Without a hot file, `ViteLoader` falls back to the hardcoded default (`localhost:5173`).
+**Hot-file convention (required for dev mode):** have the theme's `vite.config.js` write the dev server's actual URL to `dist/hot` or `public/build/hot` on startup and delete it on shutdown (Laravel Vite plugin-style; `hotFile()` in `resources/vite/taw-vite.mjs` does this). `ViteLoader` only probes the host:port from that file. **Without a hot file, dev mode is off**: there's no fallback to `localhost:5173`, because another project's Vite server on that port once passed the check. The detection lives in `TAW\Core\Assets\DevServer`, shared with `Assets\Vite` below.
 
 **Optimizer-exclusion hardening:** every module `<script>` tag (plus its `modulepreload`/`preload` `<link>`s) and every Vite-extracted stylesheet `<link>` carries `data-no-optimize="1" data-cfasync="false" data-no-defer="1" data-no-minify="1"` — standard exclusion signals WP Rocket, Autoptimize, Perfmatters, and LiteSpeed Cache all document and honor when they hook WordPress's own `script_loader_tag`/`style_loader_tag` filters. Vite's output is already minified, hashed, and (for JS) split into ES modules requiring exact, un-mangled execution order — nothing a generic optimizer does to it is safe. **This does not help against a tool that rewrites the raw HTML output buffer directly instead of hooking those filters** — e.g. a host-side CDN-rehosting feature — that class of tool needs its own exclusion-list configuration in its own admin UI regardless; see `taw-theme`'s `AGENTS.md` "Vite Integration" section for a real incident (WPMUdev Hummingbird) this doesn't cover.
 
@@ -584,6 +584,59 @@ add_filter('taw_critical_css_entry', function (string $entry) {
     return is_singular('event_invite') ? 'resources/scss/critical-event-invite.scss' : $entry;
 });
 ```
+
+
+### Block themes and packages: `Assets\Vite` (v1.49.0+)
+
+`TAW\Core\Assets\Vite` is the theme-agnostic adapter ([ADR-0006](docs/adr/0006-shared-vite-adapter.md)),
+used by taw-gutenberg. It's one instance per project root, isn't booted by `Boot::data()` or
+`Theme::boot()`, and adds no hooks until it registers something. `ViteLoader` above is unchanged.
+
+```php
+use TAW\Core\Assets\Vite;
+
+$vite = Vite::theme();                                   // the active parent theme; or new Vite($dir, $url)
+$vite->script('acme-main', 'src/js/main.ts');            // enqueue; CSS it imports comes along
+$vite->style('acme-editor', 'src/scss/editor.scss', [], false); // register only
+$vite->block(get_theme_file_path('src/blocks/hero'));    // block.json with file:./index.tsx, style.scss…
+$url = $vite->url('src/images/logo.svg');
+```
+
+- **Dev:** assets load from the dev server named in `{outDir}/hot` (default `dist/hot`), verified
+  by `DevServer` as above.
+- **Build:** hashed files come from `dist/.vite/manifest.json`, cached with the file's mtime in the
+  key.
+- **No build and no dev server:** nothing is enqueued, and users who can `edit_theme_options` see
+  one notice naming what's missing. The page still renders.
+- **ES modules:** `type="module"` is added through `wp_script_attributes`, so each tag keeps its
+  id, inline scripts and translations.
+- **`block($dir, $args, $editorScriptDeps)`:**
+  - registers each `file:` asset in block.json through Vite;
+  - leaves plain handles alone;
+  - drops an unbuilt file instead of letting WordPress register the raw `.tsx`;
+  - adds CSS extracted from the editor/view script to `editorStyle`/`viewStyle`.
+
+  The editor script depends on `Vite::EDITOR_SCRIPT_DEPS` unless you pass your own list.
+
+**Shared Vite config.** Import it from `vendor/`, so every theme uses the same WordPress-globals
+list:
+
+```js
+import { defineConfig } from 'vite';
+import { hotFile, phpReload, wordpressExternals } from './vendor/taw/core/resources/vite/taw-vite.mjs';
+
+export default defineConfig({
+    plugins: [hotFile(), wordpressExternals() /*, phpReload() */],
+    build: { outDir: 'dist', manifest: true, rolldownOptions: { input: { main: 'src/js/main.ts' } } },
+});
+```
+
+`wordpressExternals()` maps `@wordpress/*`, `react`, `react-dom` and `react/jsx-runtime` to the
+browser globals.
+- Importing a name that isn't in `WP_EXPORT_NAMES` fails the build.
+- Add names with `wordpressExternals({ extraExports: [...] })`.
+- A script that imports a package must also depend on its WordPress handle (for example
+  `wp-blocks`).
 
 ---
 

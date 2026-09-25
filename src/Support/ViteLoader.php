@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Support;
 
+use TAW\Core\Assets\DevServer;
 use TAW\Helpers\Framework;
 
 
@@ -247,64 +248,13 @@ class ViteLoader
      * the hardcoded default port, which is exactly what let an unrelated
      * project's dev server be mistaken for this one's.
      *
-     * Result is cached for the lifetime of the request via a static variable.
+     * Result is cached for the lifetime of the request (Assets\DevServer).
      */
     public static function isDevServerRunning(): bool
     {
-        static $is_dev = null;
-
-        if ($is_dev !== null) {
-            return $is_dev;
-        }
-
-        $hot_url = self::hotFileUrl();
-
-        if ($hot_url === null) {
-            $is_dev = false;
-
-            return $is_dev;
-        }
-
-        $parts = parse_url($hot_url);
-        $host  = $parts['host'] ?? self::DEV_HOST;
-        $port  = (int) ($parts['port'] ?? self::DEV_PORT);
-
-        $is_dev = self::probeViteDevServer($host, $port);
-
-        return $is_dev;
-    }
-
-    /**
-     * TCP-connect to $host:$port (sourced from this project's own hot file
-     * — see isDevServerRunning()) and confirm a real Vite dev server
-     * answers by requesting GET /@vite/client and checking for an HTTP 200
-     * response. A bare TCP connect alone isn't enough — see
-     * isDevServerRunning()'s docblock. This check alone also isn't enough
-     * to identify *whose* Vite dev server it is, which is why the caller
-     * must only ever pass a host:port already known to belong to this
-     * project (from the hot file), never a hardcoded guess.
-     */
-    private static function probeViteDevServer(string $host, int $port): bool
-    {
-        $handle = @fsockopen($host, $port, $errno, $errstr, 0.2);
-
-        if (!$handle) {
-            return false;
-        }
-
-        stream_set_timeout($handle, 0, 200000); // 200ms
-
-        $request = "GET /@vite/client HTTP/1.1\r\nHost: {$host}\r\nConnection: close\r\n\r\n";
-        fwrite($handle, $request);
-
-        $status_line = fgets($handle, 1024);
-        fclose($handle);
-
-        if ($status_line === false) {
-            return false;
-        }
-
-        return (bool) preg_match('#^HTTP/\d\.\d\s+200\b#', $status_line);
+        // Shared with Assets\Vite (ADR-0006): one hot-file probe, so the
+        // two can never drift apart.
+        return DevServer::isRunning(self::hotFiles(), self::DEV_HOST, self::DEV_PORT);
     }
 
     /**
@@ -324,27 +274,17 @@ class ViteLoader
      */
     private static function hotFileUrl(): ?string
     {
-        static $checked = false;
-        static $url     = null;
+        return DevServer::hotFileUrl(self::hotFiles());
+    }
 
-        if ($checked) {
-            return $url;
-        }
-
-        $checked = true;
-
-        foreach (['dist/hot', 'public/build/hot'] as $candidate) {
-            $path = Framework::themePath($candidate);
-            if (file_exists($path)) {
-                $contents = trim((string) file_get_contents($path));
-                if ($contents !== '') {
-                    $url = $contents;
-                }
-                break;
-            }
-        }
-
-        return $url;
+    /**
+     * The hot-file locations this class supports, in lookup order.
+     *
+     * @return list<string>
+     */
+    private static function hotFiles(): array
+    {
+        return [Framework::themePath('dist/hot'), Framework::themePath('public/build/hot')];
     }
 
     /**
