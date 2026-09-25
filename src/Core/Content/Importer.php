@@ -992,7 +992,7 @@ class Importer
             return 0;
         }
         $found = get_posts([
-            'name'             => $slug,
+            'post_name__in'    => [$slug],
             'post_type'        => 'any',
             'post_status'      => 'any',
             'posts_per_page'   => 1,
@@ -1012,9 +1012,13 @@ class Importer
         }
 
         if ($slug !== '') {
+            // `post_name__in`, not `name`: a `name` query is singular, and
+            // WP_Query drops a draft/private post from a singular result when
+            // the current user can't edit it — bin/taw content:import runs
+            // with no user, so such posts never matched and were re-created.
             $matches = get_posts([
                 'post_type'        => $type,
-                'name'             => $slug,
+                'post_name__in'    => [$slug],
                 'post_status'      => 'any',
                 'posts_per_page'   => 1,
                 'suppress_filters' => false,
@@ -1113,7 +1117,7 @@ class Importer
         }
 
         $found = get_posts([
-            'name'             => (string) $ref,
+            'post_name__in'    => [(string) $ref],
             'post_type'        => ['page', 'post'],
             'post_status'      => 'any',
             'posts_per_page'   => 1,

@@ -321,6 +321,33 @@ final class ImporterTest extends TestCase
         );
     }
 
+    public function test_slug_lookups_never_use_a_singular_name_query(): void
+    {
+        // A singular `name` query hides drafts/private posts from a user-less
+        // CLI import, so an existing draft with a slug was created again.
+        $queries = [];
+        Functions\when('get_posts')->alias(static function (array $args) use (&$queries): array {
+            $queries[] = $args;
+            return [];
+        });
+        Functions\when('get_option')->justReturn(false);
+
+        $importer = new Importer();
+        $importer->plan(['posts' => [
+            ['type' => 'page', 'slug' => 'privacy-policy', 'status' => 'draft', 'fields' => []],
+        ]]);
+        $this->callMethod($importer, 'resolveLocalPostId', 'about');
+        $this->callMethod($importer, 'resolveAnyPostId', 'hello');
+
+        $this->assertNotSame([], $queries);
+        foreach ($queries as $args) {
+            $this->assertArrayNotHasKey('name', $args);
+        }
+        $this->assertContains(['privacy-policy'], array_column($queries, 'post_name__in'));
+        $this->assertContains(['about'], array_column($queries, 'post_name__in'), 'parent / page_on_front refs');
+        $this->assertContains(['hello'], array_column($queries, 'post_name__in'), 'comment post_refs');
+    }
+
     public function test_with_users_sanitizes_roles_against_the_target_and_writes_no_password(): void
     {
         Functions\when('get_user_by')->justReturn(false);
