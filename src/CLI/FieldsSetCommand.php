@@ -62,6 +62,10 @@ class FieldsSetCommand extends Command
                   <info>php bin/taw fields:set 42 team_members --file=/tmp/team.json</info>
                   <info>php bin/taw fields:set 42 team_members '[{"name":"Ada","role":"CTO"}]'</info>
 
+                A field id shared by two fieldsets on the post's type (with different
+                prefixes) is ambiguous; pass the qualified id or the meta key:
+                  <info>php bin/taw fields:set 42 book_details.subtitle "Second edition"</info>
+
                 OptionsPage field — pass the literal 'options' instead of a post ID:
                   <info>php bin/taw fields:set options company_phone "555-1234"</info>
 
@@ -69,7 +73,7 @@ class FieldsSetCommand extends Command
                   <info>php bin/taw fields:set 42 hero_heading "Welcome" --dry-run</info>
                 HELP)
             ->addArgument('post_id', InputArgument::REQUIRED, "Post ID the field is stored against, or the literal 'options' for a site-wide OptionsPage field")
-            ->addArgument('field_id', InputArgument::REQUIRED, "Field ID, without the meta key prefix (e.g. 'hero_heading', or 'hero_cta_text' for a group sub-field)")
+            ->addArgument('field_id', InputArgument::REQUIRED, "Field ID without the meta key prefix (e.g. 'hero_heading', or 'hero_cta_text' for a group sub-field), a qualified id ('hero.hero_heading'), or the full meta key")
             ->addArgument('value', InputArgument::OPTIONAL, 'The new value. Required unless --file is given. For repeater/files/multi post_select fields, must be a JSON string.')
             ->addOption('file', null, InputOption::VALUE_REQUIRED, 'Read the value from a file instead of the value argument — recommended for repeaters, to avoid shell JSON-quoting issues')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Sanitize and report what would be saved, without writing to the database')
@@ -125,9 +129,18 @@ class FieldsSetCommand extends Command
             return Command::FAILURE;
         }
 
-        $fieldConfig = $isOptionsTarget
-            ? OptionsPage::getFieldConfig($fieldId)
-            : Metabox::get_field_config($fieldId);
+        if ($isOptionsTarget) {
+            $fieldConfig = OptionsPage::getFieldConfig($fieldId);
+        } else {
+            // Qualified id, meta key or bare id, resolved for this post's type (ADR-0008).
+            $resolved = FieldRef::resolve($postId, $fieldId);
+            if ($resolved['ambiguous'] !== []) {
+                $io->error("Field '{$fieldId}' matches several fields on this post: " . implode(', ', $resolved['ambiguous'])
+                    . '. Pass the qualified id (fieldset.field) or the meta key.');
+                return Command::FAILURE;
+            }
+            $fieldConfig = $resolved['config'];
+        }
 
         if ($fieldConfig === null) {
             $registry = $isOptionsTarget ? 'OptionsPage' : 'Metabox';
@@ -136,8 +149,9 @@ class FieldsSetCommand extends Command
         }
 
         $type = $fieldConfig['type'] ?? 'text';
-        $prefix = $fieldConfig['prefix'] ?? '_taw_';
-        $storageKey = $prefix . $fieldId;
+        $storageKey = $isOptionsTarget
+            ? ($fieldConfig['prefix'] ?? '_taw_') . $fieldId
+            : Metabox::metaKeyOf($fieldConfig);
         $target = $isOptionsTarget ? 'options' : $postId;
 
         if ($dryRun) {

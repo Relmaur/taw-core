@@ -28,7 +28,7 @@ abstract class SchemaTestCase extends TestCase
 
         Registry::resetForTests();
         CollisionReport::resetForTests();
-        $this->resetStatic(Metabox::class, 'fieldRegistry', []);
+        Metabox::resetRegistryForTests();
         $this->resetStatic(OptionsPage::class, 'fieldRegistry', []);
 
         $this->notices = [];
@@ -46,7 +46,7 @@ abstract class SchemaTestCase extends TestCase
 
         Registry::resetForTests();
         CollisionReport::resetForTests();
-        $this->resetStatic(Metabox::class, 'fieldRegistry', []);
+        Metabox::resetRegistryForTests();
         $this->resetStatic(OptionsPage::class, 'fieldRegistry', []);
 
         parent::tearDown();

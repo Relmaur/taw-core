@@ -16,6 +16,20 @@ use TAW\Tests\TestCase;
  */
 final class ImporterTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        \TAW\Core\Metabox\Metabox::resetRegistryForTests();
+        Functions\when('post_type_exists')->alias(static fn (string $t): bool => in_array($t, ['page', 'post', 'book'], true));
+    }
+
+    protected function tearDown(): void
+    {
+        \TAW\Core\Metabox\Metabox::resetRegistryForTests();
+        \TAW\Core\Metabox\Metabox::forgetInstances();
+        parent::tearDown();
+    }
+
     public function test_operations_from_passes_a_changeset_through(): void
     {
         $changeset = [
@@ -266,6 +280,45 @@ final class ImporterTest extends TestCase
 
         $this->assertSame(1, $captured['post_author']);
         $this->assertNotSame([], $report['warnings']);
+    }
+
+    public function test_apply_writes_each_field_key_form_to_its_own_meta_key(): void
+    {
+        new \TAW\Core\Metabox\Metabox([
+            'id' => 'book_details', 'title' => 'Book', 'screens' => ['book'], 'prefix' => '_book_',
+            'fields' => [['id' => 'author', 'type' => 'text']],
+        ]);
+        new \TAW\Core\Metabox\Metabox([
+            'id' => 'hero', 'title' => 'Hero', 'screens' => ['book'],
+            'fields' => [
+                ['id' => 'heading', 'type' => 'text'],
+                ['id' => 'cta', 'type' => 'group', 'fields' => [['id' => 'text', 'type' => 'text']]],
+            ],
+        ]);
+        Functions\when('get_posts')->justReturn([]);
+        Functions\when('get_current_user_id')->justReturn(1);
+        Functions\when('wp_json_encode')->alias(static fn ($v) => json_encode($v));
+        Functions\when('apply_filters')->alias(static fn (string $h, $v = null) => $v);
+        Functions\when('wp_slash')->returnArg(1);
+        Functions\when('sanitize_text_field')->returnArg(1);
+        Functions\when('wp_set_object_terms')->justReturn(true);
+        Functions\when('wp_insert_post')->justReturn(55);
+        $written = [];
+        Functions\when('update_post_meta')->alias(static function (int $id, string $key, $value) use (&$written): bool {
+            $written[$key] = $value;
+            return true;
+        });
+
+        (new Importer())->apply(['meta' => ['schema' => '1.2'], 'posts' => [[
+            'type' => 'book', 'slug' => 'dune', 'title' => 'Dune',
+            'fields' => ['_book_author' => 'Frank Herbert', 'heading' => 'Arrakis', 'cta_text' => 'Read'],
+        ]]], ['rollback' => false]);
+
+        $this->assertSame(
+            ['_book_author' => 'Frank Herbert', '_taw_heading' => 'Arrakis', '_taw_cta_text' => 'Read'],
+            $written,
+            '1.2 meta key, 1.1 bare id, and a group sub-field under its compound key (was _taw_text)'
+        );
     }
 
     public function test_with_users_sanitizes_roles_against_the_target_and_writes_no_password(): void

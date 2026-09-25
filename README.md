@@ -473,9 +473,17 @@ to the engine, like `->with()`.
   required part (a fieldset with no `->on()`, a taxonomy with no `->for()`) are skipped with a notice.
 - **Duplicates:** the same entity defined twice keeps the higher-precedence source (PHP beats JSON). The
   later one wins on a tie. Mark a deliberate replacement with `->override()` to silence the notice.
-- **Field id collisions:** Metabox's field registry is keyed by bare field id. A schema field sharing an
-  id with another field (in another fieldset or a hand-written metabox) is reported via
-  `_doing_it_wrong()`, plus an admin notice when `WP_DEBUG` is on.
+- **Qualified field ids (v1.52.0+, [ADR-0008](docs/adr/0008-qualified-registry-and-storage-contexts.md)):**
+  every field is also registered as `"{fieldset}.{field}"` (group sub-fields `"{fieldset}.{group}_{sub}"`),
+  with its meta key. `Metabox::fieldsFor('post', 'book')` returns meta key → config for the fields stored
+  on a post type, and `Metabox::fieldFor('post', 'book', $ref)` takes a qualified id, a meta key or a bare
+  id. REST meta, content export/import, the data panel, the visual editor and `fields:get`/`fields:set`
+  use them, so two fieldsets can share a field id (on different post types, or with different prefixes)
+  and each keeps its own type and sanitizer. `Metabox::getQualifiedRegistry()` lists them all.
+- **Field id collisions:** the bare-id lookups (`Metabox::get_field_config()`, `getFieldRegistry()`) still
+  hold one entry per id, the later one. A schema field sharing an id with another field (in another
+  fieldset or a hand-written metabox) is reported via `_doing_it_wrong()`, plus an admin notice when
+  `WP_DEBUG` is on.
 - **Permalinks:** when post types or taxonomies change, rewrite rules are flushed once, on the next admin
   request (fingerprint stored in the `taw_schema_rewrite_hash` option). The front end never flushes.
 
@@ -1421,6 +1429,7 @@ php bin/taw export:block HeroSection
 php bin/taw inspect --json                          # live registry: blocks, fields, forms
 php bin/taw fields:get 42 hero_heading --json        # read a field's current value
 php bin/taw fields:set 42 hero_heading "Welcome"     # write a field's value
+php bin/taw fields:set 42 book_details.subtitle "…"  # qualified id (fieldset.field) or the meta key also work
 php bin/taw fields:set options company_phone "555-1234"  # write a site-wide OptionsPage field instead
 php bin/taw sync --json                              # check for framework drift (see below)
 php bin/taw sync --apply                             # also write Tier 1 scaffold changes
@@ -1448,7 +1457,7 @@ php bin/taw corpus:export /path/to/bible.sqlite /path/to/bible-export.json  # po
 
 `hub:enroll` automates the last of those steps — registering the site with the Hub. It reads the identity `taw-hub-companion` generated on activation (`taw_hub_companion_public_key` / `_key_id` in the options table), the Hub URL (`TAW_HUB_URL`), and a one-time enrolment token (`--token`, or the `TAW_HUB_ENROLMENT_TOKEN` constant), and `POST`s them to the Hub's `POST /api/fleet/enroll` endpoint ([taw-hub ADR-0011](https://github.com/Relmaur/taw-hub/blob/main/docs/ADR/0011-site-enrolment.md)). That endpoint is not signature-guarded (the Hub does not know the site yet) — the token is the credential (single-use, 30-minute TTL, hashed at rest) — but every response *is* RESPONSE-signed with the Hub's Ed25519 identity, and `hub:enroll` verifies that signature against `TAW_HUB_PUBLIC_KEY` before trusting the reply. A signed `409 site_already_enrolled` is treated as idempotent success (a dropped connection after the Hub consumed the token); a signature-verification failure is a hard error and enrolment is reported as **not** confirmed. Boots WordPress via `WpLoader` like `inspect`. `--base-url` overrides the Hub-reachable URL (`home_url()` is often wrong behind a proxy or Herd's `:80`), `--dry-run` prints the request without sending, `--insecure` skips TLS verification for a local self-signed Hub.
 
-`fields:get`/`fields:set` are the read/write halves of the same primitive `VisualEditorEndpoint` uses for its REST-driven saves — they resolve a field's type from the live `Metabox` registry, then dispatch to the matching type-aware getter/sanitizer (`Metabox::get_repeater()`, `sanitizeRepeaterRows()`, etc.), so a repeater, `post_select`, or `files` field is read/written in exactly the shape the admin form itself would produce, with the same sanitization rules (XSS-stripping, ID coercion, JSON re-encoding). `fields:set` takes `--file=path.json` for repeater/array-shaped values, to sidestep shell JSON-quoting, and `--dry-run` to preview the sanitized result without writing. Both commands boot WordPress, like `inspect` — field configs and post data only exist once WordPress is loaded, so they walk up from the theme directory to find `wp-load.php` via the shared `TAW\CLI\WpLoader` helper.
+`fields:get`/`fields:set` are the read/write halves of the same primitive `VisualEditorEndpoint` uses for its REST-driven saves — they resolve a field's type from the live `Metabox` registry (the post type's own fields first; a bare id that matches fields with two prefixes on that post type is refused, so pass the qualified id or the meta key), then dispatch to the matching type-aware getter/sanitizer (`Metabox::get_repeater()`, `sanitizeRepeaterRows()`, etc.), so a repeater, `post_select`, or `files` field is read/written in exactly the shape the admin form itself would produce, with the same sanitization rules (XSS-stripping, ID coercion, JSON re-encoding). `fields:set` takes `--file=path.json` for repeater/array-shaped values, to sidestep shell JSON-quoting, and `--dry-run` to preview the sanitized result without writing. Both commands boot WordPress, like `inspect` — field configs and post data only exist once WordPress is loaded, so they walk up from the theme directory to find `wp-load.php` via the shared `TAW\CLI\WpLoader` helper.
 
 Pass the literal `options` in place of the post ID to target a site-wide `OptionsPage` field instead of a per-post `Metabox` field — the field is resolved via `OptionsPage::getFieldConfig()` (a bare-id lookup over `OptionsPage::getFieldRegistry()`) and written via `OptionsPage::writeOption()` (`update_option()`, sanitized the same way `writeMeta()` sanitizes a Metabox field — no `wp_slash()` first, since `update_option()` doesn't run the value through `wp_unslash()` the way `update_post_meta()` does). Everything else about the two commands — `--dry-run`, `--file`, `--json`, the per-type sanitize/decode rules — works identically for both scopes.
 
@@ -1592,7 +1601,9 @@ Also, in wp-admin: **Tools → TAW Data** (Export with option checkboxes + Impor
 
 ### The snapshot
 
-`TAW\Core\Content\Exporter::snapshot($scope)` — a plain array, `json_encode`-ready. Schema: [`resources/schema/content-interchange-1.1.json`](resources/schema/content-interchange-1.1.json) (`schema` is `"1.1"`; the importer also accepts `"1.0"`).
+`TAW\Core\Content\Exporter::snapshot($scope)` — a plain array, `json_encode`-ready. Schema: [`resources/schema/content-interchange-1.2.json`](resources/schema/content-interchange-1.2.json) (`schema` is `"1.2"`; the importer also accepts `"1.0"` and `"1.1"`).
+
+**Field keys (1.2):** a post's `fields` are keyed by the bare field id for `_taw_` fields (`"hero_heading"`), exactly as in 1.0 and 1.1, and by the full meta key for fields with any other prefix (`"_book_author"`). Each value is decoded with the config of the field registered for that post type (`Metabox::fieldsFor()`). Before 1.2, fields with another prefix were left out.
 
 | Section | Contents |
 |---|---|
@@ -1623,8 +1634,8 @@ Scope options: `--types=`, `--since=`, `--posts=` (IDs or slugs), `--no-media`, 
 
 `Theme::boot()` also registers every TAW field over the REST API (`TAW\Core\Rest\FieldMetaRegistrar`), on every post type its metabox attaches to:
 
-- **scalar fields** → `register_post_meta()` with `show_in_rest`, the field's own sanitizer, and an `auth_callback` gated on `edit_post` for that specific post.
-- **repeater / files / post_select** (stored as JSON strings) → the raw meta stays a string, **and** a `register_rest_field()` computed field `taw_<id>` exposes the decoded object/array shape (and re-encodes on write) — so `Metabox::get_repeater()`'s physical storage is untouched.
+- **scalar fields** → `register_post_meta()` with `show_in_rest`, the field's own sanitizer, and an `auth_callback` gated on `edit_post` for that specific post. Since v1.52.0 each fieldset registers its own fields ([qualified ids](#schema--post-types-taxonomies-fieldsets-options-pages)): two fieldsets sharing a field id on different post types each get their own type and sanitizer.
+- **repeater / files / post_select** (stored as JSON strings) → the raw meta stays a string, **and** a `register_rest_field()` computed field `taw_<id>` exposes the decoded object/array shape (and re-encodes on write) — so `Metabox::get_repeater()`'s physical storage is untouched. If fields with different prefixes share an id on one post type, the `_taw_` field owns `taw_<id>`.
 - OptionsPage fields → `register_setting(..., 'show_in_rest' => …)`.
 
 This exposes field values over `wp/v2` for **headless front-ends and external integrations**. It does **not** add a mobile-app editing UI — classic metaboxes stay desktop-only; direct on-phone editing to the [Visual Editor](#visual-editor). Opt out with `add_filter('taw_register_meta_in_rest', '__return_false')`.

@@ -19,6 +19,7 @@ final class ExporterTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        \TAW\Core\Metabox\Metabox::resetRegistryForTests();
 
         global $wpdb;
         $wpdb = new class {
@@ -109,6 +110,8 @@ final class ExporterTest extends TestCase
     protected function tearDown(): void
     {
         unset($GLOBALS['wpdb']);
+        \TAW\Core\Metabox\Metabox::resetRegistryForTests();
+        \TAW\Core\Metabox\Metabox::forgetInstances();
         parent::tearDown();
     }
 
@@ -116,13 +119,41 @@ final class ExporterTest extends TestCase
     {
         $snapshot = (new Exporter())->snapshot();
 
-        $this->assertSame('1.1', $snapshot['meta']['schema']);
+        $this->assertSame('1.2', $snapshot['meta']['schema']);
         $this->assertSame('https://example.test', $snapshot['meta']['source']['url']);
 
         $post = $snapshot['posts'][0];
         $this->assertSame('home', $post['slug']);
         $this->assertSame([['name' => 'Ada']], $post['fields']['team']);
         $this->assertSame(77, $post['fields']['hero']);
+    }
+
+    public function test_fields_with_another_prefix_are_keyed_by_meta_key(): void
+    {
+        new \TAW\Core\Metabox\Metabox([
+            'id' => 'page_extra', 'title' => 'Extra', 'screens' => 'page', 'prefix' => '_page_',
+            'fields' => [['id' => 'featured', 'type' => 'checkbox'], ['id' => 'rank', 'type' => 'number']],
+        ]);
+        Functions\when('get_post_meta')->alias(function ($id, $key = '', $single = false) {
+            if ($id === 10 && $key === '') {
+                return [
+                    '_taw_hero'     => ['77'],
+                    '_page_featured' => ['1'],
+                    '_page_rank'     => ['3'],
+                    '_page_unknown'  => ['x'],
+                    '_edit_lock'     => ['1:1'],
+                ];
+            }
+            return $single ? '' : [];
+        });
+
+        $fields = (new Exporter())->snapshot(['include_media' => false])['posts'][0]['fields'];
+
+        $keys = array_keys($fields);
+        sort($keys);
+        $this->assertSame(['_page_featured', '_page_rank', 'hero'], $keys, 'registered _page_ fields by meta key, _taw_ by bare id, nothing else');
+        $this->assertTrue($fields['_page_featured'], 'decoded by its own type');
+        $this->assertSame(77, $fields['hero']);
     }
 
     public function test_options_include_taw_and_resolved_core_allowlist(): void

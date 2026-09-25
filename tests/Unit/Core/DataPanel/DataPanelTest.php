@@ -19,8 +19,9 @@ final class DataPanelTest extends TestCase
         parent::setUp();
         DataPanel::resetForTests();
         Metabox::forgetInstances();
+        Metabox::resetRegistryForTests();
         Registry::resetForTests();
-        Functions\when('post_type_exists')->alias(static fn (string $type): bool => in_array($type, ['page', 'post', 'book'], true));
+        Functions\when('post_type_exists')->alias(static fn (string $type): bool => in_array($type, ['page', 'post', 'book', 'movie'], true));
         Functions\when('use_block_editor_for_post')->justReturn(true);
         Functions\when('is_wp_error')->alias(static fn ($thing): bool => $thing instanceof \WP_Error);
     }
@@ -30,6 +31,7 @@ final class DataPanelTest extends TestCase
         $this->addToAssertionCount(\Mockery::getContainer()->mockery_getExpectationCount());
         DataPanel::resetForTests();
         Metabox::forgetInstances();
+        Metabox::resetRegistryForTests();
         Registry::resetForTests();
         parent::tearDown();
     }
@@ -296,5 +298,18 @@ final class DataPanelTest extends TestCase
         $this->assertIsArray($manifest);
         $this->assertArrayHasKey(DataPanel::SCRIPT_SOURCE, $manifest, 'run npm run build in resources/data-panel');
         $this->assertFileExists(dirname(__DIR__, 4) . '/assets/data-panel/' . $manifest[DataPanel::SCRIPT_SOURCE]['file']);
+    }
+
+    public function test_stored_reader_decodes_with_the_post_types_own_config(): void
+    {
+        $this->box('book_details', [['id' => 'gallery', 'type' => 'files']]);
+        $this->box('movie_details', [['id' => 'gallery', 'type' => 'repeater', 'fields' => [['id' => 'caption', 'type' => 'text']]]], ['screens' => ['movie']]);
+        Functions\when('get_post_type')->justReturn('book');
+        Functions\when('get_post_meta')->alias(static fn (int $id, string $key): string => $id === 7 && $key === '_taw_gallery' ? '[4,5]' : '');
+
+        $reader = (new \ReflectionMethod(DataPanel::class, 'storedReader'))->invoke(null, 7, '_taw_');
+
+        $this->assertSame([4, 5], $reader('field', 'taw_gallery'), "the book's files field, not movie's repeater (the later bare entry)");
+        $this->assertNull($reader('field', 'taw_unknown'));
     }
 }

@@ -135,15 +135,16 @@ class InspectCommand extends Command
      */
     private function collectBlocks(): array
     {
-        $fieldRegistry = Metabox::getFieldRegistry();
-
-        // Group the flat field registry by block_id so each block reports
-        // only its own fields.
+        // The qualified registry (ADR-0008), grouped by block_id so each
+        // block reports only its own fields — every metabox's fields, even
+        // when two share a bare id.
         $fieldsByBlock = [];
-        foreach ($fieldRegistry as $fieldId => $field) {
+        foreach (Metabox::getQualifiedRegistry() as $field) {
             $blockId = $field['block_id'] ?? '(unassigned)';
             $fieldsByBlock[$blockId][] = [
-                'id' => $fieldId,
+                'id' => $field['field_key'],
+                'qualified_id' => $field['qualified_id'],
+                'meta_key' => $field['meta_key'],
                 'type' => $field['type'] ?? 'text',
                 'label' => $field['label'] ?? null,
                 'required' => $field['required'] ?? false,

@@ -415,8 +415,10 @@ class Importer
             }
         }
 
+        $registered = Metabox::fieldsFor('post', $type);
         foreach (is_array($incoming['fields'] ?? null) ? $incoming['fields'] : [] as $fieldId => $newVal) {
-            $config = Metabox::get_field_config((string) $fieldId) ?? ['type' => 'text', 'id' => $fieldId];
+            $target = FieldKeys::forKey((string) $fieldId, $registered, self::bareConfigLookup());
+            $config = $target['config'];
 
             // Normalize BOTH sides through the same decode path so that
             // empty ↔ empty, "1" ↔ true, "[…]" ↔ [...], "42" ↔ 42 all
@@ -424,7 +426,7 @@ class Importer
             // no-op (see Bug B).
             $oldDecoded = FieldCodec::decode(
                 $config,
-                $existing ? get_post_meta($existing->ID, '_taw_' . $fieldId, true) : ''
+                $existing ? get_post_meta($existing->ID, $target['meta_key'], true) : ''
             );
             $newDecoded = FieldCodec::decode($config, $newVal);
 
@@ -652,7 +654,7 @@ class Importer
             $tpl === '' ? delete_post_meta($postId, '_wp_page_template') : update_post_meta($postId, '_wp_page_template', $tpl);
         }
 
-        $this->writePostFields($postId, is_array($incoming['fields'] ?? null) ? $incoming['fields'] : [], $idMap);
+        $this->writePostFields($postId, $type, is_array($incoming['fields'] ?? null) ? $incoming['fields'] : [], $idMap);
         $this->writePostTerms($postId, is_array($incoming['terms'] ?? null) ? $incoming['terms'] : []);
         $this->assignFeaturedMedia($postId, $incoming['featured_media'] ?? null, $idMap);
 
@@ -663,13 +665,24 @@ class Importer
      * @param array<string, mixed> $fields
      * @param array<int, int>      $idMap
      */
-    private function writePostFields(int $postId, array $fields, array $idMap): void
+    private function writePostFields(int $postId, string $postType, array $fields, array $idMap): void
     {
+        $registered = Metabox::fieldsFor('post', $postType);
         foreach ($fields as $fieldId => $value) {
-            $config = Metabox::get_field_config((string) $fieldId) ?? ['type' => 'text', 'id' => $fieldId];
+            // Format 1.2 keys (ADR-0008): a bare id is a `_taw_` field, a full
+            // meta key is a field with another prefix; 1.0/1.1 keys are bare ids.
+            $config = FieldKeys::forKey((string) $fieldId, $registered, self::bareConfigLookup())['config'];
             $value = FieldCodec::rewriteAttachmentIds($config, $value, $idMap);
-            Metabox::writeMeta($postId, $config + ['id' => $fieldId], $value);
+            Metabox::writeMeta($postId, $config, $value);
         }
+    }
+
+    /**
+     * @return callable(string): (array<string, mixed>|null)
+     */
+    private static function bareConfigLookup(): callable
+    {
+        return static fn (string $id): ?array => Metabox::get_field_config($id);
     }
 
     /**

@@ -22,7 +22,7 @@ final class CollisionReportTest extends SchemaTestCase
         CollisionReport::checkBeforeCompile(Schema::fieldset('book_details')->on('book')->fields([Field::text('subtitle')]));
 
         $this->assertCount(1, CollisionReport::collisions());
-        $this->assertStringContainsString('replaces the registry entry of metabox "legacy_box"', CollisionReport::collisions()[0]);
+        $this->assertStringContainsString('shares its id with metabox "legacy_box"', CollisionReport::collisions()[0]);
     }
 
     public function test_legacy_metabox_registered_later_overwriting_a_schema_field_is_detected(): void

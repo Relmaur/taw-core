@@ -24,13 +24,13 @@ use TAW\Core\OptionsPage\OptionsPage;
  * transients, non-allowlisted core/plugin options, and
  * `nav_menu` / `nav_menu_item` (code-owned in TAW themes).
  *
- * Schema: see `resources/schema/content-interchange-1.1.json`.
+ * Schema: see `resources/schema/content-interchange-1.2.json`.
  *
  * @phpstan-type Scope array{types?: list<string>, since?: string, posts?: list<int|string>, include_media?: bool, all_media?: bool, include_drafts?: bool, include_users?: bool, include_user_passwords?: bool, include_comments?: bool, include_settings?: bool}
  */
 class Exporter
 {
-    public const SCHEMA_VERSION = '1.1';
+    public const SCHEMA_VERSION = '1.2';
 
     /**
      * Core (non-`_taw_`) options included in every export. `page_on_front`
@@ -253,16 +253,39 @@ class Exporter
         $meta = get_post_meta($post->ID);
         $meta = is_array($meta) ? $meta : [];
 
+        // Format 1.2 (ADR-0008): `_taw_` fields keep their bare id as the key,
+        // fields with another prefix use their full meta key.
+        $registered = Metabox::fieldsFor('post', (string) $post->post_type);
+        $bareConfig = static fn (string $id): ?array => Metabox::get_field_config($id);
+        $keyedBy = [];
+
         foreach ($meta as $key => $rawValues) {
-            if (!is_string($key) || !str_starts_with($key, '_taw_')) {
+            if (!is_string($key)) {
                 continue;
             }
-            $fieldId = substr($key, strlen('_taw_'));
-            $raw = is_array($rawValues) ? ($rawValues[0] ?? '') : $rawValues;
+            $resolved = FieldKeys::forMetaKey($key, $registered, $bareConfig);
+            if ($resolved === null) {
+                continue;
+            }
+            $fieldKey = $resolved['key'];
+            $config = $resolved['config'];
 
-            $config = Metabox::get_field_config($fieldId) ?? ['type' => 'text', 'id' => $fieldId];
+            // Another prefix's meta key spelling a `_taw_` field's bare id:
+            // the `_taw_` field keeps the key (the importer resolves it the same way).
+            if (isset($keyedBy[$fieldKey])) {
+                $keepNew = ($config['prefix'] ?? '_taw_') === '_taw_';
+                $skipped = $keepNew ? $keyedBy[$fieldKey] : $key;
+                $this->warnings[] = "Post {$post->post_type}:{$post->post_name}: meta '{$skipped}' has the same snapshot key as '"
+                    . ($keepNew ? $key : $keyedBy[$fieldKey]) . "' — '{$skipped}' left out. Rename one of the fields.";
+                if (!$keepNew) {
+                    continue;
+                }
+            }
+            $keyedBy[$fieldKey] = $key;
+
+            $raw = is_array($rawValues) ? ($rawValues[0] ?? '') : $rawValues;
             $decoded = FieldCodec::decode($config, $raw);
-            $fields[$fieldId] = $decoded;
+            $fields[$fieldKey] = $decoded;
 
             foreach (FieldCodec::referencedAttachmentIds($config, $decoded) as $attId) {
                 $this->referencedAttachments[$attId] = true;

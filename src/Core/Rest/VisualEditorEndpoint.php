@@ -117,9 +117,14 @@ class VisualEditorEndpoint
             : null;
 
         $allFields = Metabox::getAllFieldConfigs();
+        $postType  = (string) get_post_type((int) $postId);
         $groups    = [];
 
         foreach ($allFields as $fieldId => $config) {
+            // This post type's own config for the id, when a metabox on it
+            // declares one (ADR-0008); else the bare entry, as before.
+            $config = Metabox::fieldFor('post', $postType, (string) $fieldId) ?? $config;
+
             // Filter by queued blocks when the caller provides a list
             if ($allowedBlocks !== null) {
                 $blockId = $config['block_id'] ?? null;
@@ -129,7 +134,7 @@ class VisualEditorEndpoint
             }
 
             // Skip fields explicitly opted out of the editor
-            if (Metabox::get_editor_config($fieldId) === null) {
+            if (Metabox::editorConfigOf($config) === null) {
                 continue;
             }
 
@@ -137,7 +142,7 @@ class VisualEditorEndpoint
             // Fall back to metabox_id for metaboxes registered outside a MetaBlock.
             $groupId      = $config['block_id']      ?? ($config['metabox_id'] ?? 'unknown');
             $metaboxTitle = $config['metabox_title'] ?? $groupId;
-            $prefix       = $config['prefix']        ?? '_taw_';
+            $metaKey      = $config['meta_key']      ?? (($config['prefix'] ?? '_taw_') . $fieldId);
 
             if (!isset($groups[$groupId])) {
                 $groups[$groupId] = [
@@ -148,7 +153,7 @@ class VisualEditorEndpoint
 
             // ── Repeater ──────────────────────────────────────────
             if (($config['type'] ?? '') === 'repeater') {
-                $rawJson = get_post_meta($postId, $prefix . $fieldId, true);
+                $rawJson = get_post_meta($postId, $metaKey, true);
                 $rows    = is_string($rawJson) && $rawJson !== ''
                     ? (json_decode($rawJson, true) ?? [])
                     : [];
@@ -188,7 +193,7 @@ class VisualEditorEndpoint
             }
 
             // ── All other field types ──────────────────────────────
-            $value = get_post_meta($postId, $prefix . $fieldId, true);
+            $value = get_post_meta($postId, $metaKey, true);
             $field = [
                 'fieldId' => $fieldId,
                 'type'    => $config['type']  ?? 'text',
@@ -333,7 +338,9 @@ class VisualEditorEndpoint
     {
         // ── 1. Field must exist in the registry ─────────────────
 
-        $fieldConfig = Metabox::get_field_config($fieldId);
+        // This post type's own config (ADR-0008), else the bare entry.
+        $fieldConfig = Metabox::fieldFor('post', (string) get_post_type($postId), $fieldId)
+            ?? Metabox::get_field_config($fieldId);
 
         if (!$fieldConfig) {
             return "Unknown field: {$fieldId}";
@@ -341,7 +348,7 @@ class VisualEditorEndpoint
 
         // ── 2. Field must be editor-enabled ─────────────────────
 
-        $editorConfig = Metabox::get_editor_config($fieldId);
+        $editorConfig = Metabox::editorConfigOf($fieldConfig);
 
         if ($editorConfig === null) {
             return "Field '{$fieldId}' is not editor-enabled.";
@@ -356,8 +363,7 @@ class VisualEditorEndpoint
 
         // ── 4. Determine the meta key and save ──────────────────
 
-        $prefix  = $fieldConfig['prefix'] ?? '_taw_';
-        $metaKey = $prefix . $fieldId;
+        $metaKey = $fieldConfig['meta_key'] ?? (($fieldConfig['prefix'] ?? '_taw_') . $fieldId);
 
         // For group sub-fields, the meta key is already the compound ID
         // (e.g., 'hero_cta_text' → '_taw_hero_cta_text')

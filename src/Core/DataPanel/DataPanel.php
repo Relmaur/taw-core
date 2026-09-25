@@ -245,7 +245,7 @@ final class DataPanel
         $errors = [];
         $drop   = [];
         foreach (self::applicable($post) as $box) {
-            $result = Validation::check($box, self::requestMeta($request), self::requestFields($request), self::storedReader($post->ID));
+            $result = Validation::check($box, self::requestMeta($request), self::requestFields($request), self::storedReader($post->ID, $box->prefix()));
             $errors = [...$errors, ...$result['errors']];
             $drop   = [...$drop, ...$result['drop']];
         }
@@ -298,7 +298,7 @@ final class DataPanel
         }
 
         foreach (self::applicable($post) as $box) {
-            $result = Validation::check($box, [], [], self::storedReader($post->ID));
+            $result = Validation::check($box, [], [], self::storedReader($post->ID, $box->prefix()));
             foreach ($result['clear'] as $metaKey) {
                 delete_post_meta($post->ID, $metaKey);
             }
@@ -385,9 +385,9 @@ final class DataPanel
     /**
      * @return callable(string, string): mixed
      */
-    private static function storedReader(int $postId): callable
+    private static function storedReader(int $postId, string $prefix): callable
     {
-        return static function (string $kind, string $key) use ($postId): mixed {
+        return static function (string $kind, string $key) use ($postId, $prefix): mixed {
             if ($postId <= 0) {
                 return null;
             }
@@ -395,14 +395,16 @@ final class DataPanel
                 return get_post_meta($postId, $key, true);
             }
 
-            // taw_<id> → the decoded value, like the REST field returns it.
-            foreach (Metabox::getFieldRegistry() as $id => $config) {
-                if ('taw_' . $id === $key) {
-                    return \TAW\Core\Content\FieldCodec::decode($config, get_post_meta($postId, (string) ($config['prefix'] ?? '_taw_') . $id, true));
-                }
+            // taw_<id> → the decoded value, like the REST field returns it,
+            // with this box's own config for this post type (ADR-0008).
+            if (!str_starts_with($key, 'taw_')) {
+                return null;
             }
+            $config = Metabox::fieldFor('post', (string) get_post_type($postId), $prefix . substr($key, strlen('taw_')));
 
-            return null;
+            return $config === null
+                ? null
+                : \TAW\Core\Content\FieldCodec::decode($config, get_post_meta($postId, Metabox::metaKeyOf($config), true));
         };
     }
 }
