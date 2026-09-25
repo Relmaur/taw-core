@@ -193,6 +193,11 @@ final class Validation
 
     private static function isEmpty(mixed $value): bool
     {
+        // A link without a URL is no link.
+        if (is_array($value) && array_key_exists('url', $value)) {
+            return trim((string) $value['url']) === '';
+        }
+
         return $value === '' || $value === null || $value === [] || $value === false;
     }
 

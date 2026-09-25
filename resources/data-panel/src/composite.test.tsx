@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { editPost, editor } from '../tests/wp-globals';
 import FieldControl from './FieldControl';
-import { hubspotConfig, segments } from './controls/CompositeControls';
+import { hubspotConfig, linkValue, segments } from './controls/CompositeControls';
+import { isEmptyValue } from './required';
 import type { FieldDescriptor } from './types';
 
 function renderField(field: FieldDescriptor, stored: Record<string, unknown>) {
@@ -72,5 +73,40 @@ describe('hubspot_form', () => {
         expect(editPost).toHaveBeenCalledWith({
             meta: { _taw_form: '{"portal_id":"1","form_id":"g","region":"na1"}' },
         });
+    });
+});
+
+describe('link', () => {
+    const field: FieldDescriptor = { id: 'cta', type: 'link', label: 'Button', binding: { field: 'taw_cta' } };
+
+    it('reads the REST object, a repeater row string, or nothing', () => {
+        expect(linkValue({ url: 'https://a.test', label: 'Go', new_tab: true })).toEqual({
+            url: 'https://a.test',
+            label: 'Go',
+            new_tab: true,
+        });
+        expect(linkValue('{"url":"https://a.test","label":"","new_tab":"1"}')).toEqual({
+            url: 'https://a.test',
+            label: '',
+            new_tab: true,
+        });
+        expect(linkValue(null)).toEqual({ url: '', label: '', new_tab: false });
+    });
+
+    it('edits the url, text and new tab as one object', () => {
+        editor.edited = { meta: {}, taw_cta: { url: 'https://a.test', label: 'Go', new_tab: false } };
+        render(<FieldControl field={field} />);
+        fireEvent.change(screen.getByLabelText('Link text'), { target: { value: 'Read more' } });
+        expect(editPost).toHaveBeenLastCalledWith({
+            taw_cta: { url: 'https://a.test', label: 'Read more', new_tab: false },
+        });
+        fireEvent.click(screen.getByLabelText('Open in a new tab'));
+        expect(editPost).toHaveBeenLastCalledWith({ taw_cta: { url: 'https://a.test', label: 'Go', new_tab: true } });
+    });
+
+    it('counts as empty without a url, for required fields', () => {
+        expect(isEmptyValue({ url: '', label: 'Text only', new_tab: true })).toBe(true);
+        expect(isEmptyValue({ url: 'https://a.test', label: '', new_tab: false })).toBe(false);
+        expect(isEmptyValue(null)).toBe(true);
     });
 });

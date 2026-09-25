@@ -152,7 +152,7 @@
           "enum": [
             "text", "url", "number", "textarea", "wysiwyg", "select", "checkbox",
             "color", "datepicker", "range", "image", "icon", "files", "gradient_text",
-            "hubspot_form", "group", "post_select", "repeater"
+            "hubspot_form", "group", "post_select", "repeater", "link"
           ]
         },
         "label": { "type": "string" },

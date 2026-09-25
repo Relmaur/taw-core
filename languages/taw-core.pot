@@ -129,6 +129,10 @@ msgid "(added to every allow list)"
 msgstr ""
 
 #: src/Core/Metabox/Metabox.php
+msgid "(new tab)"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
 msgid "(no title)"
 msgstr ""
 
@@ -512,6 +516,10 @@ msgstr ""
 msgid "Knowledge base deleted."
 msgstr ""
 
+#: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
+msgid "Link text"
+msgstr ""
+
 #: src/Core/Media/MediaFolders.php
 msgid "Load more"
 msgstr ""
@@ -682,6 +690,10 @@ msgstr ""
 
 #: resources/data-panel/src/SaveLock.tsx
 msgid "Open TAW Data"
+msgstr ""
+
+#: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
+msgid "Open in a new tab"
 msgstr ""
 
 #: src/Core/Editor/VisualEditor.php
@@ -1044,6 +1056,10 @@ msgstr ""
 msgid "Type / to choose a block"
 msgstr ""
 
+#: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
+msgid "URL"
+msgstr ""
+
 #: src/Core/Content/ContentAdminScreen.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Unauthorized"
 msgstr ""
@@ -1134,6 +1150,10 @@ msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "default (no editing policy sets one)"
+msgstr ""
+
+#: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
+msgid "https:// or /path"
 msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php

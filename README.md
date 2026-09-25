@@ -211,6 +211,7 @@ new Metabox([
 | `icon` | Lucide icon picker; stores icon name — **opt-in**, requires `Lucide::enable()` (see [Icon System](#icon-system)) |
 | `gradient_text` | Ordered `{text, highlighted}` segments; stores JSON array (see [Gradient Text](#gradient-text)) |
 | `hubspot_form` | HubSpot embed config (`portal_id`/`form_id`/`region`); stores JSON object (see [HubSpot Form](#hubspot-form)) |
+| `link` | URL, link text and "open in a new tab"; stores one JSON object (see [Link](#link-v1590)) |
 
 All fields accept: `id`, `label`, `description`, `placeholder`, `default`, `required`, `width` (%), `readonly` (see [Readonly Fields](#readonly-fields)).
 
@@ -291,6 +292,26 @@ if (Hubspot::isConfigured($config)) {
 ```
 
 `Hubspot::render()` prints HubSpot's own `forms/embed/v2.js` loader plus a scoped `hbspt.forms.create()` call targeting a freshly generated container id — safe to call more than once per page. `region` defaults to `na1` when blank. No `enable()` gate — unlike `icon`'s bundled Lucide set, there's no asset here to opt into; the field type is available as soon as it's used.
+
+### Link (v1.59.0+)
+
+A `link` field is a URL, its text and "open in a new tab", edited together and stored as one JSON value:
+
+```php
+['id' => 'hero_cta', 'label' => 'Button', 'type' => 'link', 'required' => true],   // Field::link('hero_cta') in the schema
+```
+
+```php
+echo Taw::post()->field('hero_cta');                          // <a href="…" target="_blank" rel="noopener">Text</a>, escaped
+$cta = Taw::post()->field('hero_cta')->link();                // ->url(), ->label() (the URL when empty), ->newTab(), ->exists()
+echo $cta->html(['class' => 'btn']);
+```
+
+- **Stored:** `{"url": "…", "label": "…", "new_tab": true|false}`; nothing (`''`) without a URL. The URL is
+  `esc_url_raw()`'d, so relative paths (`/contact`) work and `javascript:` is dropped. `required` means a URL.
+- **Everywhere:** metabox and options page (including repeater rows and groups), term and user screens, the data
+  panel, REST (raw meta plus the decoded `taw_<id>` object), content snapshots and `fields:get`/`fields:set`.
+  The visual editor lists it without an inline editor, like `hubspot_form`.
 
 ### Reading Values
 

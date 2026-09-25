@@ -12,8 +12,11 @@ export function bindingKey(binding: Binding | undefined): string {
     return 'meta' in binding ? binding.meta : binding.field;
 }
 
-/** Empty the way TAW\Core\DataPanel\Validation::isEmpty() sees it. */
+/** Empty the way TAW\Core\DataPanel\Validation::isEmpty() sees it (a link without a URL is empty). */
 export function isEmptyValue(value: unknown): boolean {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value) && 'url' in value) {
+        return String((value as { url: unknown }).url ?? '').trim() === '';
+    }
     return (
         value === '' ||
         value === null ||

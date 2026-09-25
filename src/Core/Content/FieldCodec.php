@@ -29,7 +29,7 @@ final class FieldCodec
     /**
      * Field types whose stored value is a JSON string wrapping structured data.
      */
-    public const STRUCTURED_TYPES = ['repeater', 'files', 'post_select'];
+    public const STRUCTURED_TYPES = ['repeater', 'files', 'post_select', 'link'];
 
     /**
      * Decode a raw stored value into its portable representation.
@@ -51,8 +51,29 @@ final class FieldCodec
                 ? ((int) $raw ?: null)
                 : self::intList(self::decodeJsonArray($raw)),
             'repeater' => self::decodeRepeater($fieldConfig, $raw),
+            'link'     => self::decodeLink($raw),
             default    => $raw === false ? '' : $raw,
         };
+    }
+
+    /**
+     * A link as `{url, label, new_tab}`, or null when there's no URL (no link).
+     *
+     * @param mixed $raw The stored JSON string, or an already decoded array.
+     * @return array{url: string, label: string, new_tab: bool}|null
+     */
+    private static function decodeLink(mixed $raw): ?array
+    {
+        $link = is_array($raw) ? $raw : json_decode(is_string($raw) ? $raw : '', true);
+        if (!is_array($link) || !is_string($link['url'] ?? null) || trim($link['url']) === '') {
+            return null;
+        }
+
+        return [
+            'url'     => $link['url'],
+            'label'   => is_scalar($link['label'] ?? null) ? (string) $link['label'] : '',
+            'new_tab' => in_array($link['new_tab'] ?? false, [true, 1, '1', 'true', 'on'], true),
+        ];
     }
 
     /**

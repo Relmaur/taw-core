@@ -24,7 +24,7 @@ if (!defined('ABSPATH')) {
  *
  * Supported field types: text, url, number, textarea, wysiwyg, select,
  * checkbox, color, range, datepicker, image, files, group, post_select,
- * repeater, gradient_text, hubspot_form.
+ * repeater, gradient_text, hubspot_form, link.
  *
  * Usage:
  *   new OptionsPage([
@@ -879,6 +879,10 @@ class OptionsPage
                 Metabox::render_hubspot_form_field($field_id, $value);
                 break;
 
+            case 'link':
+                Metabox::render_link_field($field_id, $value);
+                break;
+
             /* ---- Default ---- */
             default:
                 printf(
@@ -1033,6 +1037,11 @@ class OptionsPage
     {
         $label = $field['label'] ?? $field['id'];
 
+        // A link is empty without a URL (its inputs post JSON either way).
+        if (($field['type'] ?? '') === 'link') {
+            $value = Metabox::sanitizeLinkValue($value);
+        }
+
         if (!empty($field['required']) && ($value === '' || $value === null)) {
             return sprintf(__('%s is required.', 'taw-core'), $label);
         }
@@ -1094,6 +1103,7 @@ class OptionsPage
             // the two contexts silently drifting apart.
             'gradient_text'  => Metabox::sanitizeGradientTextValue($value),
             'hubspot_form'   => Metabox::sanitizeHubspotFormValue($value),
+            'link'           => Metabox::sanitizeLinkValue($value),
             default          => sanitize_text_field($value),
         };
     }

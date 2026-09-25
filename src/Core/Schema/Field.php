@@ -36,7 +36,7 @@ final class Field
     public const TYPES = [
         'text', 'url', 'number', 'textarea', 'wysiwyg', 'select', 'checkbox',
         'color', 'datepicker', 'range', 'image', 'icon', 'files', 'gradient_text',
-        'hubspot_form', 'group', 'post_select', 'repeater',
+        'hubspot_form', 'group', 'post_select', 'repeater', 'link',
     ];
 
     /** Types that hold nested fields. */
@@ -90,6 +90,8 @@ final class Field
     public static function files(string $id): self { return new self('files', $id); }
     public static function gradientText(string $id): self { return new self('gradient_text', $id); }
     public static function hubspotForm(string $id): self { return new self('hubspot_form', $id); }
+    /** A link: URL, text and "open in a new tab", stored as one JSON value (v1.59.0+). */
+    public static function link(string $id): self { return new self('link', $id); }
     public static function group(string $id): self { return new self('group', $id); }
     public static function postSelect(string $id): self { return new self('post_select', $id); }
     public static function repeater(string $id): self { return new self('repeater', $id); }
