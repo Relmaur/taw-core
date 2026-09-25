@@ -46,3 +46,32 @@ jobs:
 
       - name: Shared Vite config tests (node:test, no npm deps)
         run: node --test tests/js/*.test.mjs
+
+  data-panel:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: resources/data-panel
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: resources/data-panel/package-lock.json
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint, format, typecheck, Vitest, build
+        run: npm run check
+
+      # The build is committed (ADR-0007): a fresh one must match it exactly.
+      - name: Committed build is current
+        working-directory: .
+        run: |
+          git status --porcelain -- assets/data-panel
+          test -z "$(git status --porcelain -- assets/data-panel)" || { echo "assets/data-panel is stale: run npm run build in resources/data-panel and commit it."; exit 1; }

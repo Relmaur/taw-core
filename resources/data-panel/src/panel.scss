@@ -1,0 +1,706 @@
+// The TAW Data sidebar. Matches the block editor's own sidebar controls.
+$gray-100: #f0f0f0;
+$gray-300: #ddd;
+$gray-600: #949494;
+$gray-700: #757575;
+$gray-900: #1e1e1e;
+$gap: 16px;
+// Between fields: more than inside one field, so each field reads as a unit.
+$field-gap: 24px;
+
+.taw-data-panel {
+    // One rhythm for every field, in and out of tabs.
+    &__fields {
+        display: flex;
+        flex-direction: column;
+        gap: $field-gap;
+    }
+
+    &__fields + &__tabs {
+        margin-top: $field-gap;
+    }
+
+    // Tabs span the sidebar, with a divider under them.
+    &__tabs {
+        margin: 0 (-$gap);
+
+        .components-tab-panel__tabs {
+            display: flex;
+            border-bottom: 1px solid $gray-300;
+            padding: 0 ($gap * 0.5);
+        }
+
+        .components-tab-panel__tabs-item {
+            flex: 1 1 0;
+            justify-content: center;
+        }
+
+        .components-tab-panel__tab-content {
+            padding: $gap $gap 0;
+        }
+    }
+
+    &__required {
+        color: #cc1818;
+    }
+
+    // Color and date: a full-width row that opens a popover.
+    &__picker {
+        display: block;
+        width: 100%;
+    }
+
+    &__picker-toggle.components-button {
+        width: 100%;
+        gap: 8px;
+        padding: 0 12px;
+        justify-content: flex-start;
+        border: 1px solid $gray-600;
+        border-radius: 2px;
+        color: $gray-900;
+        background: #fff;
+
+        &:hover:not(:disabled),
+        &.is-open {
+            border-color: var(--wp-admin-theme-color);
+            color: $gray-900;
+        }
+
+        &.is-empty .taw-data-panel__picker-value {
+            color: $gray-700;
+        }
+
+        .component-color-indicator {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+
+            &.is-empty {
+                background: linear-gradient(-45deg, transparent 48%, $gray-600 48%, $gray-600 52%, transparent 52%);
+                box-shadow: inset 0 0 0 1px $gray-600;
+            }
+        }
+    }
+
+    &__picker-value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__picker-icon {
+        color: $gray-700;
+    }
+
+    &__unit {
+        color: $gray-700;
+    }
+
+    // Field types the panel doesn't edit yet: a quiet note, not an alert.
+    &__pending {
+        padding: 8px 12px;
+        border: 1px dashed $gray-300;
+        border-radius: 2px;
+        background: $gray-100;
+        color: $gray-700;
+        font-size: 12px;
+    }
+
+    &__empty {
+        margin: 0;
+        padding: $gap;
+        color: $gray-700;
+    }
+}
+
+.taw-data-panel__picker-popover .components-popover__content {
+    width: 280px;
+}
+
+.taw-data-panel__popover-body {
+    padding: $gap;
+}
+
+.taw-data-panel__popover-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+// ── Media, rich and composite fields (P3) ──────────────────────────────────
+.taw-data-panel {
+    // An empty image: a dashed drop target, like core's featured image.
+    &__dropzone.components-button {
+        width: 100%;
+        height: 96px;
+        justify-content: center;
+        border-radius: 2px;
+        background: $gray-100;
+        color: $gray-900;
+        box-shadow: none;
+        outline: 1px dashed $gray-600;
+        outline-offset: -1px;
+
+        &:hover:not(:disabled) {
+            background: #e7e7e7;
+            color: var(--wp-admin-theme-color);
+        }
+    }
+
+    &__image {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    &__image-preview.components-button {
+        display: flex;
+        width: 100%;
+        height: auto;
+        min-height: 96px;
+        padding: 0;
+        justify-content: center;
+        border-radius: 2px;
+        background: $gray-100;
+        overflow: hidden;
+
+        img {
+            display: block;
+            width: 100%;
+            height: auto;
+            max-height: 240px;
+            object-fit: contain;
+        }
+
+        &:focus-visible {
+            box-shadow: 0 0 0 var(--wp-admin-border-width-focus) var(--wp-admin-theme-color);
+        }
+    }
+
+    &__actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    &__missing {
+        padding: 12px;
+        color: $gray-700;
+        font-size: 12px;
+        white-space: normal;
+    }
+
+    // files and post_select: a compact list with per-row actions.
+    &__files,
+    &__posts {
+        margin: 0 0 8px;
+        padding: 0;
+        list-style: none;
+        border: 1px solid $gray-300;
+        border-radius: 2px;
+    }
+
+    &__file,
+    &__post {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 40px;
+        margin: 0;
+        padding: 4px 4px 4px 8px;
+
+        & + & {
+            border-top: 1px solid $gray-300;
+        }
+    }
+
+    &__file-thumb {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 2px;
+        background: $gray-100;
+        color: $gray-700;
+        overflow: hidden;
+
+        img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .components-spinner {
+            margin: 0;
+        }
+    }
+
+    &__file-name,
+    &__post-title {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__post-type {
+        flex-shrink: 0;
+        padding: 0 6px;
+        border-radius: 2px;
+        background: $gray-100;
+        color: $gray-700;
+        font-size: 11px;
+        line-height: 20px;
+    }
+
+    &__file-actions {
+        display: flex;
+        flex-shrink: 0;
+        opacity: 0.6;
+
+        .taw-data-panel__file:hover &,
+        .taw-data-panel__post:hover &,
+        &:focus-within {
+            opacity: 1;
+        }
+    }
+
+    &__add.components-button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    &__count {
+        margin: 4px 0 0;
+        color: $gray-700;
+        font-size: 12px;
+        text-align: right;
+    }
+
+    &__post-search {
+        position: relative;
+    }
+
+    &__post-results {
+        margin: 4px 0 0;
+        padding: 4px 0;
+        list-style: none;
+        border: 1px solid $gray-300;
+        border-radius: 2px;
+        background: #fff;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+
+        li {
+            margin: 0;
+        }
+    }
+
+    &__post-result.components-button {
+        display: flex;
+        width: 100%;
+        height: auto;
+        min-height: 36px;
+        gap: 8px;
+        padding: 4px 8px;
+        text-align: left;
+
+        &:hover {
+            background: $gray-100;
+        }
+    }
+
+    &__post-note {
+        margin: 8px 0 0;
+        color: $gray-700;
+        font-size: 12px;
+    }
+
+    // icon
+    &__icon-svg {
+        display: inline-flex;
+        flex-shrink: 0;
+
+        svg {
+            width: 20px;
+            height: 20px;
+        }
+    }
+
+    // wysiwyg: a preview card with the edit button.
+    &__rich {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px;
+        border: 1px solid $gray-300;
+        border-radius: 2px;
+
+        &.is-empty .taw-data-panel__rich-preview {
+            color: $gray-700;
+            font-style: italic;
+        }
+    }
+
+    &__rich-preview {
+        display: -webkit-box;
+        margin: 0;
+        overflow: hidden;
+        color: $gray-900;
+        line-height: 1.5;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 4;
+    }
+
+    // A field made of parts (gradient_text, hubspot_form): one framed card.
+    &__group {
+        min-width: 0;
+        border: 1px solid $gray-300;
+        border-radius: 4px;
+        background: #fff;
+    }
+
+    &__group-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 40px;
+        padding: 0 12px;
+        border-bottom: 1px solid $gray-300;
+        border-radius: 4px 4px 0 0;
+        background: $gray-100;
+    }
+
+    &__group-title {
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1.4;
+        text-transform: uppercase;
+    }
+
+    &__group-body {
+        display: flex;
+        flex-direction: column;
+        gap: $gap;
+        padding: $gap 12px;
+    }
+
+    &__group-help {
+        margin: 0;
+        padding: 0 12px 12px;
+        color: $gray-700;
+        font-size: 12px;
+    }
+
+    &__group-empty {
+        margin: 0;
+        color: $gray-700;
+        font-style: italic;
+    }
+
+    // gradient_text
+    &__gradient-preview {
+        margin: 0;
+        padding: 8px 12px;
+        border-radius: 2px;
+        background: $gray-100;
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.4;
+
+        .is-highlighted {
+            background: linear-gradient(90deg, var(--wp-admin-theme-color), #9b51e0);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+    }
+
+    // Segments: numbered rows split by dividers (no boxes inside the card).
+    &__segments {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    &__segment {
+        display: flex;
+        gap: 10px;
+        margin: 0;
+        padding: 12px 0;
+
+        & + & {
+            border-top: 1px solid $gray-300;
+        }
+
+        &:first-child {
+            padding-top: 0;
+        }
+
+        &:last-child {
+            padding-bottom: 0;
+        }
+    }
+
+    &__segment-number {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        margin-top: 9px;
+        border-radius: 50%;
+        background: $gray-900;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    &__segment-fields {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    &__segment-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+}
+
+.taw-data-panel__icons-popover .components-popover__content {
+    width: 320px;
+}
+
+.taw-data-panel__icons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.taw-data-panel__icon-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.taw-data-panel__icon-option.components-button {
+    justify-content: center;
+    width: 100%;
+    height: 40px;
+    padding: 0;
+    border-radius: 2px;
+
+    svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    &:hover {
+        background: $gray-100;
+    }
+
+    &.is-selected {
+        background: var(--wp-admin-theme-color);
+        color: #fff;
+    }
+}
+
+.taw-data-panel__icons-note {
+    margin: 0;
+    color: $gray-700;
+}
+
+.taw-data-panel__popover-footer--padded {
+    margin: 0;
+    padding: 0 $gap $gap;
+}
+
+// The mini block editor: toolbar, canvas, footer. The canvas has a fixed
+// height that fits the modal's own max height, so only the canvas scrolls.
+.taw-data-panel__rich-modal {
+    width: min(960px, calc(100vw - 32px));
+
+    .components-modal__content {
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 0;
+        overflow: hidden;
+    }
+}
+
+.taw-data-panel__rich-toolbar {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.taw-data-panel__rich-hint {
+    color: $gray-700;
+    font-size: 12px;
+}
+
+.taw-data-panel__rich-canvas {
+    flex-shrink: 0;
+    // The modal frame is at most 70vh tall; header, toolbar and footer take ~215px.
+    height: max(200px, min(560px, calc(70vh - 220px)));
+    border: 1px solid $gray-300;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.taw-data-panel__rich-footer {
+    display: flex;
+    flex-shrink: 0;
+    justify-content: flex-end;
+    gap: 8px;
+    margin: 16px -24px 0;
+    padding: 16px 24px;
+    border-top: 1px solid $gray-300;
+    background: #fff;
+}
+
+// ── Structure (P4): repeater rows and save errors ──────────────────────────
+.taw-data-panel {
+    &__rows {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    // A row: a header you can click to collapse, then its sub-fields.
+    &__row {
+        margin: 0;
+        border: 1px solid $gray-300;
+        border-radius: 2px;
+        background: #fff;
+
+        &.is-open {
+            border-color: $gray-600;
+        }
+    }
+
+    &__row-header {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 40px;
+        padding-right: 4px;
+    }
+
+    &__row.is-open &__row-header {
+        border-bottom: 1px solid $gray-300;
+    }
+
+    &__row-toggle.components-button {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 40px;
+        gap: 6px;
+        padding: 0 4px 0 8px;
+        color: $gray-900;
+
+        &:hover {
+            color: var(--wp-admin-theme-color);
+        }
+    }
+
+    &__row-number {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 4px;
+        border-radius: 10px;
+        background: $gray-100;
+        color: $gray-700;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    &__row-title {
+        overflow: hidden;
+        font-weight: 500;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__row-body {
+        display: flex;
+        flex-direction: column;
+        gap: $gap;
+        padding: 12px;
+    }
+
+    // Inside a row (nested repeaters): a lighter header, tighter padding and
+    // no number badge, so the row titles still have room in the sidebar.
+    &__row-body &__group-header {
+        background: #f8f8f8;
+    }
+
+    &__row-body &__group-body {
+        padding: 12px 8px;
+    }
+
+    &__row-body &__row-body {
+        padding: 8px;
+    }
+
+    &__row-body &__row-number {
+        display: none;
+    }
+
+    &__rows-footer {
+        display: flex;
+        flex-direction: column;
+    }
+
+    // A field the last save refused: a red rule and the server's message.
+    &__field.has-error {
+        position: relative;
+        padding-left: 10px;
+
+        &::before {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 2px;
+            border-radius: 1px;
+            background: #cc1818;
+            content: '';
+        }
+    }
+
+    &__error {
+        margin: 6px 0 0;
+        color: #cc1818;
+        font-size: 12px;
+    }
+}
+
+// Remove buttons on rows: quiet until pointed at.
+.taw-data-panel__remove.components-button {
+    color: $gray-700;
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+        color: #cc1818;
+    }
+}

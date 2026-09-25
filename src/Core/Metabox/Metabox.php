@@ -127,6 +127,12 @@ class Metabox
      */
     private string $type;
 
+    /** Where it shows in the block editor ('panel' | 'metabox'), or null for the site default (ADR-0007). */
+    private ?string $ui;
+
+    /** @var list<self> Post-type metaboxes, in construction order (the data panel reads them). */
+    private static array $instances = [];
+
     /**
      * @param array $config {
      *     @type string   $id       Unique metabox ID.
@@ -158,6 +164,7 @@ class Metabox
         $this->icon     = $config['icon'] ?? '';
 
         $this->type = $config['type'] ?? 'post_type';
+        $this->ui   = isset($config['ui']) && is_string($config['ui']) ? $config['ui'] : null;
 
         if ($this->type === 'nav_menu') {
             add_action('wp_nav_menu_item_custom_fields', [$this, 'render_for_nav_menu'], 10, 5);
@@ -165,6 +172,7 @@ class Metabox
         } else {
             add_action('add_meta_boxes', [$this, 'register']);
             add_action('save_post', [$this, 'save'], 10, 2);
+            self::$instances[] = $this;
         }
 
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
@@ -230,6 +238,95 @@ class Metabox
     public function screens(): array
     {
         return $this->screens;
+    }
+
+    public function id(): string
+    {
+        return $this->id;
+    }
+
+    public function title(): string
+    {
+        return $this->title;
+    }
+
+    public function prefix(): string
+    {
+        return $this->prefix;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function fields(): array
+    {
+        return $this->fields;
+    }
+
+    /**
+     * @return array<mixed>
+     */
+    public function tabs(): array
+    {
+        return $this->tabs;
+    }
+
+    public function icon(): string
+    {
+        return $this->icon;
+    }
+
+    /** 'panel', 'metabox', or null when the site default applies (ADR-0007). */
+    public function ui(): ?string
+    {
+        return $this->ui;
+    }
+
+    /**
+     * Whether this metabox belongs on $post's edit screen: its show_on
+     * callback allows it, and a screen matches by post type, slug or
+     * template (the same rules register() and save() use). With
+     * $includeTemplates false, template screens are ignored: "does it apply
+     * whatever template the post uses?"
+     */
+    public function appliesTo(\WP_Post $post, bool $includeTemplates = true): bool
+    {
+        if (is_callable($this->show_on) && !call_user_func($this->show_on, $post)) {
+            return false;
+        }
+
+        [$postTypes, $templates, $slugs] = $this->parseScreens();
+
+        return in_array($post->post_type, $postTypes, true)
+            || ($slugs && in_array($post->post_name, $slugs, true))
+            || ($includeTemplates && $templates && $this->postMatchesTemplate($post, $templates));
+    }
+
+    /**
+     * The template-file screens (e.g. 'page-about.php'): the data panel
+     * re-checks these when the template changes in the editor.
+     *
+     * @return string[]
+     */
+    public function templateScreens(): array
+    {
+        return $this->parseScreens()[1];
+    }
+
+    /**
+     * Post-type metaboxes created so far this request.
+     *
+     * @return list<self>
+     */
+    public static function instances(): array
+    {
+        return self::$instances;
+    }
+
+    /** @internal Tests only. */
+    public static function forgetInstances(): void
+    {
+        self::$instances = [];
     }
 
     /**
@@ -357,6 +454,13 @@ class Metabox
         $postTypes = array_unique($postTypes);
 
         if (empty($postTypes)) {
+            return;
+        }
+
+        // The data panel (ADR-0007) shows this fieldset instead: a metabox
+        // too would post stale values after the panel's REST save. Without a
+        // form there's no nonce, so save() stays out of it as well.
+        if ($post instanceof \WP_Post && apply_filters('taw_metabox_ui', 'metabox', $this, $post) === 'panel') {
             return;
         }
 
@@ -622,6 +726,13 @@ class Metabox
                 [],
                 Framework::version()
             );
+            return;
+        }
+
+        // A fieldset in the data panel (ADR-0007) has no metabox on this
+        // screen, so its admin scripts and styles would be dead weight.
+        $post = get_post();
+        if ($post instanceof \WP_Post && apply_filters('taw_metabox_ui', 'metabox', $this, $post) === 'panel') {
             return;
         }
 
@@ -3586,8 +3697,15 @@ class Metabox
     }
 
     /**
-     * Sanitize a repeater value (array of rows) from the visual editor.
-     * Each row's sub-fields are sanitized individually using sanitizeValue().
+     * Sanitize a repeater value (array of rows) outside the metabox form: the
+     * REST field, the data panel, the visual editor, `fields:set` and
+     * Content\Importer. Stores what {@see self::sanitize_repeater()} stores
+     * for the same rows: each sub-field through
+     * {@see self::sanitizeForStorage()} (so files/post_select/gradient_text/
+     * hubspot_form inside a row keep their JSON, which the scalar-only
+     * sanitizeValue() used to blank), nested repeaters as decoded arrays
+     * inside the row (a JSON string would be double-encoded), `max` rows at
+     * most, and rows with no content dropped.
      * Returns a JSON string ready for update_post_meta().
      *
      * @param array $fieldConfig The repeater's full config (must include 'fields' sub-array).
@@ -3608,6 +3726,14 @@ class Metabox
             }
         }
 
+        if (!is_array($rows)) {
+            $rows = [];
+        }
+        $max = (int) ($fieldConfig['max'] ?? 0);
+        if ($max > 0) {
+            $rows = array_slice($rows, 0, $max);
+        }
+
         $sanitized = [];
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -3619,10 +3745,16 @@ class Metabox
                 if (str_starts_with((string) $key, '_')) {
                     continue;
                 }
-                $sf = $sfMap[$key] ?? ['type' => 'text', 'id' => $key];
-                $sanitizedRow[$key] = self::sanitizeValue($sf, $val);
+                $sf    = $sfMap[$key] ?? ['type' => 'text', 'id' => $key];
+                $clean = self::sanitizeForStorage($sf, $val);
+                if (($sf['type'] ?? 'text') === 'repeater') {
+                    $clean = json_decode((string) $clean, true) ?: [];
+                }
+                $sanitizedRow[$key] = $clean;
             }
-            if (!empty($sanitizedRow)) {
+            // Same rule as sanitize_repeater(): a row needs at least one value.
+            $hasContent = array_filter($sanitizedRow, static fn ($v) => $v !== '' && $v !== '0' && $v !== '[]' && $v !== [] && $v !== null);
+            if ($hasContent !== []) {
                 $sanitized[] = $sanitizedRow;
             }
         }

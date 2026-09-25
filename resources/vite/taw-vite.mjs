@@ -78,7 +78,7 @@ export const WP_EXPORT_NAMES = [
     'WritingFlow', 'ObserveTyping', 'BlockCanvas', 'BlockEditorKeyboardShortcuts', 'Inserter',
     'useSetting', 'useSettings', 'useBlockEditingMode', 'withColors',
     // @wordpress/components
-    'BaseControl', 'Button', 'Card', 'CardBody', 'CardHeader', 'CheckboxControl', 'ColorPalette',
+    'BaseControl', 'Button', 'Card', 'CardBody', 'CardHeader', 'CheckboxControl', 'ColorIndicator', 'ColorPalette',
     'ColorPicker', 'ComboboxControl', 'DatePicker', 'DateTimePicker', 'Dashicon', 'Dropdown',
     'DropdownMenu', 'ExternalLink', 'Fill', 'Flex', 'FlexBlock', 'FlexItem', 'FormTokenField', 'Icon',
     'MenuGroup', 'MenuItem', 'Modal', 'Notice', 'PanelBody', 'PanelRow', 'Placeholder', 'Popover',

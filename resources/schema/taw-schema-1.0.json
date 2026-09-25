@@ -8,7 +8,7 @@
   "properties": {
     "$schema": { "type": "string" },
     "version": { "const": 1 },
-    "kind": { "enum": ["post_type", "taxonomy", "fieldset", "options_page", "editing"] },
+    "kind": { "enum": ["post_type", "taxonomy", "fieldset", "options_page", "editing", "settings"] },
     "key": { "type": "string", "pattern": "^[a-z0-9_-]+$" },
     "override": {
       "type": "boolean",
@@ -53,6 +53,7 @@
           "context": { "enum": ["normal", "side", "advanced"] },
           "priority": { "enum": ["high", "default", "low"] },
           "prefix": { "type": "string", "description": "Meta key prefix. Default _taw_." },
+          "ui": { "enum": ["panel", "metabox"], "description": "Where it shows in the block editor: the TAW Data sidebar or a metabox. Unset, the site settings (fieldsetUi) and TAW_DATA_UI decide; the default is metabox." },
           "config": { "type": "object", "description": "Any other Metabox config key (tabs, icon, …)." }
         },
         "additionalProperties": false
@@ -104,6 +105,17 @@
             },
             "additionalProperties": false
           }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "settings" } } },
+      "then": {
+        "properties": {
+          "$schema": true, "version": true, "kind": true, "override": true,
+          "key": { "const": "site", "description": "A site has one settings definition." },
+          "fieldsetUi": { "enum": ["panel", "metabox"], "description": "Where fieldsets show in the block editor unless they set ui themselves. TAW_DATA_UI in wp-config.php replaces it per install. Default metabox." }
         },
         "additionalProperties": false
       }

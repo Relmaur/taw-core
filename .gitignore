@@ -43,3 +43,8 @@ ehthumbs.db
 # PHP CS Fixer
 .php-cs-fixer.cache
 .php_cs.cache
+
+# Data panel (ADR-0007): the build in assets/data-panel/ IS committed; the
+# dev-server hot file and Node deps are not.
+/assets/data-panel/hot
+/resources/data-panel/node_modules/
