@@ -164,11 +164,49 @@ final class ResolverTest extends TestCase
         $this->assertArrayNotHasKey('madeUp', $policy->design);
     }
 
+    public function test_theme_blocks_join_the_curated_list_at_every_level_that_has_one(): void
+    {
+        foreach (['guided', 'structured', 'locked'] as $level) {
+            $policy = Resolver::resolve(Schema::editing()->preset($level)->themeBlocks('taw-gutenberg/*'));
+
+            $this->assertSame([...Presets::CURATED_BLOCKS, 'taw-gutenberg/*'], $policy->content('page')['allow'], $level);
+            $this->assertSame(['taw-gutenberg/*'], $policy->themeBlocks);
+        }
+    }
+
+    public function test_theme_blocks_leave_every_block_allowed_where_nothing_is_restricted(): void
+    {
+        $policy = Resolver::resolve(Schema::editing()->preset('open')->themeBlocks('taw-gutenberg/*'));
+
+        $this->assertNull($policy->content('page')['allow']);
+        $this->assertNull($policy->content('post')['allow'], 'post types the policy never names stay open');
+    }
+
+    public function test_theme_blocks_join_custom_allow_lists_once(): void
+    {
+        $definition = Schema::editing()
+            ->preset('guided')
+            ->themeBlocks('acme/*', 'core/heading')
+            ->content('book', ['allow' => ['core/heading', 'core/paragraph']]);
+
+        $policy = Resolver::resolve($definition, ['event' => ['allow' => ['core/image']]]);
+
+        $this->assertSame(['core/heading', 'core/paragraph', 'acme/*'], $policy->content('book')['allow']);
+        $this->assertSame(['core/image', 'acme/*', 'core/heading'], $policy->content('event')['allow']);
+    }
+
+    public function test_theme_blocks_survive_the_preset_constant(): void
+    {
+        $policy = Resolver::resolve(Schema::editing()->preset('open')->themeBlocks('acme/*'), [], 'structured');
+
+        $this->assertContains('acme/*', $policy->content('page')['allow']);
+    }
+
     public function test_to_array_exposes_everything(): void
     {
         $array = Resolver::resolve(Schema::editing()->preset('guided'))->toArray();
 
-        $this->assertSame(['preset', 'presetSource', 'bypass', 'site', 'design', 'features', 'content', 'warnings'], array_keys($array));
+        $this->assertSame(['preset', 'presetSource', 'bypass', 'themeBlocks', 'site', 'design', 'features', 'content', 'warnings'], array_keys($array));
         $this->assertSame(['page'], array_keys($array['content']));
     }
 }

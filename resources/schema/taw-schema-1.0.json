@@ -87,6 +87,7 @@
             },
             "additionalProperties": false
           },
+          "themeBlocks": { "type": "array", "items": { "type": "string", "pattern": "^(\\*|[a-z0-9-]+/(\\*|[a-z0-9-]+))$" }, "description": "The theme's own blocks (names or globs, e.g. taw-gutenberg/*), added to every content allow list, the curated one included. Levels that allow every block are unchanged." },
           "layers": {
             "type": "object",
             "properties": {

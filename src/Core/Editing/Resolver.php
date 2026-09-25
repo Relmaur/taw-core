@@ -22,6 +22,10 @@ use TAW\Core\Schema\Registry;
  *   4. post type rule  — PostType::editing() / JSON "editing" (content only);
  *   5. site content map — layers.content.<post type> in the policy.
  *
+ * Then the policy's themeBlocks are added to every content rule that has an
+ * allow list (curated or custom). A rule that allows every block (null)
+ * stays that way.
+ *
  * Pure: no WordPress calls, so the same answer comes out of bin/taw, unit
  * tests and a live request.
  */
@@ -54,7 +58,8 @@ final class Resolver
             }
         }
 
-        $layers = $definition?->layers() ?? [];
+        $layers      = $definition?->layers() ?? [];
+        $themeBlocks = $definition?->themeBlockGlobs() ?? [];
 
         return new Policy(
             $preset,
@@ -63,8 +68,9 @@ final class Resolver
             self::booleanLayer('site', $preset, $layers['site'] ?? null),
             self::booleanLayer('design', $preset, $layers['design'] ?? null),
             self::booleanLayer('features', $preset, $layers['features'] ?? null),
-            self::contentRules($preset, $postTypeRules, $layers['content'] ?? null),
+            self::withThemeBlocks(self::contentRules($preset, $postTypeRules, $layers['content'] ?? null), $themeBlocks),
             $warnings,
+            $themeBlocks,
         );
     }
 
@@ -120,6 +126,28 @@ final class Resolver
             $rule  = Presets::layer('content', $level);
             $rule  = self::apply($rule, 'content', $postTypeRules[$postType] ?? null);
             $rules[$postType] = self::apply($rule, 'content', $siteContent[$postType] ?? null);
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Add the theme's own blocks to every allow list.
+     *
+     * @param array<string, array<string, mixed>> $rules
+     * @param list<string>                        $themeBlocks
+     * @return array<string, array<string, mixed>>
+     */
+    private static function withThemeBlocks(array $rules, array $themeBlocks): array
+    {
+        if ($themeBlocks === []) {
+            return $rules;
+        }
+
+        foreach ($rules as $postType => $rule) {
+            if (is_array($rule['allow'] ?? null)) {
+                $rules[$postType]['allow'] = array_values(array_unique([...$rule['allow'], ...$themeBlocks]));
+            }
         }
 
         return $rules;

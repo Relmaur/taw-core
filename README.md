@@ -476,8 +476,15 @@ JSON kind `editing` (key `site`, checked by `schema:validate`):
 
 ```json
 { "version": 1, "kind": "editing", "key": "site", "preset": "structured",
+  "themeBlocks": ["taw-gutenberg/*"],
   "layers": { "features": { "customHtml": true }, "content": { "post": "open" } } }
 ```
+
+**Theme blocks (v1.50.0+):** `themeBlocks` (PHP `->themeBlocks('taw-gutenberg/*')`) lists the theme's
+own blocks. They're added to every content allow list, the curated one included, so clients can still
+insert them at `guided` and above. Levels that allow every block are unchanged. Unlike `allow`, it
+doesn't replace a level's list, so it works at every preset. Tools → TAW Editing lists them and warns
+when a pattern matches no registered block.
 
 It's applied only when the theme calls **`\TAW\Core\Boot::editing()`** (v1.46.0+; it boots the data
 layer too). `Boot::data()` and `Theme::boot()` never apply it, so taw-theme is unaffected.

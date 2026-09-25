@@ -176,3 +176,21 @@ no console errors.
 **Consequences:** taw/core now ships a small plain-JS editor asset (no build step). It relies on
 `setBlockEditingMode()`, so a future WordPress change to editing modes needs a browser re-check.
 `Blocks`, the REST save check and the policy format are unchanged.
+
+## Addendum: `themeBlocks` adds a theme's own blocks to every allow list (v1.50.0)
+
+**Context.** At `guided` and above a content rule's allow list is `Presets::CURATED_BLOCKS` (core
+blocks only), so a theme's own blocks (taw-gutenberg's `taw-gutenberg/callout`, since its v0.3.0) are
+hidden from locked users. The only workaround was a custom `allow`, which replaces the list at *every*
+level: setting it on `page` would also restrict `open`.
+
+**Decision.** A policy-level key `themeBlocks` (list of block names/globs; PHP
+`EditingPolicy::themeBlocks()`), validated like `allow`. After the usual resolution order, the
+Resolver appends it (deduplicated) to every content rule whose `allow` is a list, curated or custom.
+A rule that allows every block (`null`) is unchanged. It survives `TAW_EDITING_PRESET`, because it
+isn't part of a level. The admin screen shows it and checks each pattern once against the block
+registry.
+
+**Consequences.** The preset table (`PresetsTest`) is unchanged: this is additive data, not a new
+level. A site that wants an exact allow list without the theme's blocks leaves `themeBlocks` out of
+its policy (a child theme's `editing.json` replaces the parent's).

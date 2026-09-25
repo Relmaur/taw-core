@@ -58,6 +58,7 @@ final class EditingAdminScreen
      *     presetSource: string,
      *     youBypass: bool,
      *     bypass: array{capability: string, users: list<string>},
+     *     themeBlocks: list<string>,
      *     layers: array<string, array<string, bool>>,
      *     content: array<string, array<string, mixed>>,
      *     warnings: list<string>
@@ -81,6 +82,7 @@ final class EditingAdminScreen
             'presetSource' => $presetSource,
             'youBypass'    => $this->bypass->active(),
             'bypass'       => ['capability' => $this->bypass->capability, 'users' => $this->bypass->users],
+            'themeBlocks'  => $this->policy->themeBlocks,
             'layers'       => [
                 'site'     => $this->policy->site,
                 'design'   => $this->policy->design,
@@ -109,10 +111,20 @@ final class EditingAdminScreen
 
         // Only question allow lists someone wrote: the presets' curated list
         // is known-good, and flagging a core block a plugin unregistered
-        // would just be noise.
+        // would just be noise. themeBlocks are in every list, so they're
+        // checked once, not per post type.
         $registered = ($this->registeredBlocks)();
+        foreach ($this->policy->themeBlocks as $glob) {
+            if (array_filter($registered, static fn (string $name): bool => Blocks::matches($name, [$glob])) === []) {
+                $warnings[] = sprintf(
+                    /* translators: %s: block name or glob. */
+                    __('"%s" in themeBlocks matches no registered block.', 'taw-core'),
+                    $glob
+                );
+            }
+        }
         foreach ($content as $postType => $rule) {
-            $allow = is_array($rule['allow']) ? array_diff($rule['allow'], Presets::CURATED_BLOCKS) : [];
+            $allow = is_array($rule['allow']) ? array_diff($rule['allow'], Presets::CURATED_BLOCKS, $this->policy->themeBlocks) : [];
             foreach ($allow as $glob) {
                 $matched = array_filter($registered, static fn (string $name): bool => Blocks::matches($name, [(string) $glob]));
                 if ($matched === []) {
@@ -174,6 +186,7 @@ final class EditingAdminScreen
                     <tr><th><?php esc_html_e('Preset', 'taw-core'); ?></th><td><strong><?php echo esc_html($report['preset']); ?></strong></td></tr>
                     <tr><th><?php esc_html_e('Set by', 'taw-core'); ?></th><td><code><?php echo esc_html($report['presetSource']); ?></code></td></tr>
                     <tr><th><?php esc_html_e('You', 'taw-core'); ?></th><td><?php echo $report['youBypass'] ? esc_html__('are exempt (bypass)', 'taw-core') : esc_html__('are locked like everyone else', 'taw-core'); ?></td></tr>
+                    <tr><th><?php esc_html_e('Theme blocks', 'taw-core'); ?></th><td><?php echo $report['themeBlocks'] === [] ? '—' : '<code>' . esc_html(implode(', ', $report['themeBlocks'])) . '</code> ' . esc_html__('(added to every allow list)', 'taw-core'); ?></td></tr>
                     <tr><th><?php esc_html_e('Bypass', 'taw-core'); ?></th><td><code><?php echo esc_html($report['bypass']['capability']); ?></code> · TAW_EDITING_BYPASS_USERS: <?php echo esc_html($report['bypass']['users'] === [] ? '—' : implode(', ', $report['bypass']['users'])); ?></td></tr>
                 </tbody>
             </table>

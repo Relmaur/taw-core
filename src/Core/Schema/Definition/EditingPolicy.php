@@ -18,7 +18,8 @@ use TAW\Core\Editing\Rules;
  *       ->preset('structured')
  *       ->layer('features', ['customHtml' => true])
  *       ->content('page', ['allow' => ['core/*'], 'lock' => 'contentOnly'])
- *       ->content('post', 'open');
+ *       ->content('post', 'open')
+ *       ->themeBlocks('taw-gutenberg/*');
  *
  * Like every definition this is inert data. Editing\Resolver turns it into
  * the effective Editing\Policy, and Boot::editing() applies that.
@@ -32,6 +33,9 @@ final class EditingPolicy extends Definition
     private ?string $preset = null;
 
     private ?string $bypassCapability = null;
+
+    /** @var list<string>|null */
+    private ?array $themeBlocks = null;
 
     /** @var array<string, mixed> layer => level name or overrides */
     private array $layers = [];
@@ -55,6 +59,19 @@ final class EditingPolicy extends Definition
     public function bypass(string $capability): self
     {
         $this->bypassCapability = $capability;
+
+        return $this;
+    }
+
+    /**
+     * The theme's own blocks (names or globs, e.g. 'taw-gutenberg/*'). They're
+     * added to every content allow list, the presets' curated list included,
+     * so locked users can still insert them. Levels that allow every block
+     * are unchanged.
+     */
+    public function themeBlocks(string ...$globs): self
+    {
+        $this->themeBlocks = array_values($globs);
 
         return $this;
     }
@@ -105,6 +122,14 @@ final class EditingPolicy extends Definition
     }
 
     /**
+     * @return list<string>
+     */
+    public function themeBlockGlobs(): array
+    {
+        return $this->themeBlocks ?? [];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function layers(): array
@@ -121,7 +146,7 @@ final class EditingPolicy extends Definition
     }
 
     /**
-     * The policy in its JSON shape (preset, bypass, layers).
+     * The policy in its JSON shape (preset, bypass, themeBlocks, layers).
      *
      * @return array<string, mixed>
      */
@@ -134,6 +159,9 @@ final class EditingPolicy extends Definition
         }
         if ($this->bypassCapability !== null) {
             $policy['bypass'] = ['capability' => $this->bypassCapability];
+        }
+        if ($this->themeBlocks !== null) {
+            $policy['themeBlocks'] = $this->themeBlocks;
         }
         if ($this->layers !== []) {
             $policy['layers'] = $this->layers;

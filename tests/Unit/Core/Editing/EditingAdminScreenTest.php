@@ -40,6 +40,7 @@ final class EditingAdminScreenTest extends TestCase
         $this->assertFalse($report['youBypass']);
         $this->assertSame(['capability' => 'taw_unlock_editing', 'users' => ['marco']], $report['bypass']);
         $this->assertSame(['site', 'design', 'features'], array_keys($report['layers']));
+        $this->assertSame([], $report['themeBlocks']);
         $this->assertSame(['page'], array_keys($report['content']));
         $this->assertSame([], $report['warnings']);
     }
@@ -72,6 +73,17 @@ final class EditingAdminScreenTest extends TestCase
         $warnings = $this->screen($definition, ['marco'])->report(null)['warnings'];
 
         $this->assertSame(['"taw-gutenberg/*" in the page allow list matches no registered block.'], $warnings);
+    }
+
+    public function test_theme_blocks_are_shown_and_checked_once(): void
+    {
+        $definition = Schema::editing()->preset('guided')->themeBlocks('acme/*', 'ghost/*')->content('book', ['allow' => ['core/heading']]);
+
+        $report = $this->screen($definition, ['marco'])->report(null);
+
+        $this->assertSame(['acme/*', 'ghost/*'], $report['themeBlocks']);
+        $this->assertContains('acme/*', $report['content']['page']['allow']);
+        $this->assertSame(['"ghost/*" in themeBlocks matches no registered block.'], $report['warnings'], 'once, not per post type');
     }
 
     public function test_resolver_warnings_are_shown(): void

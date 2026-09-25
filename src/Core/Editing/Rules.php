@@ -16,7 +16,7 @@ namespace TAW\Core\Editing;
 final class Rules
 {
     /** Keys of an editing policy besides the common definition keys. */
-    public const POLICY_KEYS = ['preset', 'bypass', 'layers'];
+    public const POLICY_KEYS = ['preset', 'bypass', 'themeBlocks', 'layers'];
 
     /**
      * Keys that are planned but not built yet. They're rejected with a
@@ -50,6 +50,12 @@ final class Rules
 
         if (array_key_exists('bypass', $policy)) {
             $errors = [...$errors, ...self::validateBypass($policy['bypass'])];
+        }
+
+        if (array_key_exists('themeBlocks', $policy)) {
+            $errors = [...$errors, ...($policy['themeBlocks'] === null
+                ? ['/themeBlocks: must be a list of block names or globs (e.g. "acme/*")']
+                : self::validateAllow($policy['themeBlocks'], '/themeBlocks'))];
         }
 
         if (array_key_exists('layers', $policy)) {
