@@ -172,4 +172,15 @@ final class DefinitionTest extends TestCase
         $this->assertSame('post_type:book', Schema::postType('book')->qualifiedKey());
         $this->assertSame('fieldset:book', Schema::fieldset('book')->qualifiedKey());
     }
+
+    public function test_fieldsets_take_term_targets_mixed_with_post_types(): void
+    {
+        $fieldset = Schema::fieldset('genre_details')->on('book', 'term:genre');
+
+        $this->assertSame(['book', 'term:genre'], $fieldset->screens());
+        $this->assertSame(['genre'], $fieldset->taxonomies());
+
+        $this->expectException(\InvalidArgumentException::class);
+        Schema::fieldset('bad')->on('term:Not A Taxonomy');
+    }
 }

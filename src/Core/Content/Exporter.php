@@ -384,19 +384,54 @@ class Exporter
                 continue;
             }
 
+            // Term fieldsets (ADR-0008): a taxonomy with TAW fields gets a
+            // `fields` map per term, keyed like post fields. Taxonomies
+            // without any keep the 1.1 row shape exactly.
+            $registered = Metabox::fieldsFor('term', (string) $taxonomy);
+
             $rows = [];
             foreach ($terms as $term) {
-                $rows[] = [
+                $row = [
                     'slug'        => $term->slug,
                     'name'        => $term->name,
                     'description' => $term->description,
                     'parent'      => $term->parent ? (get_term($term->parent)->slug ?? null) : null,
-                    'meta'        => $this->termMeta($term->term_id),
+                    'meta'        => array_diff_key($this->termMeta($term->term_id), $registered),
                 ];
+                if ($registered !== []) {
+                    $row['fields'] = $this->termFields((int) $term->term_id, $registered);
+                }
+                $rows[] = $row;
             }
             $out[$taxonomy] = $rows;
         }
         return $out;
+    }
+
+    /**
+     * A term's TAW field values, decoded and keyed like post fields.
+     *
+     * @param array<string, array<string, mixed>> $registered Metabox::fieldsFor('term', …)
+     * @return array<string, mixed>
+     */
+    private function termFields(int $termId, array $registered): array
+    {
+        $meta = get_term_meta($termId);
+        $fields = [];
+        foreach ((is_array($meta) ? $meta : []) as $key => $values) {
+            if (!is_string($key) || !isset($registered[$key])) {
+                continue;
+            }
+            $config = $registered[$key];
+            $decoded = FieldCodec::decode($config, is_array($values) ? ($values[0] ?? '') : $values);
+            $fields[FieldKeys::keyOf($config)] = $decoded;
+
+            foreach (FieldCodec::referencedAttachmentIds($config, $decoded) as $attId) {
+                $this->referencedAttachments[$attId] = true;
+            }
+        }
+
+        return $fields;
     }
 
     /**

@@ -44,6 +44,7 @@ final class ValidatorTest extends TestCase
             'fieldset without on'      => [array_diff_key($fieldset, ['on' => 1]), '/on: must be a non-empty list of strings'],
             'fieldset without fields'  => [array_diff_key($fieldset, ['fields' => 1]), '/fields: must be a non-empty list of fields'],
             'bad context'              => [$fieldset + ['context' => 'top'], '/context: must be one of normal, side, advanced'],
+            'bad term target'          => [array_replace($fieldset, ['on' => ['book', 'term:Bad Tax']]), '/on/1: a term target is "term:" plus a taxonomy key'],
             'unknown field type'       => [array_replace($fieldset, ['fields' => [['id' => 'a', 'type' => 'text'], ['id' => 'b', 'type' => 'slider']]]), '/fields/1/type: must be one of'],
             'bad field id'             => [array_replace($fieldset, ['fields' => [['id' => 'has space', 'type' => 'text']]]), '/fields/0/id: must use letters'],
             'duplicate field id'       => [array_replace($fieldset, ['fields' => [['id' => 'a', 'type' => 'text'], ['id' => 'a', 'type' => 'url']]]), '/fields/1/id: "a" is used twice'],

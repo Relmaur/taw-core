@@ -778,3 +778,26 @@ div[id*="taw_"] .postbox-header h2.hndle:has(img) {
     }
   }
 }
+
+/* Term screens (ADR-0008): the Add/Edit term forms are narrower than a
+   post's main column. The 100-column grid above can't shrink below its
+   99 gaps (~792px), so nested containers (groups, repeater rows) would
+   overflow; here the same spans and gaps are laid out as a wrapping row. */
+.taw-term-fields .fields-container {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.taw-term-fields .fields-container > .field {
+  flex: 0 0 calc(var(--span, 100) * 1% - var(--fields-container-gap) * (1 - var(--span, 100) / 100));
+  min-width: 0;
+  max-width: 100%;
+}
+
+.taw-term-fields .fields-container > .taw-tabbed {
+  flex: 0 0 100%;
+}
+
+.taw-term-fields__title {
+  margin: 1.5em 0 0.5em;
+}

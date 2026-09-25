@@ -156,6 +156,27 @@ final class ExporterTest extends TestCase
         $this->assertSame(77, $fields['hero']);
     }
 
+    public function test_term_fields_export_only_for_taxonomies_with_term_fieldsets(): void
+    {
+        new \TAW\Core\Metabox\Metabox([
+            'id' => 'genre_details', 'title' => 'Genre', 'screens' => ['term:genre'],
+            'fields' => [['id' => 'genre_rank', 'type' => 'number'], ['id' => 'genre_cover', 'type' => 'image']],
+        ]);
+        Functions\when('get_taxonomies')->justReturn(['genre' => 'genre', 'topic' => 'topic']);
+        Functions\when('get_terms')->alias(static fn (array $args): array => [new \WP_Term(['term_id' => $args['taxonomy'] === 'genre' ? 5 : 6, 'slug' => 'x', 'name' => 'X', 'description' => '', 'parent' => 0])]);
+        Functions\when('get_term_meta')->alias(static fn (int $id) => $id === 5
+            ? ['_taw_genre_rank' => ['3'], '_taw_genre_cover' => ['77'], 'color' => ['red']]
+            : ['color' => ['blue']]);
+
+        $snapshot = (new Exporter())->snapshot();
+
+        $genre = $snapshot['terms']['genre'][0];
+        $this->assertSame(['genre_rank' => 3, 'genre_cover' => 77], $genre['fields']);
+        $this->assertSame(['color' => 'red'], $genre['meta']);
+        $this->assertArrayNotHasKey('fields', $snapshot['terms']['topic'][0], 'no term fieldsets: the 1.1 row shape');
+        $this->assertSame([77], array_column($snapshot['media'], 'id'), 'a term image is a referenced attachment');
+    }
+
     public function test_options_include_taw_and_resolved_core_allowlist(): void
     {
         $options = (new Exporter())->snapshot()['options'];
