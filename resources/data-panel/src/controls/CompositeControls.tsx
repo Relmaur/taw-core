@@ -7,7 +7,8 @@ import FieldGroup from './FieldGroup';
 /**
  * gradient_text and hubspot_form are stored as JSON strings in one meta key
  * (Metabox::sanitizeGradientTextValue / sanitizeHubspotFormValue), so the
- * panel reads and writes the same strings.
+ * panel reads and writes the same strings. link is a structured type: it's
+ * edited as the decoded `taw_<id>` object (a JSON string inside repeater rows).
  */
 
 export interface Segment {
@@ -166,6 +167,60 @@ export function HubspotForm({ field, value, onChange }: ControlProps) {
                 value={config.region}
                 disabled={field.readonly}
                 onChange={set('region')}
+            />
+        </FieldGroup>
+    );
+}
+
+export interface LinkValue {
+    url: string;
+    label: string;
+    new_tab: boolean;
+}
+
+/** A link from the REST `taw_<id>` object, a repeater row's JSON string, or nothing. */
+export function linkValue(value: unknown): LinkValue {
+    const raw = parseJson(value);
+    const link = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+    const text = (key: string) => (typeof link[key] === 'string' ? (link[key] as string) : '');
+    return {
+        url: text('url'),
+        label: text('label'),
+        new_tab: link.new_tab === true || link.new_tab === 1 || link.new_tab === '1' || link.new_tab === 'true',
+    };
+}
+
+/** link: URL, text and "open in a new tab". The server stores nothing without a URL. */
+export function Link({ field, value, onChange }: ControlProps) {
+    const link = linkValue(value);
+    const set = (patch: Partial<LinkValue>) => onChange({ ...link, ...patch });
+
+    return (
+        <FieldGroup field={field}>
+            <TextControl
+                __next40pxDefaultSize
+                __nextHasNoMarginBottom
+                inputMode="url"
+                label={__('URL', 'taw-core')}
+                placeholder={__('https:// or /path', 'taw-core')}
+                value={link.url}
+                disabled={field.readonly}
+                onChange={(url: string) => set({ url })}
+            />
+            <TextControl
+                __next40pxDefaultSize
+                __nextHasNoMarginBottom
+                label={__('Link text', 'taw-core')}
+                value={link.label}
+                disabled={field.readonly}
+                onChange={(label: string) => set({ label })}
+            />
+            <ToggleControl
+                __nextHasNoMarginBottom
+                label={__('Open in a new tab', 'taw-core')}
+                checked={link.new_tab}
+                disabled={field.readonly}
+                onChange={(new_tab: boolean) => set({ new_tab })}
             />
         </FieldGroup>
     );

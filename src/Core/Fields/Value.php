@@ -192,6 +192,20 @@ final class Value implements \Stringable
         return array_map(static fn (int $id): PostRef => new PostRef($id), $this->ids());
     }
 
+    /** A link field's link (URL, text, new tab). */
+    public function link(): Link
+    {
+        $this->mismatch('link()', ['link', 'url']);
+
+        if ($this->type() === 'url' || ($this->config === null && is_string($this->raw) && !str_starts_with(ltrim($this->raw), '{'))) {
+            return new Link(is_string($this->raw) ? $this->raw : '');
+        }
+
+        $link = FieldCodec::decode(['type' => 'link'], $this->raw);
+
+        return Link::from(is_array($link) ? $link : null);
+    }
+
     /** A repeater's rows, each typed by the repeater's sub-fields. */
     public function rows(): Rows
     {
@@ -235,7 +249,7 @@ final class Value implements \Stringable
      *
      * text, textarea, select, number, range, datepicker, color, icon: esc_html();
      * url: esc_url(); wysiwyg: wp_kses_post(); image: the <img> markup;
-     * a single post_select: the post's title; structured types: ''.
+     * a single post_select: the post's title; link: the <a>; structured types: ''.
      */
     public function html(): string
     {
@@ -244,6 +258,7 @@ final class Value implements \Stringable
             'wysiwyg'     => wp_kses_post($this->text()),
             'image'       => (new Image($this->ids()[0] ?? 0))->html(),
             'post_select' => empty($this->config['multiple']) ? (new PostRef($this->ids()[0] ?? 0))->html() : '',
+            'link'        => $this->link()->html(),
             'checkbox', 'files', 'repeater', 'group', 'gradient_text', 'hubspot_form' => '',
             default       => is_array($this->raw) || is_object($this->raw) ? '' : esc_html($this->text()),
         };

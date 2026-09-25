@@ -57,7 +57,7 @@ class FieldsSetCommand extends Command
                 Plain fields — pass the value directly:
                   <info>php bin/taw fields:set 42 hero_heading "Welcome"</info>
 
-                Repeaters / post_select / files / gradient_text / hubspot_form — value
+                Repeaters / post_select / files / gradient_text / hubspot_form / link — value
                 must be JSON. Prefer --file over inline JSON to sidestep shell quoting:
                   <info>php bin/taw fields:set 42 team_members --file=/tmp/team.json</info>
                   <info>php bin/taw fields:set 42 team_members '[{"name":"Ada","role":"CTO"}]'</info>

@@ -273,6 +273,11 @@ final class FieldMetaRegistrar
         return match ($type) {
             'files'       => ['type' => 'array', 'items' => ['type' => 'integer']],
             'post_select' => ['type' => ['integer', 'array', 'null']],
+            'link'        => ['type' => ['object', 'null'], 'properties' => [
+                'url'     => ['type' => 'string'],
+                'label'   => ['type' => 'string'],
+                'new_tab' => ['type' => 'boolean'],
+            ]],
             default       => ['type' => 'array', 'items' => ['type' => 'object']], // repeater
         };
     }

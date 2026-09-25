@@ -147,6 +147,7 @@ class FieldsGetCommand extends Command
             'checkbox' => Metabox::get_bool($postId, $fieldId, $prefix),
             'post_select' => Metabox::get_posts($postId, $fieldId, $prefix),
             'files', 'gradient_text', 'hubspot_form' => json_decode((string) Metabox::get($postId, $fieldId, $prefix), true) ?: [],
+            'link' => \TAW\Core\Content\FieldCodec::decode(['type' => 'link'], Metabox::get($postId, $fieldId, $prefix)),
             'image' => (int) Metabox::get($postId, $fieldId, $prefix),
             default => Metabox::get($postId, $fieldId, $prefix),
         };
@@ -167,6 +168,7 @@ class FieldsGetCommand extends Command
             'checkbox' => (string) $raw === '1',
             'post_select' => json_decode((string) $raw, true) ?: (($id = absint($raw)) ? [$id] : []),
             'repeater', 'files', 'gradient_text', 'hubspot_form' => json_decode((string) $raw, true) ?: [],
+            'link' => \TAW\Core\Content\FieldCodec::decode(['type' => 'link'], $raw),
             'image' => (int) $raw,
             default => $raw,
         };

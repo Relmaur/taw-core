@@ -2453,6 +2453,10 @@ class Metabox
                 self::render_hubspot_form_field($field_id, $value);
                 break;
 
+            case 'link':
+                self::render_link_field($field_id, $value);
+                break;
+
             /* ---- MARK: Group ---- */
             case 'group':
                 $group_fields = $field['fields'] ?? [];
@@ -2735,6 +2739,18 @@ class Metabox
                     $segments
                 ));
 
+            case 'link':
+                $link = \TAW\Core\Content\FieldCodec::decode(['type' => 'link'], $value);
+                if (!is_array($link)) {
+                    return $empty;
+                }
+                return sprintf(
+                    '%s &lt;%s&gt;%s',
+                    esc_html($link['label'] !== '' ? $link['label'] : $link['url']),
+                    esc_html($link['url']),
+                    $link['new_tab'] ? ' ' . esc_html__('(new tab)', 'taw-core') : ''
+                );
+
             case 'hubspot_form':
                 $config = json_decode((string) $value, true);
                 if (!is_array($config) || empty($config['portal_id']) || empty($config['form_id'])) {
@@ -2821,6 +2837,44 @@ class Metabox
      * @param string $field_id Full input name/id (post meta key or option name).
      * @param mixed  $value    Current saved value — a JSON string, or already-decoded array.
      */
+    /**
+     * Render a link field: URL, label and "open in a new tab", mirrored as
+     * JSON into one hidden input (the stored format, see
+     * {@see self::sanitizeLinkValue()}). The URL input comes first, so
+     * WordPress's validateForm() (term Add screen) checks it for `required`.
+     * It's a text input (inputmode url): a url input would make the browser
+     * refuse relative paths like /contact, which links often are. The change
+     * event bubbles, so a repeater row re-serializes when the link changes.
+     * Used by the options page too.
+     */
+    public static function render_link_field(string $field_id, mixed $value): void
+    {
+        $link = \TAW\Core\Content\FieldCodec::decode(['type' => 'link'], $value);
+        $initial = is_array($link) ? $link : ['url' => '', 'label' => '', 'new_tab' => false];
+    ?>
+        <div class="taw-link-field"
+            x-data="{ link: <?php echo esc_attr(wp_json_encode($initial, JSON_UNESCAPED_UNICODE)); ?> }"
+            x-init="$watch('link', function (v) { $refs.input.value = v.url === '' && v.label === '' ? '' : JSON.stringify(v); $refs.input.dispatchEvent(new Event('change', { bubbles: true })); }, { deep: true })">
+            <p class="taw-link-row">
+                <label><?php esc_html_e('URL', 'taw-core'); ?>
+                    <input type="text" inputmode="url" x-model="link.url" id="<?php echo esc_attr($field_id); ?>" class="regular-text" placeholder="<?php esc_attr_e('https:// or /path', 'taw-core'); ?>"></label>
+            </p>
+            <p class="taw-link-row">
+                <label><?php esc_html_e('Link text', 'taw-core'); ?>
+                    <input type="text" x-model="link.label" class="regular-text"></label>
+            </p>
+            <p class="taw-link-row">
+                <label><input type="checkbox" x-model="link.new_tab"> <?php esc_html_e('Open in a new tab', 'taw-core'); ?></label>
+            </p>
+            <input type="hidden"
+                class="taw-link-input"
+                x-ref="input"
+                name="<?php echo esc_attr($field_id); ?>"
+                value="<?php echo esc_attr(is_array($link) ? (string) wp_json_encode($link, JSON_UNESCAPED_UNICODE) : ''); ?>">
+        </div>
+    <?php
+    }
+
     public static function render_hubspot_form_field(string $field_id, mixed $value): void
     {
         $config = is_string($value) && $value !== '' ? json_decode($value, true) : $value;
@@ -3537,6 +3591,7 @@ class Metabox
             'files'             => $this->sanitize_files($value),
             'gradient_text'     => self::sanitizeGradientTextValue($value),
             'hubspot_form'      => self::sanitizeHubspotFormValue($value),
+            'link'              => self::sanitizeLinkValue($value),
             default          => sanitize_text_field($value),
         };
     }
@@ -3683,6 +3738,30 @@ class Metabox
      * Static for the same cross-class-sharing reason as
      * {@see self::sanitizeGradientTextValue()}.
      */
+    /**
+     * Sanitize a link value — JSON (or an array) `{url, label, new_tab}` —
+     * to the stored JSON string, or '' when there's no URL (no link).
+     * Accepts arrays for REST, the data panel and the importer.
+     */
+    public static function sanitizeLinkValue(mixed $value): string
+    {
+        $link = is_string($value) ? json_decode($value, true) : $value;
+        if (!is_array($link)) {
+            return '';
+        }
+
+        $url = esc_url_raw(trim((string) ($link['url'] ?? '')));
+        if ($url === '') {
+            return '';
+        }
+
+        return (string) wp_json_encode([
+            'url'     => $url,
+            'label'   => sanitize_text_field((string) ($link['label'] ?? '')),
+            'new_tab' => in_array($link['new_tab'] ?? false, [true, 1, '1', 'true', 'on'], true),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
     public static function sanitizeHubspotFormValue(mixed $value): string
     {
         $config = is_string($value) ? (json_decode($value, true) ?: []) : $value;
@@ -3815,6 +3894,11 @@ class Metabox
         }
 
         $label = $field['label'] ?? $field['id'];
+
+        // A link is empty without a URL (its inputs post JSON either way).
+        if (($field['type'] ?? '') === 'link') {
+            $value = self::sanitizeLinkValue($value);
+        }
 
         // Required check
         if (!empty($field['required']) && ($value === '' || $value === null)) {
@@ -4205,6 +4289,7 @@ class Metabox
             'post_select'   => self::sanitizePostSelectValue($fieldConfig, $value),
             'gradient_text' => self::sanitizeGradientTextValue($value),
             'hubspot_form'  => self::sanitizeHubspotFormValue($value),
+            'link'          => self::sanitizeLinkValue($value),
             default         => self::sanitizeValue($fieldConfig, $value),
         };
     }

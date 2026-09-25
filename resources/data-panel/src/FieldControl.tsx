@@ -7,7 +7,7 @@ import { useBinding } from './useValues';
 import { Group } from './controls/Group';
 import { Repeater } from './controls/Repeater';
 import { Checkbox, Range, Select } from './controls/ChoiceControls';
-import { GradientText, HubspotForm } from './controls/CompositeControls';
+import { GradientText, HubspotForm, Link } from './controls/CompositeControls';
 import { IconField } from './controls/IconControl';
 import { Files, Image } from './controls/MediaControls';
 import { Color, DateField } from './controls/PickerControls';
@@ -33,6 +33,7 @@ export const CONTROLS: Record<string, React.ComponentType<ControlProps>> = {
     wysiwyg: Wysiwyg,
     gradient_text: GradientText,
     hubspot_form: HubspotForm,
+    link: Link,
     repeater: Repeater,
 };
 
