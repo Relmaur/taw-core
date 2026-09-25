@@ -15,9 +15,22 @@ export const editor = {
     settings: {} as Record<string, unknown>,
     edited: {} as Record<string, unknown>,
     saved: {} as Record<string, unknown>,
+    dirty: false,
+    /** What core-data's getLastEntitySaveError() returns. */
+    saveError: undefined as unknown,
 };
 
 export const editPost = vi.fn();
+
+/** Every action the panel dispatches, whatever the store (spies). */
+export const dispatchers = {
+    editPost,
+    lockPostSaving: vi.fn(),
+    unlockPostSaving: vi.fn(),
+    createWarningNotice: vi.fn(),
+    removeNotice: vi.fn(),
+    enableComplementaryArea: vi.fn(),
+};
 
 /** Media records by id for core-data's getMedia (missing id = still loading unless listed in `gone`). */
 export const media = {
@@ -62,6 +75,9 @@ export function resetEditor(): void {
     editor.edited = { meta: {} };
     editor.saved = {};
     editPost.mockReset();
+    for (const spy of Object.values(dispatchers)) spy.mockReset();
+    editor.saveError = undefined;
+    editor.dirty = false;
     media.records = {};
     media.gone = [];
     media.pick = [];
@@ -75,6 +91,9 @@ export function resetEditor(): void {
 }
 
 const coreEditor = {
+    getCurrentPostType: () => 'book',
+    isEditedPostDirty: () => editor.dirty,
+    getCurrentPostId: () => 7,
     getEditorSettings: () => editor.settings,
     getEditedPostAttribute: (key: string) => editor.edited[key],
     getCurrentPostAttribute: (key: string) => editor.saved[key],
@@ -85,6 +104,7 @@ const blockEditor = {
 };
 
 const core = {
+    getLastEntitySaveError: () => editor.saveError,
     getEntityRecord: (_kind: string, _name: string, id: number) => media.records[id],
     hasFinishedResolution: (_selector: string, args: [string, string, number]) => media.gone.includes(args[2]),
 };
@@ -94,7 +114,7 @@ const stores: Record<string, unknown> = { 'core/editor': coreEditor, 'core/block
 const data = {
     useSelect: (mapSelect: (select: (store: string) => unknown) => unknown) =>
         mapSelect((store: string) => stores[store] ?? {}),
-    useDispatch: () => ({ editPost }),
+    useDispatch: () => dispatchers,
 };
 
 type Props = Record<string, unknown> & { children?: ReactNode };
@@ -190,9 +210,10 @@ const components = {
             </div>
         </div>
     ),
-    Button: ({ children, onClick, disabled, label, id, role }: Props) => (
+    Button: ({ children, onClick, disabled, label, id, role, ...rest }: Props) => (
         <button
             type="button"
+            {...Object.fromEntries(Object.entries(rest).filter(([key]) => key.startsWith('aria-')))}
             id={id as string}
             role={role as string}
             aria-label={label as string}

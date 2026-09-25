@@ -570,6 +570,131 @@ $field-gap: 24px;
     background: #fff;
 }
 
+// ── Structure (P4): repeater rows and save errors ──────────────────────────
+.taw-data-panel {
+    &__rows {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    // A row: a header you can click to collapse, then its sub-fields.
+    &__row {
+        margin: 0;
+        border: 1px solid $gray-300;
+        border-radius: 2px;
+        background: #fff;
+
+        &.is-open {
+            border-color: $gray-600;
+        }
+    }
+
+    &__row-header {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 40px;
+        padding-right: 4px;
+    }
+
+    &__row.is-open &__row-header {
+        border-bottom: 1px solid $gray-300;
+    }
+
+    &__row-toggle.components-button {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 40px;
+        gap: 6px;
+        padding: 0 4px 0 8px;
+        color: $gray-900;
+
+        &:hover {
+            color: var(--wp-admin-theme-color);
+        }
+    }
+
+    &__row-number {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 4px;
+        border-radius: 10px;
+        background: $gray-100;
+        color: $gray-700;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    &__row-title {
+        overflow: hidden;
+        font-weight: 500;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__row-body {
+        display: flex;
+        flex-direction: column;
+        gap: $gap;
+        padding: 12px;
+    }
+
+    // Inside a row (nested repeaters): a lighter header, tighter padding and
+    // no number badge, so the row titles still have room in the sidebar.
+    &__row-body &__group-header {
+        background: #f8f8f8;
+    }
+
+    &__row-body &__group-body {
+        padding: 12px 8px;
+    }
+
+    &__row-body &__row-body {
+        padding: 8px;
+    }
+
+    &__row-body &__row-number {
+        display: none;
+    }
+
+    &__rows-footer {
+        display: flex;
+        flex-direction: column;
+    }
+
+    // A field the last save refused: a red rule and the server's message.
+    &__field.has-error {
+        position: relative;
+        padding-left: 10px;
+
+        &::before {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 2px;
+            border-radius: 1px;
+            background: #cc1818;
+            content: '';
+        }
+    }
+
+    &__error {
+        margin: 6px 0 0;
+        color: #cc1818;
+        font-size: 12px;
+    }
+}
+
 // Remove buttons on rows: quiet until pointed at.
 .taw-data-panel__remove.components-button {
     color: $gray-700;

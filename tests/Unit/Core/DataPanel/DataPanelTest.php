@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Tests\Unit\Core\DataPanel;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use TAW\Core\DataPanel\DataPanel;
 use TAW\Core\Metabox\Metabox;
@@ -83,6 +84,18 @@ final class DataPanelTest extends TestCase
         $this->box('book_map', [['id' => 'book_map', 'type' => 'map']]);
 
         $this->assertSame([$details], DataPanel::panelMetaboxes());
+    }
+
+    public function test_a_panel_fieldset_enqueues_no_metabox_admin_assets(): void
+    {
+        $box = $this->box('book_details', [['id' => 'book_cover', 'type' => 'image']], ['ui' => 'panel']);
+        Functions\when('get_post')->justReturn(new \WP_Post(['ID' => 7, 'post_type' => 'book']));
+        Filters\expectApplied('taw_metabox_ui')->once()->andReturn('panel');
+        Functions\expect('wp_enqueue_style')->never();
+        Functions\expect('wp_enqueue_media')->never();
+
+        $box->enqueue_admin_assets('post.php');
+        $this->addToAssertionCount(1);
     }
 
     public function test_placement_only_in_the_block_editor(): void

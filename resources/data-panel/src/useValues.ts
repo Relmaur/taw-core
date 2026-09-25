@@ -1,5 +1,6 @@
 import { useDispatch, useSelect } from '@wordpress/data';
 import type { Binding, FieldDescriptor } from './types';
+import { conditionValues } from './required';
 
 /** The value a binding points at, from the post being edited. */
 export function useBinding(binding: Binding | undefined): [unknown, (value: unknown) => void] {
@@ -31,21 +32,15 @@ export function useBinding(binding: Binding | undefined): [unknown, (value: unkn
     return [value, setValue];
 }
 
-/** Current values of a fieldset's top-level fields by id, for conditions. */
+/** Condition values for a fieldset's fields (see ConditionValues). */
 export function useFieldValues(fields: FieldDescriptor[]): Record<string, unknown> {
     return useSelect(
         (select) => {
             const editor = select('core/editor');
             const meta = (editor.getEditedPostAttribute('meta') ?? {}) as Record<string, unknown>;
-            const values: Record<string, unknown> = {};
-            for (const field of fields) {
-                if (!field.binding) continue;
-                values[field.id] =
-                    'meta' in field.binding
-                        ? meta[field.binding.meta]
-                        : editor.getEditedPostAttribute(field.binding.field);
-            }
-            return values;
+            return conditionValues(fields, (binding) =>
+                'meta' in binding ? meta[binding.meta] : editor.getEditedPostAttribute(binding.field),
+            );
         },
         [fields],
     );

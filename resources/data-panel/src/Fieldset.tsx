@@ -2,6 +2,7 @@ import React from 'react';
 import { Dashicon, PanelBody, TabPanel } from '@wordpress/components';
 import type { FieldDescriptor, FieldsetDescriptor } from './types';
 import { conditionsMet } from './conditions';
+import { ConditionValues } from './context';
 import { useFieldValues } from './useValues';
 import FieldControl from './FieldControl';
 
@@ -35,30 +36,32 @@ export default function Fieldset({ fieldset, initialOpen }: { fieldset: Fieldset
     const loose = fieldset.fields.filter((field) => !claimed.has(field.id));
 
     return (
-        <PanelBody
-            title={fieldset.title}
-            icon={dashicon(fieldset.icon)}
-            initialOpen={initialOpen}
-            className="taw-data-panel__fieldset"
-        >
-            <Fields fields={tabs.length > 0 ? loose : fieldset.fields} values={values} />
-            {tabs.length > 0 ? (
-                <TabPanel
-                    className="taw-data-panel__tabs"
-                    tabs={tabs.map((tab, index) => ({ name: `tab-${index}`, title: tab.label || `${index + 1}` }))}
-                >
-                    {(tab: { name: string }) => {
-                        const index = Number(tab.name.slice(4));
-                        const ids = tabs[index].fields;
-                        return (
-                            <Fields
-                                fields={fieldset.fields.filter((field) => ids.includes(field.id))}
-                                values={values}
-                            />
-                        );
-                    }}
-                </TabPanel>
-            ) : null}
-        </PanelBody>
+        <ConditionValues.Provider value={values}>
+            <PanelBody
+                title={fieldset.title}
+                icon={dashicon(fieldset.icon)}
+                initialOpen={initialOpen}
+                className="taw-data-panel__fieldset"
+            >
+                <Fields fields={tabs.length > 0 ? loose : fieldset.fields} values={values} />
+                {tabs.length > 0 ? (
+                    <TabPanel
+                        className="taw-data-panel__tabs"
+                        tabs={tabs.map((tab, index) => ({ name: `tab-${index}`, title: tab.label || `${index + 1}` }))}
+                    >
+                        {(tab: { name: string }) => {
+                            const index = Number(tab.name.slice(4));
+                            const ids = tabs[index].fields;
+                            return (
+                                <Fields
+                                    fields={fieldset.fields.filter((field) => ids.includes(field.id))}
+                                    values={values}
+                                />
+                            );
+                        }}
+                    </TabPanel>
+                ) : null}
+            </PanelBody>
+        </ConditionValues.Provider>
     );
 }

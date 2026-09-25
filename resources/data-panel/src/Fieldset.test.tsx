@@ -54,12 +54,7 @@ describe('a fieldset', () => {
     });
 
     it('says which types are not in the panel yet', () => {
-        render(
-            <Fieldset
-                fieldset={{ ...base, fields: [{ id: 'links', type: 'repeater', label: 'Links' }] }}
-                initialOpen
-            />,
-        );
-        expect(screen.getByRole('note')).toHaveTextContent('Links (repeater) can’t be edited in the panel yet.');
+        render(<Fieldset fieldset={{ ...base, fields: [{ id: 'spot', type: 'map', label: 'Spot' }] }} initialOpen />);
+        expect(screen.getByRole('note')).toHaveTextContent('Spot (map) can’t be edited in the panel yet.');
     });
 });

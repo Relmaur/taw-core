@@ -43,6 +43,19 @@ final class DescriptorTest extends TestCase
         $this->assertNull(Descriptor::fieldset($this->box([['id' => 'b', 'type' => 'map']])));
     }
 
+    public function test_a_group_inside_a_repeater_keeps_the_fieldset_a_metabox(): void
+    {
+        $group = ['id' => 'size', 'type' => 'group', 'fields' => [['id' => 'w', 'type' => 'number']]];
+
+        $this->assertFalse(Descriptor::supports($this->box([['id' => 'rows', 'type' => 'repeater', 'fields' => [$group]]])));
+        $this->assertFalse(Descriptor::supports($this->box([['id' => 'rows', 'type' => 'repeater', 'fields' => [
+            ['id' => 'inner', 'type' => 'repeater', 'fields' => [$group]],
+        ]]])));
+        $this->assertTrue(Descriptor::supports($this->box([$group, ['id' => 'rows', 'type' => 'repeater', 'fields' => [
+            ['id' => 'inner', 'type' => 'repeater', 'fields' => [['id' => 'x', 'type' => 'text']]],
+        ]]])), 'top-level groups and nested repeaters are fine');
+    }
+
     public function test_the_fieldset_shape(): void
     {
         $descriptor = Descriptor::fieldset($this->box(
