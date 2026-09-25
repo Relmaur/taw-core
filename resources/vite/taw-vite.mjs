@@ -146,8 +146,6 @@ export function wordpressExternals(options = {}) {
         }
     }
 
-    const exportList = names.join(', ');
-
     return {
         name: 'taw-wordpress-externals',
         enforce: 'pre',
@@ -160,11 +158,15 @@ export function wordpressExternals(options = {}) {
             }
             const expression = globalExpression(globals[id.slice(VIRTUAL_PREFIX.length)]);
 
-            // Read the global when the module runs, not at build time.
+            // Read the global when the module runs, not at build time. One
+            // export per name, each marked pure, so the build drops every name
+            // nothing imports (a single destructuring can't be tree-shaken:
+            // every bundle would carry all of WP_EXPORT_NAMES).
             return [
                 `const mod = ${expression} || {};`,
+                'const get = (name) => mod[name];',
                 'export default mod;',
-                `export const { ${exportList} } = mod;`,
+                ...names.map((name) => `export const ${name} = /*#__PURE__*/ get(${JSON.stringify(name)});`),
                 '',
             ].join('\n');
         },

@@ -77,6 +77,15 @@ describe('wordpressExternals', () => {
         assert.throws(() => wordpressExternals({ extraExports: ['not-valid'] }), /valid export name/);
     });
 
+    it('exports each name on its own, marked pure, so bundles keep only what they import', () => {
+        const plugin = wordpressExternals();
+        const code = plugin.load(plugin.resolveId('@wordpress/blocks'));
+
+        assert.match(code, /^export const registerBlockType = \/\*#__PURE__\*\/ get\("registerBlockType"\);$/m);
+        assert.doesNotMatch(code, /export const \{/, 'no destructuring export');
+        assert.equal(code.match(/^export const /gm).length, WP_EXPORT_NAMES.length);
+    });
+
     it('has no duplicate export names', () => {
         assert.equal(new Set(WP_EXPORT_NAMES).size, WP_EXPORT_NAMES.length);
     });
