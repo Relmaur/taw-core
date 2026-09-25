@@ -113,6 +113,18 @@ final class SchemaValidateCommandTest extends TestCase
         $this->assertStringNotContainsString('targets "term:', $warnings, 'term targets are not post types');
     }
 
+    public function test_the_user_target_is_not_an_unknown_post_type(): void
+    {
+        file_put_contents($this->tmp . '/taw-schema/fs.json', json_encode([
+            'version' => 1, 'kind' => 'fieldset', 'key' => 'fs', 'on' => ['user'],
+            'fields'  => [['id' => 'a', 'type' => 'text']],
+        ]));
+        $tester = new CommandTester(new SchemaValidateCommand($this->tmp));
+
+        $this->assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
+        $this->assertSame([], json_decode($tester->getDisplay(), true)['warnings']);
+    }
+
     public function test_the_same_entity_in_two_files_is_a_warning(): void
     {
         copy(self::FIXTURES . '/genre.json', $this->tmp . '/taw-schema/a.json');

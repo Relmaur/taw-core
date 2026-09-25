@@ -382,6 +382,44 @@ final class ImporterTest extends TestCase
         $this->assertArrayHasKey('5|_taw_genre_rank', $written);
     }
 
+    public function test_user_fields_diff_and_write_through_user_meta(): void
+    {
+        new \TAW\Core\Metabox\Metabox(['id' => 'author_details', 'title' => 'Author', 'screens' => ['user'], 'fields' => [
+            ['id' => 'author_rank', 'type' => 'number'], ['id' => 'author_twitter', 'type' => 'text'],
+        ]]);
+        Functions\when('get_user_by')->alias(static fn (string $f, $v) => $f === 'login' ? (object) ['ID' => 3] : false);
+        Functions\when('get_userdata')->justReturn((object) ['ID' => 3, 'display_name' => 'Ada', 'roles' => ['author']]);
+        Functions\when('get_user_meta')->alias(static fn (int $id, string $key) => ['_taw_author_rank' => '2', '_taw_author_twitter' => 'old'][$key] ?? '');
+        $input = ['meta' => ['schema' => '1.2'], 'users' => [
+            ['login' => 'ada', 'email' => 'ada@x.test', 'display_name' => 'Ada', 'roles' => ['author'], 'meta' => [], 'fields' => ['author_rank' => 2, 'author_twitter' => 'new']],
+        ]];
+
+        $changes = (new Importer())->plan($input)['records'][0]['changes'];
+        $this->assertSame(['fields.author_twitter' => ['status' => 'changed', 'old' => 'old', 'new' => 'new']], $changes, '2 ↔ "2" is unchanged');
+
+        Functions\when('wp_roles')->justReturn(new class {
+            /** @return array<string, string> */
+            public function get_names(): array
+            {
+                return ['author' => 'Author'];
+            }
+        });
+        Functions\when('wp_update_user')->justReturn(3);
+        Functions\when('apply_filters')->alias(static fn (string $h, $v = null) => $v);
+        Functions\when('wp_json_encode')->alias(static fn ($v) => json_encode($v));
+        Functions\when('wp_slash')->returnArg(1);
+        Functions\when('sanitize_text_field')->returnArg(1);
+        $written = [];
+        Functions\when('update_user_meta')->alias(static function (int $id, string $key, $value) use (&$written): bool {
+            $written["{$id}|{$key}"] = $value;
+            return true;
+        });
+
+        (new Importer())->apply($input, ['rollback' => false]);
+
+        $this->assertSame('new', $written['3|_taw_author_twitter'] ?? null);
+    }
+
     public function test_with_users_sanitizes_roles_against_the_target_and_writes_no_password(): void
     {
         Functions\when('get_user_by')->justReturn(false);

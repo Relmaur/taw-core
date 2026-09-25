@@ -7,6 +7,7 @@ namespace TAW\Core\Rest;
 use TAW\Core\Content\FieldCodec;
 use TAW\Core\Metabox\Metabox;
 use TAW\Core\Metabox\Store\TermMetaStore;
+use TAW\Core\Metabox\Store\UserMetaStore;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -91,6 +92,54 @@ final class FieldMetaRegistrar
         // Called from here rather than hooked on its own, so a site without
         // term fieldsets gains no hook (the golden hook snapshot).
         self::registerTermMeta();
+        self::registerUserMeta();
+    }
+
+    /**
+     * User fieldsets (`"user"`, ADR-0008), gated on `edit_user`. Exposed only
+     * in the REST `edit` context: `/wp/v2/users/<id>` is public for authors,
+     * and user fields must never show there.
+     */
+    public static function registerUserMeta(): void
+    {
+        $fields = Metabox::fieldsFor('user');
+        $restOwner = self::restOwners($fields);
+        $auth = static fn ($allowed, $meta, $objectId): bool => current_user_can('edit_user', (int) $objectId);
+
+        foreach ($fields as $metaKey => $config) {
+            $type = (string) ($config['type'] ?? 'text');
+            $structured = in_array($type, FieldCodec::STRUCTURED_TYPES, true);
+
+            register_meta('user', (string) $metaKey, $structured
+                ? ['type' => 'string', 'single' => true, 'show_in_rest' => ['schema' => ['context' => ['edit']]], 'auth_callback' => $auth]
+                : [
+                    'type'              => self::SCALAR_REST_TYPE[$type] ?? 'string',
+                    'single'            => true,
+                    'show_in_rest'      => ['schema' => ['context' => ['edit']]],
+                    'sanitize_callback' => static fn ($value) => Metabox::sanitizeForStorage($config, $value),
+                    'auth_callback'     => $auth,
+                ]);
+
+            $fieldId = (string) $config['field_key'];
+            if (!$structured || $restOwner[$fieldId] !== $metaKey) {
+                continue;
+            }
+
+            register_rest_field('user', 'taw_' . $fieldId, [
+                'get_callback'    => static function (array $object) use ($metaKey, $config) {
+                    return current_user_can('edit_user', (int) $object['id'])
+                        ? FieldCodec::decode($config, get_user_meta((int) $object['id'], (string) $metaKey, true))
+                        : null;
+                },
+                'update_callback' => static function ($value, \WP_User $user) use ($config): void {
+                    if (!current_user_can('edit_user', $user->ID)) {
+                        return;
+                    }
+                    Metabox::writeTo(new UserMetaStore(), (int) $user->ID, $config, $value);
+                },
+                'schema'          => self::structuredSchema($type) + ['context' => ['edit']],
+            ]);
+        }
     }
 
     /**

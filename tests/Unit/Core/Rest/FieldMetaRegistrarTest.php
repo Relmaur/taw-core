@@ -34,6 +34,10 @@ final class FieldMetaRegistrarTest extends TestCase
             $this->restFields["{$type}:{$name}"] = $args;
             return true;
         });
+        Functions\when('register_meta')->alias(function (string $objectType, string $key, array $args): bool {
+            $this->byType["{$objectType}:{$key}"] = $args;
+            return true;
+        });
         Functions\when('register_term_meta')->alias(function (string $taxonomy, string $key, array $args): bool {
             $this->byType["term:{$taxonomy}:{$key}"] = $args;
             return true;
@@ -129,5 +133,24 @@ final class FieldMetaRegistrarTest extends TestCase
         $this->assertArrayHasKey('tag:taw_tag_links', $this->restFields, 'post_tag\'s REST object type is "tag"');
         $this->assertArrayHasKey('book:_taw_tag_rank', $this->byType);
         $this->assertArrayNotHasKey('page:_taw_tag_rank', $this->byType, 'the term target is not a page slug');
+    }
+
+    public function test_user_fields_register_for_the_edit_context_only(): void
+    {
+        new Metabox(['id' => 'author_details', 'title' => 'Author', 'screens' => ['user'], 'fields' => [
+            ['id' => 'author_twitter', 'type' => 'url'],
+            ['id' => 'author_links', 'type' => 'repeater', 'fields' => [['id' => 'href', 'type' => 'url']]],
+        ]]);
+        Functions\when('current_user_can')->alias(static fn (string $cap, int $id): bool => $cap === 'edit_user' && $id === 7);
+
+        FieldMetaRegistrar::registerPostMeta();
+
+        $twitter = $this->byType['user:_taw_author_twitter'];
+        $this->assertSame(['schema' => ['context' => ['edit']]], $twitter['show_in_rest'], 'never in the public view of an author');
+        $this->assertTrue(($twitter['auth_callback'])(false, '_taw_author_twitter', 7));
+        $this->assertFalse(($twitter['auth_callback'])(false, '_taw_author_twitter', 8));
+        $this->assertSame(['edit'], $this->restFields['user:taw_author_links']['schema']['context']);
+        $this->assertNull(($this->restFields['user:taw_author_links']['get_callback'])(['id' => 8]), 'no value for a user you cannot edit');
+        $this->assertArrayNotHasKey('page:_taw_author_twitter', $this->byType, '"user" is not a page slug');
     }
 }

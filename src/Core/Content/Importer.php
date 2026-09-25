@@ -12,6 +12,7 @@ namespace TAW\Core\Content;
 
 use TAW\Core\Metabox\Metabox;
 use TAW\Core\Metabox\Store\TermMetaStore;
+use TAW\Core\Metabox\Store\UserMetaStore;
 
 /**
  * Consumes a content snapshot ({@see Exporter} output) or a change-set
@@ -271,7 +272,7 @@ class Importer
                 'post'    => $this->applyPost($op, $policy, $idMap),
                 'option'  => $this->applyOption($op, $policy),
                 'term'    => $this->applyTerm($op, $policy, $idMap),
-                'user'    => $this->applyUser($op, $policy),
+                'user'    => $this->applyUser($op, $policy, $idMap),
                 'comment' => $this->applyComment($op, $policy),
                 default   => ['bucket' => 'skipped', 'label' => "unknown:{$kind}"],
             };
@@ -542,6 +543,19 @@ class Importer
             foreach (is_array($fields['meta'] ?? null) ? $fields['meta'] : [] as $mk => $mv) {
                 if ((string) get_user_meta($existing, (string) $mk, true) !== (string) $mv) {
                     $changes['meta.' . $mk] = ['status' => 'changed', 'old' => get_user_meta($existing, (string) $mk, true), 'new' => $mv];
+                }
+            }
+
+            // User fieldsets (ADR-0008): same key rules and normalized diff as post fields.
+            $registered = Metabox::fieldsFor('user');
+            foreach (is_array($fields['fields'] ?? null) ? $fields['fields'] : [] as $fieldKey => $newVal) {
+                $target = FieldKeys::forKey((string) $fieldKey, $registered, self::bareConfigLookup());
+                $oldDecoded = FieldCodec::decode($target['config'], get_user_meta($existing, $target['meta_key'], true));
+                $newDecoded = FieldCodec::decode($target['config'], $newVal);
+                if (self::valueKey($oldDecoded) !== self::valueKey($newDecoded)) {
+                    $changes['fields.' . $fieldKey] = self::isEmptyValue($oldDecoded)
+                        ? ['status' => 'new', 'new' => $newDecoded]
+                        : ['status' => 'changed', 'old' => $oldDecoded, 'new' => $newDecoded];
                 }
             }
         }
@@ -841,9 +855,10 @@ class Importer
 
     /**
      * @param array<string, mixed> $op
+     * @param array<int, int>      $idMap
      * @return array{bucket: string, label: string}
      */
-    private function applyUser(array $op, string $policy): array
+    private function applyUser(array $op, string $policy, array $idMap = []): array
     {
         $fields = is_array($op['fields'] ?? null) ? $op['fields'] : [];
         $login = (string) ($fields['login'] ?? '');
@@ -910,6 +925,12 @@ class Importer
 
         foreach (is_array($fields['meta'] ?? null) ? $fields['meta'] : [] as $mk => $mv) {
             update_user_meta($userId, (string) $mk, $mv);
+        }
+
+        $registered = Metabox::fieldsFor('user');
+        foreach (is_array($fields['fields'] ?? null) ? $fields['fields'] : [] as $fieldKey => $value) {
+            $config = FieldKeys::forKey((string) $fieldKey, $registered, self::bareConfigLookup())['config'];
+            Metabox::writeTo(new UserMetaStore(), $userId, $config, FieldCodec::rewriteAttachmentIds($config, $value, $idMap));
         }
 
         // Portable password hash — WP would re-hash a plain value, so write it raw.

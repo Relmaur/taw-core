@@ -416,7 +416,19 @@ class Exporter
      */
     private function termFields(int $termId, array $registered): array
     {
-        $meta = get_term_meta($termId);
+        return $this->objectFields(get_term_meta($termId), $registered);
+    }
+
+    /**
+     * An object's TAW field values from all its meta, decoded and keyed like
+     * post fields; referenced attachments are collected for `media`.
+     *
+     * @param mixed                               $meta       get_{type}_meta($id) (all keys).
+     * @param array<string, array<string, mixed>> $registered Metabox::fieldsFor(…)
+     * @return array<string, mixed>
+     */
+    private function objectFields(mixed $meta, array $registered): array
+    {
         $fields = [];
         foreach ((is_array($meta) ? $meta : []) as $key => $values) {
             if (!is_string($key) || !isset($registered[$key])) {
@@ -593,6 +605,10 @@ class Exporter
      */
     private function exportUsers(bool $includePasswords): array
     {
+        // User fieldsets (ADR-0008): `fields`, keyed like post fields, only
+        // when some fieldset targets users.
+        $registered = Metabox::fieldsFor('user');
+
         $out = [];
         foreach (get_users(['fields' => 'all']) as $user) {
             $meta = [];
@@ -608,6 +624,9 @@ class Exporter
                 'meta'            => $meta,
                 'user_registered' => (string) $user->user_registered,
             ];
+            if ($registered !== []) {
+                $record['fields'] = $this->objectFields(get_user_meta($user->ID), $registered);
+            }
 
             if ($includePasswords) {
                 // WP password hashes (phpass, or bcrypt on newer cores) are

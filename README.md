@@ -322,6 +322,24 @@ Schema::fieldset('genre_details')->on('term:genre')->fields([...]);      // or '
   fields); taxonomies without them keep their row shape.
 - The data panel stays post-only (it's a block-editor feature).
 
+### User fields (v1.54.0+)
+
+`user` in a fieldset's screens (JSON/PHP `on`) targets the user screens, alone or mixed with other targets:
+
+```php
+Schema::fieldset('author_details')->on('user')->fields([...]);          // or 'screens' => ['user']
+```
+
+- **Where:** Profile, Edit User and Add New User, saved on `personal_options_update` / `edit_user_profile_update`
+  / `user_register` with the same nonce, validation, conditions and sanitizing as a post, gated on `edit_user`.
+  Validation messages show on the screen you land on (Profile, Edit User, or the Users list after adding).
+  Values are user meta with the fieldset's prefix. `user` is never a page slug.
+- **Read:** `Metabox::get_user($userId, 'author_twitter')`, or `Metabox::user($userId)->repeater('author_links')`
+  etc. (same typed readers as terms).
+- **REST:** `register_meta('user', …)` plus `taw_<id>` for structured types, **in the `edit` context only** (users
+  who can edit that user). `/wp/v2/users/<id>` is public for authors, and user fields never appear there.
+- **Content snapshots:** with `--with-users`, user records gain `fields` (only when a fieldset targets users).
+
 ### Readonly Fields
 
 Set `'readonly' => true` on any field whose value is authoritatively written by something other than the wp-admin form — an external sync pipeline, a computed value, etc. — so the metabox stops implying it's editable there:
@@ -505,7 +523,8 @@ to the engine, like `->with()`.
   id. REST meta, content export/import, the data panel, the visual editor and `fields:get`/`fields:set`
   use them, so two fieldsets can share a field id (on different post types, or with different prefixes)
   and each keeps its own type and sanitizer. `Metabox::getQualifiedRegistry()` lists them all.
-  `Metabox::fieldsFor('term', 'genre')` does the same for [term fieldsets](#term-fields-v1530).
+  `Metabox::fieldsFor('term', 'genre')` and `Metabox::fieldsFor('user')` do the same for [term](#term-fields-v1530)
+  and [user](#user-fields-v1540) fieldsets.
 - **Term targets:** `on` entries of the form `term:<taxonomy>` are checked (a taxonomy key, 1–32 lowercase
   letters, numbers, `_` or `-`); `schema:validate` warns when the taxonomy isn't defined in the schema files
   or by WordPress core.
@@ -1640,7 +1659,7 @@ Also, in wp-admin: **Tools → TAW Data** (Export with option checkboxes + Impor
 | `options` | every `_taw_*` option (repeater/files **decoded to arrays**), plus an allowlisted core set — `blogname`, `blogdescription`, `show_on_front`, `page_on_front`/`page_for_posts` **resolved to slugs**. Filter: `taw_content_export_core_options`. With `--with-settings`, also a **second** allowlist of environment settings (`permalink_structure`, `timezone_string`, `sticky_posts` → slugs, …). Filter: `taw_content_export_settings_options` |
 | `terms` | per public taxonomy (except `nav_menu`): `{slug, name, description, parent (by slug), meta}`, plus `fields` (decoded, keyed like post fields) when the taxonomy has term fieldsets (v1.53.0+) |
 | `posts` | `page`/`post`, every **public** CPT, **and** every CPT with a `Metabox` attached (so `public => false` content CPTs export without a manual filter) — except `taw_submission` and framework-internal types. Filter: `taw_content_export_post_types` (runs last). Per post: `type, slug, status, title, excerpt, content, menu_order, date, author ({login,email}), comment_status, ping_status, parent (by slug), template, terms, featured_media (filename), fields`. A slug-less draft also carries a composite `match_key` |
-| `users` | opt-in (`--with-users`): `{login, email, display_name, roles[], meta{first_name,last_name,description,nickname,locale}, user_registered}`. Password hashes only with the second flag `--with-user-passwords` |
+| `users` | opt-in (`--with-users`): `{login, email, display_name, roles[], meta{first_name,last_name,description,nickname,locale}, user_registered}`, plus `fields` when a fieldset targets users (v1.54.0+). Password hashes only with the second flag `--with-user-passwords` |
 | `comments` | opt-in (`--with-comments`): comments on exported posts, with `parent_ref` threading |
 | `media` | every referenced attachment: `{id, ref (filename), filename, url, title, description, alt, caption, mime}`. `--all-media` also carries unreferenced attachments |
 
