@@ -2005,11 +2005,13 @@ class Metabox
         <div class="fields-container"
             x-data="{ fields: <?php echo esc_attr(wp_json_encode($initial_values, JSON_UNESCAPED_UNICODE)); ?> }"
             x-init="
-            // Watch all inputs within this metabox and sync to reactive state
+            // Watch all inputs within this metabox and sync to reactive state.
+            // A checkbox's value is always '1': use '0' when unchecked, as the form posts it.
             $el.querySelectorAll('input, select, textarea').forEach(el => {
                 if (el.name && fields.hasOwnProperty(el.name)) {
-                    el.addEventListener('input', () => { fields[el.name] = el.value; });
-                    el.addEventListener('change', () => { fields[el.name] = el.value; });
+                    const read = () => el.type === 'checkbox' && !el.checked ? '0' : el.value;
+                    el.addEventListener('input', () => { fields[el.name] = read(); });
+                    el.addEventListener('change', () => { fields[el.name] = read(); });
                 }
             });
          ">
@@ -2955,8 +2957,9 @@ class Metabox
                         $el.querySelectorAll('input, select, textarea').forEach(function(el) {
                             var m = el.name && el.name.match(/\[([^\]]+)\]$/);
                             if (m && rowFields.hasOwnProperty(m[1])) {
-                                el.addEventListener('input',  function() { rowFields[m[1]] = el.value; });
-                                el.addEventListener('change', function() { rowFields[m[1]] = el.value; });
+                                var read = function() { return el.type === 'checkbox' && !el.checked ? '0' : el.value; };
+                                el.addEventListener('input',  function() { rowFields[m[1]] = read(); });
+                                el.addEventListener('change', function() { rowFields[m[1]] = read(); });
                             }
                         });
                     ">
