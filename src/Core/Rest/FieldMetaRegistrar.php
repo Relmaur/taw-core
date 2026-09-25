@@ -52,28 +52,46 @@ final class FieldMetaRegistrar
 
     public static function registerPostMeta(): void
     {
-        foreach (Metabox::getFieldRegistry() as $fieldId => $config) {
-            $type = $config['type'] ?? 'text';
+        // Qualified registry (ADR-0008): each metabox registers its own
+        // fields with its own config, even when another metabox uses the
+        // same bare id. Collected per post type and meta key first, so one
+        // meta key is registered once (the later metabox wins, as in the
+        // bare registry).
+        $byPostType = [];
 
+        foreach (Metabox::getQualifiedRegistry() as $config) {
             // Group parents own no meta of their own — the compound sub-field
             // entries ('<group>_<sub>') carry the real types and are handled
             // as their own registry entries.
-            if ($type === 'group') {
+            if (($config['type'] ?? 'text') === 'group') {
                 continue;
             }
 
-            $postTypes = self::resolvePostTypes(is_array($config['screens'] ?? null) ? $config['screens'] : []);
-            if ($postTypes === []) {
-                continue;
+            foreach (self::resolvePostTypes(is_array($config['screens'] ?? null) ? $config['screens'] : []) as $postType) {
+                $byPostType[$postType][Metabox::metaKeyOf($config)] = $config;
+            }
+        }
+
+        foreach ($byPostType as $postType => $fields) {
+            // The computed field `taw_<id>` is named by bare id; when fields
+            // with different prefixes share one on a post type, the `_taw_`
+            // field owns it (the others stay readable as raw meta).
+            $restOwner = [];
+            foreach ($fields as $metaKey => $config) {
+                $name = (string) ($config['field_key'] ?? $config['id'] ?? '');
+                if (!isset($restOwner[$name]) || ($config['prefix'] ?? '_taw_') === '_taw_') {
+                    $restOwner[$name] = $metaKey;
+                }
             }
 
-            $metaKey = (string) ($config['prefix'] ?? '_taw_') . $fieldId;
+            foreach ($fields as $metaKey => $config) {
+                $type = (string) ($config['type'] ?? 'text');
+                $fieldId = (string) ($config['field_key'] ?? $config['id'] ?? '');
 
-            foreach ($postTypes as $postType) {
                 if (in_array($type, FieldCodec::STRUCTURED_TYPES, true)) {
-                    self::registerStructured($postType, $metaKey, (string) $fieldId, $config);
+                    self::registerStructured((string) $postType, (string) $metaKey, $fieldId, $config, $restOwner[$fieldId] === $metaKey);
                 } else {
-                    self::registerScalar($postType, $metaKey, (string) $type, $config);
+                    self::registerScalar((string) $postType, (string) $metaKey, $type, $config);
                 }
             }
         }
@@ -96,7 +114,7 @@ final class FieldMetaRegistrar
     /**
      * @param array<string, mixed> $config
      */
-    private static function registerStructured(string $postType, string $metaKey, string $fieldId, array $config): void
+    private static function registerStructured(string $postType, string $metaKey, string $fieldId, array $config, bool $withRestField = true): void
     {
         // Raw JSON string, still readable/writable as a string over wp/v2.
         register_post_meta($postType, $metaKey, [
@@ -106,16 +124,20 @@ final class FieldMetaRegistrar
             'auth_callback' => static fn ($allowed, $meta, $objectId): bool => current_user_can('edit_post', (int) $objectId),
         ]);
 
+        if (!$withRestField) {
+            return;
+        }
+
         // Decoded object/array shape as a computed field.
         register_rest_field($postType, 'taw_' . $fieldId, [
             'get_callback'    => static function (array $object) use ($metaKey, $config) {
                 return FieldCodec::decode($config, get_post_meta((int) $object['id'], $metaKey, true));
             },
-            'update_callback' => static function ($value, \WP_Post $object) use ($fieldId, $config): void {
+            'update_callback' => static function ($value, \WP_Post $object) use ($config): void {
                 if (!current_user_can('edit_post', $object->ID)) {
                     return;
                 }
-                Metabox::writeMeta($object->ID, $config + ['id' => $fieldId], $value);
+                Metabox::writeMeta($object->ID, $config, $value);
             },
             'schema'          => self::structuredSchema((string) ($config['type'] ?? 'repeater')),
         ]);

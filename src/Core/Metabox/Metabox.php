@@ -101,6 +101,17 @@ class Metabox
     /** @var array stores field configurations */
     private static array $fieldRegistry = [];
 
+    /**
+     * Every field, keyed by its qualified id `"{metabox id}.{field id}"`
+     * (group sub-fields `"{metabox id}.{group}_{sub}"`), so fields that share
+     * a bare id in different metaboxes each keep their own config (ADR-0008).
+     * Entries are the bare registry's entry plus `qualified_id`, `field_key`
+     * (the id the meta key is built from) and `meta_key`.
+     *
+     * @var array<string, array<string, mixed>>
+     */
+    private static array $qualifiedRegistry = [];
+
 
     /** @var callable|null Callback to conditionally show the metabox. Receives WP_Post. */
     private $show_on;
@@ -202,6 +213,7 @@ class Metabox
 
         foreach ($this->fields as $field) {
             self::$fieldRegistry[$field['id']] = array_merge($field, $registryBase);
+            $this->qualify((string) $field['id'], self::$fieldRegistry[$field['id']]);
 
             // Group: register sub-fields with compound IDs
             if (($field['type'] ?? '') === 'group' && !empty($field['fields'])) {
@@ -217,6 +229,7 @@ class Metabox
                     self::$fieldRegistry[$compoundId] = array_merge($subField, $registryBase, [
                         'parent_group' => $field['id'],
                     ]);
+                    $this->qualify($compoundId, self::$fieldRegistry[$compoundId]);
                 }
             }
 
@@ -327,6 +340,27 @@ class Metabox
     public static function forgetInstances(): void
     {
         self::$instances = [];
+    }
+
+    /** @internal Tests only: empties the bare and the qualified field registries. */
+    public static function resetRegistryForTests(): void
+    {
+        self::$fieldRegistry = [];
+        self::$qualifiedRegistry = [];
+    }
+
+    /**
+     * @param array<string, mixed> $entry The bare registry entry.
+     */
+    private function qualify(string $fieldKey, array $entry): void
+    {
+        $qualifiedId = $this->id . '.' . $fieldKey;
+
+        self::$qualifiedRegistry[$qualifiedId] = array_merge($entry, [
+            'qualified_id' => $qualifiedId,
+            'field_key'    => $fieldKey,
+            'meta_key'     => $this->prefix . $fieldKey,
+        ]);
     }
 
     /**
@@ -3780,16 +3814,28 @@ class Metabox
      */
     public static function writeMeta(int $postId, array $fieldConfig, mixed $value): mixed
     {
-        $type   = $fieldConfig['type'] ?? 'text';
-        $prefix = $fieldConfig['prefix'] ?? '_taw_';
-        $id     = $fieldConfig['id'] ?? '';
-        $metaKey = $prefix . $id;
+        $metaKey = self::metaKeyOf($fieldConfig);
 
         $sanitized = self::sanitizeForStorage($fieldConfig, $value);
 
         update_post_meta($postId, $metaKey, wp_slash($sanitized));
 
         return $sanitized;
+    }
+
+    /**
+     * The meta key a field config stores under: its `meta_key` (qualified
+     * registry entries, which get group sub-fields right), else prefix + id.
+     *
+     * @param array<string, mixed> $fieldConfig
+     */
+    public static function metaKeyOf(array $fieldConfig): string
+    {
+        if (isset($fieldConfig['meta_key']) && is_string($fieldConfig['meta_key']) && $fieldConfig['meta_key'] !== '') {
+            return $fieldConfig['meta_key'];
+        }
+
+        return (string) ($fieldConfig['prefix'] ?? '_taw_') . (string) ($fieldConfig['id'] ?? '');
     }
 
     /**
@@ -3828,6 +3874,92 @@ class Metabox
     }
 
     /**
+     * Every field keyed by qualified id (`"{metabox id}.{field id}"`), including
+     * group parents. See {@see self::$qualifiedRegistry}.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function getQualifiedRegistry(): array
+    {
+        return self::$qualifiedRegistry;
+    }
+
+    /**
+     * The fields that store a value on one object, keyed by meta key: the
+     * lookup that maps meta keys to configs without going through bare ids,
+     * so each metabox keeps its own config and any prefix works (ADR-0008).
+     *
+     * Group parents own no meta and are left out; their sub-fields are
+     * included. When two metaboxes on the same post type store the same meta
+     * key, the later one wins, as in the bare registry.
+     *
+     * @param string $objectType 'post' (terms and users come with their storage contexts).
+     * @param string $subtype    The post type.
+     * @return array<string, array<string, mixed>> meta key → config (with `qualified_id`, `field_key`, `meta_key`).
+     */
+    public static function fieldsFor(string $objectType, string $subtype): array
+    {
+        if ($objectType !== 'post' || $subtype === '') {
+            return [];
+        }
+
+        $fields = [];
+        foreach (self::$qualifiedRegistry as $config) {
+            if (($config['type'] ?? 'text') === 'group') {
+                continue;
+            }
+            $screens = is_array($config['screens'] ?? null) ? $config['screens'] : [];
+            if (!in_array($subtype, self::screensToPostTypes($screens), true)) {
+                continue;
+            }
+            $fields[(string) $config['meta_key']] = $config;
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Every field on one object that a reference can mean, best match first.
+     *
+     * The reference is a qualified id (`"hero.heading"`), a meta key
+     * (`"_taw_hero_heading"`), or a bare id (`"hero_heading"`). A bare id can
+     * match several fields when metaboxes with different prefixes share it;
+     * the `_taw_` one comes first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function fieldMatches(string $objectType, string $subtype, string $ref): array
+    {
+        $fields = self::fieldsFor($objectType, $subtype);
+
+        foreach ($fields as $config) {
+            if ($config['qualified_id'] === $ref) {
+                return [$config];
+            }
+        }
+
+        if (isset($fields[$ref])) {
+            return [$fields[$ref]];
+        }
+
+        $matches = array_values(array_filter($fields, static fn (array $config): bool => $config['field_key'] === $ref));
+        usort($matches, static fn (array $a, array $b): int => (($b['prefix'] ?? '') === '_taw_') <=> (($a['prefix'] ?? '') === '_taw_'));
+
+        return $matches;
+    }
+
+    /**
+     * The config for a field on one object (see {@see self::fieldMatches()}),
+     * or null when no field for that object matches.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function fieldFor(string $objectType, string $subtype, string $ref): ?array
+    {
+        return self::fieldMatches($objectType, $subtype, $ref)[0] ?? null;
+    }
+
+    /**
      * Every concrete post type that has at least one Metabox attached to it,
      * derived from the field registry's `screens` lists.
      *
@@ -3847,7 +3979,7 @@ class Metabox
     {
         $types = [];
 
-        foreach (self::$fieldRegistry as $config) {
+        foreach (self::$qualifiedRegistry as $config) {
             $screens = is_array($config['screens'] ?? null) ? $config['screens'] : [];
             foreach (self::screensToPostTypes($screens) as $postType) {
                 $types[$postType] = true;
@@ -3915,6 +4047,17 @@ class Metabox
             return null;
         }
 
+        return self::editorConfigOf($field);
+    }
+
+    /**
+     * {@see self::get_editor_config()} for a config already in hand (from
+     * {@see self::fieldFor()}).
+     *
+     * @param array<string, mixed> $field
+     */
+    public static function editorConfigOf(array $field): mixed
+    {
         // Default true — opt-out via 'editor' => false
         $editor = $field['editor'] ?? true;
 

@@ -19,15 +19,24 @@ final class FieldMetaRegistrarTest extends TestCase
     /** @var array<string, array<string, mixed>> */
     private array $registered = [];
 
+    /** @var array<string, array<string, mixed>> "post type:meta key" → args */
+    private array $byType = [];
+
+    /** @var array<string, array<string, mixed>> "post type:field name" → args */
+    private array $restFields = [];
+
     protected function setUp(): void
     {
         parent::setUp();
-        $registry = new \ReflectionProperty(Metabox::class, 'fieldRegistry');
-        $registry->setValue(null, []);
-        Functions\when('post_type_exists')->alias(static fn (string $type): bool => $type === 'book');
-        Functions\when('register_rest_field')->justReturn(true);
+        Metabox::resetRegistryForTests();
+        Functions\when('post_type_exists')->alias(static fn (string $type): bool => in_array($type, ['book', 'movie'], true));
+        Functions\when('register_rest_field')->alias(function (string $type, string $name, array $args): bool {
+            $this->restFields["{$type}:{$name}"] = $args;
+            return true;
+        });
         Functions\when('register_post_meta')->alias(function (string $type, string $key, array $args): bool {
             $this->registered[$key] = $args;
+            $this->byType["{$type}:{$key}"] = $args;
             return true;
         });
         Functions\when('wp_json_encode')->alias(static fn (mixed $data, int $flags = 0): string|false => json_encode($data, $flags));
@@ -36,7 +45,7 @@ final class FieldMetaRegistrarTest extends TestCase
 
     protected function tearDown(): void
     {
-        (new \ReflectionProperty(Metabox::class, 'fieldRegistry'))->setValue(null, []);
+        Metabox::resetRegistryForTests();
         Metabox::forgetInstances();
         parent::tearDown();
     }
@@ -64,5 +73,38 @@ final class FieldMetaRegistrarTest extends TestCase
             'segments normalized: highlighted as a boolean, empty segments dropped'
         );
         $this->assertSame('Ada', $sanitize('_taw_book_author', ' <b>Ada</b> '));
+    }
+
+    public function test_fieldsets_sharing_an_id_register_their_own_type_per_post_type(): void
+    {
+        new Metabox(['id' => 'book_details', 'title' => 'Book', 'screens' => ['book'], 'fields' => [
+            ['id' => 'subtitle', 'type' => 'text'],
+        ]]);
+        new Metabox(['id' => 'movie_details', 'title' => 'Movie', 'screens' => ['movie'], 'fields' => [
+            ['id' => 'subtitle', 'type' => 'number'],
+        ]]);
+
+        FieldMetaRegistrar::registerPostMeta();
+
+        $this->assertSame('string', $this->byType['book:_taw_subtitle']['type'], 'book keeps its text field (was lost to movie\'s)');
+        $this->assertSame('number', $this->byType['movie:_taw_subtitle']['type']);
+        $this->assertSame('Ada', ($this->byType['book:_taw_subtitle']['sanitize_callback'])(' <b>Ada</b> '));
+    }
+
+    public function test_every_prefix_registers_and_the_taw_field_owns_the_rest_field(): void
+    {
+        new Metabox(['id' => 'legacy', 'title' => 'Legacy', 'screens' => ['book'], 'prefix' => 'acme_', 'fields' => [
+            ['id' => 'gallery', 'type' => 'files'],
+        ]]);
+        new Metabox(['id' => 'book_details', 'title' => 'Book', 'screens' => ['book'], 'fields' => [
+            ['id' => 'gallery', 'type' => 'repeater', 'fields' => [['id' => 'caption', 'type' => 'text']]],
+        ]]);
+
+        FieldMetaRegistrar::registerPostMeta();
+
+        $this->assertArrayHasKey('book:acme_gallery', $this->byType);
+        $this->assertArrayHasKey('book:_taw_gallery', $this->byType);
+        $this->assertSame(['book:taw_gallery'], array_keys($this->restFields));
+        $this->assertSame(['type' => 'array', 'items' => ['type' => 'object']], $this->restFields['book:taw_gallery']['schema'], 'the repeater, not the files field');
     }
 }

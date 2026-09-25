@@ -28,6 +28,7 @@ final class PreBootAutoloadTest extends TestCase
         return [
             ['\\TAW\\Core\\Content\\Importer::POLICIES'],
             ['\\TAW\\Core\\Content\\FieldCodec::STRUCTURED_TYPES'],
+            ['\\TAW\\Core\\Content\\FieldKeys::DEFAULT_PREFIX'],
             ['\\TAW\\Core\\Content\\Exporter::SCHEMA_VERSION'],
             ['\\TAW\\Core\\Content\\ChangeSet::between([], [])'],
             ['\\TAW\\Core\\Content\\RegistryFingerprint::drift([], [])'],

@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://taw.mlizardo.com/schema/content-interchange-1.2.json",
+  "title": "TAW Content Interchange 1.2",
+  "description": "Portable snapshot / change-set format produced by TAW\\Core\\Content\\Exporter and consumed by TAW\\Core\\Content\\Importer (php bin/taw content:export | content:import | content:diff). 1.1 adds optional users / comments sections and per-post author / comment_status / ping_status for whole-site state migration. 1.2 keys post fields with another meta prefix than _taw_ by their full meta key (_taw_ fields keep their bare id, as in 1.0 and 1.1). Importer accepts 1.0, 1.1 and 1.2.",
+  "oneOf": [
+    { "$ref": "#/$defs/snapshot" },
+    { "$ref": "#/$defs/changeset" }
+  ],
+  "$defs": {
+    "snapshot": {
+      "type": "object",
+      "required": ["meta", "options", "terms", "posts"],
+      "properties": {
+        "meta": {
+          "type": "object",
+          "required": ["schema", "generated_at", "source"],
+          "properties": {
+            "schema": { "enum": ["1.0", "1.1", "1.2"] },
+            "generated_at": { "type": "string", "format": "date-time" },
+            "source": {
+              "type": "object",
+              "properties": {
+                "url": { "type": "string" },
+                "taw_core_version": { "type": ["string", "null"] },
+                "theme": { "type": "string" }
+              }
+            },
+            "registry_fingerprint": {
+              "type": "object",
+              "description": "The block/field registry at export time, so the importer can warn on drift.",
+              "properties": {
+                "blocks": { "type": "array", "items": { "type": "string" } },
+                "fields": { "type": "object", "additionalProperties": { "type": "string" } },
+                "options": { "type": "object", "additionalProperties": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "options": {
+          "type": "object",
+          "description": "Every _taw_* option (repeater/files decoded to arrays) plus an allowlisted core set, plus the environment-settings allowlist when exported with --with-settings. page_on_front / page_for_posts resolve to slugs; sticky_posts resolves to a list of slugs.",
+          "additionalProperties": true
+        },
+        "terms": {
+          "type": "object",
+          "description": "Keyed by taxonomy. nav_menu is excluded.",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/term" }
+          }
+        },
+        "posts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/post" }
+        },
+        "users": {
+          "type": "array",
+          "description": "Present only when exported with --with-users. Matched on import by login then email.",
+          "items": { "$ref": "#/$defs/user" }
+        },
+        "comments": {
+          "type": "array",
+          "description": "Present only when exported with --with-comments. Threading is rebuilt from parent_ref.",
+          "items": { "$ref": "#/$defs/comment" }
+        },
+        "media": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/media" }
+        }
+      }
+    },
+    "changeset": {
+      "type": "object",
+      "required": ["taw_changeset", "operations"],
+      "properties": {
+        "taw_changeset": {
+          "type": "object",
+          "required": ["schema"],
+          "properties": {
+            "schema": { "enum": ["1.0", "1.1", "1.2"] },
+            "base": {},
+            "target": {}
+          }
+        },
+        "operations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/operation" }
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "required": ["target"],
+      "properties": {
+        "op": { "enum": ["create", "update", "delete", "skip"] },
+        "target": {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["post", "option", "term", "user", "comment"] },
+            "type": { "type": "string", "description": "post type, or taxonomy for kind=term" },
+            "slug": { "type": "string" },
+            "match_key": { "type": ["string", "null"], "description": "composite key for a slug-less draft post" },
+            "key": { "type": "string", "description": "option name (kind=option), user login (kind=user), or content hash (kind=comment)" }
+          }
+        },
+        "post": { "$ref": "#/$defs/post" },
+        "fields": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "post": {
+      "type": "object",
+      "required": ["type", "slug"],
+      "properties": {
+        "type": { "type": "string" },
+        "slug": { "type": "string" },
+        "match_key": { "type": "string", "description": "present only for slug-less posts: sha1(type|title|date_gmt)" },
+        "status": { "type": "string" },
+        "title": { "type": "string" },
+        "excerpt": { "type": "string" },
+        "content": { "type": "string" },
+        "menu_order": { "type": "integer" },
+        "date": { "type": "string" },
+        "author": {
+          "type": ["object", "null"],
+          "description": "portable author ref; resolved on import by login then email",
+          "properties": {
+            "login": { "type": "string" },
+            "email": { "type": "string" }
+          }
+        },
+        "comment_status": { "type": "string" },
+        "ping_status": { "type": "string" },
+        "parent": { "type": ["string", "null"], "description": "parent post slug" },
+        "template": { "type": ["string", "null"] },
+        "terms": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "featured_media": { "type": ["string", "null"], "description": "attachment filename" },
+        "fields": {
+          "type": "object",
+          "description": "field key => value, decoded by the field's registered type. The key is the bare field id for _taw_ fields and the full meta key for any other prefix (1.2).",
+          "additionalProperties": true
+        }
+      }
+    },
+    "term": {
+      "type": "object",
+      "required": ["slug", "name"],
+      "properties": {
+        "slug": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "parent": { "type": ["string", "null"], "description": "parent term slug" },
+        "meta": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "user": {
+      "type": "object",
+      "required": ["login", "email"],
+      "properties": {
+        "login": { "type": "string" },
+        "email": { "type": "string" },
+        "display_name": { "type": "string" },
+        "roles": { "type": "array", "items": { "type": "string" } },
+        "meta": {
+          "type": "object",
+          "properties": {
+            "first_name": { "type": "string" },
+            "last_name": { "type": "string" },
+            "description": { "type": "string" },
+            "nickname": { "type": "string" },
+            "locale": { "type": "string" }
+          }
+        },
+        "user_registered": { "type": "string" },
+        "password_hash": { "type": "string", "description": "present only with --with-user-passwords; a portable phpass/bcrypt hash" }
+      }
+    },
+    "comment": {
+      "type": "object",
+      "required": ["post_ref", "content"],
+      "properties": {
+        "ref": { "type": "string", "description": "source-site comment ID — an in-file id for threading" },
+        "post_ref": { "type": "string", "description": "slug of the post the comment belongs to" },
+        "author_name": { "type": "string" },
+        "author_email": { "type": "string" },
+        "author_url": { "type": "string" },
+        "content": { "type": "string" },
+        "date_gmt": { "type": "string" },
+        "approved": { "type": "string" },
+        "type": { "type": "string" },
+        "parent_ref": { "type": ["string", "null"], "description": "ref of the parent comment, for threading" }
+      }
+    },
+    "media": {
+      "type": "object",
+      "required": ["ref", "filename"],
+      "properties": {
+        "id": { "type": "integer", "description": "source-site attachment ID, used only to build the old->new ID map" },
+        "ref": { "type": "string", "description": "filename — the stable match key" },
+        "filename": { "type": "string" },
+        "url": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "alt": { "type": "string" },
+        "caption": { "type": "string" },
+        "mime": { "type": "string" }
+      }
+    }
+  }
+}

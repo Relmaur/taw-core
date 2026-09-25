@@ -12,14 +12,14 @@ use TAW\Core\Schema\Definition\Fieldset;
 /**
  * Detects schema fields whose id clashes with another field (ADR-0004 § 7).
  *
- * WHY THIS MATTERS: Metabox's field registry is keyed by the bare field id,
- * so two fields named "subtitle" in different metaboxes share one registry
- * entry — the later one overwrites the earlier. The meta values themselves
- * are separate per post, but everything that reads the registry (REST meta
- * registration, content export, bin/taw fields:*) sees only one of the two
- * configs. That's a latent bug a developer should hear about, but fixing
- * the registry changes behavior for existing sites, so Phase 1 only
- * DETECTS; Phase 2 fixes it.
+ * WHY THIS MATTERS: since ADR-0008 every field is also registered under its
+ * qualified id ("{fieldset}.{field}"), and REST meta, content export/import,
+ * the data panel, the visual editor and bin/taw fields:* resolve fields per
+ * post type through it, so each fieldset keeps its own config. What stays
+ * ambiguous is the bare-id API: `Metabox::get_field_config($id)` and the
+ * bare registry still hold one entry per id (the later one), and on a post
+ * type with both fields, `Metabox::get($postId, $id)` only reads the `_taw_`
+ * prefix. A developer should still hear about it.
  *
  * HOW: collisions can happen in either direction —
  *   - before: when a fieldset compiles (init:8), an entry with its field id
@@ -47,7 +47,7 @@ final class CollisionReport
         foreach ($fieldset->registryFieldIds() as $fieldId) {
             if (isset(self::$claimed[$fieldId]) && self::$claimed[$fieldId] !== $fieldset->key()) {
                 self::$collisions[] = sprintf(
-                    'Field "%s" is defined by both schema fieldsets "%s" and "%s"; the registry keeps only "%s".',
+                    'Field "%s" is defined by both schema fieldsets "%s" and "%s"; each keeps its own config, but get_field_config() returns only "%s"\'s.',
                     $fieldId,
                     self::$claimed[$fieldId],
                     $fieldset->key(),
@@ -57,7 +57,7 @@ final class CollisionReport
                 $existing = Metabox::get_field_config($fieldId);
                 if ($existing !== null && ($existing['metabox_id'] ?? null) !== $fieldset->key()) {
                     self::$collisions[] = sprintf(
-                        'Schema fieldset "%s" field "%s" replaces the registry entry of metabox "%s".',
+                        'Schema fieldset "%s" field "%s" shares its id with metabox "%s"; each keeps its own config, but get_field_config() returns only the schema field.',
                         $fieldset->key(),
                         $fieldId,
                         (string) ($existing['metabox_id'] ?? '?')
@@ -81,7 +81,7 @@ final class CollisionReport
 
             if ($current !== null && $owner !== $fieldsetKey) {
                 self::$collisions[] = sprintf(
-                    'Metabox "%s" (registered after the schema) replaces the registry entry of schema fieldset "%s" field "%s".',
+                    'Metabox "%s" (registered after the schema) shares an id with schema fieldset "%s" field "%s"; each keeps its own config, but get_field_config() returns only the metabox\'s.',
                     (string) $owner,
                     $fieldsetKey,
                     $fieldId
@@ -102,7 +102,7 @@ final class CollisionReport
         }
 
         foreach (self::$collisions as $collision) {
-            Registry::warn(__METHOD__, $collision . ' Rename one of the fields.');
+            Registry::warn(__METHOD__, $collision . ' Rename one of the fields, or use qualified ids (fieldset.field).');
         }
 
         if (defined('WP_DEBUG') && WP_DEBUG && function_exists('add_action')) {

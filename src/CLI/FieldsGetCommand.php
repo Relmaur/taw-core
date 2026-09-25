@@ -55,7 +55,7 @@ class FieldsGetCommand extends Command
                   <info>php bin/taw fields:get options company_phone</info>
                 HELP)
             ->addArgument('post_id', InputArgument::REQUIRED, "Post ID the field is stored against, or the literal 'options' for a site-wide OptionsPage field")
-            ->addArgument('field_id', InputArgument::REQUIRED, "Field ID, without the meta key prefix (e.g. 'hero_heading', or 'hero_cta_text' for a group sub-field)")
+            ->addArgument('field_id', InputArgument::REQUIRED, "Field ID without the meta key prefix (e.g. 'hero_heading', or 'hero_cta_text' for a group sub-field), a qualified id ('hero.hero_heading'), or the full meta key")
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output machine-readable JSON instead of a formatted summary');
     }
 
@@ -85,9 +85,18 @@ class FieldsGetCommand extends Command
             return Command::FAILURE;
         }
 
-        $fieldConfig = $isOptionsTarget
-            ? OptionsPage::getFieldConfig($fieldId)
-            : Metabox::get_field_config($fieldId);
+        if ($isOptionsTarget) {
+            $fieldConfig = OptionsPage::getFieldConfig($fieldId);
+        } else {
+            // Qualified id, meta key or bare id, resolved for this post's type (ADR-0008).
+            $resolved = FieldRef::resolve($postId, $fieldId);
+            if ($resolved['ambiguous'] !== []) {
+                $io->error("Field '{$fieldId}' matches several fields on this post: " . implode(', ', $resolved['ambiguous'])
+                    . '. Pass the qualified id (fieldset.field) or the meta key.');
+                return Command::FAILURE;
+            }
+            $fieldConfig = $resolved['config'];
+        }
 
         if ($fieldConfig === null) {
             $registry = $isOptionsTarget ? 'OptionsPage' : 'Metabox';
@@ -99,8 +108,8 @@ class FieldsGetCommand extends Command
         $type = $fieldConfig['type'] ?? 'text';
         $value = $isOptionsTarget
             ? $this->readOptionValue($fieldId, $type, $prefix)
-            : $this->readValue($postId, $fieldId, $type, $prefix);
-        $storageKey = $prefix . $fieldId;
+            : $this->readValue($postId, (string) $fieldConfig['field_key'], $type, $prefix);
+        $storageKey = $isOptionsTarget ? $prefix . $fieldId : Metabox::metaKeyOf($fieldConfig);
 
         if ($asJson) {
             $output->writeln((string) json_encode(array_merge(
