@@ -93,6 +93,8 @@ languages/              # taw-core's translations (.pot, <locale>.po, <locale>.l
 tools/i18n.php          # builds them (composer run i18n:*); not shipped
 ```
 
+**Upgrading an existing site:** see [UPGRADING.md](UPGRADING.md) (also at `vendor/taw/core/UPGRADING.md`): what changes, by the version you're coming from.
+
 **Namespace:** `TAW\` → `src/` (PSR-4). `src/Support/utilities.php` is file-autoloaded (global scope).
 
 ---
