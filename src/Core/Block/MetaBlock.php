@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace TAW\Core\Block;
 
 use TAW\Core\Editor\VisualEditor;
+use TAW\Core\Fields\PostFields;
 use TAW\Core\Metabox\Metabox;
+use TAW\Taw;
 
 
 if (!defined('ABSPATH')) {
@@ -121,5 +123,14 @@ abstract class MetaBlock extends BaseBlock
     {
         if (!$postId) return [];
         return Metabox::get_repeater($postId, $fieldId, $prefix);
+    }
+
+    /**
+     * The post's fields as typed values (ADR-0009): `$this->fields($postId)
+     * ->field('hero_image')->image()->url()`. Safe with `false` (a 404).
+     */
+    protected function fields(int|false $postId): PostFields
+    {
+        return Taw::post($postId);
     }
 }

@@ -299,6 +299,43 @@ $value = Metabox::get($post_id, 'field_id');
 $rows  = json_decode(Metabox::get($post_id, 'team'), true); // repeater
 ```
 
+### Typed reads: `Taw::post()` (v1.57.0+)
+
+`TAW\Taw` reads fields as typed values, escaped when echoed ([ADR-0009](docs/adr/0009-typed-value-api.md)):
+
+```php
+use TAW\Taw;
+
+$book = Taw::post();                                  // the current post; or Taw::post(42), Taw::post($wpPost)
+echo $book->field('book_subtitle');                    // esc_html'd
+echo $book->field('book_subtitle')->or('Untitled');    // a default when empty
+echo $book->field('book_cover')->image()->html('large', ['class' => 'cover']);
+$book->field('book_cover')->image()->url('medium');   // ->alt(), ->width(), ->height(), ->exists()
+foreach ($book->field('book_awards')->rows() as $row) { // typed by the repeater's sub-fields
+    echo $row->field('name');
+    echo $row->field('logo')->image();
+}
+$book->field('book_featured')->bool();                // ->int(), ->float(), ->text() (unescaped)
+$book->field('book_related')->posts();                // list<PostRef>: ->title(), ->url(), ->post(), ->fields()
+$book->field('book_address')->field('city');          // group sub-field
+$book->field('book_gallery')->images();               // files
+$book->field('book_awards')->value();                 // decoded exactly like REST taw_<id> / content export
+$book->field('book_awards')->raw();                   // the stored value, like Metabox::get()
+```
+
+In a `MetaBlock`: `$this->fields($postId)` (safe with `false` on a 404).
+
+- **`field()`** takes a bare id, a qualified id (`book_details.book_subtitle`) or a meta key, resolved per post type
+  through the qualified registry. A field no metabox registers is still read from `_taw_<id>`, untyped.
+- **`echo`** by type: `esc_html()` for plain values; `esc_url()` for `url`; `wp_kses_post()` for `wysiwyg` (no
+  paragraphs; `->paragraphs()` adds `wpautop()`); the `<img>` for `image`; the escaped title for a single
+  `post_select`; nothing for checkbox, files, repeater, group, gradient_text and hubspot_form.
+- **Never throws:** a missing post, unknown field or empty value gives `''`, `false`, `0`, `[]` or an empty object
+  (`->exists()` false). An accessor that doesn't fit a known type (e.g. `->rows()` on text) converts best-effort
+  and raises `_doing_it_wrong()` under `WP_DEBUG`.
+- The static helpers (`Metabox::get()`, `get_image_url()`, …) and `getMeta()` are unchanged; `Taw::post()` is
+  the recommended way for new code.
+
 ### Term fields (v1.53.0+)
 
 A fieldset can target a taxonomy's terms with `term:<taxonomy>` in its screens (JSON/PHP `on`), alone or mixed
