@@ -6,6 +6,7 @@ namespace TAW\Core;
 
 use TAW\Core\Content\ContentAdminScreen;
 use TAW\Core\DataPanel\DataPanel;
+use TAW\Core\Icons\Lucide;
 use TAW\Core\Editing\Editing;
 use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\FieldMetaRegistrar;
@@ -77,6 +78,10 @@ final class Boot
         new ContentEndpoint();
         FieldMetaRegistrar::register();
         Compiler::register();
+        // The icon endpoint `icon` fields search (metabox picker and data
+        // panel). No-op unless Lucide::enable() was called; already done
+        // when Theme::boot() ran it first.
+        Lucide::init();
         // Last, so the hooks above keep their positions. It removes its only
         // hook on init unless a fieldset uses the panel (ADR-0007).
         DataPanel::register();
@@ -139,5 +144,6 @@ final class Boot
         self::$editingBooted = false;
         Editing::resetForTests();
         DataPanel::resetForTests();
+        Lucide::resetForTests();
     }
 }
