@@ -8,6 +8,7 @@ use TAW\Core\Content\ContentAdminScreen;
 use TAW\Core\DataPanel\DataPanel;
 use TAW\Core\Icons\Lucide;
 use TAW\Core\Editing\Editing;
+use TAW\Core\I18n\Translations;
 use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\FieldMetaRegistrar;
 use TAW\Core\Schema\Compiler;
@@ -85,6 +86,8 @@ final class Boot
         // Last, so the hooks above keep their positions. It removes its only
         // hook on init unless a fieldset uses the panel (ADR-0007).
         DataPanel::register();
+        // taw-core's own text domain; Theme::boot() reaches it through here.
+        Translations::register();
     }
 
     /**

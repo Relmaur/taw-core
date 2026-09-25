@@ -865,9 +865,9 @@ class Metabox
                             $remove = $wrapper.find('.taw-remove-image');
 
                         var frame = wp.media({
-                            title: '<?php echo esc_js(__('Select or Upload Image', 'taw-theme')); ?>',
+                            title: '<?php echo esc_js(__('Select or Upload Image', 'taw-core')); ?>',
                             button: {
-                                text: '<?php echo esc_js(__('Use this image', 'taw-theme')); ?>'
+                                text: '<?php echo esc_js(__('Use this image', 'taw-core')); ?>'
                             },
                             multiple: false,
                             library: {
@@ -1045,7 +1045,7 @@ class Metabox
                                     $item.append('<span class="taw-files-icon dashicons dashicons-media-default"></span>');
                                     $item.append('<span class="taw-files-name">' + $('<span>').text(attachment.filename || attachment.title || '').html() + '</span>');
                                 }
-                                $item.append('<button type="button" class="taw-files-remove" title="<?php echo esc_js(__('Remove', 'taw-theme')); ?>">&times;</button>');
+                                $item.append('<button type="button" class="taw-files-remove" title="<?php echo esc_js(__('Remove', 'taw-core')); ?>">&times;</button>');
                                 $preview.append($item);
                                 updateButton();
                             }
@@ -1078,8 +1078,8 @@ class Metabox
                                 if (limit > 0 && getIds().length >= limit) return;
 
                                 var cfg = {
-                                    title:    '<?php echo esc_js(__('Select or Upload Files', 'taw-theme')); ?>',
-                                    button:   { text: '<?php echo esc_js(__('Add selected', 'taw-theme')); ?>' },
+                                    title:    '<?php echo esc_js(__('Select or Upload Files', 'taw-core')); ?>',
+                                    button:   { text: '<?php echo esc_js(__('Add selected', 'taw-core')); ?>' },
                                     multiple: true
                                 };
                                 if (fileTypes) cfg.library = { type: fileTypes };
@@ -1398,7 +1398,7 @@ class Metabox
                                     },
                                     error: function() {
                                         $results.html(
-                                            '<div class="taw-ps-no-results"><?php echo esc_js(__('Search failed. Please try again.', 'taw-theme')); ?></div>'
+                                            '<div class="taw-ps-no-results"><?php echo esc_js(__('Search failed. Please try again.', 'taw-core')); ?></div>'
                                         ).show();
                                     }
                                 });
@@ -1418,7 +1418,7 @@ class Metabox
 
                                 if (!posts.length) {
                                     $results.html(
-                                        '<div class="taw-ps-no-results"><?php echo esc_js(__('No posts found.', 'taw-theme')); ?></div>'
+                                        '<div class="taw-ps-no-results"><?php echo esc_js(__('No posts found.', 'taw-core')); ?></div>'
                                     ).show();
                                     return;
                                 }
@@ -1430,7 +1430,7 @@ class Metabox
                                             '<img src="' + post.thumbnail + '" class="taw-ps-thumb" alt="">' :
                                             '<span class="taw-ps-thumb taw-ps-thumb--empty"></span>') +
                                         '<span class="taw-ps-result-info">' +
-                                        '<span class="taw-ps-result-title">' + $('<span>').text(post.title || '<?php echo esc_js(__('(no title)', 'taw-theme')); ?>').html() + '</span>' +
+                                        '<span class="taw-ps-result-title">' + $('<span>').text(post.title || '<?php echo esc_js(__('(no title)', 'taw-core')); ?>').html() + '</span>' +
                                         '<span class="taw-ps-result-meta">' + post.post_type + ' · ' + post.date + '</span>' +
                                         '</span>' +
                                         '</div>'
@@ -1515,9 +1515,9 @@ class Metabox
                                         (post.thumbnail ?
                                             '<img src="' + post.thumbnail + '" class="taw-ps-pill-thumb" alt="">' :
                                             '') +
-                                        '<span class="taw-ps-pill-title">' + $('<span>').text(post.title || '<?php echo esc_js(__('(no title)', 'taw-theme')); ?>').html() + '</span>' +
+                                        '<span class="taw-ps-pill-title">' + $('<span>').text(post.title || '<?php echo esc_js(__('(no title)', 'taw-core')); ?>').html() + '</span>' +
                                         '<span class="taw-ps-pill-meta">' + post.post_type + '</span>' +
-                                        '<button type="button" class="taw-ps-pill-remove" title="<?php echo esc_js(__('Remove', 'taw-theme')); ?>">&times;</button>' +
+                                        '<button type="button" class="taw-ps-pill-remove" title="<?php echo esc_js(__('Remove', 'taw-core')); ?>">&times;</button>' +
                                         '</div>'
                                     );
 
@@ -1531,7 +1531,7 @@ class Metabox
                                 // Show count for multi mode with max
                                 if (multiple && max > 0) {
                                     $selected.append(
-                                        '<div class="taw-ps-count">' + selection.length + ' / ' + max + ' <?php echo esc_js(__('selected', 'taw-theme')); ?></div>'
+                                        '<div class="taw-ps-count">' + selection.length + ' / ' + max + ' <?php echo esc_js(__('selected', 'taw-core')); ?></div>'
                                     );
                                 }
                             }
@@ -2340,11 +2340,11 @@ class Metabox
                     </div>
 
                     <button type="button" class="button taw-upload-image">
-                        <?php esc_html_e('Select Image', 'taw-theme'); ?>
+                        <?php esc_html_e('Select Image', 'taw-core'); ?>
                     </button>
                     <button type="button" class="button taw-remove-image"
                         style="<?php echo $value ? '' : 'display:none;'; ?>">
-                        <?php esc_html_e('Remove Image', 'taw-theme'); ?>
+                        <?php esc_html_e('Remove Image', 'taw-core'); ?>
                     </button>
                 </div>
             <?php break;
@@ -2354,7 +2354,7 @@ class Metabox
                 if (!Lucide::isEnabled()) {
             ?>
                     <p class="description">
-                        <?php esc_html_e('Lucide icons aren\'t enabled for this site — call TAW\\Core\\Icons\\Lucide::enable() in customizations.php before Theme::boot().', 'taw-theme'); ?>
+                        <?php esc_html_e('Lucide icons aren\'t enabled for this site — call TAW\\Core\\Icons\\Lucide::enable() in customizations.php before Theme::boot().', 'taw-core'); ?>
                     </p>
                 <?php
                     break;
@@ -2374,16 +2374,16 @@ class Metabox
                             <?php echo Lucide::render($icon_name, ['class' => 'taw-icon-preview__svg']); ?>
                             <span class="taw-icon-preview__name"><?php echo esc_html($icon_name); ?></span>
                         <?php else: ?>
-                            <span class="taw-icon-preview__empty"><?php esc_html_e('No icon selected', 'taw-theme'); ?></span>
+                            <span class="taw-icon-preview__empty"><?php esc_html_e('No icon selected', 'taw-core'); ?></span>
                         <?php endif; ?>
                     </div>
 
                     <button type="button" class="button taw-icon-choose">
-                        <?php esc_html_e('Choose Icon', 'taw-theme'); ?>
+                        <?php esc_html_e('Choose Icon', 'taw-core'); ?>
                     </button>
                     <button type="button" class="button taw-icon-remove"
                         style="<?php echo $icon_name ? '' : 'display:none;'; ?>">
-                        <?php esc_html_e('Remove', 'taw-theme'); ?>
+                        <?php esc_html_e('Remove', 'taw-core'); ?>
                     </button>
                 </div>
             <?php break;
@@ -2432,13 +2432,13 @@ class Metabox
                                     <span class="taw-files-icon dashicons dashicons-media-default"></span>
                                     <span class="taw-files-name"><?php echo esc_html($att['name']); ?></span>
                                 <?php endif; ?>
-                                <button type="button" class="taw-files-remove" title="<?php esc_attr_e('Remove', 'taw-theme'); ?>">&times;</button>
+                                <button type="button" class="taw-files-remove" title="<?php esc_attr_e('Remove', 'taw-core'); ?>">&times;</button>
                             </div>
                         <?php endforeach; ?>
                     </div>
 
                     <button type="button" class="button taw-files-add">
-                        <?php echo esc_html($field['button_label'] ?? __('Add Files', 'taw-theme')); ?>
+                        <?php echo esc_html($field['button_label'] ?? __('Add Files', 'taw-core')); ?>
                     </button>
                 </div>
             <?php break;
@@ -2519,7 +2519,7 @@ class Metabox
                     <div class="taw-post-selector-search-wrap">
                         <input type="text"
                             class="taw-post-selector-search regular-text"
-                            placeholder="<?php echo esc_attr($multiple ? __('Search to add posts…', 'taw-theme') : __('Search for a post…', 'taw-theme')); ?>"
+                            placeholder="<?php echo esc_attr($multiple ? __('Search to add posts…', 'taw-core') : __('Search for a post…', 'taw-core')); ?>"
                             autocomplete="off">
                         <div class="taw-post-selector-results"></div>
                     </div>
@@ -2532,7 +2532,7 @@ class Metabox
                 $sub_fields  = $field['fields'] ?? [];
                 $max_rows    = $field['max'] ?? 0;      // 0 = unlimited
                 $min_rows    = $field['min'] ?? 0;
-                $button_label = $field['button_label'] ?? __('Add Row', 'taw-theme');
+                $button_label = $field['button_label'] ?? __('Add Row', 'taw-core');
                 $layout      = $field['layout'] ?? '';  // '', 'tabbed_horizontal', 'tabbed_vertical'
                 $is_readonly = !empty($field['readonly']);
 
@@ -2638,7 +2638,7 @@ class Metabox
 
         printf(
             ' <span class="taw-readonly-lock dashicons dashicons-lock" title="%s" aria-hidden="true"></span>',
-            esc_attr__('Managed externally — read-only', 'taw-theme')
+            esc_attr__('Managed externally — read-only', 'taw-core')
         );
     }
 
@@ -2662,14 +2662,14 @@ class Metabox
      */
     private function readonly_display_value(array $field, mixed $value): string
     {
-        $empty = '<span class="taw-readonly-empty">' . esc_html__('Empty', 'taw-theme') . '</span>';
+        $empty = '<span class="taw-readonly-empty">' . esc_html__('Empty', 'taw-core') . '</span>';
         $type  = $field['type'] ?? 'text';
 
         switch ($type) {
             case 'checkbox':
                 return $value === '1'
-                    ? esc_html__('Yes', 'taw-theme')
-                    : esc_html__('No', 'taw-theme');
+                    ? esc_html__('Yes', 'taw-core')
+                    : esc_html__('No', 'taw-core');
 
             case 'select':
                 $options = $field['options'] ?? [];
@@ -2690,7 +2690,7 @@ class Metabox
                 $url = $value ? wp_get_attachment_url(absint($value)) : '';
                 return $url
                     ? sprintf('<img src="%s" alt="" class="taw-readonly-image">', esc_url($url))
-                    : '<span class="taw-readonly-empty">' . esc_html__('No image', 'taw-theme') . '</span>';
+                    : '<span class="taw-readonly-empty">' . esc_html__('No image', 'taw-core') . '</span>';
 
             case 'wysiwyg':
                 return $value !== '' && $value !== null ? wp_kses_post((string) $value) : $empty;
@@ -2701,7 +2701,7 @@ class Metabox
                     ? (json_decode((string) $value, true) ?: [])
                     : ($value ? [$value] : []);
                 if (!is_array($ids) || empty($ids)) {
-                    return '<span class="taw-readonly-empty">' . esc_html__('None selected', 'taw-theme') . '</span>';
+                    return '<span class="taw-readonly-empty">' . esc_html__('None selected', 'taw-core') . '</span>';
                 }
                 $titles = array_map(
                     static fn($id) => get_the_title(absint($id)) ?: ('#' . absint($id)),
@@ -2712,7 +2712,7 @@ class Metabox
             case 'files':
                 $ids = json_decode((string) $value, true);
                 if (!is_array($ids) || empty($ids)) {
-                    return '<span class="taw-readonly-empty">' . esc_html__('No files', 'taw-theme') . '</span>';
+                    return '<span class="taw-readonly-empty">' . esc_html__('No files', 'taw-core') . '</span>';
                 }
                 $names = array_map(static function ($id) {
                     $id  = absint($id);
@@ -2742,7 +2742,7 @@ class Metabox
                 }
                 return esc_html(sprintf(
                     /* translators: 1: HubSpot portal ID, 2: HubSpot form ID, 3: HubSpot region */
-                    __('Portal %1$s / Form %2$s (%3$s)', 'taw-theme'),
+                    __('Portal %1$s / Form %2$s (%3$s)', 'taw-core'),
                     $config['portal_id'],
                     $config['form_id'],
                     $config['region'] ?? 'na1'
@@ -2795,19 +2795,19 @@ class Metabox
             <template x-for="(segment, index) in segments" :key="index">
                 <div class="taw-gradient-text-segment">
                     <input type="text" x-model="segment.text" class="regular-text"
-                        placeholder="<?php echo esc_attr__('Segment text', 'taw-theme'); ?>">
+                        placeholder="<?php echo esc_attr__('Segment text', 'taw-core'); ?>">
                     <label class="taw-gradient-text-highlight">
                         <input type="checkbox" x-model="segment.highlighted">
-                        <?php esc_html_e('Highlighted', 'taw-theme'); ?>
+                        <?php esc_html_e('Highlighted', 'taw-core'); ?>
                     </label>
                     <button type="button" class="button-link taw-gradient-text-remove" @click="segments.splice(index, 1)">
-                        <?php esc_html_e('Remove', 'taw-theme'); ?>
+                        <?php esc_html_e('Remove', 'taw-core'); ?>
                     </button>
                 </div>
             </template>
 
             <button type="button" class="button taw-gradient-text-add" @click="segments.push({ text: '', highlighted: false })">
-                <?php esc_html_e('Add Segment', 'taw-theme'); ?>
+                <?php esc_html_e('Add Segment', 'taw-core'); ?>
             </button>
         </div>
     <?php
@@ -2844,15 +2844,15 @@ class Metabox
                 value="<?php echo esc_attr(is_string($value) ? $value : (wp_json_encode($initial) ?: '')); ?>">
 
             <p class="taw-hubspot-form-row">
-                <label><?php esc_html_e('Portal ID', 'taw-theme'); ?>
+                <label><?php esc_html_e('Portal ID', 'taw-core'); ?>
                     <input type="text" x-model="hs.portal_id" class="regular-text"></label>
             </p>
             <p class="taw-hubspot-form-row">
-                <label><?php esc_html_e('Form ID', 'taw-theme'); ?>
+                <label><?php esc_html_e('Form ID', 'taw-core'); ?>
                     <input type="text" x-model="hs.form_id" class="regular-text"></label>
             </p>
             <p class="taw-hubspot-form-row">
-                <label><?php esc_html_e('Region', 'taw-theme'); ?>
+                <label><?php esc_html_e('Region', 'taw-core'); ?>
                     <input type="text" x-model="hs.region" class="regular-text" placeholder="na1"></label>
             </p>
         </div>
@@ -2916,7 +2916,7 @@ class Metabox
                         <?php if (!empty($group['tab']['icon'])): ?>
                             <img src="<?php echo esc_url($group['tab']['icon']); ?>" alt="">
                         <?php endif; ?>
-                        <p><?php echo esc_html($group['tab']['label'] ?? __('Tab', 'taw-theme')); ?></p>
+                        <p><?php echo esc_html($group['tab']['label'] ?? __('Tab', 'taw-core')); ?></p>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -2958,12 +2958,12 @@ class Metabox
     ?>
         <div class="taw-repeater-row" data-index="<?php echo esc_attr((string) $index); ?>">
             <div class="taw-repeater-row-header">
-                <span class="taw-repeater-row-drag" title="<?php esc_attr_e('Drag to reorder', 'taw-theme'); ?>">☰</span>
+                <span class="taw-repeater-row-drag" title="<?php esc_attr_e('Drag to reorder', 'taw-core'); ?>">☰</span>
                 <span class="taw-repeater-row-title">
                     <?php echo esc_html('#' . (is_int($index) ? $index + 1 : '')); ?>
                 </span>
-                <button type="button" class="taw-repeater-row-toggle" title="<?php esc_attr_e('Collapse', 'taw-theme'); ?>">▾</button>
-                <button type="button" class="taw-repeater-row-remove" title="<?php esc_attr_e('Remove row', 'taw-theme'); ?>" <?php disabled($is_readonly); ?>>&times;</button>
+                <button type="button" class="taw-repeater-row-toggle" title="<?php esc_attr_e('Collapse', 'taw-core'); ?>">▾</button>
+                <button type="button" class="taw-repeater-row-remove" title="<?php esc_attr_e('Remove row', 'taw-core'); ?>" <?php disabled($is_readonly); ?>>&times;</button>
             </div>
             <div class="taw-repeater-row-content">
                 <div class="fields-container"
@@ -3819,7 +3819,7 @@ class Metabox
         // Required check
         if (!empty($field['required']) && ($value === '' || $value === null)) {
             /* translators: %s: field label */
-            return sprintf(__('%s is required.', 'taw-theme'), $label);
+            return sprintf(__('%s is required.', 'taw-core'), $label);
         }
 
         // Custom validation callback
@@ -3827,7 +3827,7 @@ class Metabox
             $result = call_user_func($field['validate'], $value);
             if ($result !== true) {
                 /* translators: %s: field label */
-                return is_string($result) ? $result : sprintf(__('%s is invalid.', 'taw-theme'), $label);
+                return is_string($result) ? $result : sprintf(__('%s is invalid.', 'taw-core'), $label);
             }
         }
 

@@ -285,7 +285,7 @@ class Form
             if (RateLimiter::tooManyAttempts($this->id, $ip, $max, $window)) {
                 wp_send_json_error([
                     'general' => $this->config['messages']['rate_limited']
-                        ?? __('Too many attempts. Please wait a moment and try again.', 'taw'),
+                        ?? __('Too many attempts. Please wait a moment and try again.', 'taw-core'),
                 ]);
             }
         }
@@ -307,7 +307,7 @@ class Form
             if (!Turnstile::verify($token, SubmissionsHandler::getUserIp())) {
                 wp_send_json_error([
                     'general' => $this->config['messages']['turnstile_failed']
-                        ?? __('We could not verify you are human. Please try again.', 'taw'),
+                        ?? __('We could not verify you are human. Please try again.', 'taw-core'),
                 ]);
             }
         }
@@ -428,7 +428,7 @@ class Form
                     ['form_id' => $this->id, 'exception' => get_class($e), 'error' => $e->getMessage()],
                 );
                 $this->cleanupUploadedFiles($data);
-                wp_send_json_error(['general' => __('Something went wrong. Please try again.', 'taw')]);
+                wp_send_json_error(['general' => __('Something went wrong. Please try again.', 'taw-core')]);
             }
         }
 
@@ -442,7 +442,7 @@ class Form
         }
 
         wp_send_json_success([
-            'message' => $this->config['messages']['success'] ?? __('Thank you! Your message has been sent.', 'taw'),
+            'message' => $this->config['messages']['success'] ?? __('Thank you! Your message has been sent.', 'taw-core'),
         ]);
     }
 
@@ -458,7 +458,7 @@ class Form
     private function requiredMessage(array $field, string $label): string
     {
         /* translators: %s: field label */
-        $template = $this->config['messages']['required'] ?? __('%s is required.', 'taw');
+        $template = $this->config['messages']['required'] ?? __('%s is required.', 'taw-core');
 
         return $field['required_message'] ?? sprintf($template, $label);
     }
@@ -473,7 +473,7 @@ class Form
     {
         return $field['email_message']
             ?? $this->config['messages']['email']
-            ?? __('Invalid email address.', 'taw');
+            ?? __('Invalid email address.', 'taw-core');
     }
 
     /**
@@ -488,13 +488,13 @@ class Form
     {
         if (isset($field['min_length']) && mb_strlen($value) < (int) $field['min_length']) {
             /* translators: 1: field label, 2: minimum length */
-            $template = $this->config['messages']['min_length'] ?? __('%1$s must be at least %2$d characters.', 'taw');
+            $template = $this->config['messages']['min_length'] ?? __('%1$s must be at least %2$d characters.', 'taw-core');
             return $field['min_length_message'] ?? sprintf($template, $label, (int) $field['min_length']);
         }
 
         if (isset($field['max_length']) && mb_strlen($value) > (int) $field['max_length']) {
             /* translators: 1: field label, 2: maximum length */
-            $template = $this->config['messages']['max_length'] ?? __('%1$s must be no more than %2$d characters.', 'taw');
+            $template = $this->config['messages']['max_length'] ?? __('%1$s must be no more than %2$d characters.', 'taw-core');
             return $field['max_length_message'] ?? sprintf($template, $label, (int) $field['max_length']);
         }
 
@@ -511,10 +511,10 @@ class Form
                     sprintf('Invalid regex pattern in field "%s" — rejecting the value fail-safe.', $field['id']),
                     ['form_id' => $this->id, 'field_id' => $field['id'], 'pattern' => $field['pattern']],
                 );
-                return sprintf(__('%s could not be validated.', 'taw'), $label);
+                return sprintf(__('%s could not be validated.', 'taw-core'), $label);
             }
             if ($matched === 0) {
-                $template = $this->config['messages']['pattern'] ?? __('%s is not in the correct format.', 'taw');
+                $template = $this->config['messages']['pattern'] ?? __('%s is not in the correct format.', 'taw-core');
                 return $field['pattern_message'] ?? sprintf($template, $label);
             }
         }
@@ -524,13 +524,13 @@ class Form
 
             if (isset($field['min']) && $numeric < (float) $field['min']) {
                 /* translators: 1: field label, 2: minimum value */
-                $template = $this->config['messages']['min'] ?? __('%1$s must be at least %2$s.', 'taw');
+                $template = $this->config['messages']['min'] ?? __('%1$s must be at least %2$s.', 'taw-core');
                 return $field['min_message'] ?? sprintf($template, $label, $field['min']);
             }
 
             if (isset($field['max']) && $numeric > (float) $field['max']) {
                 /* translators: 1: field label, 2: maximum value */
-                $template = $this->config['messages']['max'] ?? __('%1$s must be no more than %2$s.', 'taw');
+                $template = $this->config['messages']['max'] ?? __('%1$s must be no more than %2$s.', 'taw-core');
                 return $field['max_message'] ?? sprintf($template, $label, $field['max']);
             }
         }
@@ -592,7 +592,7 @@ class Form
 
         if ($error !== UPLOAD_ERR_OK) {
             /* translators: %s: field label */
-            $message = $field['upload_message'] ?? sprintf(__('%s could not be uploaded. Please try a different file.', 'taw'), $label);
+            $message = $field['upload_message'] ?? sprintf(__('%s could not be uploaded. Please try a different file.', 'taw-core'), $label);
             return ['value' => 0, 'error' => $message];
         }
 
@@ -620,7 +620,7 @@ class Form
         if (!wp_attachment_is_image($attachmentId)) {
             wp_delete_attachment($attachmentId, true);
             /* translators: %s: field label */
-            $message = $field['upload_message'] ?? sprintf(__('%s must be an image file.', 'taw'), $label);
+            $message = $field['upload_message'] ?? sprintf(__('%s must be an image file.', 'taw-core'), $label);
             return ['value' => 0, 'error' => $message];
         }
 
@@ -896,8 +896,8 @@ class Form
         if ($isMultiStep) {
             $this->renderMultiStepBody();
         } else {
-            $submitLabel  = $this->config['submit_label'] ?? __('Send Message', 'taw');
-            $loadingLabel = $this->config['submit_loading_label'] ?? __('Sending...', 'taw');
+            $submitLabel  = $this->config['submit_label'] ?? __('Send Message', 'taw-core');
+            $loadingLabel = $this->config['submit_loading_label'] ?? __('Sending...', 'taw-core');
 
             echo '<div class="taw-form-grid">';
             foreach (($this->config['fields'] ?? []) as $field) {
@@ -921,10 +921,10 @@ class Form
     {
         $steps        = $this->config['steps'];
         $count        = count($steps);
-        $submitLabel  = $this->config['submit_label'] ?? __('Submit', 'taw');
-        $loadingLabel = $this->config['submit_loading_label'] ?? __('Sending...', 'taw');
-        $prevLabel    = $this->config['prev_label'] ?? __('Back', 'taw');
-        $nextLabel    = $this->config['next_label'] ?? __('Next', 'taw');
+        $submitLabel  = $this->config['submit_label'] ?? __('Submit', 'taw-core');
+        $loadingLabel = $this->config['submit_loading_label'] ?? __('Sending...', 'taw-core');
+        $prevLabel    = $this->config['prev_label'] ?? __('Back', 'taw-core');
+        $nextLabel    = $this->config['next_label'] ?? __('Next', 'taw-core');
 
         // ── Compact progress (mobile) ─────────────────────────────
         $firstTitle = $steps[0]['title'] ?? '';
@@ -1177,9 +1177,9 @@ class Form
                 '<span class="%s"><button type="button" class="taw-help-trigger" aria-label="%s"%s>?</button>'
                     . '<dialog class="taw-help-popup"><button type="button" class="taw-help-close" aria-label="%s">&times;</button>%s</dialog></span>',
                 esc_attr(implode(' ', $wrapperClasses)),
-                esc_attr__('More information', 'taw'),
+                esc_attr__('More information', 'taw-core'),
                 $triggerAttrs,
-                esc_attr__('Close', 'taw'),
+                esc_attr__('Close', 'taw-core'),
                 $helpText
             );
             return;
@@ -1188,7 +1188,7 @@ class Form
         printf(
             '<span class="%s"><button type="button" class="taw-help-trigger" aria-label="%s"%s>?</button><span class="taw-help-popup" role="tooltip">%s</span></span>',
             esc_attr(implode(' ', $wrapperClasses)),
-            esc_attr__('More information', 'taw'),
+            esc_attr__('More information', 'taw-core'),
             $triggerAttrs,
             $helpText
         );
@@ -1294,7 +1294,7 @@ class Form
 
             case 'select':
                 echo '<select id="' . esc_attr($id) . '" name="' . esc_attr($id) . '" class="' . $inputClass . '">';
-                echo '<option value="" disabled selected>' . esc_html__('Select an option…', 'taw') . '</option>';
+                echo '<option value="" disabled selected>' . esc_html__('Select an option…', 'taw-core') . '</option>';
                 foreach (($field['options'] ?? []) as $optVal => $optLabel) {
                     echo '<option value="' . esc_attr($optVal) . '">' . esc_html($optLabel) . '</option>';
                 }
@@ -1481,10 +1481,10 @@ class Form
         $formId       = esc_js($this->id);
         $isMultiStep  = $this->isMultiStep();
         $stepCount    = $isMultiStep ? count($this->config['steps']) : 0;
-        $submitLabel  = esc_js($this->config['submit_label'] ?? ($isMultiStep ? __('Submit', 'taw') : __('Send Message', 'taw')));
-        $loadingLabel = esc_js($this->config['submit_loading_label'] ?? __('Sending…', 'taw'));
-        $networkError = esc_js(__('A network error occurred. Please try again.', 'taw'));
-        $requiredMsg  = esc_js(__('This field is required.', 'taw'));
+        $submitLabel  = esc_js($this->config['submit_label'] ?? ($isMultiStep ? __('Submit', 'taw-core') : __('Send Message', 'taw-core')));
+        $loadingLabel = esc_js($this->config['submit_loading_label'] ?? __('Sending…', 'taw-core'));
+        $networkError = esc_js(__('A network error occurred. Please try again.', 'taw-core'));
+        $requiredMsg  = esc_js(__('This field is required.', 'taw-core'));
 
         $stepRequired = wp_json_encode($this->buildStepRequiredMap());
         $fieldToStep  = wp_json_encode($this->buildFieldToStepMap());

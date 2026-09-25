@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\DataPanel;
 
 use TAW\Core\Assets\Vite;
+use TAW\Core\I18n\Translations;
 use TAW\Core\Icons\Lucide;
 use TAW\Core\Metabox\Metabox;
 use TAW\Core\Schema\Registry;
@@ -214,6 +215,15 @@ final class DataPanel
         }
 
         self::vite()->script(self::SCRIPT_HANDLE, self::SCRIPT_SOURCE, self::SCRIPT_DEPS);
+
+        $localeData = Translations::scriptLocaleData();
+        if ($localeData !== null) {
+            wp_add_inline_script(
+                self::SCRIPT_HANDLE,
+                sprintf('wp.i18n.setLocaleData(%s, %s);', wp_json_encode($localeData), wp_json_encode(Translations::DOMAIN)),
+                'before'
+            );
+        }
     }
 
     /** @internal Tests swap in an adapter on a temp build. */

@@ -141,7 +141,7 @@ class VisualEditor
                 'href' => get_permalink($postId),
                 'meta' => [
                     'class' => 'taw-visual-editor-exit',
-                    'title' => __('Return to normal view', 'taw-theme')
+                    'title' => __('Return to normal view', 'taw-core')
                 ]
             ]);
 
@@ -151,11 +151,11 @@ class VisualEditor
         // Normal state: show "Edit Visually"
         $adminBar->add_node([
             'id'    => 'taw-visual-editor',
-            'title' => __('Edit Visually', 'taw-theme'),
+            'title' => __('Edit Visually', 'taw-core'),
             'href'  => $editorUrl,
             'meta'  => [
                 'class' => 'taw-visual-editor-btn',
-                'title' => __('Open the visual content editor', 'taw-theme'),
+                'title' => __('Open the visual content editor', 'taw-core'),
             ],
         ]);
     }

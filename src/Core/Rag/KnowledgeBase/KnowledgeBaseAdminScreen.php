@@ -52,25 +52,25 @@ final class KnowledgeBaseAdminScreen
     public function renderPage(): void
     {
         if (!current_user_can(self::CAP)) {
-            wp_die(esc_html__('You do not have permission to access this page.', 'taw-theme'));
+            wp_die(esc_html__('You do not have permission to access this page.', 'taw-core'));
         }
 
         $registry = new KnowledgeBaseRegistry();
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e('Knowledge Bases', 'taw-theme'); ?></h1>
+            <h1><?php esc_html_e('Knowledge Bases', 'taw-core'); ?></h1>
             <p class="description">
-                <?php esc_html_e('Any .sqlite file uploaded here becomes searchable by the chatbot — every table and text column is chunked, embedded, and semantically searched. No particular schema is required.', 'taw-theme'); ?>
+                <?php esc_html_e('Any .sqlite file uploaded here becomes searchable by the chatbot — every table and text column is chunked, embedded, and semantically searched. No particular schema is required.', 'taw-core'); ?>
             </p>
 
             <?php $this->renderNotices(); ?>
 
             <table class="widefat striped">
                 <thead><tr>
-                    <th><?php esc_html_e('Name', 'taw-theme'); ?></th>
-                    <th><?php esc_html_e('Description', 'taw-theme'); ?></th>
-                    <th><?php esc_html_e('Status', 'taw-theme'); ?></th>
-                    <th><?php esc_html_e('Chunks', 'taw-theme'); ?></th>
+                    <th><?php esc_html_e('Name', 'taw-core'); ?></th>
+                    <th><?php esc_html_e('Description', 'taw-core'); ?></th>
+                    <th><?php esc_html_e('Status', 'taw-core'); ?></th>
+                    <th><?php esc_html_e('Chunks', 'taw-core'); ?></th>
                     <th></th>
                 </tr></thead>
                 <tbody>
@@ -82,11 +82,11 @@ final class KnowledgeBaseAdminScreen
                         <td><?php echo esc_html((string) $kb['chunk_count']); ?></td>
                         <td>
                             <?php if ($kb['id'] !== KnowledgeBaseRegistry::WP_CONTENT_ID): ?>
-                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('<?php echo esc_js(__('Delete this knowledge base?', 'taw-theme')); ?>');">
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('<?php echo esc_js(__('Delete this knowledge base?', 'taw-core')); ?>');">
                                     <?php wp_nonce_field('taw_rag_kb_delete_' . $kb['id']); ?>
                                     <input type="hidden" name="action" value="taw_rag_kb_delete">
                                     <input type="hidden" name="id" value="<?php echo esc_attr($kb['id']); ?>">
-                                    <button type="submit" class="button-link-delete"><?php esc_html_e('Delete', 'taw-theme'); ?></button>
+                                    <button type="submit" class="button-link-delete"><?php esc_html_e('Delete', 'taw-core'); ?></button>
                                 </form>
                             <?php endif; ?>
                         </td>
@@ -95,28 +95,28 @@ final class KnowledgeBaseAdminScreen
                 </tbody>
             </table>
 
-            <h2><?php esc_html_e('Add Knowledge Base', 'taw-theme'); ?></h2>
+            <h2><?php esc_html_e('Add Knowledge Base', 'taw-core'); ?></h2>
             <form method="post" enctype="multipart/form-data" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <?php wp_nonce_field('taw_rag_kb_upload'); ?>
                 <input type="hidden" name="action" value="taw_rag_kb_upload">
                 <table class="form-table">
                     <tr>
-                        <th><label for="taw_rag_kb_name"><?php esc_html_e('Name', 'taw-theme'); ?></label></th>
+                        <th><label for="taw_rag_kb_name"><?php esc_html_e('Name', 'taw-core'); ?></label></th>
                         <td><input type="text" id="taw_rag_kb_name" name="name" class="regular-text" required></td>
                     </tr>
                     <tr>
-                        <th><label for="taw_rag_kb_description"><?php esc_html_e('Description', 'taw-theme'); ?></label></th>
+                        <th><label for="taw_rag_kb_description"><?php esc_html_e('Description', 'taw-core'); ?></label></th>
                         <td>
                             <textarea id="taw_rag_kb_description" name="description" class="large-text" rows="2" required></textarea>
-                            <p class="description"><?php esc_html_e('Tells the chatbot when to use this knowledge base — be specific about what it contains.', 'taw-theme'); ?></p>
+                            <p class="description"><?php esc_html_e('Tells the chatbot when to use this knowledge base — be specific about what it contains.', 'taw-core'); ?></p>
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="taw_rag_kb_file"><?php esc_html_e('.sqlite file', 'taw-theme'); ?></label></th>
+                        <th><label for="taw_rag_kb_file"><?php esc_html_e('.sqlite file', 'taw-core'); ?></label></th>
                         <td><input type="file" id="taw_rag_kb_file" name="database" accept=".sqlite,.db,.sqlite3" required></td>
                     </tr>
                 </table>
-                <?php submit_button(__('Upload', 'taw-theme')); ?>
+                <?php submit_button(__('Upload', 'taw-core')); ?>
             </form>
         </div>
         <?php
@@ -129,7 +129,7 @@ final class KnowledgeBaseAdminScreen
     public function handleUpload(): void
     {
         if (!current_user_can(self::CAP)) {
-            wp_die(esc_html__('Unauthorized', 'taw-theme'));
+            wp_die(esc_html__('Unauthorized', 'taw-core'));
         }
         check_admin_referer('taw_rag_kb_upload');
 
@@ -167,7 +167,7 @@ final class KnowledgeBaseAdminScreen
     public function handleDelete(): void
     {
         if (!current_user_can(self::CAP)) {
-            wp_die(esc_html__('Unauthorized', 'taw-theme'));
+            wp_die(esc_html__('Unauthorized', 'taw-core'));
         }
 
         $id = sanitize_text_field((string) ($_POST['id'] ?? ''));
@@ -200,11 +200,11 @@ final class KnowledgeBaseAdminScreen
     private function renderNotices(): void
     {
         $errors = [
-            'missing_fields' => __('Name and description are required.', 'taw-theme'),
-            'no_file' => __('No file was uploaded.', 'taw-theme'),
-            'not_sqlite' => __('That file is not a valid SQLite database.', 'taw-theme'),
-            'upload_failed' => __('The upload failed — please try again.', 'taw-theme'),
-            'cannot_delete_wp_content' => __('The built-in "This site\'s content" knowledge base cannot be deleted.', 'taw-theme'),
+            'missing_fields' => __('Name and description are required.', 'taw-core'),
+            'no_file' => __('No file was uploaded.', 'taw-core'),
+            'not_sqlite' => __('That file is not a valid SQLite database.', 'taw-core'),
+            'upload_failed' => __('The upload failed — please try again.', 'taw-core'),
+            'cannot_delete_wp_content' => __('The built-in "This site\'s content" knowledge base cannot be deleted.', 'taw-core'),
         ];
         $err = sanitize_key((string) ($_GET['taw_rag_error'] ?? ''));
         if (isset($errors[$err])) {
@@ -212,11 +212,11 @@ final class KnowledgeBaseAdminScreen
         }
 
         if (!empty($_GET['taw_rag_uploaded'])) {
-            echo '<div class="notice notice-success"><p>' . esc_html__('Uploaded — indexing runs in the background and may take a few minutes.', 'taw-theme') . '</p></div>';
+            echo '<div class="notice notice-success"><p>' . esc_html__('Uploaded — indexing runs in the background and may take a few minutes.', 'taw-core') . '</p></div>';
         }
 
         if (!empty($_GET['taw_rag_deleted'])) {
-            echo '<div class="notice notice-success"><p>' . esc_html__('Knowledge base deleted.', 'taw-theme') . '</p></div>';
+            echo '<div class="notice notice-success"><p>' . esc_html__('Knowledge base deleted.', 'taw-core') . '</p></div>';
         }
     }
 

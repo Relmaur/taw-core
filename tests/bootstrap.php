@@ -124,6 +124,33 @@ if (!class_exists('WP_User')) {
 }
 
 /**
+ * Minimal i18n stand-ins for TAW\Core\I18n\Translations.
+ */
+if (!class_exists('WP_Textdomain_Registry')) {
+    class WP_Textdomain_Registry
+    {
+        /** @var array<string, string> */
+        public array $customPaths = [];
+
+        public function set_custom_path(string $domain, string $path): void
+        {
+            $this->customPaths[$domain] = $path;
+        }
+    }
+}
+
+if (!class_exists('Translation_Entry')) {
+    class Translation_Entry
+    {
+        public ?string $context = null;
+        public string $singular = '';
+        /** @var list<string> */
+        public array $translations = [];
+        public bool $is_plural = false;
+    }
+}
+
+/**
  * Minimal stand-in for WP_REST_Request: the method and route, which is all
  * the editing policy's REST guard reads.
  */

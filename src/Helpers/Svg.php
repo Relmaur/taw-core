@@ -123,7 +123,7 @@ class Svg
         // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- best-effort cleanup, upload is being rejected regardless
         @unlink($upload['file']);
 
-        return ['error' => __('This SVG file could not be safely sanitized and was rejected.', 'taw-theme')];
+        return ['error' => __('This SVG file could not be safely sanitized and was rejected.', 'taw-core')];
     }
 
     /**
@@ -139,7 +139,7 @@ class Svg
     public static function allowPluploadMimeType(array $params): array
     {
         $params['filters']['mime_types'][] = [
-            'title'      => __('SVG Images'),
+            'title'      => __('SVG Images', 'taw-core'),
             'extensions' => 'svg,svgz',
         ];
 

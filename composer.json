@@ -34,7 +34,11 @@
     },
     "scripts": {
         "phpstan": "phpstan analyse --memory-limit=-1",
-        "test": "phpunit"
+        "test": "phpunit",
+        "i18n:pot": "php tools/i18n.php pot",
+        "i18n:po": "php tools/i18n.php po",
+        "i18n:compile": "php tools/i18n.php compile",
+        "i18n:check": "php tools/i18n.php check"
     },
     "autoload": {
         "psr-4": {

@@ -450,10 +450,10 @@ class Performance
 
         printf(
             '<div class="notice notice-warning is-dismissible"><p><strong>TAW:</strong> %s</p><pre style="background:#f0f0f1;padding:12px;overflow:auto;">%s</pre><p><a href="%s">%s</a></p></div>',
-            esc_html__("Your build assets aren't getting cache headers — this site appears to run nginx, which doesn't read .htaccess. Add this to your nginx server block:", 'taw-theme'),
+            esc_html__("Your build assets aren't getting cache headers — this site appears to run nginx, which doesn't read .htaccess. Add this to your nginx server block:", 'taw-core'),
             esc_html($snippet),
             esc_url($dismissUrl),
-            esc_html__('Dismiss', 'taw-theme')
+            esc_html__('Dismiss', 'taw-core')
         );
     }
 

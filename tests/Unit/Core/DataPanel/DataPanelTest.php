@@ -266,6 +266,20 @@ final class DataPanelTest extends TestCase
         Functions\when('get_current_screen')->alias(static function () use (&$screen): object {
             return $screen;
         });
+        // The taw-core translations reach the panel as inline locale data (Spanish here).
+        $entry = new \Translation_Entry();
+        $entry->singular = 'Open TAW Data';
+        $entry->translations = ['Abrir datos TAW'];
+        Functions\when('get_translations_for_domain')->justReturn((object) ['entries' => [$entry]]);
+        Functions\when('determine_locale')->justReturn('es_MX');
+        Functions\when('translate')->alias(static fn (string $text) => $text === 'Open TAW Data' ? 'Abrir datos TAW' : $text);
+        Functions\when('wp_json_encode')->alias(static fn ($data) => json_encode($data, JSON_UNESCAPED_UNICODE));
+        $inline = [];
+        Functions\when('wp_add_inline_script')->alias(static function (string $handle, string $js, string $position) use (&$inline): bool {
+            $inline[] = [$handle, $js, $position];
+
+            return true;
+        });
 
         try {
             $this->box('book_details', [['id' => 'book_author', 'type' => 'text']], ['ui' => 'panel']);
@@ -286,6 +300,11 @@ final class DataPanelTest extends TestCase
                 ['https://site.test/vendor/taw/core/assets/data-panel/data-panel-1.js', DataPanel::SCRIPT_DEPS],
                 $scripts[DataPanel::SCRIPT_HANDLE]
             );
+            $this->assertSame([[
+                DataPanel::SCRIPT_HANDLE,
+                'wp.i18n.setLocaleData({"":{"domain":"taw-core","lang":"es_MX"},"Open TAW Data":["Abrir datos TAW"]}, "taw-core");',
+                'before',
+            ]], $inline);
         } finally {
             exec('rm -rf ' . escapeshellarg($root));
         }

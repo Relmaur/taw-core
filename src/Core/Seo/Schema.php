@@ -110,66 +110,66 @@ final class Schema
     {
         new OptionsPage([
             'id' => self::OPTIONS_ID,
-            'title' => __('SEO Schema', 'taw-theme'),
-            'menu_title' => __('SEO Schema', 'taw-theme'),
+            'title' => __('SEO Schema', 'taw-core'),
+            'menu_title' => __('SEO Schema', 'taw-core'),
             'icon' => 'dashicons-networking',
             'fields' => [
                 [
                     'id' => SeoMeta::OUTPUT_MODE_FIELD,
-                    'label' => __('SEO Output', 'taw-theme'),
+                    'label' => __('SEO Output', 'taw-core'),
                     'type' => 'select',
                     'options' => [
-                        'auto' => __('Automatic — detect Yoast/RankMath/SmartCrawl and stand down if one is active', 'taw-theme'),
-                        'force_on' => __("Always on — ignore detection, always use TAW's own SEO output", 'taw-theme'),
-                        'force_off' => __('Always off — defer entirely to another SEO plugin', 'taw-theme'),
+                        'auto' => __('Automatic — detect Yoast/RankMath/SmartCrawl and stand down if one is active', 'taw-core'),
+                        'force_on' => __("Always on — ignore detection, always use TAW's own SEO output", 'taw-core'),
+                        'force_off' => __('Always off — defer entirely to another SEO plugin', 'taw-core'),
                     ],
                     'default' => 'auto',
-                    'description' => __('Automatic detection can be unreliable for plugins with no stable version constant (e.g. some SmartCrawl installs) — this overrides it explicitly. Controls SeoMeta\'s <title>/meta/OG tags and this page\'s JSON-LD together.', 'taw-theme'),
+                    'description' => __('Automatic detection can be unreliable for plugins with no stable version constant (e.g. some SmartCrawl installs) — this overrides it explicitly. Controls SeoMeta\'s <title>/meta/OG tags and this page\'s JSON-LD together.', 'taw-core'),
                 ],
                 [
                     'id' => 'organization_type',
-                    'label' => __('Organization Type', 'taw-theme'),
+                    'label' => __('Organization Type', 'taw-core'),
                     'type' => 'select',
                     'options' => [
-                        'Organization' => __('Organization', 'taw-theme'),
-                        'LocalBusiness' => __('Local Business', 'taw-theme'),
+                        'Organization' => __('Organization', 'taw-core'),
+                        'LocalBusiness' => __('Local Business', 'taw-core'),
                     ],
                     'default' => 'Organization',
                     'width' => '50',
                 ],
                 [
                     'id' => 'twitter_handle',
-                    'label' => __('Twitter / X Handle', 'taw-theme'),
+                    'label' => __('Twitter / X Handle', 'taw-core'),
                     'type' => 'text',
                     'placeholder' => '@yoursite',
                     'width' => '50',
                 ],
                 [
                     'id' => 'organization_name',
-                    'label' => __('Organization Name', 'taw-theme'),
+                    'label' => __('Organization Name', 'taw-core'),
                     'type' => 'text',
-                    'description' => __('Falls back to the site title when empty.', 'taw-theme'),
+                    'description' => __('Falls back to the site title when empty.', 'taw-core'),
                 ],
                 [
                     'id' => 'organization_logo',
-                    'label' => __('Logo', 'taw-theme'),
+                    'label' => __('Logo', 'taw-core'),
                     'type' => 'image',
                     'width' => '50',
                 ],
                 [
                     'id' => 'organization_phone',
-                    'label' => __('Phone', 'taw-theme'),
+                    'label' => __('Phone', 'taw-core'),
                     'type' => 'text',
                     'width' => '50',
                 ],
                 [
                     'id' => 'organization_same_as',
-                    'label' => __('Social Profile Links', 'taw-theme'),
+                    'label' => __('Social Profile Links', 'taw-core'),
                     'type' => 'repeater',
-                    'button_label' => __('Add Profile', 'taw-theme'),
-                    'description' => __('Feeds the "sameAs" entity signal — link every profile that represents this same organization/brand (LinkedIn, Instagram, etc.).', 'taw-theme'),
+                    'button_label' => __('Add Profile', 'taw-core'),
+                    'description' => __('Feeds the "sameAs" entity signal — link every profile that represents this same organization/brand (LinkedIn, Instagram, etc.).', 'taw-core'),
                     'fields' => [
-                        ['id' => 'url', 'label' => __('Profile URL', 'taw-theme'), 'type' => 'url'],
+                        ['id' => 'url', 'label' => __('Profile URL', 'taw-core'), 'type' => 'url'],
                     ],
                 ],
             ],
@@ -331,7 +331,7 @@ final class Schema
             return null;
         }
 
-        $items = [['name' => __('Home', 'taw-theme'), 'url' => home_url('/')]];
+        $items = [['name' => __('Home', 'taw-core'), 'url' => home_url('/')]];
 
         if (is_page($postId)) {
             $ancestors = array_reverse(get_post_ancestors($postId));
