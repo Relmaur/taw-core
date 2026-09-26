@@ -369,6 +369,42 @@ Taw::options('site')->field('social')->field('x');    // one page's fields; a gr
 - The static helpers (`Metabox::get()`, `get_image_url()`, …) and `getMeta()` are unchanged; `Taw::post()` is
   the recommended way for new code.
 
+### Block Bindings: `taw/field` (v1.60.0+)
+
+Core blocks can show TAW fields through WordPress's Block Bindings API (ADR-0010). The source is
+`taw/field`, registered for every TAW theme by `Boot::data()`:
+
+```html
+<!-- wp:heading {"metadata":{"bindings":{"content":{"source":"taw/field","args":{"field":"book_subtitle"}}}}} -->
+<h2 class="wp-block-heading">Subtitle</h2>
+<!-- /wp:heading -->
+```
+
+- **`args`:**
+  - `field`: an id, qualified id or meta key;
+  - `from`: `post` (default), `option`, `term` or `user`;
+  - `sub`: a group's sub-field;
+  - `size`: an image size (default `full`).
+- **Where the object comes from:**
+  - `post`: the block's `postId` context, so each Query Loop item shows its own post;
+  - `term`: the queried term;
+  - `user`: the post's author, or the queried author on author archives;
+  - `option`: site-wide.
+- **What each attribute gets depends on the field type:**
+  - text fields bind escaped into paragraph, heading, list-item and button text;
+  - `wysiwyg` gives safe HTML (no added `<p>`), and `textarea` keeps its line breaks;
+  - `image` gives core/image its `id`, `url` (at `size`), `alt`, `title` and `caption`;
+  - `link` gives a button its `url`, `text` and "new tab" `linkTarget`/`rel`, and `url` gives a URL;
+  - a single `post_select` gives its title, its permalink, or its featured image on core/image;
+  - `datepicker` gives post-date's `datetime`.
+- **What doesn't bind:** checkbox, files, repeater, group (use `sub`), gradient_text and hubspot_form. An empty or unbindable field keeps the block's saved content.
+- **Privacy:**
+  - only registered fields bind, never arbitrary meta;
+  - a private post needs `read_post`, and a password-protected post gives nothing (as core's `core/post-meta`);
+  - user fields bind only with `'bindings' => true`;
+  - any other field can opt out with `'bindings' => false` (`Field::…->bindings(false)`, JSON `"bindings": false`).
+- The values come from the typed API (`Taw::post()` and friends), so a bound block renders a field the same way a template does. Editor previews come in v1.61.0.
+
 ### Term fields (v1.53.0+)
 
 A fieldset can target a taxonomy's terms with `term:<taxonomy>` in its screens (JSON/PHP `on`), alone or mixed

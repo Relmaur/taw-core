@@ -127,6 +127,16 @@ final class Field
     }
 
     /**
+     * Whether core blocks may show this field through the `taw/field` Block
+     * Bindings source (ADR-0010). Post, term and option fields may unless
+     * this says false; user fields only when it says true.
+     */
+    public function bindings(bool $bindable = true): self
+    {
+        return $this->set('bindings', $bindable);
+    }
+
+    /**
      * Choices for select fields: [value => label].
      *
      * @param array<string|int, string> $options

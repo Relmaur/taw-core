@@ -24,6 +24,7 @@ return array (
     'Search to add posts…' => 'Buscar para agregar publicaciones…',
     'Select Image' => 'Seleccionar imagen',
     'Select or Upload Image' => 'Seleccionar o Subir Imagen',
+    'TAW field' => 'Campo TAW',
     'Tab' => 'Pestaña',
     'Use this image' => 'Usar esta imagen',
     'selected' => 'seleccionado',

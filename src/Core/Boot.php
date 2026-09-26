@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TAW\Core;
 
+use TAW\Core\Bindings\Bindings;
 use TAW\Core\Content\ContentAdminScreen;
 use TAW\Core\DataPanel\DataPanel;
 use TAW\Core\Icons\Lucide;
@@ -88,6 +89,9 @@ final class Boot
         DataPanel::register();
         // taw-core's own text domain; Theme::boot() reaches it through here.
         Translations::register();
+        // The `taw/field` Block Bindings source (ADR-0010). Last, so the hooks
+        // above keep their positions.
+        Bindings::register();
     }
 
     /**
