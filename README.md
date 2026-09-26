@@ -415,6 +415,8 @@ Core blocks can show TAW fields through WordPress's Block Bindings API (ADR-0010
   - Bound blocks preview the real value in the canvas. The preview comes from `POST /wp-json/taw/v1/bindings/preview` (editors only, and only for posts they can edit), which runs the same resolver as the front end.
   - Templates with no post preview the most recent post of their type.
   - Bound blocks are read-only: edit the value in the metabox or data panel, and the preview refreshes after saving.
+- **In locked-down post types (v1.62.0+):** an editing policy's `allowBound` lets clients add some blocks
+  only bound to a field; see "Editing policies".
 
 ### Term fields (v1.53.0+)
 
@@ -662,7 +664,7 @@ taw-docs):
 
 | Layer | Controls |
 |---|---|
-| **content** | Per post type: allowed blocks (globs), a starting template for new posts, `lock` (`false`, `insert`, `contentOnly`, `all`) |
+| **content** | Per post type: allowed blocks (globs), blocks allowed only bound to a TAW field (`allowBound`), a starting template for new posts, `lock` (`false`, `insert`, `contentOnly`, `all`) |
 | **site** | Templates, template parts, Global Styles, Navigation, the post editor's "edit template", the Site Editor itself |
 | **design** | theme.json: custom colors, gradients, font sizes, drop cap, spacing, line height, border, shadow, duotone |
 | **features** | Code editor, Custom HTML, block directory, Openverse, core and remote patterns, block lock UI |
@@ -697,6 +699,24 @@ layer too). `Boot::data()` and `Theme::boot()` never apply it, so taw-theme is u
   template parts, Global Styles or Navigation get a 403 at REST dispatch (`taw_editing_site_locked`);
   reads always work. At `locked`, the Site Editor menu and the dashboard welcome panel are removed and
   `site-editor.php` returns a 403.
+- **Blocks only bound to a TAW field, `allowBound` (v1.62.0+):** a content rule can list blocks
+  (globs) that clients may add only connected to a `taw/field` binding, next to its `allow` list:
+
+  ```json
+  "content": { "page": { "level": "guided", "allow": ["core/heading", "core/buttons"], "allowBound": ["core/paragraph", "core/button", "core/image"] } }
+  ```
+
+  - **In the inserter** they appear as **Field text**, **Field heading**, **Field button**, **Field image**
+    (…) instead of the plain block. Inserting one opens the field picker; the block shows "Choose a TAW
+    field" until a field is picked.
+  - **Saving is locked**, with a notice, while the edit adds unbound ones (a plain paragraph from the
+    default appender or a paste, or a disconnected block).
+  - **On the server** a save that adds more unbound blocks of a name than the post had gets a 400
+    (`taw_editing_block_not_bound`), so unbound blocks already in the post still save.
+  - It only matters where blocks can be inserted: with `lock: false` (a `structured` or `locked` page
+    can't insert at all), and for blocks that need a parent (`core/button`), the parent must be allowed.
+    A block in `allow` is free, and with `allow: null` the list has no effect (the TAW Editing screen
+    warns). No preset sets it, bypass users are unaffected, and Custom HTML never binds.
 - **Editor guardrails:** the starting template, the layout locks and the features layer. On WordPress
   7.1 the editor ignores a page-level `contentOnly` lock, so `lock: contentOnly` is sent as
   `templateLock: all` plus `assets/editing-content-only.js`, which puts every block in `contentOnly`

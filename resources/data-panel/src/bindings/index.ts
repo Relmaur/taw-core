@@ -7,6 +7,7 @@ import apiFetch from '@wordpress/api-fetch';
 import { registerBlockBindingsSource } from '@wordpress/blocks';
 import { createReduxStore, dispatch, register, select, subscribe } from '@wordpress/data';
 import { registerPlugin } from '@wordpress/plugins';
+import { registerAllowBound } from './allowBound';
 import { batcher, source, STORE, type Config, type PreviewItem } from './logic';
 import { connectMenu } from './menu';
 import { registerToolbar } from './toolbar';
@@ -61,6 +62,8 @@ if (config) {
     registerPlugin('taw-bindings-menu', { render: connectMenu(config) });
     // A "TAW field" dropdown in the block toolbar itself.
     registerToolbar(config);
+    // Bound-only blocks from the editing policy (allowBound), when there are any.
+    registerAllowBound(config);
 
     // Previews show saved values: refresh them after each (non-auto) save.
     let wasSaving = false;

@@ -53,15 +53,18 @@ final class PresetsTest extends TestCase
     public function test_content_rules_per_level(): void
     {
         $this->assertSame(
-            ['allow' => null, 'template' => null, 'lock' => false, 'newPostsOnly' => true],
+            ['allow' => null, 'allowBound' => [], 'template' => null, 'lock' => false, 'newPostsOnly' => true],
             Presets::layer('content', 'open')
         );
         $this->assertSame(
-            ['allow' => Presets::CURATED_BLOCKS, 'template' => null, 'lock' => false, 'newPostsOnly' => true],
+            ['allow' => Presets::CURATED_BLOCKS, 'allowBound' => [], 'template' => null, 'lock' => false, 'newPostsOnly' => true],
             Presets::layer('content', 'guided')
         );
         $this->assertSame('contentOnly', Presets::layer('content', 'structured')['lock']);
         $this->assertSame('all', Presets::layer('content', 'locked')['lock']);
+        foreach (Presets::LEVELS as $level) {
+            $this->assertSame([], Presets::layer('content', $level)['allowBound'], "no level allows bound-only blocks ({$level})");
+        }
     }
 
     public function test_every_level_locks_at_least_what_the_level_before_it_locks(): void

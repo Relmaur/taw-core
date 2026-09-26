@@ -4,12 +4,13 @@
  * gets url, text and the new-tab target from a link field). The Attributes
  * panel stays the per-attribute way.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { BlockSettingsMenuControls } from '@wordpress/block-editor';
 import { Button, MenuItem, Modal } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
 import {
+    awaitingField,
     candidatesFor,
     CONNECTABLE_BLOCKS,
     connectedMetadata,
@@ -119,10 +120,30 @@ function ConnectModal({ config, clientId, onClose }: { config: Config; clientId:
     );
 }
 
+/**
+ * The block to prompt for a field: the selected one, when it has a
+ * `taw/field` binding without a field (a "Field …" block just inserted).
+ */
+function useAwaiting(config: Config): string | null {
+    const selected = useSelect((select) => select('core/block-editor').getSelectedBlockClientId() as string | null, []);
+    const block = useBlock(selected);
+    return selected && block && awaitingField(config.source, block.metadata.bindings) ? selected : null;
+}
+
 /** The plugin root: the menu fill, and the dialog (which outlives the closed menu). */
 export function connectMenu(config: Config) {
     return function TawBindingsMenu() {
         const [connecting, setConnecting] = useState<string | null>(null);
+        const awaiting = useAwaiting(config);
+        const prompted = useRef(new Set<string>());
+
+        // Open the picker once per fresh "Field …" block; after that, the toolbar or ⋮ menu.
+        useEffect(() => {
+            if (awaiting && !prompted.current.has(awaiting)) {
+                prompted.current.add(awaiting);
+                setConnecting(awaiting);
+            }
+        }, [awaiting]);
 
         return (
             <>

@@ -225,13 +225,18 @@ Bound blocks preview their value in the block editor. Connectable blocks get a "
 The theme's hook list gains two lines (`rest_api_init` for the preview route, and
 `enqueue_block_editor_assets` for the editor script). **Nothing to do.**
 
+### v1.62.0: `allowBound` in editing policies
+An editing policy's content rule can now say `allowBound`: blocks clients may add only bound to a
+`taw/field` (they appear as "Field …" blocks in the inserter). The key was reserved and rejected before,
+so no existing policy uses it; no preset sets it. No hooks change. **Nothing to do.**
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
 - **Fields:** the data panel (`"ui": "panel"`), the `link` field, and term and user fieldsets.
 - **Reading and REST:** typed reads (`Taw::post()`), Block Bindings (`taw/field`), and options over REST.
 - **Content:** content snapshots (`bin/taw content:export` / `content:import`).
-- **Lockdown:** editing policies (`Boot::editing()`).
+- **Lockdown:** editing policies (`Boot::editing()`), including `allowBound` for field-only blocks.
 - **Integrations:** Lucide icons (`Lucide::enable()`), media folders (`MediaFolders::enable()`), the
   RAG chatbot, and the Bible and Catechism readers.
 

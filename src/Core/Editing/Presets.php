@@ -66,7 +66,7 @@ final class Presets
     ];
 
     /** Keys a content rule can set (besides "level"). */
-    public const CONTENT_KEYS = ['allow', 'template', 'lock', 'newPostsOnly'];
+    public const CONTENT_KEYS = ['allow', 'allowBound', 'template', 'lock', 'newPostsOnly'];
 
     /**
      * What each level locks, per boolean layer. Anything not listed stays
@@ -104,8 +104,9 @@ final class Presets
      *
      * For site/design/features: array<string, bool> keyed by SETTINGS.
      * For content: the content rule — allow (list of block globs, or null for
-     * every block), template (null = none), lock (false or one of LOCKS) and
-     * newPostsOnly.
+     * every block), allowBound (globs addable only when bound to a TAW field;
+     * no level sets any), template (null = none), lock (false or one of
+     * LOCKS) and newPostsOnly.
      *
      * @return array<string, mixed>
      * @throws \InvalidArgumentException For an unknown layer or level.
@@ -119,6 +120,7 @@ final class Presets
         if ($layer === 'content') {
             return [
                 'allow'        => $level === 'open' ? null : self::CURATED_BLOCKS,
+                'allowBound'   => [],
                 'template'     => null,
                 'lock'         => match ($level) {
                     'structured' => 'contentOnly',

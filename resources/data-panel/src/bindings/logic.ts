@@ -122,6 +122,7 @@ export function fieldsList(config: Config, context: BlockContext): FieldEntry[] 
 /** The label a binding shows while its preview loads, or when the field is empty. */
 export function placeholder(config: Config, args: BindingArgs, attribute: string): string | undefined {
     if (!TEXT_ATTRIBUTES.includes(attribute)) return undefined;
+    if (args.field.trim() === '') return __('Choose a TAW field', 'taw-core');
     const from = args.from ?? 'post';
     const pool = from === 'post' ? Object.values(config.fields.post).flat() : config.fields[from];
     const entry = pool.find((e) => e.args.field === args.field && (e.args.sub ?? '') === (args.sub ?? ''));
@@ -168,20 +169,28 @@ export function source(config: Config) {
             select: Select;
             context: BlockContext;
             bindings: Record<string, { args: BindingArgs }>;
-            clientId: string;
+            clientId?: string;
         }): Record<string, unknown> {
-            const block = select('core/block-editor').getBlockName?.(clientId) ?? '';
+            const block = (clientId && select('core/block-editor').getBlockName?.(clientId)) || '';
             const result: Record<string, unknown> = {};
             for (const [attribute, binding] of Object.entries(bindings)) {
                 const args = binding?.args;
                 if (!args || typeof args.field !== 'string') continue;
-                const value = select(STORE).getValue?.(previewItem(args, block, attribute, context ?? {}));
+                // No field picked yet (a fresh "Field …" block): nothing to ask the server.
+                const value =
+                    args.field.trim() === ''
+                        ? undefined
+                        : select(STORE).getValue?.(previewItem(args, block, attribute, context ?? {}));
                 result[attribute] =
                     value === undefined || value === null || value === ''
                         ? placeholder(config, args, attribute)
                         : value;
             }
-            return stable(values, `${clientId}|${Object.keys(bindings).join(',')}`, result);
+            // The Attributes panel's field menu calls this without a clientId, once per field:
+            // the args and the post are part of the key, or those calls would share one entry.
+            const where = `${context?.postId ?? ''}|${context?.postType ?? ''}`;
+            const args = Object.entries(bindings).map(([attribute, b]) => [attribute, b?.args]);
+            return stable(values, `${clientId ?? ''}|${where}|${JSON.stringify(args)}`, result);
         },
         getFieldsList({ context }: { context: BlockContext }): FieldEntry[] {
             const key = context?.postType ?? '';
@@ -315,4 +324,83 @@ export function sameField(a: BindingArgs | null, b: BindingArgs): boolean {
         (a.from ?? 'post') === (b.from ?? 'post') &&
         (a.sub ?? '') === (b.sub ?? '')
     );
+}
+
+/** Whether a block's bindings connect it to a TAW field (one with a field picked). Mirrors Editing\\Blocks::isBound(). */
+export function isBound(source: string, bindings: Bindings | undefined): boolean {
+    return Object.values(bindings ?? {}).some(
+        (b) => b?.source === source && typeof b.args?.field === 'string' && b.args.field.trim() !== '',
+    );
+}
+
+/** A `taw/field` binding is there, but no field is picked yet (a fresh "Field …" block). */
+export function awaitingField(source: string, bindings: Bindings | undefined): boolean {
+    return Object.values(bindings ?? {}).some((b) => b?.source === source) && !isBound(source, bindings);
+}
+
+/* ------------------------------------------------------------------ */
+/* allowBound (editing policies): blocks a locked-down post type only   */
+/* takes bound to a TAW field. The server sends their names as the      */
+/* `tawAllowBound` editor setting (Editing\\ContentLayer).               */
+/* ------------------------------------------------------------------ */
+
+/** The attribute a fresh "Field …" block binds before a field is picked, and its inserter title. */
+const BOUND_VARIATIONS: Record<string, { attribute: string; title: () => string }> = {
+    'core/paragraph': { attribute: 'content', title: () => __('Field text', 'taw-core') },
+    'core/heading': { attribute: 'content', title: () => __('Field heading', 'taw-core') },
+    'core/list-item': { attribute: 'content', title: () => __('Field list item', 'taw-core') },
+    'core/button': { attribute: 'text', title: () => __('Field button', 'taw-core') },
+    'core/image': { attribute: 'url', title: () => __('Field image', 'taw-core') },
+    'core/post-date': { attribute: 'datetime', title: () => __('Field date', 'taw-core') },
+};
+
+/**
+ * The inserter variation that stands in for a bound-only block. `isDefault`
+ * makes the inserter list it instead of the plain block; inserting it adds a
+ * `taw/field` binding with no field yet, and the field picker opens.
+ */
+export function boundVariation(source: string, block: string): Record<string, unknown> | null {
+    const spec = BOUND_VARIATIONS[block];
+    if (!spec) return null;
+
+    return {
+        name: 'taw-field',
+        title: spec.title(),
+        description: __('Shows a TAW field. Pick the field after inserting it.', 'taw-core'),
+        icon: 'database',
+        isDefault: true,
+        scope: ['inserter'],
+        attributes: { metadata: { bindings: { [spec.attribute]: { source, args: { field: '' } } } } },
+        isActive: (attributes: { metadata?: { bindings?: Bindings } }) =>
+            Object.values(attributes.metadata?.bindings ?? {}).some((b) => b?.source === source),
+    };
+}
+
+export interface BlockNode {
+    name: string;
+    attributes: { metadata?: { bindings?: Bindings }; [key: string]: unknown };
+    innerBlocks?: BlockNode[];
+}
+
+/** Unbound blocks per name, inner blocks included. Mirrors Editing\\Blocks::unboundCounts(). */
+export function unboundCounts(source: string, blocks: BlockNode[], counts: Record<string, number> = {}) {
+    for (const block of blocks) {
+        if (!isBound(source, block.attributes?.metadata?.bindings)) {
+            counts[block.name] = (counts[block.name] ?? 0) + 1;
+        }
+        if (block.innerBlocks?.length) unboundCounts(source, block.innerBlocks, counts);
+    }
+    return counts;
+}
+
+/**
+ * The bound-only blocks this edit adds unbound: more unbound blocks of that
+ * name than the saved post has. The same count the server's save check makes.
+ */
+export function newlyUnbound(
+    boundOnly: string[],
+    saved: Record<string, number>,
+    edited: Record<string, number>,
+): string[] {
+    return boundOnly.filter((name) => (edited[name] ?? 0) > (saved[name] ?? 0));
 }

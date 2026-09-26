@@ -36,7 +36,8 @@ final class Policy
 
     /**
      * The content rule for a post type: allow (list of globs, or null for
-     * every block), template (or null), lock (false or a LOCKS value) and
+     * every block), allowBound (globs addable only when bound to a TAW
+     * field), template (or null), lock (false or a LOCKS value) and
      * newPostsOnly. A post type the policy doesn't name gets the open rule.
      *
      * @return array<string, mixed>

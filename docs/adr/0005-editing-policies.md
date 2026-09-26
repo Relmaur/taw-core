@@ -62,7 +62,7 @@ Constraints and facts (WordPress 7.1.2, checked in core):
    - The `TAW_EDITING_PRESET` constant replaces only the preset, so one theme can serve clients
      at different levels.
    - The JSON format stays at version 1, because this change is additive.
-   - `allowBound` is reserved for Phase 4 (Block Bindings) and rejected until then.
+   - `allowBound` was reserved for Phase 4 (Block Bindings) and rejected until then; implemented in v1.62.0 (ADR-0010 decision 10).
 4. **Bypass.** A user bypasses when their login is in `TAW_EDITING_BYPASS_USERS` (wp-config.php) or
    they have `taw_unlock_editing`, the policy's `bypass.capability`, granted through
    `user_has_cap`. It is **not** tied to a core role. With no bypass configured, nobody bypasses
@@ -117,7 +117,7 @@ Constraints and facts (WordPress 7.1.2, checked in core):
   keeps its own `ThemeMode` and doesn't adopt this.
 - Deliberately not done yet:
   - per-role levels (only the one bypass)
-  - `allowBound` (Phase 4)
+  - `allowBound` (Phase 4; done in v1.62.0, see ADR-0010)
   - checking structural locks on save
   - adoption by taw-theme (it can opt in later by calling `Boot::editing()`)
 

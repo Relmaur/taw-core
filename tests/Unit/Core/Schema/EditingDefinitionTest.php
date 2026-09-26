@@ -155,7 +155,7 @@ final class EditingDefinitionTest extends SchemaTestCase
             Validator::validate(['version' => 1, 'kind' => 'editing', 'key' => 'site', 'preset' => 'max'])
         );
         $this->assertSame(
-            ['/editing/allowBound: is reserved for Block Bindings (data layer Phase 4) and not available yet'],
+            ['/editing/allowBound: must be a list of block names or globs (e.g. "core/paragraph") that can be added only when bound to a TAW field'],
             Validator::validate(['version' => 1, 'kind' => 'post_type', 'key' => 'event', 'editing' => ['allowBound' => true]])
         );
         $this->assertSame(

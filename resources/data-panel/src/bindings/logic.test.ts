@@ -12,6 +12,12 @@ import {
     connectedMetadata,
     connectedArgs,
     sameField,
+    awaitingField,
+    boundVariation,
+    isBound,
+    newlyUnbound,
+    unboundCounts,
+    type BlockNode,
     type Config,
 } from './logic';
 
@@ -220,5 +226,77 @@ describe('taw/field in the editor', () => {
             bindings: { content: { args: { field: 'subtitle' } } },
         };
         expect(src.getValues(args)).toBe(src.getValues(args));
+    });
+});
+
+describe('allowBound in the editor', () => {
+    const bound = (field: string) => ({ content: { source: 'taw/field', args: { field } } });
+
+    it('is bound only with a field picked, and awaits one otherwise', () => {
+        expect(isBound('taw/field', bound('headline'))).toBe(true);
+        expect(isBound('taw/field', bound(' '))).toBe(false);
+        expect(isBound('taw/field', { content: { source: 'core/post-meta', args: { field: 'x' } } })).toBe(false);
+        expect(awaitingField('taw/field', bound(''))).toBe(true);
+        expect(awaitingField('taw/field', bound('headline'))).toBe(false);
+        expect(awaitingField('taw/field', undefined)).toBe(false);
+    });
+
+    it('offers a default inserter variation bound to no field yet', () => {
+        const variation = boundVariation('taw/field', 'core/button')!;
+        expect(variation).toMatchObject({
+            name: 'taw-field',
+            title: 'Field button',
+            isDefault: true,
+            scope: ['inserter'],
+            attributes: { metadata: { bindings: { text: { source: 'taw/field', args: { field: '' } } } } },
+        });
+        const isActive = variation.isActive as (a: unknown) => boolean;
+        expect(isActive({ metadata: { bindings: bound('cta') } })).toBe(true);
+        expect(isActive({})).toBe(false);
+        expect(boundVariation('taw/field', 'core/columns')).toBeNull();
+    });
+
+    it('counts unbound blocks like the server and finds the ones an edit adds', () => {
+        const blocks: BlockNode[] = [
+            { name: 'core/paragraph', attributes: { metadata: { bindings: bound('a') } } },
+            { name: 'core/paragraph', attributes: {} },
+            {
+                name: 'core/group',
+                attributes: {},
+                innerBlocks: [{ name: 'core/paragraph', attributes: { metadata: { bindings: bound('') } } }],
+            },
+        ];
+        const edited = unboundCounts('taw/field', blocks);
+        expect(edited).toEqual({ 'core/paragraph': 2, 'core/group': 1 });
+        expect(newlyUnbound(['core/paragraph', 'core/image'], { 'core/paragraph': 1 }, edited)).toEqual([
+            'core/paragraph',
+        ]);
+        expect(newlyUnbound(['core/paragraph'], { 'core/paragraph': 2 }, edited)).toEqual([]);
+    });
+
+    it('shows a prompt instead of asking the server when no field is picked', () => {
+        const getValue = vi.fn();
+        const select = (store: string) => (store === STORE ? { getValue } : { getBlockName: () => 'core/paragraph' });
+        const values = source(config).getValues({ select, context: {}, bindings: bound(''), clientId: 'c1' });
+        expect(values).toEqual({ content: 'Choose a TAW field' });
+        expect(getValue).not.toHaveBeenCalled();
+        expect(placeholder(config, { field: '' }, 'url')).toBeUndefined();
+    });
+
+    it('keeps one result per field when the Attributes panel asks without a clientId', () => {
+        const values: Record<string, string> = { headline: 'H', intro: 'I' };
+        const select = (store: string) =>
+            store === STORE
+                ? { getValue: (item: { args: { field: string } }) => values[item.args.field] }
+                : { getBlockName: () => null };
+        const src = source(config);
+        const ask = (field: string) =>
+            src.getValues({ select, context: { postId: 5, postType: 'book' }, bindings: bound(field) });
+        const headline = ask('headline');
+        const intro = ask('intro');
+        expect(headline).toEqual({ content: 'H' });
+        expect(intro).toEqual({ content: 'I' });
+        expect(ask('headline')).toBe(headline);
+        expect(ask('intro')).toBe(intro);
     });
 });
