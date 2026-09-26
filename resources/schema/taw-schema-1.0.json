@@ -180,6 +180,7 @@
           "properties": {
             "level": { "$ref": "#/$defs/level" },
             "allow": { "type": ["array", "null"], "items": { "type": "string", "pattern": "^(\\*|[a-z0-9-]+/(\\*|[a-z0-9-]+))$" }, "description": "Block names or globs that can be inserted (e.g. core/*); null = every block." },
+            "allowBound": { "type": "array", "items": { "type": "string", "pattern": "^(\\*|[a-z0-9-]+/(\\*|[a-z0-9-]+))$" }, "description": "Block names or globs that can be added only when bound to a TAW field (taw/field Block Bindings), e.g. core/paragraph. The editor offers them as \"Field …\" variations." },
             "template": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/blockTemplate" }] },
             "lock": { "enum": [false, "insert", "contentOnly", "all"] },
             "newPostsOnly": { "type": "boolean", "description": "Apply the starting template to new posts only (default true)." }

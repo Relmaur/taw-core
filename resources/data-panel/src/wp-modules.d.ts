@@ -50,6 +50,8 @@ declare module '@wordpress/blocks' {
     export function serialize(blocks: BlockInstance[]): string;
     export function createBlock(name: string, attributes?: Record<string, unknown>): BlockInstance;
     export function registerBlockBindingsSource(source: Record<string, unknown>): void;
+    export function registerBlockVariation(block: string, variation: Record<string, unknown>): void;
+    export function parse(content: string): BlockInstance[];
 }
 
 declare module '@wordpress/block-editor' {

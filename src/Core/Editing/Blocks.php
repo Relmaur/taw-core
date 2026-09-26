@@ -22,6 +22,12 @@ final class Blocks
     public const HTML = 'core/html';
 
     /**
+     * The Block Bindings source an allowBound block must use (Bindings::SOURCE,
+     * repeated here so this class stays loadable before WordPress boots).
+     */
+    public const BOUND_SOURCE = 'taw/field';
+
+    /**
      * Whether $name matches any glob: "*" (every block), "core/*" (a
      * namespace) or an exact name.
      *
@@ -54,6 +60,72 @@ final class Blocks
         }
 
         return $allow === null || self::matches($name, $allow);
+    }
+
+    /**
+     * Whether a block the allow list refuses may still be added bound to a
+     * TAW field (a content rule's allowBound). Custom HTML can't be bound,
+     * so the features layer's setting still wins.
+     *
+     * @param list<string> $allowBound
+     */
+    public static function isAllowedBound(string $name, array $allowBound, bool $customHtml): bool
+    {
+        return ($customHtml || $name !== self::HTML) && self::matches($name, $allowBound);
+    }
+
+    /**
+     * Whether a parsed block is bound to a TAW field: one of its bindings
+     * uses BOUND_SOURCE with a field name.
+     *
+     * @param array<string, mixed> $block A parse_blocks() entry.
+     */
+    public static function isBound(array $block): bool
+    {
+        $bindings = $block['attrs']['metadata']['bindings'] ?? null;
+        if (!is_array($bindings)) {
+            return false;
+        }
+
+        foreach ($bindings as $binding) {
+            if (is_array($binding)
+                && ($binding['source'] ?? null) === self::BOUND_SOURCE
+                && is_string($binding['args']['field'] ?? null)
+                && trim($binding['args']['field']) !== ''
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * How many blocks of each name aren't bound to a TAW field, inner blocks
+     * included.
+     *
+     * @param array<int, array<string, mixed>> $blocks parse_blocks() output.
+     * @return array<string, int>
+     */
+    public static function unboundCounts(array $blocks): array
+    {
+        $counts = [];
+
+        foreach ($blocks as $block) {
+            $name = $block['blockName'] ?? null;
+            if (is_string($name) && $name !== '' && !self::isBound($block)) {
+                $counts[$name] = ($counts[$name] ?? 0) + 1;
+            }
+
+            $inner = $block['innerBlocks'] ?? [];
+            if (is_array($inner) && $inner !== []) {
+                foreach (self::unboundCounts($inner) as $innerName => $count) {
+                    $counts[$innerName] = ($counts[$innerName] ?? 0) + $count;
+                }
+            }
+        }
+
+        return $counts;
     }
 
     /**

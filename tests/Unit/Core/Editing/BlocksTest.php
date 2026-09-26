@@ -53,4 +53,34 @@ final class BlocksTest extends TestCase
 
         $this->assertSame(['core/freeform'], Blocks::namesIn($blocks));
     }
+
+    public function test_a_block_is_bound_only_to_a_named_taw_field(): void
+    {
+        $bound = static fn (array $bindings): array => ['blockName' => 'core/paragraph', 'attrs' => ['metadata' => ['bindings' => $bindings]]];
+
+        $this->assertTrue(Blocks::isBound($bound(['content' => ['source' => 'taw/field', 'args' => ['field' => 'headline']]])));
+        $this->assertTrue(Blocks::isBound($bound(['url' => ['source' => 'core/post-meta', 'args' => ['key' => 'x']], 'text' => ['source' => 'taw/field', 'args' => ['field' => 'cta']]])));
+        $this->assertFalse(Blocks::isBound($bound(['content' => ['source' => 'taw/field', 'args' => ['field' => '  ']]])), 'no field picked yet');
+        $this->assertFalse(Blocks::isBound($bound(['content' => ['source' => 'core/post-meta', 'args' => ['key' => 'headline']]])));
+        $this->assertFalse(Blocks::isBound(['blockName' => 'core/paragraph', 'attrs' => []]));
+    }
+
+    public function test_unbound_blocks_are_counted_per_name_recursively(): void
+    {
+        $bound = ['blockName' => 'core/paragraph', 'attrs' => ['metadata' => ['bindings' => ['content' => ['source' => 'taw/field', 'args' => ['field' => 'a']]]]], 'innerBlocks' => []];
+        $plain = ['blockName' => 'core/paragraph', 'attrs' => [], 'innerBlocks' => []];
+
+        $this->assertSame(
+            ['core/paragraph' => 2, 'core/group' => 1],
+            Blocks::unboundCounts([$bound, $plain, ['blockName' => 'core/group', 'attrs' => [], 'innerBlocks' => [$bound, $plain]], ['blockName' => null, 'innerHTML' => "\n"]])
+        );
+    }
+
+    public function test_allow_bound_matches_globs_but_never_custom_html_when_it_is_off(): void
+    {
+        $this->assertTrue(Blocks::isAllowedBound('core/paragraph', ['core/paragraph'], false));
+        $this->assertTrue(Blocks::isAllowedBound('core/image', ['core/*'], true));
+        $this->assertFalse(Blocks::isAllowedBound('core/html', ['core/*'], false));
+        $this->assertFalse(Blocks::isAllowedBound('core/paragraph', [], true));
+    }
 }

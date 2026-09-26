@@ -20,7 +20,7 @@ final class RulesTest extends TestCase
                 'design'   => 'locked',
                 'features' => ['customHtml' => true],
                 'content'  => [
-                    'page'  => ['allow' => ['core/*', 'taw-gutenberg/hero'], 'lock' => 'all', 'template' => [['core/heading', ['level' => 2]]]],
+                    'page'  => ['allow' => ['core/*', 'taw-gutenberg/hero'], 'allowBound' => ['core/paragraph', 'core/image'], 'lock' => 'all', 'template' => [['core/heading', ['level' => 2]]]],
                     'post'  => 'open',
                     'event' => ['allow' => null, 'lock' => false, 'newPostsOnly' => false],
                 ],
@@ -67,7 +67,9 @@ final class RulesTest extends TestCase
             'template bad name'      => [['layers' => ['content' => ['page' => ['template' => [['heading']]]]]], '/layers/content/page/template/0/0: must be a block name'],
             'template bad attrs'     => [['layers' => ['content' => ['page' => ['template' => [['core/heading', 'big']]]]]], '/layers/content/page/template/0/1: block attributes must be an object'],
             'template bad inner'     => [['layers' => ['content' => ['page' => ['template' => [['core/group', [], [['x']]]]]]]], '/layers/content/page/template/0/2/0/0: must be a block name'],
-            'allowBound is reserved' => [['layers' => ['content' => ['page' => ['allowBound' => true]]]], '/layers/content/page/allowBound: is reserved for Block Bindings'],
+            'allowBound not a list'  => [['layers' => ['content' => ['page' => ['allowBound' => true]]]], '/layers/content/page/allowBound: must be a list of block names or globs'],
+            'allowBound null'        => [['layers' => ['content' => ['page' => ['allowBound' => null]]]], '/layers/content/page/allowBound: must be a list'],
+            'bad allowBound glob'    => [['layers' => ['content' => ['page' => ['allowBound' => ['paragraph']]]]], '/layers/content/page/allowBound/0: must be a block name or glob'],
         ];
     }
 

@@ -80,7 +80,7 @@ final class ResolverTest extends TestCase
     {
         $policy = Resolver::resolve(Schema::editing()->preset('locked'), ['event' => ['lock' => 'insert']]);
 
-        $this->assertSame(['allow' => null, 'template' => null, 'lock' => 'insert', 'newPostsOnly' => true], $policy->content('event'));
+        $this->assertSame(['allow' => null, 'allowBound' => [], 'template' => null, 'lock' => 'insert', 'newPostsOnly' => true], $policy->content('event'));
     }
 
     public function test_post_type_rule_can_name_a_level(): void

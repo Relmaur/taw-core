@@ -295,6 +295,98 @@ final class ContentLayerTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    // --- allowBound (ADR-0010 decision 10) -------------------------------
+
+    /** @return array<string, mixed> A parse_blocks() entry, bound to a TAW field when $field is given. */
+    private static function block(string $name, ?string $field = null): array
+    {
+        $attrs = $field === null ? [] : ['metadata' => ['bindings' => ['content' => ['source' => 'taw/field', 'args' => ['field' => $field]]]]];
+
+        return ['blockName' => $name, 'attrs' => $attrs, 'innerHTML' => '<p>x</p>', 'innerBlocks' => []];
+    }
+
+    private function boundLayer(): ContentLayer
+    {
+        return $this->layer(Schema::editing()->content('page', ['allow' => ['core/heading'], 'allowBound' => ['core/paragraph', 'core/image', 'core/html']]));
+    }
+
+    public function test_allow_bound_blocks_stay_insertable_and_reach_the_editor(): void
+    {
+        $layer = $this->boundLayer();
+
+        $this->assertSame(['core/paragraph', 'core/heading', 'core/html', 'core/image'], $layer->allowedBlockTypes(true, self::context('page')));
+        $this->assertSame(['tawAllowBound' => ['core/paragraph', 'core/html', 'core/image']], $layer->editorSettings([], self::context('page')));
+        $this->assertSame([], $layer->editorSettings([], self::context('post')), 'other post types: nothing');
+    }
+
+    public function test_allow_bound_blocks_the_allow_list_already_allows_are_not_bound_only(): void
+    {
+        $layer = $this->layer(Schema::editing()->content('page', ['allow' => ['core/*'], 'allowBound' => ['core/paragraph']]));
+
+        $this->assertSame([], $layer->editorSettings([], self::context('page')));
+    }
+
+    public function test_a_save_may_add_allow_bound_blocks_only_bound(): void
+    {
+        Functions\when('get_post_field')->justReturn('');
+        $this->parsed['BOUND'] = [self::block('core/heading'), self::block('core/paragraph', 'headline')];
+        $this->parsed['PLAIN'] = [self::block('core/paragraph', 'headline'), self::block('core/paragraph'), self::block('core/paragraph', '')];
+        $layer = $this->boundLayer();
+
+        $bound = (object) ['post_content' => 'BOUND'];
+        $this->assertSame($bound, $layer->checkSave($bound, 'page'));
+
+        $result = $layer->checkSave((object) ['post_content' => 'PLAIN'], 'page');
+        $this->assertInstanceOf(\WP_Error::class, $result);
+        $this->assertSame('taw_editing_block_not_bound', $result->get_error_code());
+        $this->assertSame(['status' => 400, 'blocks' => ['core/paragraph']], $result->error_data['taw_editing_block_not_bound']);
+    }
+
+    public function test_existing_unbound_blocks_still_save_but_no_new_ones(): void
+    {
+        $this->parsed['OLD'] = [self::block('core/paragraph'), self::block('core/paragraph', 'headline')];
+        $this->parsed['SAME'] = [self::block('core/paragraph', 'headline'), self::block('core/paragraph'), self::block('core/paragraph', 'intro')];
+        $this->parsed['MORE'] = [self::block('core/paragraph'), self::block('core/paragraph'), self::block('core/paragraph', 'headline')];
+        Functions\when('get_post_field')->justReturn('OLD');
+        $layer = $this->boundLayer();
+
+        $same = (object) ['ID' => 42, 'post_content' => 'SAME'];
+        $this->assertSame($same, $layer->checkSave($same, 'page'), 'legacy unbound paragraph + a new bound one');
+        $this->assertInstanceOf(\WP_Error::class, $layer->checkSave((object) ['ID' => 42, 'post_content' => 'MORE'], 'page'), 'a second unbound paragraph');
+    }
+
+    public function test_blocks_outside_both_lists_are_still_refused_first(): void
+    {
+        Functions\when('get_post_field')->justReturn('');
+        $this->parsed['BOTH'] = [self::block('acme/slider'), self::block('core/paragraph')];
+
+        $result = $this->boundLayer()->checkSave((object) ['post_content' => 'BOTH'], 'page');
+
+        $this->assertSame('taw_editing_block_not_allowed', $result->get_error_code());
+        $this->assertSame(['status' => 400, 'blocks' => ['acme/slider']], $result->error_data['taw_editing_block_not_allowed']);
+    }
+
+    public function test_custom_html_off_wins_over_allow_bound(): void
+    {
+        Functions\when('get_post_field')->justReturn('');
+        $this->parsed['HTML'] = [self::block('core/html', 'headline')];
+        $layer = $this->layer(Schema::editing()->layer('features', ['customHtml' => false])->content('page', ['allow' => ['core/heading'], 'allowBound' => ['core/*']]));
+
+        $this->assertNotContains('core/html', $layer->allowedBlockTypes(true, self::context('page')));
+        $this->assertSame('taw_editing_block_not_allowed', $layer->checkSave((object) ['post_content' => 'HTML'], 'page')->get_error_code());
+    }
+
+    public function test_bypass_users_ignore_allow_bound(): void
+    {
+        Functions\when('get_post_field')->justReturn('');
+        Functions\when('current_user_can')->justReturn(true);
+        $this->parsed['PLAIN'] = [self::block('core/paragraph')];
+        $prepared = (object) ['post_content' => 'PLAIN'];
+
+        $this->assertSame($prepared, $this->boundLayer()->checkSave($prepared, 'page'));
+        $this->assertSame([], $this->boundLayer()->editorSettings([], self::context('page')));
+    }
+
     public function test_register_hooks_the_editor_and_rest(): void
     {
         $layer = $this->layer(Schema::editing());

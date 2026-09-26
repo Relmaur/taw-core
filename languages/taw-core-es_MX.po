@@ -15,6 +15,12 @@ msgstr ""
 msgid "\"%1$s\" in the %2$s allow list matches no registered block."
 msgstr ""
 
+#. translators: 1: block name or glob, 2: post type.
+#: src/Core/Editing/EditingAdminScreen.php
+#, php-format
+msgid "\"%1$s\" in the %2$s allowBound list matches no registered block."
+msgstr "\"%1$s\" en la lista allowBound de %2$s no coincide con ningún bloque registrado."
+
 #. translators: %s: block name or glob.
 #: src/Core/Editing/EditingAdminScreen.php
 #, php-format
@@ -279,6 +285,10 @@ msgstr ""
 msgid "Choose Icon"
 msgstr ""
 
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Choose a TAW field"
+msgstr "Elige un campo TAW"
+
 #: resources/data-panel/src/controls/PickerControls.tsx
 msgid "Choose a color"
 msgstr ""
@@ -318,6 +328,12 @@ msgstr "Contraer"
 #: resources/data-panel/src/controls/Repeater.tsx
 msgid "Collapse all"
 msgstr ""
+
+#. translators: %s: comma-separated block titles.
+#: resources/data-panel/src/bindings/allowBound.ts
+#, php-format
+msgid "Connect these blocks to a TAW field (block toolbar → TAW field) or remove them before saving: %s."
+msgstr "Conecta estos bloques a un campo TAW (barra del bloque → Campo TAW) o elimínalos antes de guardar: %s."
 
 #: resources/data-panel/src/bindings/menu.tsx resources/data-panel/src/bindings/toolbar.tsx
 msgid "Connect to TAW field"
@@ -414,6 +430,30 @@ msgstr ""
 #: src/Core/Seo/Schema.php
 msgid "Feeds the \"sameAs\" entity signal — link every profile that represents this same organization/brand (LinkedIn, Instagram, etc.)."
 msgstr ""
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Field button"
+msgstr "Botón de campo"
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Field date"
+msgstr "Fecha de campo"
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Field heading"
+msgstr "Encabezado de campo"
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Field image"
+msgstr "Imagen de campo"
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Field list item"
+msgstr "Elemento de lista de campo"
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Field text"
+msgstr "Texto de campo"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Field-level changes"
@@ -712,6 +752,10 @@ msgstr ""
 msgid "Oldest first"
 msgstr ""
 
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Only bound to a TAW field"
+msgstr "Solo conectados a un campo TAW"
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Op"
 msgstr ""
@@ -950,6 +994,10 @@ msgstr ""
 msgid "Shown in search results and link previews. ~155 characters is the practical limit before truncation."
 msgstr ""
 
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Shows a TAW field. Pick the field after inserting it."
+msgstr "Muestra un campo TAW. Elige el campo después de insertarlo."
+
 #: src/Core/Editing/SiteLayer.php
 msgid "Site Editor locked"
 msgstr ""
@@ -1034,6 +1082,12 @@ msgstr ""
 msgid "That file is not valid JSON."
 msgstr ""
 
+#. translators: %s: post type.
+#: src/Core/Editing/EditingAdminScreen.php
+#, php-format
+msgid "The %s rule allows every block, so its allowBound list has no effect."
+msgstr "La regla de %s permite todos los bloques, así que su lista allowBound no tiene efecto."
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "The built-in \"This site's content\" knowledge base cannot be deleted."
 msgstr ""
@@ -1061,6 +1115,12 @@ msgstr ""
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Theme blocks"
 msgstr ""
+
+#. translators: 1: comma-separated block names, 2: post type.
+#: src/Core/Editing/ContentLayer.php
+#, php-format
+msgid "These blocks can only be added here connected to a TAW field: %1$s. Connect them (block toolbar → TAW field) or remove them. Editing policy for \"%2$s\"."
+msgstr "Estos bloques solo se pueden añadir aquí conectados a un campo TAW: %1$s. Conéctalos (barra del bloque → Campo TAW) o elimínalos. Política de edición de \"%2$s\"."
 
 #. translators: 1: comma-separated block names, 2: post type.
 #: src/Core/Editing/ContentLayer.php

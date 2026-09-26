@@ -75,6 +75,20 @@ final class EditingAdminScreenTest extends TestCase
         $this->assertSame(['"taw-gutenberg/*" in the page allow list matches no registered block.'], $warnings);
     }
 
+    public function test_warns_about_allow_bound_patterns_that_match_nothing_or_do_nothing(): void
+    {
+        $definition = Schema::editing()
+            ->content('page', ['allow' => ['core/heading'], 'allowBound' => ['core/heading', 'ghost/*']])
+            ->content('post', ['allowBound' => ['core/heading']]);
+
+        $warnings = $this->screen($definition, ['marco'])->report(null)['warnings'];
+
+        $this->assertSame([
+            '"ghost/*" in the page allowBound list matches no registered block.',
+            'The post rule allows every block, so its allowBound list has no effect.',
+        ], $warnings);
+    }
+
     public function test_theme_blocks_are_shown_and_checked_once(): void
     {
         $definition = Schema::editing()->preset('guided')->themeBlocks('acme/*', 'ghost/*')->content('book', ['allow' => ['core/heading']]);

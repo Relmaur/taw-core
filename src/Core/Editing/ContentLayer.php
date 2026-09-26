@@ -20,6 +20,11 @@ use TAW\Helpers\Framework;
  * alone, so tightening a policy never makes existing content unsaveable.
  * Template locks are editor guardrails only (ADR-0005 § 5).
  *
+ * A rule's allowBound blocks (ADR-0010 decision 10) are the exception to
+ * the allow list: they can be inserted, but a save may only add them bound
+ * to a TAW field. The editor learns them from the `tawAllowBound` editor
+ * setting and offers them as "Field …" variations (the bindings script).
+ *
  * `lock: contentOnly` is sent as templateLock "all" plus an editor script
  * that puts every block in the contentOnly editing mode: since WordPress
  * 7.1 the editor ignores a page-level contentOnly lock (it only applies
@@ -67,7 +72,9 @@ final class ContentLayer
             return $allowed;
         }
 
-        $allow      = $this->ruleFor($context)['allow'] ?? null;
+        $rule       = $this->ruleFor($context);
+        $allow      = $rule['allow'] ?? null;
+        $allowBound = $rule['allowBound'] ?? [];
         $customHtml = $this->policy->features['customHtml'] ?? true;
 
         if ($allow === null && $customHtml) {
@@ -79,6 +86,7 @@ final class ContentLayer
         return array_values(array_filter(
             $names,
             static fn (string $name): bool => Blocks::isAllowed($name, $allow, $customHtml)
+                || Blocks::isAllowedBound($name, $allowBound, $customHtml)
         ));
     }
 
@@ -110,7 +118,33 @@ final class ContentLayer
             $settings['templateLock'] = $rule['lock'] === 'contentOnly' ? 'all' : $rule['lock'];
         }
 
+        $boundOnly = $this->boundOnly($rule);
+        if ($boundOnly !== []) {
+            $settings['tawAllowBound'] = $boundOnly;
+        }
+
         return $settings;
+    }
+
+    /**
+     * The registered blocks a rule allows only bound to a TAW field.
+     *
+     * @param array<string, mixed> $rule
+     * @return list<string>
+     */
+    private function boundOnly(array $rule): array
+    {
+        $allowBound = $rule['allowBound'] ?? [];
+        if ($allowBound === [] || $rule['allow'] === null) {
+            return [];
+        }
+        $customHtml = $this->policy->features['customHtml'] ?? true;
+
+        return array_values(array_filter(
+            ($this->registeredBlocks)(),
+            static fn (string $name): bool => !Blocks::isAllowed($name, $rule['allow'], $customHtml)
+                && Blocks::isAllowedBound($name, $allowBound, $customHtml)
+        ));
     }
 
     /**
@@ -155,6 +189,11 @@ final class ContentLayer
      * rest_pre_insert_{post_type}: reject blocks this save *adds* that the
      * rule doesn't allow. Covers autosaves too (they go through the same
      * filter via the parent controller).
+     *
+     * An allowBound block is counted instead: the save may not add unbound
+     * ones (more unbound blocks of that name than the saved post has), so a
+     * post that already holds a bound paragraph can't slip a plain one in,
+     * and existing unbound content still saves.
      */
     public function checkSave(mixed $prepared, string $postType): mixed
     {
@@ -165,25 +204,53 @@ final class ContentLayer
             return $prepared;
         }
 
-        $allow      = $this->policy->content($postType)['allow'];
+        $rule       = $this->policy->content($postType);
+        $allow      = $rule['allow'];
+        $allowBound = $rule['allowBound'] ?? [];
         $customHtml = $this->policy->features['customHtml'] ?? true;
         if ($allow === null && $customHtml) {
             return $prepared;
         }
 
         $existing = !empty($prepared->ID) ? (string) get_post_field('post_content', (int) $prepared->ID) : '';
-        $added    = array_diff(
-            Blocks::namesIn(parse_blocks($prepared->post_content)),
-            Blocks::namesIn(parse_blocks($existing))
-        );
+        $new      = parse_blocks($prepared->post_content);
+        $old      = parse_blocks($existing);
+        $added    = array_diff(Blocks::namesIn($new), Blocks::namesIn($old));
 
         $refused = array_values(array_filter(
             $added,
             static fn (string $name): bool => !Blocks::isAllowed($name, $allow, $customHtml)
+                && !Blocks::isAllowedBound($name, $allowBound, $customHtml)
         ));
 
-        if ($refused === []) {
+        $unbound = [];
+        if ($allowBound !== []) {
+            $before = Blocks::unboundCounts($old);
+            foreach (Blocks::unboundCounts($new) as $name => $count) {
+                if ($count > ($before[$name] ?? 0)
+                    && !Blocks::isAllowed($name, $allow, $customHtml)
+                    && Blocks::isAllowedBound($name, $allowBound, $customHtml)
+                ) {
+                    $unbound[] = (string) $name;
+                }
+            }
+        }
+
+        if ($refused === [] && $unbound === []) {
             return $prepared;
+        }
+
+        if ($refused === []) {
+            return new \WP_Error(
+                'taw_editing_block_not_bound',
+                sprintf(
+                    /* translators: 1: comma-separated block names, 2: post type. */
+                    __('These blocks can only be added here connected to a TAW field: %1$s. Connect them (block toolbar → TAW field) or remove them. Editing policy for "%2$s".', 'taw-core'),
+                    implode(', ', $unbound),
+                    $postType
+                ),
+                ['status' => 400, 'blocks' => $unbound]
+            );
         }
 
         return new \WP_Error(

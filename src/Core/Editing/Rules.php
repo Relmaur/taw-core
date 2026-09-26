@@ -18,15 +18,6 @@ final class Rules
     /** Keys of an editing policy besides the common definition keys. */
     public const POLICY_KEYS = ['preset', 'bypass', 'themeBlocks', 'layers'];
 
-    /**
-     * Keys that are planned but not built yet. They're rejected with a
-     * pointer to the plan instead of "unknown key", so nobody thinks they're
-     * a typo.
-     */
-    private const RESERVED = [
-        'allowBound' => 'is reserved for Block Bindings (data layer Phase 4) and not available yet',
-    ];
-
     /** A block name or a glob of them: "core/*", "core/paragraph", "*". */
     private const BLOCK_GLOB = '/^(\*|[a-z0-9-]+\/(\*|[a-z0-9-]+))$/';
 
@@ -88,6 +79,12 @@ final class Rules
 
         if (array_key_exists('allow', $rule)) {
             $errors = [...$errors, ...self::validateAllow($rule['allow'], "{$at}/allow")];
+        }
+
+        if (array_key_exists('allowBound', $rule)) {
+            $errors = [...$errors, ...(is_array($rule['allowBound']) && array_is_list($rule['allowBound'])
+                ? self::validateAllow($rule['allowBound'], "{$at}/allowBound")
+                : ["{$at}/allowBound: must be a list of block names or globs (e.g. \"core/paragraph\") that can be added only when bound to a TAW field"])];
         }
 
         if (array_key_exists('template', $rule)) {
@@ -269,7 +266,7 @@ final class Rules
     }
 
     /**
-     * Unknown and reserved keys of an object.
+     * Unknown keys of an object.
      *
      * @param array<array-key, mixed> $object
      * @param list<string> $allowed
@@ -279,9 +276,7 @@ final class Rules
     {
         $errors = [];
         foreach (array_keys($object) as $key) {
-            if (isset(self::RESERVED[$key])) {
-                $errors[] = "{$at}/{$key}: " . self::RESERVED[$key];
-            } elseif (!in_array($key, $allowed, true)) {
+            if (!in_array($key, $allowed, true)) {
                 $errors[] = "{$at}/{$key}: unknown key (allowed: " . implode(', ', $allowed) . ')';
             }
         }

@@ -136,6 +136,23 @@ final class EditingAdminScreen
                     );
                 }
             }
+            foreach ($rule['allowBound'] ?? [] as $glob) {
+                if (array_filter($registered, static fn (string $name): bool => Blocks::matches($name, [(string) $glob])) === []) {
+                    $warnings[] = sprintf(
+                        /* translators: 1: block name or glob, 2: post type. */
+                        __('"%1$s" in the %2$s allowBound list matches no registered block.', 'taw-core'),
+                        $glob,
+                        $postType
+                    );
+                }
+            }
+            if (($rule['allowBound'] ?? []) !== [] && $rule['allow'] === null) {
+                $warnings[] = sprintf(
+                    /* translators: %s: post type. */
+                    __('The %s rule allows every block, so its allowBound list has no effect.', 'taw-core'),
+                    $postType
+                );
+            }
         }
 
         return $warnings;
@@ -205,12 +222,13 @@ final class EditingAdminScreen
             <h2><?php esc_html_e('Content, per post type', 'taw-core'); ?></h2>
             <p class="description"><?php esc_html_e('Post types not listed keep the normal editor.', 'taw-core'); ?></p>
             <table class="widefat striped" style="max-width:48rem">
-                <thead><tr><th><?php esc_html_e('Post type', 'taw-core'); ?></th><th><?php esc_html_e('Allowed blocks', 'taw-core'); ?></th><th><?php esc_html_e('Lock', 'taw-core'); ?></th><th><?php esc_html_e('Starting template', 'taw-core'); ?></th></tr></thead>
+                <thead><tr><th><?php esc_html_e('Post type', 'taw-core'); ?></th><th><?php esc_html_e('Allowed blocks', 'taw-core'); ?></th><th><?php esc_html_e('Only bound to a TAW field', 'taw-core'); ?></th><th><?php esc_html_e('Lock', 'taw-core'); ?></th><th><?php esc_html_e('Starting template', 'taw-core'); ?></th></tr></thead>
                 <tbody>
                     <?php foreach ($report['content'] as $postType => $rule) : ?>
                         <tr>
                             <td><code><?php echo esc_html($postType); ?></code></td>
                             <td><?php echo esc_html(is_array($rule['allow']) ? implode(', ', $rule['allow']) : __('all', 'taw-core')); ?></td>
+                            <td><?php echo esc_html(($rule['allowBound'] ?? []) === [] ? '—' : implode(', ', $rule['allowBound'])); ?></td>
                             <td><?php echo esc_html($rule['lock'] === false ? __('none', 'taw-core') : (string) $rule['lock']); ?></td>
                             <td><?php echo esc_html($rule['template'] === null ? '—' : sprintf(_n('%d block', '%d blocks', count($rule['template']), 'taw-core'), count($rule['template']))); ?></td>
                         </tr>
