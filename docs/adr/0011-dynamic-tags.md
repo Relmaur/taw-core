@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-09-26). Plan: umbrella `docs/plans/dynamic-tags.md` (data layer Phase 7a, roadmap row
+Accepted (2026-09-26); decision 6 (the canvas `@`) superseded by ADR-0012. Plan: umbrella `docs/plans/dynamic-tags.md` (data layer Phase 7a, roadmap row
 "7. Dynamic tags / expressions", built before Phase 5). Builds on ADR-0010 (Block Bindings, the
 `ExpressionResolver` interface) and ADR-0009 (typed value API).
 
