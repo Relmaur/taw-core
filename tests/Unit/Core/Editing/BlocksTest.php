@@ -61,6 +61,7 @@ final class BlocksTest extends TestCase
         $this->assertTrue(Blocks::isBound($bound(['content' => ['source' => 'taw/field', 'args' => ['field' => 'headline']]])));
         $this->assertTrue(Blocks::isBound($bound(['url' => ['source' => 'core/post-meta', 'args' => ['key' => 'x']], 'text' => ['source' => 'taw/field', 'args' => ['field' => 'cta']]])));
         $this->assertFalse(Blocks::isBound($bound(['content' => ['source' => 'taw/field', 'args' => ['field' => '  ']]])), 'no field picked yet');
+        $this->assertTrue(Blocks::isBound($bound(['content' => ['source' => 'taw/field', 'args' => ['expr' => 'By @post.author']]])), 'an expression');
         $this->assertFalse(Blocks::isBound($bound(['content' => ['source' => 'core/post-meta', 'args' => ['key' => 'headline']]])));
         $this->assertFalse(Blocks::isBound(['blockName' => 'core/paragraph', 'attrs' => []]));
     }

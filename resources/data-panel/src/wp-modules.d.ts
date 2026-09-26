@@ -51,6 +51,7 @@ declare module '@wordpress/blocks' {
     export function createBlock(name: string, attributes?: Record<string, unknown>): BlockInstance;
     export function registerBlockBindingsSource(source: Record<string, unknown>): void;
     export function registerBlockVariation(block: string, variation: Record<string, unknown>): void;
+    export function getBlockType(name: string): { attributes?: Record<string, unknown> } | undefined;
     export function parse(content: string): BlockInstance[];
 }
 

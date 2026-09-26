@@ -112,7 +112,7 @@ export const WP_EXPORT_NAMES = [
     'createHooks',
     // @wordpress/rich-text
     'registerFormatType', 'unregisterFormatType', 'applyFormat', 'removeFormat', 'toggleFormat',
-    'create', 'insert', 'toHTMLString', 'useAnchor',
+    'create', 'insert', 'insertObject', 'remove', 'toHTMLString', 'useAnchor',
     // @wordpress/autop, url, html-entities, date, media-utils, primitives
     'autop', 'removep', 'addQueryArgs', 'getQueryArg', 'removeQueryArgs', 'isURL', 'cleanForSlug',
     'safeDecodeURI', 'decodeEntities', 'dateI18n', 'format', 'getSettings', 'uploadMedia', 'SVG',

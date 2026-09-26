@@ -16,6 +16,8 @@ export type From = 'post' | 'option' | 'term' | 'user';
 
 export interface BindingArgs {
     field: string;
+    /** An expression binding (ADR-0012) has `expr` and no field. */
+    expr?: string;
     from?: From;
     sub?: string;
     size?: string;
@@ -26,6 +28,8 @@ export interface FieldEntry {
     args: BindingArgs;
     type: 'string' | 'number';
     fieldType?: string;
+    /** The metabox or options page title (EditorFields). */
+    fieldset?: string;
 }
 
 export interface Config {
@@ -47,6 +51,8 @@ export interface BlockContext {
 /** One preview request: a bound attribute of a block, in its post context. */
 export interface PreviewItem {
     key: string;
+    /** Inline tags and expressions (ADR-0011/0012); bound attributes send none. */
+    kind?: 'tag' | 'expr';
     args: BindingArgs;
     block: string;
     attribute: string;
@@ -151,6 +157,34 @@ function stable(cache: Map<string, Record<string, unknown>>, key: string, next: 
     return next;
 }
 
+/** HTML-escaped text, for rich-text attributes. */
+function escapeText(text: string): string {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * An expression binding's preview: the server's value (plain text, escaped
+ * here for rich-text attributes), or the expression itself while it loads.
+ */
+function expressionPreview(select: Select, expr: string, attribute: string, context: BlockContext): unknown {
+    const postId = typeof context.postId === 'number' ? context.postId : 0;
+    const postType = typeof context.postType === 'string' ? context.postType : '';
+    const item: PreviewItem = {
+        key: `tag|${postId}|${postType}|${JSON.stringify({ expr })}`,
+        kind: 'tag',
+        args: { expr } as unknown as BindingArgs,
+        block: '',
+        attribute,
+        postId,
+        postType,
+    };
+    const value = select(STORE).getValue?.(item);
+    const text = typeof value === 'string' && value !== '' ? value : expr;
+    return TEXT_ATTRIBUTES.includes(attribute) && attribute !== 'alt' && attribute !== 'title'
+        ? escapeText(text)
+        : text;
+}
+
 /** The object handed to registerBlockBindingsSource(). */
 export function source(config: Config) {
     // WordPress calls these inside useSelect: equal results must be the same object.
@@ -175,6 +209,10 @@ export function source(config: Config) {
             const result: Record<string, unknown> = {};
             for (const [attribute, binding] of Object.entries(bindings)) {
                 const args = binding?.args;
+                if (args && typeof args.expr === 'string') {
+                    result[attribute] = expressionPreview(select, args.expr, attribute, context ?? {});
+                    continue;
+                }
                 if (!args || typeof args.field !== 'string') continue;
                 // No field picked yet (a fresh "Field …" block): nothing to ask the server.
                 const value =
@@ -329,7 +367,10 @@ export function sameField(a: BindingArgs | null, b: BindingArgs): boolean {
 /** Whether a block's bindings connect it to a TAW field (one with a field picked). Mirrors Editing\\Blocks::isBound(). */
 export function isBound(source: string, bindings: Bindings | undefined): boolean {
     return Object.values(bindings ?? {}).some(
-        (b) => b?.source === source && typeof b.args?.field === 'string' && b.args.field.trim() !== '',
+        (b) =>
+            b?.source === source &&
+            ((typeof b.args?.field === 'string' && b.args.field.trim() !== '') ||
+                (typeof b.args?.expr === 'string' && b.args.expr.trim() !== '')),
     );
 }
 

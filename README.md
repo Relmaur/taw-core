@@ -467,7 +467,25 @@ Published on @post.date.format('F j, Y') by @post.author · @option.company_phon
     attributes; URLs and IDs don't take expressions.
 - **Evaluation:** a small parser (`Bindings\Expression\Parser`) plus the same resolvers as tags and
   bindings. Nothing is executed, and an unknown name or function renders empty unless `default()` is used.
-- The editor's **TAW data** popup (Fields and Expression tabs) comes in v1.65.0.
+
+#### In the editor: the TAW data popup (v1.65.0+)
+
+Select a text block (or an image, button or post date) and click the **TAW data** button (a database
+icon) in its toolbar:
+
+- **Insert as:** **Inline** (a chip at the cursor; the default when the cursor is in text) or **Block text**
+  (a `taw/field` binding; images and links bind their ID/URL/alt or URL/text as before).
+- **Fields tab:** every value, grouped by fieldset (metabox or options page title), then Post and Site,
+  searchable, with its live value. One click inserts or binds it.
+- **Expression tab:** write an expression. Typing `@` suggests values and `.` suggests functions; helper
+  chips add them too. It has a live preview and flags errors (bad syntax, unknown names). It opens with the
+  block's own expression, or the last one used in that block.
+- **Chips** are atomic, like core footnotes: arrows skip them, and Backspace/Delete removes the whole chip.
+  Click one to edit its expression, **Refresh** its stored text, or **Remove** it. A chip's text in the
+  editor is the value when it was inserted or refreshed; the front end is always live.
+- The footer shows what the block is bound to, with **Disconnect**. The canvas `@` stays WordPress's user
+  mentions.
+- A group's sub-field is named `@{group}_{sub}` (e.g. `@address_city`).
 
 ### Term fields (v1.53.0+)
 
