@@ -20,10 +20,12 @@ if (!defined('ABSPATH')) {
  * - `id`: an attachment ID (image id).
  * - `target` / `rel`: a button's linkTarget / rel.
  * - `date`: post-date's datetime.
+ * - `inline`: an inline dynamic tag (ADR-0011): plain, unescaped text that
+ *   the caller escapes. Images and URLs give their URL, a post select its title.
  */
 final class Target
 {
-    public const KINDS = ['text', 'plain', 'url', 'id', 'target', 'rel', 'date'];
+    public const KINDS = ['text', 'plain', 'url', 'id', 'target', 'rel', 'date', 'inline'];
 
     private const KNOWN = [
         'core/paragraph'          => ['content' => 'text'],
@@ -41,6 +43,12 @@ final class Target
         public readonly string $attribute,
         public readonly string $kind,
     ) {
+    }
+
+    /** The target of an inline dynamic tag. */
+    public static function inline(): self
+    {
+        return new self('taw/tag', 'value', 'inline');
     }
 
     /**
