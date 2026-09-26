@@ -33,6 +33,17 @@ final class Bindings
 
     public const CANVAS_STYLE = 'taw-tags-canvas';
 
+    /**
+     * Chips, conditional chips (dashed), and conditional blocks (ADR-0013):
+     * a dashed outline with a label, dimmed when hidden for the edited post.
+     */
+    private const CANVAS_CSS = '.taw-tag{background:rgba(56,88,233,.1);box-shadow:inset 0 0 0 1px rgba(56,88,233,.35);border-radius:3px;padding:0 .2em;white-space:nowrap;cursor:pointer}'
+        . '.taw-tag[data-rich-text-format-boundary],.taw-tag:focus{background:rgba(56,88,233,.22)}'
+        . '.taw-tag[data-taw-tag*=\'"if":\']{box-shadow:none;outline:1px dashed rgba(56,88,233,.8);outline-offset:-1px}'
+        . '.taw-conditional{position:relative;outline:1px dashed rgba(56,88,233,.55);outline-offset:4px}'
+        . '.taw-conditional::after{content:attr(data-taw-condition);position:absolute;top:-6px;right:0;transform:translateY(-100%);z-index:2;padding:0 6px;border-radius:2px;background:#3858e9;color:#fff;font:500 10px/16px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;letter-spacing:.02em;white-space:nowrap;pointer-events:none}'
+        . '.taw-conditional.is-taw-hidden{opacity:.5}.taw-conditional.is-taw-hidden::after{background:#8a6100}';
+
     /** Source entry in resources/data-panel/ (its manifest key). */
     public const SCRIPT_SOURCE = 'src/bindings/index.ts';
 
@@ -93,7 +104,7 @@ final class Bindings
 
         wp_register_style(self::CANVAS_STYLE, false, [], Framework::version());
         wp_enqueue_style(self::CANVAS_STYLE);
-        wp_add_inline_style(self::CANVAS_STYLE, '.taw-tag{background:rgba(56,88,233,.1);box-shadow:inset 0 0 0 1px rgba(56,88,233,.35);border-radius:3px;padding:0 .2em;white-space:nowrap;cursor:pointer}.taw-tag[data-rich-text-format-boundary],.taw-tag:focus{background:rgba(56,88,233,.22)}');
+        wp_add_inline_style(self::CANVAS_STYLE, self::CANVAS_CSS);
     }
 
     public static function registerSource(): void

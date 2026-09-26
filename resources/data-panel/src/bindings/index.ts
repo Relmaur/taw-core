@@ -14,6 +14,7 @@ import { connectMenu } from './menu';
 import { setPreviewFetch } from './preview';
 import { injectStyles } from './styles';
 import { registerToolbar } from './toolbar';
+import { registerVisibility } from './visibility';
 
 declare global {
     interface Window {
@@ -70,6 +71,8 @@ if (config) {
     registerPlugin('taw-bindings-menu', { render: connectMenu(config) });
     // The TAW data popup (Fields / Expression) from the block toolbar.
     registerToolbar(config);
+    // Whole-block conditions (ADR-0013): a sidebar panel on every block, and canvas cues.
+    registerVisibility(config);
     // Bound-only blocks from the editing policy (allowBound), when there are any.
     registerAllowBound(config);
 

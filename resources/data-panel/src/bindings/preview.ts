@@ -1,11 +1,13 @@
 /**
  * Previews for chips and expressions (ADR-0012), through the same batched
  * POST taw/v1/bindings/preview as bound blocks: `kind: "tag"` gives a chip's
- * text, `kind: "expr"` an expression's value and errors.
+ * text, `kind: "expr"` an expression's value and errors, `kind: "condition"`
+ * whether a condition holds for the edited post (ADR-0013).
  */
 import { select } from '@wordpress/data';
 import type { ExpressionError } from './expression';
 import type { PreviewItem } from './logic';
+import type { ConditionError } from './conditions';
 import type { TagArgs } from './tags';
 
 type Fetch = (item: PreviewItem) => Promise<unknown>;
@@ -25,7 +27,7 @@ function context(): { postId: number; postType: string } {
     return { postId: typeof id === 'number' ? id : 0, postType: typeof type === 'string' ? type : '' };
 }
 
-function item(kind: 'tag' | 'expr', args: TagArgs): PreviewItem {
+function item(kind: 'tag' | 'expr' | 'condition', args: object): PreviewItem {
     const { postId, postType } = context();
     return {
         key: `${kind}|${postId}|${postType}|${JSON.stringify(args)}`,
@@ -60,5 +62,22 @@ export async function previewExpression(expr: string): Promise<{ value: string; 
         };
     } catch {
         return { value: '', errors: [] };
+    }
+}
+
+/** Whether a condition holds for the edited post; null when it can't be asked. */
+export async function previewCondition(
+    condition: unknown,
+): Promise<{ shown: boolean; errors: ConditionError[] } | null> {
+    if (!fetchPreview) return null;
+    try {
+        const result = (await fetchPreview(item('condition', { if: condition }))) as {
+            shown?: unknown;
+            errors?: unknown;
+        } | null;
+        if (!result || typeof result.shown !== 'boolean') return null;
+        return { shown: result.shown, errors: Array.isArray(result.errors) ? (result.errors as ConditionError[]) : [] };
+    } catch {
+        return null;
     }
 }

@@ -4,8 +4,8 @@
  * Bindings::enqueueCanvasStyles().
  */
 const CSS = `
-.taw-data-dropdown .components-popover__content{width:400px;max-width:calc(100vw - 32px);padding:0;overflow:hidden}
-.taw-chip-popover .components-popover__content{width:400px;max-width:calc(100vw - 32px);padding:0}
+.taw-data-dropdown .components-popover__content{width:400px;max-width:calc(100vw - 32px);max-height:min(80vh,720px);padding:0;overflow:auto}
+.taw-chip-popover .components-popover__content{width:400px;max-width:calc(100vw - 32px);max-height:min(80vh,720px);padding:0;overflow:auto}
 .taw-data-popup{font-size:13px;color:#1e1e1e}
 .taw-data-header{display:flex;align-items:center;gap:8px;padding:10px 8px 10px 16px;border-bottom:1px solid #e0e0e0}
 .taw-data-header strong{flex:1;font-weight:600}
@@ -60,6 +60,38 @@ const CSS = `
 .taw-expression-errors .dashicon{font-size:16px;width:16px;height:16px;flex-shrink:0}
 .taw-chip-popover .taw-data-popup{padding:12px 16px 16px}
 .taw-data-expression .taw-data-note{margin:10px 0 0}
+.taw-cond__head{margin:0 0 8px;font-size:12px;line-height:28px;color:#1e1e1e}
+.taw-cond select,.taw-cond-input{box-sizing:border-box;min-height:30px;padding:0 8px;border:1px solid #949494;border-radius:2px;background-color:#fff;font-size:12px;line-height:28px;color:#1e1e1e}
+.taw-cond select{-webkit-appearance:none;appearance:none;padding-right:26px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'%3E%3Cpath fill='%231e1e1e' d='M17.5 11.6 12 16l-5.5-4.4.9-1.2L12 14l4.5-3.6 1 1.2z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;background-size:16px}
+.taw-cond select,.taw-cond .taw-cond-input{height:30px;min-height:30px;margin:0}
+.taw-cond select:focus,.taw-cond-input:focus{border-color:var(--wp-admin-theme-color,#3858e9);box-shadow:0 0 0 1px var(--wp-admin-theme-color,#3858e9);outline:none}
+.taw-cond-match{width:auto!important;min-height:26px!important;line-height:24px!important;padding:0 24px 0 8px!important;font-weight:600;vertical-align:middle}
+.taw-cond-rule{display:flex;flex-direction:column;gap:6px;margin:0 0 6px;padding:8px;border:1px solid #e0e0e0;border-radius:2px;background:#fff}
+.taw-cond-rule select,.taw-cond-rule .taw-cond-input{width:100%}
+.taw-cond-rule__main{display:flex;align-items:center;gap:4px}
+.taw-cond-rule__main select{flex:1;min-width:0;font-weight:500}
+.taw-cond-input--code{font-family:Menlo,Consolas,monospace}
+.taw-cond-pair{display:flex;align-items:center;gap:6px}
+.taw-cond-pair .taw-cond-input{flex:1;min-width:0}
+.taw-cond-pair span{color:#757575;font-size:12px}
+.taw-cond-group{margin:0 0 6px;padding:8px 8px 2px;border-left:3px solid var(--wp-admin-theme-color,#3858e9);border-radius:2px;background:#f6f7f7}
+.taw-cond-group__head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;font-size:12px}
+.taw-cond-add{display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 4px}
+.taw-cond-answer{display:flex;align-items:center;gap:6px;margin:8px 0 0;padding:6px 10px;border-radius:2px;background:#f6f7f7;color:#757575;font-size:12px}
+.taw-cond-answer.is-shown{background:#edfaef;color:#007017}
+.taw-cond-answer.is-hidden{background:#fcf9e8;color:#8a6100}
+.taw-cond-answer .dashicon{flex-shrink:0;font-size:16px;width:16px;height:16px}
+.taw-cond-section{margin-top:12px;padding-top:8px;border-top:1px solid #e0e0e0}
+.taw-cond-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:4px 0;border:0;background:none;color:var(--wp-admin-theme-color,#3858e9);font-size:13px;font-weight:500;text-align:left;cursor:pointer}
+.taw-cond-toggle .dashicon{font-size:16px;width:16px;height:16px}
+.taw-cond-section.is-on .taw-cond-toggle{margin-bottom:6px;color:#1e1e1e}
+.taw-cond-toggle__off{margin-left:auto;color:#cc1818;font-size:12px;font-weight:400}
+.taw-cond-else{display:flex;flex-direction:column;gap:4px;margin-top:10px}
+.taw-cond-else span{color:#757575;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.taw-data-visibility{padding:12px 16px 16px}
+.taw-vis__intro,.taw-vis__note{margin:0 0 10px;color:#757575;font-size:12px;line-height:1.5}
+.taw-vis__note{margin:10px 0 0}
+.taw-vis-panel .taw-data-actions{margin-top:8px}
 `;
 
 export function injectStyles(): void {

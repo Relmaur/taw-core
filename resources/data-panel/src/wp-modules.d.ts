@@ -86,6 +86,7 @@ declare module '@wordpress/block-editor' {
     }>;
     export const BlockCanvas: ComponentType<{ height?: string; styles?: unknown }>;
     export const Inserter: ComponentType<Record<string, unknown>>;
+    export const InspectorControls: ComponentType<{ children?: ReactNode; group?: string }>;
     export const BlockControls: ComponentType<{ group?: string; children?: ReactNode }>;
     export const BlockSettingsMenuControls: ComponentType<{
         children: (props: { selectedClientIds: string[]; onClose: () => void }) => ReactNode;

@@ -174,6 +174,10 @@ msgstr ""
 msgid "A network error occurred. Please try again."
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "A number"
+msgstr ""
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "A snapshot or change-set JSON file. The next screen shows exactly what would change — nothing is written yet."
 msgstr ""
@@ -198,12 +202,24 @@ msgstr ""
 msgid "Add Segment"
 msgstr ""
 
+#: resources/data-panel/src/bindings/visibility.tsx
+msgid "Add a condition"
+msgstr ""
+
 #: resources/data-panel/src/controls/MediaControls.tsx
 msgid "Add files"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Add group"
+msgstr ""
+
 #: resources/data-panel/src/controls/Repeater.tsx
 msgid "Add item"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Add rule"
 msgstr ""
 
 #: resources/data-panel/src/controls/CompositeControls.tsx
@@ -299,6 +315,10 @@ msgstr ""
 msgid "Change"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Checking this post…"
+msgstr ""
+
 #: src/Core/Metabox/Metabox.php
 msgid "Choose Icon"
 msgstr ""
@@ -351,6 +371,30 @@ msgstr ""
 msgid "Collapse all"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Compare with"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Comparison"
+msgstr ""
+
+#: resources/data-panel/src/bindings/visibility.tsx
+msgid "Condition incomplete"
+msgstr ""
+
+#: resources/data-panel/src/bindings/visibility.tsx
+msgid "Conditional"
+msgstr ""
+
+#: resources/data-panel/src/bindings/visibility.tsx
+msgid "Conditional · hidden for this post"
+msgstr ""
+
+#: resources/data-panel/src/bindings/visibility.tsx
+msgid "Conditional · shown for this post"
+msgstr ""
+
 #. translators: %s: comma-separated block titles.
 #: resources/data-panel/src/bindings/allowBound.ts
 #, php-format
@@ -373,8 +417,20 @@ msgstr ""
 msgid "Current year"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Custom value"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Custom value…"
+msgstr ""
+
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Date"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "Dates"
 msgstr ""
 
 #: src/Core/Media/MediaFolders.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
@@ -529,6 +585,22 @@ msgstr ""
 msgid "Form ID"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "From"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "Group"
+msgstr ""
+
+#: resources/data-panel/src/bindings/visibility.tsx
+msgid "Hidden blocks are still in the post content: this changes what shows, not who can read it."
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Hidden for this post"
+msgstr ""
+
 #: src/Core/Media/MediaFolders.php
 msgid "Hide folder IDs"
 msgstr ""
@@ -634,6 +706,10 @@ msgstr ""
 msgid "Item %d"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Items, separated by commas"
+msgstr ""
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Knowledge Bases"
 msgstr ""
@@ -644,6 +720,10 @@ msgstr ""
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Link text"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "Lists"
 msgstr ""
 
 #: src/Core/Media/MediaFolders.php
@@ -672,6 +752,10 @@ msgstr ""
 
 #: src/Core/Metabox/Metabox.php
 msgid "Managed externally — read-only"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Match"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -822,8 +906,16 @@ msgstr ""
 msgid "Not a value this post has:"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Nothing"
+msgstr ""
+
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Nothing found."
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "Numbers"
 msgstr ""
 
 #: src/Core/Media/MediaFolders.php
@@ -866,12 +958,20 @@ msgstr ""
 msgid "Organization Type"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Otherwise show"
+msgstr ""
+
 #: src/Core/Auth/PagePassword.php
 msgid "Password"
 msgstr ""
 
 #: src/Core/Seo/Schema.php
 msgid "Phone"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Pick a value…"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -902,6 +1002,10 @@ msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Post types not listed keep the normal editor."
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "Presence"
 msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
@@ -957,8 +1061,20 @@ msgstr ""
 msgid "Remove Image"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx resources/data-panel/src/bindings/visibility.tsx
+msgid "Remove condition"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Remove group"
+msgstr ""
+
 #: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Remove row"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Remove rule"
 msgstr ""
 
 #. translators: %d: segment number.
@@ -989,6 +1105,10 @@ msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Rollback snapshot"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "Rule"
 msgstr ""
 
 #. translators: 1: the build command, 2: the dev-server command.
@@ -1092,8 +1212,29 @@ msgstr ""
 msgid "Set by"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+#, php-format
+msgid "Show %s when"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Show only when…"
+msgstr ""
+
+#: resources/data-panel/src/bindings/visibility.tsx
+msgid "Show this block only when values match, e.g. a Buy button only when the buy link is set."
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Shown for this post"
+msgstr ""
+
 #: src/Core/Seo/SeoMeta.php
 msgid "Shown in search results and link previews. ~155 characters is the practical limit before truncation."
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Shown only when…"
 msgstr ""
 
 #: resources/data-panel/src/bindings/logic.ts
@@ -1178,6 +1319,10 @@ msgstr ""
 msgid "TAW value"
 msgstr ""
 
+#: resources/data-panel/src/bindings/visibility.tsx
+msgid "TAW visibility"
+msgstr ""
+
 #. translators: %s: capability name.
 #: src/Core/Editing/EditingAdminScreen.php
 #, php-format
@@ -1198,6 +1343,14 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/tags.ts
 msgid "Term"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "Text"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Text, or @another_value"
 msgstr ""
 
 #: src/Core/Form/Form.php
@@ -1282,6 +1435,10 @@ msgstr ""
 msgid "Title"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "To"
+msgstr ""
+
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "To change a value already in the text, click it there."
 msgstr ""
@@ -1292,6 +1449,10 @@ msgstr ""
 
 #: src/Core/Form/Form.php
 msgid "Too many attempts. Please wait a moment and try again."
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "Too many rules (20 at most)."
 msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
@@ -1366,6 +1527,14 @@ msgstr ""
 msgid "Used for Open Graph/Twitter card previews. Falls back to the featured image when empty."
 msgstr ""
 
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "Value"
+msgstr ""
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Visibility"
+msgstr ""
+
 #: src/Core/Form/Form.php
 msgid "We could not verify you are human. Please try again."
 msgstr ""
@@ -1384,6 +1553,10 @@ msgstr ""
 
 #: src/Core/Metabox/Metabox.php
 msgid "Yes"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "Yes / no"
 msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
@@ -1410,12 +1583,20 @@ msgstr ""
 msgid "Your session expired. Please try again."
 msgstr ""
 
-#: src/Core/Editing/EditingAdminScreen.php
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx src/Core/Editing/EditingAdminScreen.php
 msgid "all"
 msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "allowed"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "and"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "any"
 msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
@@ -1426,16 +1607,116 @@ msgstr ""
 msgid "are locked like everyone else"
 msgstr ""
 
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "contains"
+msgstr ""
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "default (no editing policy sets one)"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "does not contain"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "does not have the item"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "ends with"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "fiction, poetry"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "fill in what to compare with."
 msgstr ""
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "function"
 msgstr ""
 
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "groups can’t contain groups."
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "has the item"
+msgstr ""
+
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "https:// or /path"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is after"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is at least"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is at most"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is before"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is between"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is between the dates"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is empty"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is greater than"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is less than"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is no / off"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is not"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is not empty"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is not one of"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is on"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is one of"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "is yes / on"
 msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
@@ -1444,6 +1725,26 @@ msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "none"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "of these are true:"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "of these:"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "pick a comparison."
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "pick a value, or write one value like @book_year."
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "rule"
 msgstr ""
 
 #: src/Core/Media/MediaFolders.php src/Core/Metabox/Metabox.php
@@ -1456,6 +1757,26 @@ msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "skip it (only create new)"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "starts with"
+msgstr ""
+
+#: resources/data-panel/src/bindings/visibility.tsx
+msgid "this block"
+msgstr ""
+
+#: resources/data-panel/src/bindings/conditions.ts
+msgid "this rule is incomplete."
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "this value"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+msgid "today, -30 days or 2025-01-31"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php

@@ -257,6 +257,11 @@ line (`render_block` at priority 9: `BlockVisibility`); blocks and chips without
 before. `@viewer.*` values vary per visitor, so check the page cache varies by login before using them.
 **Nothing to do.**
 
+### v1.67.0: conditions in the editor
+The TAW data popup gains a **Visibility** tab and a **Show only when…** section (Expression tab and chip
+editor); every block's sidebar gains **TAW visibility**. Conditional blocks and chips are marked in the canvas.
+No hooks change. **Nothing to do.**
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
