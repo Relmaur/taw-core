@@ -9,6 +9,7 @@ import { createReduxStore, dispatch, register, select, subscribe } from '@wordpr
 import { registerPlugin } from '@wordpress/plugins';
 import { batcher, source, STORE, type Config, type PreviewItem } from './logic';
 import { connectMenu } from './menu';
+import { registerToolbar } from './toolbar';
 
 declare global {
     interface Window {
@@ -58,6 +59,8 @@ if (config) {
 
     // "Connect to TAW field…" in each block's Options (⋮) menu.
     registerPlugin('taw-bindings-menu', { render: connectMenu(config) });
+    // A "TAW field" dropdown in the block toolbar itself.
+    registerToolbar(config);
 
     // Previews show saved values: refresh them after each (non-auto) save.
     let wasSaving = false;

@@ -30,7 +30,7 @@ final class Bindings
     /** Source entry in resources/data-panel/ (its manifest key). */
     public const SCRIPT_SOURCE = 'src/bindings/index.ts';
 
-    public const SCRIPT_DEPS = ['react', 'wp-blocks', 'wp-block-editor', 'wp-data', 'wp-api-fetch', 'wp-i18n', 'wp-plugins', 'wp-components', 'wp-element'];
+    public const SCRIPT_DEPS = ['react', 'wp-blocks', 'wp-block-editor', 'wp-data', 'wp-api-fetch', 'wp-i18n', 'wp-plugins', 'wp-components', 'wp-element', 'wp-hooks', 'wp-compose'];
 
     private static bool $registered = false;
 

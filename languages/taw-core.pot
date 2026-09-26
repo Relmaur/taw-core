@@ -317,7 +317,7 @@ msgstr ""
 msgid "Collapse all"
 msgstr ""
 
-#: resources/data-panel/src/bindings/menu.tsx
+#: resources/data-panel/src/bindings/menu.tsx resources/data-panel/src/bindings/toolbar.tsx
 msgid "Connect to TAW field"
 msgstr ""
 
@@ -345,7 +345,7 @@ msgstr ""
 msgid "Discard your changes to this field?"
 msgstr ""
 
-#: resources/data-panel/src/bindings/menu.tsx
+#: resources/data-panel/src/bindings/menu.tsx resources/data-panel/src/bindings/toolbar.tsx
 msgid "Disconnect TAW field"
 msgstr ""
 
@@ -998,7 +998,7 @@ msgstr ""
 msgid "TAW Media"
 msgstr ""
 
-#: src/Core/Bindings/Bindings.php
+#: resources/data-panel/src/bindings/toolbar.tsx src/Core/Bindings/Bindings.php
 msgid "TAW field"
 msgstr ""
 

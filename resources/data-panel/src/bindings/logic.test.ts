@@ -9,6 +9,9 @@ import {
     source,
     STORE,
     withoutTawBindings,
+    connectedMetadata,
+    connectedArgs,
+    sameField,
     type Config,
 } from './logic';
 
@@ -172,5 +175,50 @@ describe('taw/field in the editor', () => {
         };
         expect(withoutTawBindings('taw/field', bindings)).toEqual({ url: bindings.url });
         expect(withoutTawBindings('taw/field', { content: bindings.content })).toBeUndefined();
+    });
+
+    it('connecting replaces only TAW bindings, and knows which field is connected', () => {
+        const link = {
+            label: 'Buy',
+            args: { field: 'cta', from: 'post' as const },
+            type: 'string' as const,
+            fieldType: 'link',
+        };
+        const metadata = {
+            name: 'Hero CTA',
+            bindings: {
+                url: { source: 'taw/field', args: { field: 'old' } },
+                rel: { source: 'other/src', args: { field: 'r' } },
+            },
+        };
+        const next = connectedMetadata('taw/field', 'core/button', metadata, link);
+        expect(next?.name).toBe('Hero CTA');
+        expect(Object.keys(next?.bindings ?? {}).sort()).toEqual(['linkTarget', 'rel', 'text', 'url']);
+        expect(next?.bindings?.url.args.field).toBe('cta');
+        expect(connectedMetadata('taw/field', 'core/image', metadata, link)).toBeNull();
+
+        expect(connectedArgs('taw/field', next?.bindings)).toEqual({ field: 'cta', from: 'post' });
+        expect(connectedArgs('taw/field', { rel: { source: 'other/src', args: { field: 'r' } } })).toBeNull();
+        expect(sameField({ field: 'cta' }, { field: 'cta', from: 'post' })).toBe(true);
+        expect(
+            sameField({ field: 'social', sub: 'x', from: 'option' }, { field: 'social', sub: 'y', from: 'option' }),
+        ).toBe(false);
+        expect(sameField(null, { field: 'cta' })).toBe(false);
+    });
+
+    it('returns the same objects for the same results (WordPress calls these in useSelect)', () => {
+        const src = source(config);
+        expect(src.getFieldsList({ context: { postType: 'book' } })).toBe(
+            src.getFieldsList({ context: { postType: 'book' } }),
+        );
+        const select = (store: string) =>
+            store === STORE ? { getValue: () => 'x' } : { getBlockName: () => 'core/heading' };
+        const args = {
+            select,
+            context: { postId: 5 },
+            clientId: 'c1',
+            bindings: { content: { args: { field: 'subtitle' } } },
+        };
+        expect(src.getValues(args)).toBe(src.getValues(args));
     });
 });

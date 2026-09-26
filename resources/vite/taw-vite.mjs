@@ -85,7 +85,7 @@ export const WP_EXPORT_NAMES = [
     'MenuGroup', 'MenuItem', 'Modal', 'Notice', 'PanelBody', 'PanelRow', 'Placeholder', 'Popover',
     'RadioControl', 'RangeControl', 'SearchControl', 'SelectControl', 'Slot', 'SlotFillProvider',
     'Spinner', 'TabPanel', 'TextControl', 'TextareaControl', 'ToggleControl', 'Toolbar',
-    'ToolbarButton', 'ToolbarGroup', 'Tooltip', 'VisuallyHidden',
+    'ToolbarButton', 'ToolbarDropdownMenu', 'ToolbarGroup', 'Tooltip', 'VisuallyHidden',
     // @wordpress/element, react, react-dom, react/jsx-runtime
     'Children', 'Fragment', 'RawHTML', 'StrictMode', 'cloneElement', 'createContext', 'createElement',
     'createPortal', 'createRoot', 'forwardRef', 'isValidElement', 'memo', 'render', 'useCallback',

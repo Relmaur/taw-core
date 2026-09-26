@@ -135,8 +135,27 @@ type Select = (store: string) => {
 
 export const STORE = 'taw/bindings';
 
+/** Same values as the previous object: return that one, so useSelect sees a stable result. */
+function stable(cache: Map<string, Record<string, unknown>>, key: string, next: Record<string, unknown>) {
+    const previous = cache.get(key);
+    const keys = Object.keys(next);
+    if (
+        previous &&
+        keys.length === Object.keys(previous).length &&
+        keys.every((k) => Object.is(previous[k], next[k]))
+    ) {
+        return previous;
+    }
+    cache.set(key, next);
+    return next;
+}
+
 /** The object handed to registerBlockBindingsSource(). */
 export function source(config: Config) {
+    // WordPress calls these inside useSelect: equal results must be the same object.
+    const lists = new Map<string, FieldEntry[]>();
+    const values = new Map<string, Record<string, unknown>>();
+
     return {
         name: config.source,
         usesContext: ['postId', 'postType'],
@@ -152,20 +171,26 @@ export function source(config: Config) {
             clientId: string;
         }): Record<string, unknown> {
             const block = select('core/block-editor').getBlockName?.(clientId) ?? '';
-            const values: Record<string, unknown> = {};
+            const result: Record<string, unknown> = {};
             for (const [attribute, binding] of Object.entries(bindings)) {
                 const args = binding?.args;
                 if (!args || typeof args.field !== 'string') continue;
                 const value = select(STORE).getValue?.(previewItem(args, block, attribute, context ?? {}));
-                values[attribute] =
+                result[attribute] =
                     value === undefined || value === null || value === ''
                         ? placeholder(config, args, attribute)
                         : value;
             }
-            return values;
+            return stable(values, `${clientId}|${Object.keys(bindings).join(',')}`, result);
         },
         getFieldsList({ context }: { context: BlockContext }): FieldEntry[] {
-            return fieldsList(config, context ?? {});
+            const key = context?.postType ?? '';
+            let list = lists.get(key);
+            if (!list) {
+                list = fieldsList(config, context ?? {});
+                lists.set(key, list);
+            }
+            return list;
         },
     };
 }
@@ -263,4 +288,31 @@ export function candidatesFor(config: Config, block: string, context: BlockConte
 export function withoutTawBindings(source: string, bindings: Bindings | undefined): Bindings | undefined {
     const kept = Object.fromEntries(Object.entries(bindings ?? {}).filter(([, binding]) => binding?.source !== source));
     return Object.keys(kept).length > 0 ? kept : undefined;
+}
+
+/** The block's `metadata` after picking a field: its TAW bindings replaced by the field's plan (null if it doesn't fit). */
+export function connectedMetadata(
+    source: string,
+    block: string,
+    metadata: { bindings?: Bindings; [key: string]: unknown },
+    entry: FieldEntry,
+): { bindings?: Bindings; [key: string]: unknown } | null {
+    const plan = planFor(source, block, entry);
+    if (!plan) return null;
+    return { ...metadata, bindings: { ...(withoutTawBindings(source, metadata.bindings) ?? {}), ...plan } };
+}
+
+/** The args of the field a block is connected to (its first `taw/field` binding), if any. */
+export function connectedArgs(source: string, bindings: Bindings | undefined): BindingArgs | null {
+    const binding = Object.values(bindings ?? {}).find((b) => b?.source === source);
+    return binding ? binding.args : null;
+}
+
+export function sameField(a: BindingArgs | null, b: BindingArgs): boolean {
+    return (
+        a !== null &&
+        a.field === b.field &&
+        (a.from ?? 'post') === (b.from ?? 'post') &&
+        (a.sub ?? '') === (b.sub ?? '')
+    );
 }

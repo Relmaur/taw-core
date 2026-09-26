@@ -12,7 +12,7 @@ import { __ } from '@wordpress/i18n';
 import {
     candidatesFor,
     CONNECTABLE_BLOCKS,
-    planFor,
+    connectedMetadata,
     withoutTawBindings,
     type Bindings,
     type Config,
@@ -91,10 +91,8 @@ function ConnectModal({ config, clientId, onClose }: { config: Config; clientId:
 
     const candidates = candidatesFor(config, block.name, { postType });
     const connect = (entry: FieldEntry) => {
-        const plan = planFor(config.source, block.name, entry);
-        if (!plan) return;
-        const kept = withoutTawBindings(config.source, block.metadata.bindings) ?? {};
-        updateBlockAttributes(clientId, { metadata: { ...block.metadata, bindings: { ...kept, ...plan } } });
+        const next = connectedMetadata(config.source, block.name, block.metadata, entry);
+        if (next) updateBlockAttributes(clientId, { metadata: next });
         onClose();
     };
 
