@@ -1,0 +1,103 @@
+{
+  "about": "The expression grammar (ADR-0012), as cases both parsers must pass: PHP (Bindings\\Expression\\Parser, tests/Unit/Core/Bindings/ExpressionParserTest.php) and TypeScript (resources/data-panel, Step 3). Offsets count characters (code points).",
+  "cases": [
+    {
+      "name": "text only",
+      "expr": "Just text.",
+      "parts": [{ "text": "Just text." }],
+      "errors": []
+    },
+    {
+      "name": "a field, then a sentence ends",
+      "expr": "Released in @book_year.",
+      "parts": [{ "text": "Released in " }, { "name": "book_year", "calls": [], "at": 12, "length": 10 }, { "text": "." }],
+      "errors": []
+    },
+    {
+      "name": "namespaced names and a format",
+      "expr": "Published on @post.date.format('F j, Y') by @post.author",
+      "parts": [
+        { "text": "Published on " },
+        { "name": "post.date", "calls": [{ "fn": "format", "args": ["F j, Y"] }], "at": 13, "length": 27 },
+        { "text": " by " },
+        { "name": "post.author", "calls": [], "at": 44, "length": 12 }
+      ],
+      "errors": []
+    },
+    {
+      "name": "chained calls, a number and multibyte text",
+      "expr": "· @option.company_phone.default('—').upper() — @post.excerpt.truncate(20)",
+      "parts": [
+        { "text": "· " },
+        { "name": "option.company_phone", "calls": [{ "fn": "default", "args": ["—"] }, { "fn": "upper", "args": [] }], "at": 2, "length": 42 },
+        { "text": " — " },
+        { "name": "post.excerpt", "calls": [{ "fn": "truncate", "args": [20] }], "at": 47, "length": 26 }
+      ],
+      "errors": []
+    },
+    {
+      "name": "an e-mail stays text, @@ is a literal @",
+      "expr": "Write to hi@example.com or @@team",
+      "parts": [{ "text": "Write to hi@example.com or @team" }],
+      "errors": []
+    },
+    {
+      "name": "@ not followed by a name is text",
+      "expr": "Price @ 5 and @",
+      "parts": [{ "text": "Price @ 5 and @" }],
+      "errors": []
+    },
+    {
+      "name": "a dot and a word without parentheses end the token",
+      "expr": "@book_year.Next sentence",
+      "parts": [{ "name": "book_year", "calls": [], "at": 0, "length": 10 }, { "text": ".Next sentence" }],
+      "errors": []
+    },
+    {
+      "name": "double quotes and escaped quotes in arguments",
+      "expr": "@book_note.default(\"it's \\\"new\\\"\")",
+      "parts": [{ "name": "book_note", "calls": [{ "fn": "default", "args": ["it's \"new\""] }], "at": 0, "length": 34 }],
+      "errors": []
+    },
+    {
+      "name": "a token after punctuation",
+      "expr": "(@post.title)",
+      "parts": [{ "text": "(" }, { "name": "post.title", "calls": [], "at": 1, "length": 11 }, { "text": ")" }],
+      "errors": []
+    },
+    {
+      "name": "an unknown function",
+      "expr": "@post.title.shout()",
+      "parts": [{ "name": "post.title", "calls": [{ "fn": "shout", "args": [] }], "at": 0, "length": 19, "error": "unknown_function" }],
+      "errors": [{ "code": "unknown_function", "at": 12 }]
+    },
+    {
+      "name": "wrong arguments",
+      "expr": "@book_year.truncate('x') @book_year.upper(1)",
+      "parts": [
+        { "name": "book_year", "calls": [{ "fn": "truncate", "args": ["x"] }], "at": 0, "length": 24, "error": "wrong_arguments" },
+        { "text": " " },
+        { "name": "book_year", "calls": [{ "fn": "upper", "args": [1] }], "at": 25, "length": 19, "error": "wrong_arguments" }
+      ],
+      "errors": [{ "code": "wrong_arguments", "at": 11 }, { "code": "wrong_arguments", "at": 36 }]
+    },
+    {
+      "name": "an unclosed call ends the token; the rest is text",
+      "expr": "@post.date.format('Y rest",
+      "parts": [{ "name": "post.date", "calls": [], "at": 0, "length": 18, "error": "bad_arguments" }, { "text": "'Y rest" }],
+      "errors": [{ "code": "bad_arguments", "at": 11 }]
+    },
+    {
+      "name": "an unknown site property",
+      "expr": "@site.owner",
+      "parts": [{ "name": "site.owner", "calls": [], "at": 0, "length": 11, "error": "unknown_name" }],
+      "errors": [{ "code": "unknown_name", "at": 0 }]
+    },
+    {
+      "name": "too many tokens",
+      "expr": "@a @a @a @a @a @a @a @a @a @a @a @a @a @a @a @a @a @a @a @a @a",
+      "parts": [],
+      "errors": [{ "code": "too_many_tokens", "at": 60 }]
+    }
+  ]
+}

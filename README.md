@@ -439,7 +439,35 @@ Where a binding replaces a block's whole text, a dynamic tag puts a value *insid
   Post properties follow core: a private post needs `read_post`; a password-protected post shows only its
   ID, title, URL, date and type.
 - Blocks with rich text get `postId`/`postType` context, so a tag in a Query Loop item reads that item.
-- The editor side (typing `@` to insert a tag) comes in v1.64.0.
+
+#### Expressions (v1.64.0+)
+
+An expression mixes text and values in one string (ADR-0012):
+
+```text
+Published on @post.date.format('F j, Y') by @post.author · @option.company_phone.default('—')
+```
+
+- **Names:**
+  - `@book_date`: a field of the post;
+  - `@post.<property|field>`;
+  - `@site.name|tagline|url|year`;
+  - `@option.<field>`, `@term.<field>`, `@author.<field>` (author fields need `'bindings' => true`).
+- **Functions** (chained, always with parentheses):
+  - `format('…')`: dates, PHP `date()` syntax;
+  - `upper()`, `lower()`;
+  - `default('…')`: when empty;
+  - `truncate(n)`: characters, adds `…`.
+- **Plain text:** `@` inside a word (e-mail addresses) and a `.` not followed by `name(` stay text; `@@` is a
+  literal `@`. Limits: 500 characters and 20 tokens.
+- **Where:**
+  - an inline chip: `data-taw-tag='{"expr": "…"}'`;
+  - a whole text attribute: a `taw/field` binding with `args: {"expr": "…"}` on paragraph, heading or
+    list-item content, button text, or image alt/caption. It's escaped for rich text and plain for HTML
+    attributes; URLs and IDs don't take expressions.
+- **Evaluation:** a small parser (`Bindings\Expression\Parser`) plus the same resolvers as tags and
+  bindings. Nothing is executed, and an unknown name or function renders empty unless `default()` is used.
+- The editor's **TAW data** popup (Fields and Expression tabs) comes in v1.65.0.
 
 ### Term fields (v1.53.0+)
 
