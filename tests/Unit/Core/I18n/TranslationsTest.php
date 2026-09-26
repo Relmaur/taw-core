@@ -90,6 +90,7 @@ final class TranslationsTest extends TestCase
         Translations::register();
 
         $this->assertStringEndsWith('/languages', $GLOBALS['wp_textdomain_registry']->customPaths['taw-core']);
+        $this->assertSame(10, has_filter('load_textdomain_mofile', [Translations::class, 'mofile']));
         $this->assertSame(10, has_filter('gettext_taw-core', [Translations::class, 'gettext']));
         $this->assertSame(10, has_filter('gettext_with_context_taw-core', [Translations::class, 'gettextWithContext']));
         $this->assertSame(10, has_filter('ngettext_taw-core', [Translations::class, 'ngettext']));
@@ -150,5 +151,21 @@ final class TranslationsTest extends TestCase
         $this->assertSame('es_MX', $data['language']);
         $this->assertSame('Agregar Renglón', $data['messages']['Add Row']);
         $this->assertGreaterThanOrEqual(21, count($data['messages']));
+    }
+
+    /**
+     * In a classic theme taw-core sits in the theme's vendor/, and WordPress
+     * then asks for "{path}{locale}.mo" (the theme naming) — the bundled
+     * file was never found (v1.56.0 – v1.59.1, found by the fleet upgrade).
+     */
+    public function test_the_file_name_wordpress_guesses_inside_a_theme_is_corrected(): void
+    {
+        $languages = \dirname(__DIR__, 4) . '/languages';
+
+        $this->assertSame("{$languages}/taw-core-es_MX.mo", Translations::mofile("{$languages}/es_MX.mo", 'taw-core'));
+        $this->assertSame("{$languages}/taw-core-es_MX.mo", Translations::mofile("{$languages}/taw-core-es_MX.mo", 'taw-core'), 'already right: unchanged');
+        $this->assertSame('/wp-content/languages/plugins/taw-core-es_MX.mo', Translations::mofile('/wp-content/languages/plugins/taw-core-es_MX.mo', 'taw-core'), 'another directory: unchanged');
+        $this->assertSame("{$languages}/es_MX.mo", Translations::mofile("{$languages}/es_MX.mo", 'taw-theme'), 'another domain: unchanged');
+        $this->assertFileExists(substr_replace(Translations::mofile("{$languages}/es_MX.mo", 'taw-core'), '.l10n.php', -3));
     }
 }

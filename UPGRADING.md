@@ -13,18 +13,30 @@ to the site you're updating.
 1. **Find the installed version:** `composer show taw/core | grep versions` (or `composer.lock`).
 2. **Theme scaffold first (optional, recommended):** run the `update-theme` skill (`php bin/taw sync`).
    It syncs `functions.php`, `bin/`, CI and the framework skills, and never touches `Blocks/`, `inc/` or
-   templates.
-3. **Update the package:** `composer update taw/core`. The theme's constraint (`"taw/core": "^1.0"`)
-   allows every 1.x release.
+   templates. Its `composer.json`/`package.json` diffs include optional starter features (Reactiph with
+   `minimum-stability: dev`, the chatbot's `marked`/`dompurify`): skip those unless the site wants them.
+   The shared docs also mention `inc/security.php` and `Blocks/Chatbot`, which older sites may not have.
+3. **Update the package:** `composer update taw/core`. The theme's constraint (`^1.0`, or `^1.22` and
+   similar on older sites) allows every later 1.x release.
 4. **Read the sections below** for every version newer than the one you came from, and do the checks
    marked **Check**.
 5. **Verify:**
    - `composer run test`, and `composer run phpstan` when the theme has it;
    - load the front page and a few pages with forms and blocks (the `visual-check` skill);
    - open wp-admin screens with metaboxes and options pages.
-   With `WP_DEBUG` on, read `wp-content/debug.log` for new notices.
+   `wp-content/debug.log` exists only with `WP_DEBUG` and `WP_DEBUG_LOG` on, and most sites keep them off.
+   Under Local, read the site's `logs/php/error.log` instead, or turn `WP_DEBUG` on for the check and
+   restore `wp-config.php` afterwards.
 6. **Commit `composer.lock`**, and only when the site's rules allow it. The live site gets the update on
    its next deploy.
+
+**Under Local by Flywheel,** start the site in Local before running `php bin/taw …` commands that need
+the database. Since v1.59.2, `bin/taw wp` says so when the site is stopped, and `bin/taw wp db …` reaches
+the site's database (before, it failed with `ERROR 2002 … /tmp/mysql.sock`).
+
+**Forms have side effects.** A real submission can send email to a client or create a post. To check
+that validation works, prefer a submission that must be rejected (a required field left empty), which
+saves and sends nothing. Delete any test entries you create.
 
 Nothing here changes stored data. Meta keys, option names and stored formats are the same in every 1.x
 release, so a rollback is `composer update taw/core:<old version>` (or restoring `composer.lock`).
@@ -40,6 +52,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.41 | Metaboxes with `tabs` now render as tabs |
 | < v1.42 | Performance tweaks register only when the theme boots |
 | < v1.56 | taw-core's text has its own translations (the site's own still win) |
+| < v1.59.2 | taw-core's Spanish translation now actually loads in classic themes; tabs work by keyboard |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -81,7 +94,10 @@ All of these are additive:
 - per-form `class`, `button_class` and `--taw-span`.
 
 v1.39.1 fixes a bug: a **required `email` field left empty is now rejected** instead of saving blank.
-**Check:** submit each form once (the `visual-check` skill or by hand).
+
+**Check:** only forms with a required `email` field are affected (`php bin/taw inspect` lists the
+forms). For each one that a published page shows, send it with the email empty and the other fields
+filled, and expect "… is required." Nothing is saved or sent. Skip forms that no page shows.
 
 ### v1.41.0: metabox tabs render
 A `Metabox` config with `'tabs' => [...]` was rendered as a flat list before; it now shows tabs. Fields
@@ -122,19 +138,47 @@ those were lost.
 All of it is additive. The one fix: `fields:set` and `content:import` wrote group sub-fields to the
 wrong key (`_taw_{sub}` instead of `_taw_{group}_{sub}`).
 
-**Check:** if an agent used `fields:set` on a group sub-field before v1.52.0, look for stray `_taw_{sub}`
-meta:
-`php bin/taw wp db query "SELECT meta_key, COUNT(*) FROM wp_postmeta WHERE meta_key LIKE '\_taw\_%' GROUP BY meta_key"`
-(the table prefix may differ).
+**Check:** skip this if the site has no `group` fields (`grep -rn "'group'" Blocks/ inc/`). Otherwise,
+list the posts where a group sub-field's value sits under the bare key. This asks the field registry, so
+ordinary leftover `_taw_` meta doesn't show up:
+
+```bash
+php bin/taw wp eval-file - <<'PHP'
+<?php
+foreach (get_post_types() as $type) {
+    foreach (\TAW\Core\Metabox\Metabox::fieldsFor('post', $type) as $key => $f) {
+        if (empty($f['parent_group'])) { continue; }
+        $bare = substr($key, 0, -strlen($f['field_key'])) . $f['id'];
+        foreach (get_posts(['post_type' => $type, 'post_status' => 'any', 'numberposts' => -1, 'meta_key' => $bare, 'fields' => 'ids']) as $id) {
+            printf("%s #%d: %s is set, the field reads %s (%s) -> fields:set %d %s\n", $type, $id, $bare, $key,
+                get_post_meta($id, $key, true) === '' ? 'empty' : 'also set', $id, $f['qualified_id']);
+        }
+    }
+}
+PHP
+```
+
+**If it finds some, the bare key may be the only copy of the data**, so the page shows nothing (or a
+block's default) where the value should be. The fix is a data change, so ask first:
+1. `php bin/taw fields:set <id> <qualified id> "<value>" --dry-run`, then without `--dry-run`;
+2. check that the page shows the value;
+3. delete the bare key: `php bin/taw wp post meta delete <id> <bare key>`.
+
+Do the same on production, which needs its own access. Also check the block: if its `getData()` reads the
+group with `getMeta($postId, '<group>')` (a single `_taw_<group>` key), it never sees the stored
+sub-fields. Read them with `$this->fields($postId)->field('<group>')->value()` instead.
 
 ### v1.55.0: options pages over REST
 It's opt-in per page (`'rest' => 'private' | 'public'`); pages without it expose nothing.
 
 ### v1.56.0: taw-core's own translations
-taw-core's admin and form text uses the `taw-core` text domain and ships its own Spanish translation.
-**The theme's own translations still win.** If `languages/es_MX.po` translates a taw-core string (for
-example "Add Row"), that wording stays. One visible change on Spanish sites: the form message
-"%s is required." is now translated.
+taw-core's admin and form text uses the `taw-core` text domain and ships a partial Spanish translation
+(about 20 of the most visible strings, such as "Add Row" and "%s is required."; the rest stay in
+English). **The theme's own translations still win.** If `languages/es_MX.po` translates a taw-core
+string, that wording stays.
+
+In classic themes the bundled file didn't load until v1.59.2 (see below), so from v1.56.0 to v1.59.1
+only the theme's own `.po` translated taw-core text.
 
 **Check:** nothing to do. You no longer need to add taw-core strings to the theme's `.po`, though
 existing entries are harmless.
@@ -153,6 +197,20 @@ These are new APIs, and nothing existing changes:
   directly, or escape `->text()`;
 - converting a block from three fields (URL, label, new tab) to one `link` field changes the stored
   data: it needs a content migration, so treat it as a site change, not part of the upgrade.
+
+### v1.59.2: fixes found by the first fleet upgrade
+- **taw-core's Spanish translation loads in classic themes.** taw-core sits in the theme's `vendor/`, and
+  for a path inside the theme WordPress looked for `es_MX.l10n.php` instead of `taw-core-es_MX.l10n.php`.
+  Spanish sites now show the bundled wording for strings their own `.po` doesn't translate.
+- **`bin/taw wp db …` works under Local**, and `bin/taw wp` says when the Local site is stopped.
+- **Metabox and options-page tabs work by keyboard** (Tab to the active tab, arrows to move, Enter or
+  Space to select). They look the same.
+- **`php bin/taw sync` keeps a site's own skill** (`owner: site`) when a framework skill with the same
+  name appears. Before, it replaced it. The report names the clash, and the framework copy isn't
+  installed until the site renames or removes its own.
+
+**Check:** on a Spanish site, open a form with a required field and leave it empty: the message is in
+Spanish.
 
 ## Opt-in features you may want
 

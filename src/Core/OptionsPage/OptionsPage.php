@@ -6,6 +6,7 @@ namespace TAW\Core\OptionsPage;
 
 use TAW\Core\Content\FieldCodec;
 use TAW\Core\Metabox\Metabox;
+use TAW\Core\Metabox\Tabs;
 use TAW\Core\Rest\FieldMetaRegistrar;
 use TAW\Core\Schema\Definition\OptionsPage as OptionsPageDefinition;
 use TAW\Helpers\Framework;
@@ -476,12 +477,14 @@ class OptionsPage
     private function render_tabs(): void
     {
     ?>
+        <?php $tabIds = Tabs::idBase($this->id); ?>
         <div class="taw-tabbed" x-data="{ activeTab: 0 }">
-            <div class="tabs">
+            <div class="tabs" <?php echo Tabs::listAttributes(); ?>>
                 <?php foreach ($this->tabs as $index => $tab): ?>
                     <div class="tab-title"
                         :class="activeTab === <?php echo $index; ?> ? 'active' : ''"
-                        @click="activeTab = <?php echo $index; ?>">
+                        @click="activeTab = <?php echo $index; ?>"
+                        <?php echo Tabs::tabAttributes($tabIds, (int) $index, count($this->tabs)); ?>>
                         <?php if (!empty($tab['icon'])): ?>
                             <img src="<?php echo esc_url($tab['icon']); ?>" alt="">
                         <?php endif; ?>
@@ -496,6 +499,7 @@ class OptionsPage
                     });
                 ?>
                     <div class="fields-container"
+                        <?php echo Tabs::panelAttributes($tabIds, (int) $index); ?>
                         x-show="activeTab === <?php echo $index; ?>"
                         x-cloak>
                         <?php $this->render_fields($tab_fields); ?>

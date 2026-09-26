@@ -6,6 +6,7 @@ namespace TAW\CLI;
 
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
@@ -80,15 +81,17 @@ class WpCliCommand extends Command
         $wpRoot = dirname($wpLoad);
 
         $socket = WpLoader::resolveLocalSocket($this->themeDir);
+        $expected = WpLoader::expectedLocalSocket($this->themeDir);
+        if ($socket === null && $expected !== null) {
+            // A Local site, but stopped: without this, MySQL falls back to
+            // /tmp/mysql.sock and fails with a message that points nowhere.
+            $errorOutput = $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+            $errorOutput->writeln("<comment>This Local site's database isn't running (no socket at {$expected}). Start the site in Local, then run the command again.</comment>");
+        }
 
-        $command = $socket !== null
-            ? [PHP_BINARY, '-d', "mysqli.default_socket={$socket}", '-d', "pdo_mysql.default_socket={$socket}", $wpBinary]
-            : [$wpBinary];
+        [$command, $env] = self::processSpec($wpBinary, $wpRoot, $socket, $this->passthroughArgs());
 
-        $command[] = "--path={$wpRoot}";
-        array_push($command, ...$this->passthroughArgs());
-
-        $process = new Process($command);
+        $process = new Process($command, null, $env);
         $process->setTimeout(null);
 
         // A real interactive terminal's stdin is always a TTY; piped or
@@ -112,6 +115,30 @@ class WpCliCommand extends Command
     }
 
     /**
+     * The `wp` process: its command line and extra environment.
+     *
+     * With a Local socket, PHP's MySQL drivers get it through `-d` flags,
+     * and the `mysql`/`mysqldump` clients that `wp db query|export|import|cli`
+     * start get it through MYSQL_UNIX_PORT. Those clients never read PHP's
+     * ini settings, so without the variable they fall back to
+     * /tmp/mysql.sock (ERROR 2002).
+     *
+     * @param list<string> $args
+     * @return array{0: list<string>, 1: array<string, string>}
+     */
+    public static function processSpec(string $wpBinary, string $wpRoot, ?string $socket, array $args): array
+    {
+        $command = $socket !== null
+            ? [PHP_BINARY, '-d', "mysqli.default_socket={$socket}", '-d', "pdo_mysql.default_socket={$socket}", $wpBinary]
+            : [$wpBinary];
+
+        $command[] = "--path={$wpRoot}";
+        array_push($command, ...$args);
+
+        return [$command, $socket !== null ? ['MYSQL_UNIX_PORT' => $socket] : []];
+    }
+
+    /**
      * Everything after the 'wp' token in the real argv, forwarded verbatim —
      * deliberately bypassing Symfony's own argument parsing (see class
      * docblock). `array_search` finds the leftmost 'wp' (the command name
@@ -119,13 +146,13 @@ class WpCliCommand extends Command
      * that happens to also equal the literal string 'wp' is outside this
      * command's realistic usage.
      *
-     * @return string[]
+     * @return list<string>
      */
     private function passthroughArgs(): array
     {
         $argv = $_SERVER['argv'] ?? [];
         $index = array_search('wp', $argv, true);
 
-        return $index !== false ? array_slice($argv, $index + 1) : [];
+        return $index !== false ? array_values(array_slice($argv, $index + 1)) : [];
     }
 }

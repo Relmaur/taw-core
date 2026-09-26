@@ -36,6 +36,7 @@ final class SkillsReconcileTest extends TestCase
         // Canonical scaffold ships two framework skills.
         $this->writeSkill($this->canonical, 'audit-seo', 'taw', 'canonical v2');
         $this->writeSkill($this->canonical, 'build-page', 'taw', 'canonical');
+        $this->writeSkill($this->canonical, 'image-crop', 'taw', 'framework version');
 
         // Client tree: one framework skill is stale-but-current, one is an
         // older copy, one was retired upstream, one is site-authored, and one
@@ -45,6 +46,7 @@ final class SkillsReconcileTest extends TestCase
         $this->writeSkill($this->local, 'legacy-export', 'taw', 'retired');        // gone upstream -> delete
         $this->writeSkill($this->local, 'publish-news', 'site', 'parish voice');   // site-authored -> preserve
         $this->writeSkill($this->local, 'mystery', null, 'no marker');             // unknown -> warn + preserve
+        $this->writeSkill($this->local, 'image-crop', 'site', 'site version');     // same name as a framework skill -> clash, kept
     }
 
     protected function tearDown(): void
@@ -62,6 +64,7 @@ final class SkillsReconcileTest extends TestCase
         $this->assertSame(['legacy-export'], $plan['delete'], 'owner: taw skill absent from canonical is removed');
         $this->assertSame(['publish-news'], $plan['preserve'], 'owner: site skill is preserved');
         $this->assertSame(['mystery'], $plan['warn'], 'unmarked skill is flagged, not deleted');
+        $this->assertSame(['image-crop'], $plan['clash'], 'owner: site skill with a framework name is kept, not overwritten');
     }
 
     public function test_apply_executes_the_plan_on_disk(): void
@@ -77,6 +80,7 @@ final class SkillsReconcileTest extends TestCase
         $this->assertDirectoryDoesNotExist($skills . '/legacy-export', 'retired framework skill removed');
         $this->assertDirectoryExists($skills . '/publish-news', 'site skill untouched');
         $this->assertDirectoryExists($skills . '/mystery', 'unmarked skill untouched');
+        $this->assertStringContainsString('site version', (string) file_get_contents($skills . '/image-crop/SKILL.md'), 'clashing site skill untouched');
         $this->assertStringContainsString(
             'canonical v2',
             (string) file_get_contents($skills . '/audit-seo/SKILL.md'),
@@ -97,13 +101,13 @@ final class SkillsReconcileTest extends TestCase
     }
 
     /**
-     * @return array{overwrite: list<string>, delete: list<string>, preserve: list<string>, warn: list<string>}
+     * @return array{overwrite: list<string>, delete: list<string>, preserve: list<string>, warn: list<string>, clash: list<string>}
      */
     private function plan(): array
     {
         $method = new ReflectionMethod(SyncCommand::class, 'planSkillsReconcile');
 
-        /** @var array{overwrite: list<string>, delete: list<string>, preserve: list<string>, warn: list<string>} $plan */
+        /** @var array{overwrite: list<string>, delete: list<string>, preserve: list<string>, warn: list<string>, clash: list<string>} $plan */
         $plan = $method->invoke(
             new SyncCommand($this->local),
             ['path' => '.claude/skills/', 'type' => 'skills-dir'],

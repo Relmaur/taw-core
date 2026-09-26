@@ -2961,12 +2961,14 @@ class Metabox
     private function render_tabs(array $groups, int $object_id): void
     {
         ?>
+        <?php $tabIds = Tabs::idBase($this->id); ?>
         <div class="taw-tabbed" x-data="{ activeTab: 0 }">
-            <div class="tabs">
+            <div class="tabs" <?php echo Tabs::listAttributes(); ?>>
                 <?php foreach ($groups as $index => $group): ?>
                     <div class="tab-title"
                         :class="activeTab === <?php echo (int) $index; ?> ? 'active' : ''"
-                        @click="activeTab = <?php echo (int) $index; ?>">
+                        @click="activeTab = <?php echo (int) $index; ?>"
+                        <?php echo Tabs::tabAttributes($tabIds, (int) $index, count($groups)); ?>>
                         <?php if (!empty($group['tab']['icon'])): ?>
                             <img src="<?php echo esc_url($group['tab']['icon']); ?>" alt="">
                         <?php endif; ?>
@@ -2977,6 +2979,7 @@ class Metabox
             <div class="tab-content--wrapper">
                 <?php foreach ($groups as $index => $group): ?>
                     <div class="fields-container tab-content-<?php echo (int) $index; ?>"
+                        <?php echo Tabs::panelAttributes($tabIds, (int) $index); ?>
                         x-show="activeTab === <?php echo (int) $index; ?>"
                         x-cloak>
                         <?php foreach ($group['fields'] as $field) {

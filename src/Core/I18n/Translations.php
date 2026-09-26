@@ -45,6 +45,7 @@ final class Translations
             $wp_textdomain_registry->set_custom_path(self::DOMAIN, Framework::path('languages'));
         }
 
+        add_filter('load_textdomain_mofile', [self::class, 'mofile'], 10, 2);
         add_filter('gettext_' . self::DOMAIN, [self::class, 'gettext'], 10, 2);
         add_filter('gettext_with_context_' . self::DOMAIN, [self::class, 'gettextWithContext'], 10, 3);
         add_filter('ngettext_' . self::DOMAIN, [self::class, 'ngettext'], 10, 4);
@@ -55,6 +56,31 @@ final class Translations
     public static function reset(): void
     {
         self::$registered = false;
+    }
+
+    /**
+     * The file name WordPress guesses for our domain, corrected.
+     *
+     * In a classic TAW theme, taw-core lives in the theme's own `vendor/`,
+     * so our `languages/` path starts with the stylesheet directory. For
+     * such paths WordPress's just-in-time loader asks for `{locale}.mo`
+     * (the theme convention) instead of `{domain}-{locale}.mo`, and our
+     * `taw-core-es_MX.l10n.php` was never found (v1.56.0 – v1.59.1). From
+     * this name WordPress also derives the `.l10n.php` file it prefers.
+     */
+    public static function mofile(string $mofile, string $domain): string
+    {
+        if ($domain !== self::DOMAIN) {
+            return $mofile;
+        }
+
+        $name = basename($mofile);
+        $inOurDirectory = rtrim(dirname($mofile), '/') === rtrim(Framework::path('languages'), '/');
+        if (!$inOurDirectory || str_starts_with($name, self::DOMAIN . '-')) {
+            return $mofile;
+        }
+
+        return dirname($mofile) . '/' . self::DOMAIN . '-' . $name;
     }
 
     public static function gettext(string $translation, string $text): string
