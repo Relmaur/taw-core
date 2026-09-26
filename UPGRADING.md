@@ -262,6 +262,10 @@ The TAW data popup gains a **Visibility** tab and a **Show only when…** sectio
 editor); every block's sidebar gains **TAW visibility**. Conditional blocks and chips are marked in the canvas.
 No hooks change. **Nothing to do.**
 
+### v1.67.1: conditions preview in templates
+In the Site Editor, a template's conditions are checked against the latest post of its type (as its field
+previews are), not against the template itself, which always read "hidden". **Nothing to do.**
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
