@@ -19,7 +19,8 @@ if (!defined('ABSPATH')) {
  *
  * Registered for every TAW theme by Boot::data(): the source on `init`, the
  * preview route on `rest_api_init`, the editor script on
- * `enqueue_block_editor_assets`.
+ * `enqueue_block_editor_assets`, and inline dynamic tags (InlineTags,
+ * ADR-0011) on `render_block` / `register_block_type_args`.
  */
 final class Bindings
 {
@@ -46,6 +47,7 @@ final class Bindings
         add_action('init', [self::class, 'registerSource']);
         add_action('rest_api_init', [PreviewEndpoint::class, 'registerRoute']);
         add_action('enqueue_block_editor_assets', [self::class, 'enqueueEditor']);
+        InlineTags::register();
     }
 
     /**
@@ -93,7 +95,8 @@ final class Bindings
     public static function getValue(array $args, object $block, string $attribute): mixed
     {
         $ref = Reference::fromArgs($args);
-        if ($ref === null) {
+        // Property tags (post.date…) are inline-only for now (ADR-0011).
+        if ($ref === null || $ref->tag !== null) {
             return null;
         }
 
@@ -114,5 +117,6 @@ final class Bindings
     {
         self::$registered = false;
         self::$resolver   = null;
+        InlineTags::reset();
     }
 }

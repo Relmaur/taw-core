@@ -34,6 +34,10 @@ final class AttributeMap
             return null;
         }
 
+        if ($target->kind === 'inline') {
+            return self::inline($value, $type, $ref);
+        }
+
         return match (true) {
             in_array($type, self::TEXT_TYPES, true) => self::text($value, $target, $type),
             $type === 'textarea'                    => self::textarea($value, $target),
@@ -44,6 +48,40 @@ final class AttributeMap
             $type === 'post_select'                 => self::postSelect($value, $target, $ref),
             default                                 => null,
         };
+    }
+
+    /**
+     * An inline dynamic tag (ADR-0011): one line of plain text, unescaped (the
+     * caller escapes it). Dates take the tag's `format` (default: the site's
+     * date format); images and URLs give their URL; a link its URL; a post
+     * select its title.
+     */
+    private static function inline(Value $value, string $type, Reference $ref): ?string
+    {
+        $text = match (true) {
+            $type === 'datepicker'                  => self::formatDate($value->text(), $ref->format),
+            in_array($type, self::TEXT_TYPES, true) => $value->text(),
+            $type === 'textarea'                    => preg_replace('/\s*\R\s*/', ' ', $value->text()) ?? $value->text(),
+            $type === 'wysiwyg'                     => html_entity_decode(wp_strip_all_tags($value->text(), true), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            $type === 'url'                         => esc_url_raw($value->text()),
+            $type === 'image'                       => $value->image()->exists() ? $value->image()->url($ref->size) : '',
+            $type === 'link'                        => $value->link()->exists() ? esc_url_raw($value->link()->url()) : '',
+            $type === 'post_select'                 => empty($value->config()['multiple']) && $value->post()->exists() ? $value->post()->title() : '',
+            default                                 => '',
+        };
+
+        return self::emptyToNull(trim($text));
+    }
+
+    /**
+     * A stored date in the site's time zone, in $format (or the site's date
+     * format). Unparseable values come back as stored.
+     */
+    public static function formatDate(string $stored, ?string $format): string
+    {
+        $date = trim($stored) === '' ? false : date_create_immutable($stored, wp_timezone());
+
+        return $date === false ? $stored : (string) wp_date($format ?? (string) get_option('date_format'), $date->getTimestamp());
     }
 
     private static function text(Value $value, Target $target, string $type): mixed

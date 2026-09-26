@@ -14,6 +14,8 @@ if (!defined('ABSPATH')) {
  * front end does, so the preview is what the page will render.
  *
  * Request:  {"items": [{"key", "args", "block", "attribute", "postId", "postType"}]}
+ *           An inline dynamic tag (ADR-0011) sends "kind": "tag" and no block/attribute:
+ *           its value is the plain text InlineTags::value() gives (fallback included).
  * Response: {"values": {"<key>": <value or null>}}
  *
  * Editors only (`edit_posts`), and a post's values only for users who can
@@ -59,10 +61,12 @@ final class PreviewEndpoint
      */
     public static function resolve(array $item): mixed
     {
-        $ref = Reference::fromArgs(is_array($item['args'] ?? null) ? $item['args'] : []);
+        $args = is_array($item['args'] ?? null) ? $item['args'] : [];
+        $ref = Reference::fromArgs($args);
+        $isTag = ($item['kind'] ?? null) === 'tag';
         $block = is_string($item['block'] ?? null) ? $item['block'] : '';
         $attribute = is_string($item['attribute'] ?? null) ? $item['attribute'] : '';
-        if ($ref === null || $block === '' || $attribute === '') {
+        if ($ref === null || (!$isTag && ($block === '' || $attribute === '' || $ref->tag !== null))) {
             return null;
         }
 
@@ -72,6 +76,10 @@ final class PreviewEndpoint
         }
         if ($postId <= 0 && is_string($item['postType'] ?? null) && $item['postType'] !== '') {
             $postId = self::samplePost($item['postType']);
+        }
+
+        if ($isTag) {
+            return InlineTags::value($args, new BindingContext($postId));
         }
 
         $value = Bindings::resolver()->resolve($ref, new BindingContext($postId), Target::for($block, $attribute, self::attributeSchema($block, $attribute)));

@@ -230,6 +230,12 @@ An editing policy's content rule can now say `allowBound`: blocks clients may ad
 `taw/field` (they appear as "Field …" blocks in the inserter). The key was reserved and rejected before,
 so no existing policy uses it; no preset sets it. No hooks change. **Nothing to do.**
 
+### v1.63.0: dynamic tags (server side)
+Inline `<span class="taw-tag" data-taw-tag='…'>` elements in content now render live values (see "Dynamic
+tags" in the README). The theme's hook list gains two lines: `render_block` (skips any block without a
+tag) and `register_block_type_args` (adds `postId`/`postType` context to rich-text blocks). Content
+without tags renders exactly as before. **Nothing to do.**
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

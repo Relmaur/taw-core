@@ -418,6 +418,29 @@ Core blocks can show TAW fields through WordPress's Block Bindings API (ADR-0010
 - **In locked-down post types (v1.62.0+):** an editing policy's `allowBound` lets clients add some blocks
   only bound to a field; see "Editing policies".
 
+### Dynamic tags: live values inside text (v1.63.0+)
+
+Where a binding replaces a block's whole text, a dynamic tag puts a value *inside* it (ADR-0011):
+"Published on **September 26, 2026** by **Jane Doe**". Each tag is an inline element in the content:
+
+```html
+<p>Published on <span class="taw-tag" data-taw-tag='{"tag":"post.date","format":"F j, Y"}'>September 26, 2026</span></p>
+```
+
+- **`data-taw-tag`** is JSON: a property `{"tag": "…"}` or a field with the `taw/field` args
+  (`field`, `from`, `sub`), plus optional `format` (dates, default: the site's date format) and `fallback`.
+- **Properties:** `post.id`, `post.title`, `post.date`, `post.modified`, `post.url`, `post.excerpt`,
+  `post.author`, `post.type`, `site.name`, `site.tagline`, `site.url`, `site.year`.
+- **On render** (a `render_block` filter that skips HTML without `data-taw-tag`) each tag's text is replaced
+  by the live value as escaped text, else its `fallback`, else nothing; the span keeps its class and loses
+  `data-taw-tag`. The stored text is only what shows if taw/core is absent.
+- **Fields** resolve exactly as bindings do (privacy, `bindings: false`, `from`), shaped as one line of
+  text: dates formatted, rich text stripped, images and links as their URL, a post select as its title.
+  Post properties follow core: a private post needs `read_post`; a password-protected post shows only its
+  ID, title, URL, date and type.
+- Blocks with rich text get `postId`/`postType` context, so a tag in a Query Loop item reads that item.
+- The editor side (typing `@` to insert a tag) comes in v1.64.0.
+
 ### Term fields (v1.53.0+)
 
 A fieldset can target a taxonomy's terms with `term:<taxonomy>` in its screens (JSON/PHP `on`), alone or mixed
