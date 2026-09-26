@@ -260,11 +260,17 @@ describe('allowBound in the editor', () => {
         const blocks: BlockNode[] = [
             { name: 'core/paragraph', attributes: { metadata: { bindings: bound('a') } } },
             { name: 'core/paragraph', attributes: {} },
-            { name: 'core/group', attributes: {}, innerBlocks: [{ name: 'core/paragraph', attributes: { metadata: { bindings: bound('') } } }] },
+            {
+                name: 'core/group',
+                attributes: {},
+                innerBlocks: [{ name: 'core/paragraph', attributes: { metadata: { bindings: bound('') } } }],
+            },
         ];
         const edited = unboundCounts('taw/field', blocks);
         expect(edited).toEqual({ 'core/paragraph': 2, 'core/group': 1 });
-        expect(newlyUnbound(['core/paragraph', 'core/image'], { 'core/paragraph': 1 }, edited)).toEqual(['core/paragraph']);
+        expect(newlyUnbound(['core/paragraph', 'core/image'], { 'core/paragraph': 1 }, edited)).toEqual([
+            'core/paragraph',
+        ]);
         expect(newlyUnbound(['core/paragraph'], { 'core/paragraph': 2 }, edited)).toEqual([]);
     });
 
@@ -284,7 +290,8 @@ describe('allowBound in the editor', () => {
                 ? { getValue: (item: { args: { field: string } }) => values[item.args.field] }
                 : { getBlockName: () => null };
         const src = source(config);
-        const ask = (field: string) => src.getValues({ select, context: { postId: 5, postType: 'book' }, bindings: bound(field) });
+        const ask = (field: string) =>
+            src.getValues({ select, context: { postId: 5, postType: 'book' }, bindings: bound(field) });
         const headline = ask('headline');
         const intro = ask('intro');
         expect(headline).toEqual({ content: 'H' });
@@ -293,4 +300,3 @@ describe('allowBound in the editor', () => {
         expect(ask('intro')).toBe(intro);
     });
 });
-

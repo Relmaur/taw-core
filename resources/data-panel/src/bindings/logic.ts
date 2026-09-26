@@ -397,6 +397,10 @@ export function unboundCounts(source: string, blocks: BlockNode[], counts: Recor
  * The bound-only blocks this edit adds unbound: more unbound blocks of that
  * name than the saved post has. The same count the server's save check makes.
  */
-export function newlyUnbound(boundOnly: string[], saved: Record<string, number>, edited: Record<string, number>): string[] {
+export function newlyUnbound(
+    boundOnly: string[],
+    saved: Record<string, number>,
+    edited: Record<string, number>,
+): string[] {
     return boundOnly.filter((name) => (edited[name] ?? 0) > (saved[name] ?? 0));
 }

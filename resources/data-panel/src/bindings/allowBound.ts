@@ -67,7 +67,10 @@ export function registerAllowBound(config: Config): void {
             dispatch('core/notices').createWarningNotice(
                 sprintf(
                     /* translators: %s: comma-separated block titles. */
-                    __('Connect these blocks to a TAW field (block toolbar → TAW field) or remove them before saving: %s.', 'taw-core'),
+                    __(
+                        'Connect these blocks to a TAW field (block toolbar → TAW field) or remove them before saving: %s.',
+                        'taw-core',
+                    ),
                     titles.join(', '),
                 ),
                 { id: NOTICE, isDismissible: false },

@@ -125,10 +125,7 @@ function ConnectModal({ config, clientId, onClose }: { config: Config; clientId:
  * `taw/field` binding without a field (a "Field …" block just inserted).
  */
 function useAwaiting(config: Config): string | null {
-    const selected = useSelect(
-        (select) => select('core/block-editor').getSelectedBlockClientId() as string | null,
-        [],
-    );
+    const selected = useSelect((select) => select('core/block-editor').getSelectedBlockClientId() as string | null, []);
     const block = useBlock(selected);
     return selected && block && awaitingField(config.source, block.metadata.bindings) ? selected : null;
 }
