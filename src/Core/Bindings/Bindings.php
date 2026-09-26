@@ -54,6 +54,7 @@ final class Bindings
         add_action('enqueue_block_editor_assets', [self::class, 'enqueueEditor']);
         add_action('enqueue_block_assets', [self::class, 'enqueueCanvasStyles']);
         InlineTags::register();
+        BlockVisibility::register();
     }
 
     /**
@@ -116,6 +117,11 @@ final class Bindings
      */
     public static function getValue(array $args, object $block, string $attribute): mixed
     {
+        // A condition (ADR-0013): when it doesn't hold, the `else` text (text attributes) or empty.
+        if (array_key_exists('if', $args) && !Conditions::shown($args['if'], BindingContext::fromBlock($block))) {
+            return self::otherwise($args, $block, $attribute);
+        }
+
         if (isset($args['expr'])) {
             return self::expressionValue($args['expr'], $block, $attribute);
         }
@@ -152,6 +158,18 @@ final class Bindings
         }
 
         return $kind === 'text' ? esc_html($value) : $value;
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     */
+    private static function otherwise(array $args, object $block, string $attribute): string
+    {
+        $name = property_exists($block, 'name') && is_string($block->name) ? $block->name : '';
+        $kind = Target::for($name, $attribute)->kind;
+        $else = in_array($kind, ['text', 'plain'], true) ? Conditions::otherwise($args) : null;
+
+        return $else === null ? '' : ($kind === 'text' ? esc_html($else) : $else);
     }
 
     public static function resolver(): ExpressionResolver

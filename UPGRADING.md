@@ -250,6 +250,13 @@ Options-page field registry entries gain `option_page_title`. **Nothing to do.**
 A chip's popover closes after **Save** or **Refresh**, and on Escape or a click elsewhere. Removing a chip (its
 **Remove** button, Backspace or Delete) no longer throws an error in the editor. **Nothing to do.**
 
+### v1.66.0: conditions
+Chips, bound block text and whole blocks can carry a condition (ADR-0013; see "Conditions" in the README).
+New values `@viewer.logged_in`, `@viewer.role`, `@date.today`, `@date.now`. The theme's hook list gains one
+line (`render_block` at priority 9: `BlockVisibility`); blocks and chips without a condition render as
+before. `@viewer.*` values vary per visitor, so check the page cache varies by login before using them.
+**Nothing to do.**
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

@@ -10,7 +10,8 @@ if (!defined('ABSPATH')) {
 
 /**
  * Post and site properties for inline dynamic tags (ADR-0011), the second
- * ExpressionResolver: `{"tag": "post.date", "format": "F j, Y"}`.
+ * ExpressionResolver: `{"tag": "post.date", "format": "F j, Y"}`. Also the
+ * viewer and the current date (ADR-0013), for conditions and expressions.
  *
  * Returns plain, unescaped text (the caller escapes it), or null for nothing.
  * The post is the block's context post (a Query Loop item, else the queried
@@ -23,6 +24,7 @@ final class TagResolver implements ExpressionResolver
     public const TAGS = [
         'post.id', 'post.title', 'post.date', 'post.modified', 'post.url', 'post.excerpt', 'post.author', 'post.type',
         'site.name', 'site.tagline', 'site.url', 'site.year',
+        'viewer.logged_in', 'viewer.role', 'date.today', 'date.now',
     ];
 
     /** What a password-protected post still shows. */
@@ -40,7 +42,12 @@ final class TagResolver implements ExpressionResolver
             return null;
         }
 
-        $text = str_starts_with($tag, 'site.') ? self::site($tag) : self::post($tag, $context->postId, $ref->format);
+        $text = match (strstr($tag, '.', true)) {
+            'site'   => self::site($tag),
+            'viewer' => self::viewer($tag),
+            'date'   => self::date($tag, $ref->format),
+            default  => self::post($tag, $context->postId, $ref->format),
+        };
 
         return $text === null || trim($text) === '' ? null : trim($text);
     }
@@ -53,6 +60,29 @@ final class TagResolver implements ExpressionResolver
             'site.url'     => home_url('/'),
             default        => (string) wp_date('Y'),
         };
+    }
+
+    /**
+     * Who is looking (ADR-0013): "1" when logged in (else nothing), and the
+     * viewer's role slugs ("editor, author"). Varies per visitor: page caches
+     * must vary by login for these.
+     */
+    private static function viewer(string $tag): ?string
+    {
+        if (!is_user_logged_in()) {
+            return null;
+        }
+
+        return $tag === 'viewer.logged_in' ? '1' : implode(', ', wp_get_current_user()->roles);
+    }
+
+    /** The current date (`date.today`) or date and time (`date.now`) in the site's time zone. */
+    private static function date(string $tag, ?string $format): string
+    {
+        $dateFormat = (string) get_option('date_format');
+        $format   ??= $tag === 'date.now' ? $dateFormat . ' ' . (string) get_option('time_format') : $dateFormat;
+
+        return (string) wp_date($format);
     }
 
     private static function post(string $tag, int $postId, ?string $format): ?string

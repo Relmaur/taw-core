@@ -452,7 +452,9 @@ Published on @post.date.format('F j, Y') by @post.author · @option.company_phon
   - `@book_date`: a field of the post;
   - `@post.<property|field>`;
   - `@site.name|tagline|url|year`;
-  - `@option.<field>`, `@term.<field>`, `@author.<field>` (author fields need `'bindings' => true`).
+  - `@option.<field>`, `@term.<field>`, `@author.<field>` (author fields need `'bindings' => true`);
+  - `@viewer.logged_in` (`1` or empty), `@viewer.role` (role slugs, `editor, author`), `@date.today`,
+    `@date.now` (v1.66.0+; the viewer ones vary per visitor, so a page cache must vary by login).
 - **Functions** (chained, always with parentheses):
   - `format('…')`: dates, PHP `date()` syntax;
   - `upper()`, `lower()`;
@@ -467,6 +469,48 @@ Published on @post.date.format('F j, Y') by @post.author · @option.company_phon
     attributes; URLs and IDs don't take expressions.
 - **Evaluation:** a small parser (`Bindings\Expression\Parser`) plus the same resolvers as tags and
   bindings. Nothing is executed, and an unknown name or function renders empty unless `default()` is used.
+
+#### Conditions (v1.66.0+)
+
+Show a chip, a block's bound text, or a **whole block** only when rules hold (ADR-0013):
+
+```json
+{"match": "all", "rules": [
+  {"value": "@book_year", "op": "not_empty"},
+  {"value": "@post.date", "op": "after", "to": "-30 days"},
+  {"match": "any", "rules": [
+    {"value": "@genre", "op": "in", "to": ["fiction", "poetry"]},
+    {"value": "@viewer.logged_in", "op": "is_true"}
+  ]}
+]}
+```
+
+- **`value`** is one expression token, functions included (`@post.date.format('Y')`); same names and
+  privacy as expressions (an unreadable value is empty). **`to`** is text, a number, a list, a pair, or
+  another value (`"@first_year"`; `"@@x"` is the text `@x`).
+- **Operators:**
+  - presence: `empty`, `not_empty`;
+  - text (case-insensitive, trimmed): `equals`, `not_equals`, `contains`, `not_contains`, `starts_with`,
+    `ends_with`;
+  - lists: `in`, `not_in` (a list or `"a, b"`), `has`, `has_not` (a multi-value field includes an item);
+  - numbers: `gt`, `gte`, `lt`, `lte`, `between` (`[min, max]`);
+  - dates: `before`, `after`, `on`, `between_dates`. `to` is a date (`2025-01-01`), `now`, `today`,
+    `tomorrow`, `yesterday`, or relative (`-30 days`, `+1 week`), in the site's time zone. Date fields and
+    `@post.date` are compared as dates unless the token has its own `format()`;
+  - yes/no: `is_true`, `is_false` (`0`, `false`, `no`, `off` and empty are false).
+- **Groups:** `match` is `all` (default) or `any`; one nested level; at most 20 rules. An invalid condition
+  (unknown operator, bad value) hides. No regular expressions.
+- **Where:**
+  - a chip: `data-taw-tag='{"tag": "post.title", "if": {…}, "else": "Untitled"}'` (hidden: `else`, or
+    nothing);
+  - block text: `args: {"field": "book_subtitle", "if": {…}, "else": "…"}` (hidden: `else` for text
+    attributes, else empty);
+  - a whole block: `"metadata": {"tawShowIf": {…}}` on any block; hidden blocks render nothing, and each
+    Query Loop item decides for itself (`Bindings\BlockVisibility`, `render_block` at priority 9).
+- **Display, not access control:** hidden content is still in the post content.
+- Pure `Bindings\Condition\{Condition,Evaluator}`; `Bindings\Conditions::check()` runs one against a post.
+  The preview endpoint takes `"kind": "condition"` → `{shown, errors}`. `tests/fixtures/conditions.json` is
+  the spec.
 
 #### In the editor: the TAW data popup (v1.65.0+)
 

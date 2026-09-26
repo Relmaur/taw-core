@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-09-26). Plan: umbrella `docs/plans/conditions.md`. Builds on ADR-0011 (dynamic tags) and
+Accepted (2026-09-26). Plan: umbrella `docs/plans/conditions.md`. Builds on ADR-0011 (dynamic tags) and
 ADR-0012 (expressions and the TAW data popup); both stand unchanged.
 
 ## Context

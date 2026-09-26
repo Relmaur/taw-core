@@ -39,6 +39,22 @@ final class Evaluator
     }
 
     /**
+     * One token's value (`@post.date.format('Y')`), as plain text: '' when the
+     * token is invalid or empty. $format is the date format to use when the
+     * token has no `format()` of its own (conditions compare dates with it).
+     */
+    public static function tokenValue(string $token, BindingContext $context, ?string $format = null): string
+    {
+        $parsed = Parser::parse($token);
+        $parts  = $parsed['parts'];
+        if (count($parts) !== 1 || !isset($parts[0]['name']) || isset($parts[0]['error'])) {
+            return '';
+        }
+
+        return self::token($parts[0], $context, $format);
+    }
+
+    /**
      * The value args a name reads (the tag/field args InlineTags::value()
      * takes), or null for a name that can't exist.
      *
@@ -55,6 +71,8 @@ final class Evaluator
             'option' => ['field' => $rest, 'from' => 'option'],
             'term'   => ['field' => $rest, 'from' => 'term'],
             'author' => ['field' => $rest, 'from' => 'user'],
+            'viewer' => TagResolver::knows("viewer.{$rest}") ? ['tag' => "viewer.{$rest}"] : null,
+            'date'   => TagResolver::knows("date.{$rest}") ? ['tag' => "date.{$rest}"] : null,
             default  => null,
         };
     }
@@ -62,13 +80,16 @@ final class Evaluator
     /**
      * @param array<string, mixed> $token
      */
-    private static function token(array $token, BindingContext $context): string
+    private static function token(array $token, BindingContext $context, ?string $format = null): string
     {
         $calls = is_array($token['calls'] ?? null) ? $token['calls'] : [];
         $args  = isset($token['error']) ? null : self::argsFor((string) ($token['name'] ?? ''));
 
         $value = '';
         if ($args !== null) {
+            if ($format !== null) {
+                $args['format'] = $format;
+            }
             foreach ($calls as $call) {
                 if ($call['fn'] === 'format') {
                     $args['format'] = (string) $call['args'][0];
