@@ -1,14 +1,18 @@
 /**
  * The `taw/tag` rich-text format (ADR-0011/0012): an atomic inline chip, as
  * core footnotes are (`contentEditable: false`). Clicking one opens a small
- * popover: edit its expression, refresh its stored text, or remove it.
+ * popover: edit its expression and condition (ADR-0013), refresh its stored
+ * text, or remove it.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button, Dashicon, Popover } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
 import { registerFormatType, remove, useAnchor } from '@wordpress/rich-text';
 import type { RichTextValue } from '@wordpress/rich-text';
+import { ConditionSection, type Conditional } from './ConditionBuilder';
+import { readCondition } from './conditions';
 import { ExpressionEditor } from './ExpressionEditor';
 import type { Config } from './logic';
 import { previewExpression, previewTag } from './preview';
@@ -20,6 +24,7 @@ import {
     parseTag,
     storedText,
     toExpression,
+    valueArgs,
     valueOptions,
     type TagArgs,
 } from './tags';
@@ -54,7 +59,11 @@ function afterChip(value: RichTextValue): RichTextValue {
 function ChipPopover({ config, props, args }: { config: Config; props: EditProps; args: TagArgs }) {
     const postType = useSelect((select) => select('core/editor')?.getCurrentPostType?.() as string | undefined, []);
     const options = useMemo(() => valueOptions(config, postType), [config, postType]);
-    const [expression, setExpression] = useState(() => toExpression(args, options));
+    const [expression, setExpression] = useState(() => toExpression(valueArgs(args), options));
+    const [conditional, setConditional] = useState<Conditional>(() => {
+        const condition = readCondition(args.if);
+        return condition ? { if: condition, else: args.else } : {};
+    });
     const [busy, setBusy] = useState(false);
     const anchor = useAnchor({
         editableContentElement: props.contentRef.current,
@@ -63,7 +72,9 @@ function ChipPopover({ config, props, args }: { config: Config; props: EditProps
 
     const save = async (next: TagArgs) => {
         setBusy(true);
-        const value = next.expr !== undefined ? (await previewExpression(next.expr)).value : await previewTag(next);
+        // The chip's text is its value; the condition only decides on the front end.
+        const value =
+            next.expr !== undefined ? (await previewExpression(next.expr)).value : await previewTag(valueArgs(next));
         setBusy(false);
         props.onChange(
             withChip(props.value, chipObject(next, storedText(value, next.expr ?? next.tag ?? next.field ?? ''))),
@@ -71,43 +82,50 @@ function ChipPopover({ config, props, args }: { config: Config; props: EditProps
     };
 
     return (
-        <Popover
-            anchor={anchor}
-            placement="bottom-start"
-            className="taw-chip-popover"
-            focusOnMount={false}
-            shift
-            resize={false}
-            onClose={() => props.onChange(afterChip(props.value))}
-        >
-            <div className="taw-data-header">
-                <Dashicon icon="database" />
-                <strong>{__('TAW value', 'taw-core')}</strong>
-            </div>
-            <div className="taw-data-popup">
-                <ExpressionEditor value={expression} onChange={setExpression} options={options} autoFocus={false} />
-                <div className="taw-data-actions">
-                    <Button
-                        variant="tertiary"
-                        isDestructive
-                        onClick={() => props.onChange(withChip(props.value, null))}
-                    >
-                        {__('Remove', 'taw-core')}
-                    </Button>
-                    <Button variant="secondary" isBusy={busy} disabled={busy} onClick={() => void save(args)}>
-                        {__('Refresh', 'taw-core')}
-                    </Button>
-                    <Button
-                        variant="primary"
-                        isBusy={busy}
-                        disabled={busy || expression.trim() === ''}
-                        onClick={() => void save({ expr: expression })}
-                    >
-                        {__('Save', 'taw-core')}
-                    </Button>
+        // Rendered at the end of <body>: the canvas's popover slot clips at the canvas edge, and the
+        // editor (with its condition) is taller than core's own format popovers.
+        createPortal(
+            <Popover
+                inline
+                anchor={anchor}
+                placement="bottom-start"
+                className="taw-chip-popover"
+                focusOnMount={false}
+                shift
+                resize={false}
+                onClose={() => props.onChange(afterChip(props.value))}
+            >
+                <div className="taw-data-header">
+                    <Dashicon icon="database" />
+                    <strong>{__('TAW value', 'taw-core')}</strong>
                 </div>
-            </div>
-        </Popover>
+                <div className="taw-data-popup">
+                    <ExpressionEditor value={expression} onChange={setExpression} options={options} autoFocus={false} />
+                    <ConditionSection value={conditional} onChange={setConditional} options={options} />
+                    <div className="taw-data-actions">
+                        <Button
+                            variant="tertiary"
+                            isDestructive
+                            onClick={() => props.onChange(withChip(props.value, null))}
+                        >
+                            {__('Remove', 'taw-core')}
+                        </Button>
+                        <Button variant="secondary" isBusy={busy} disabled={busy} onClick={() => void save(args)}>
+                            {__('Refresh', 'taw-core')}
+                        </Button>
+                        <Button
+                            variant="primary"
+                            isBusy={busy}
+                            disabled={busy || expression.trim() === ''}
+                            onClick={() => void save({ expr: expression, ...conditional })}
+                        >
+                            {__('Save', 'taw-core')}
+                        </Button>
+                    </div>
+                </div>
+            </Popover>,
+            document.body,
+        )
     );
 }
 

@@ -530,6 +530,14 @@ icon) in its toolbar:
 - The footer shows what the block is bound to, with **Disconnect**. The canvas `@` stays WordPress's user
   mentions.
 - A group's sub-field is named `@{group}_{sub}` (e.g. `@address_city`).
+- **Conditions (v1.67.0+):**
+  - the **Expression** tab and a chip's editor have **Show only when…**: the rule builder (value · comparison ·
+    what to compare with; All/Any; **Add group**) and **Otherwise show**. It answers live: "Shown / Hidden for
+    this post";
+  - the **Visibility** tab puts a condition on the whole block. The same editor is in every block's sidebar
+    as **TAW visibility**, including blocks without the toolbar button;
+  - in the canvas, a conditional block has a dashed outline and a label ("Conditional · hidden for this
+    post", dimmed when hidden), and a conditional chip a dashed border. The chip's text stays its value.
 
 ### Term fields (v1.53.0+)
 

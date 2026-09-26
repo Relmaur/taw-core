@@ -26,6 +26,9 @@ export interface TagArgs {
     sub?: string;
     format?: string;
     fallback?: string;
+    /** A condition (ADR-0013) and the text shown when it doesn't hold. */
+    if?: unknown;
+    else?: string;
 }
 
 /** One value the popup offers. */
@@ -171,6 +174,10 @@ export function serializeTag(args: TagArgs): string {
     }
     if (args.expr === undefined && args.format?.trim()) out.format = args.format.trim();
     if (args.fallback?.trim()) out.fallback = args.fallback;
+    if (args.if !== undefined) {
+        out.if = args.if;
+        if (args.else?.trim()) out.else = args.else;
+    }
     return JSON.stringify(out);
 }
 
@@ -187,6 +194,14 @@ export function parseTag(json: unknown): TagArgs | null {
     } catch {
         return null;
     }
+}
+
+/** A chip's value args without its condition: what its text shows in the editor. */
+export function valueArgs(args: TagArgs): TagArgs {
+    const rest = { ...args };
+    delete rest.if;
+    delete rest.else;
+    return rest;
 }
 
 /** A chip's args as an expression, to edit it in the Expression tab. */

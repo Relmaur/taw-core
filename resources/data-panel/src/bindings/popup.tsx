@@ -7,16 +7,22 @@
  * - Inline: a chip where the caret is (default when the caret is in text);
  * - Block text: a `taw/field` binding on the block (read-only text, or, for
  *   an image field on an image, its ID/URL/alt as before).
+ *
+ * The Expression tab can add a condition (ADR-0013) to what it inserts; the
+ * Visibility tab puts one on the whole block.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Dashicon, SearchControl, TabPanel } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
+import { ConditionSection, type Conditional } from './ConditionBuilder';
+import { readCondition } from './conditions';
 import { ExpressionEditor } from './ExpressionEditor';
 import { connectedMetadata, planFor, withoutTawBindings, type BindingArgs, type Bindings, type Config } from './logic';
 import { previewExpression, previewTag } from './preview';
 import { caretIn, insertChip } from './richText';
-import { groupOptions, storedText, valueOptions, type TagArgs, type ValueOption } from './tags';
+import { groupOptions, storedText, valueArgs, valueOptions, type TagArgs, type ValueOption } from './tags';
+import { VisibilityEditor } from './visibility';
 
 /** The text attribute an expression binds, per block. */
 export const TEXT_ATTRIBUTE: Record<string, string> = {
@@ -38,14 +44,34 @@ export interface PopupProps {
     onClose: () => void;
 }
 
-function withExpression(source: string, metadata: Metadata, attribute: string, expr: string): Metadata {
+function withExpression(
+    source: string,
+    metadata: Metadata,
+    attribute: string,
+    expr: string,
+    conditional: Conditional = {},
+): Metadata {
+    const args: Record<string, unknown> = { expr };
+    if (conditional.if !== undefined) {
+        args.if = conditional.if;
+        if (conditional.else?.trim()) args.else = conditional.else;
+    }
     return {
         ...metadata,
         bindings: {
             ...(withoutTawBindings(source, metadata.bindings) ?? {}),
-            [attribute]: { source, args: { expr } as unknown as BindingArgs },
+            [attribute]: { source, args: args as unknown as BindingArgs },
         },
     };
+}
+
+/** The block text binding's condition, to reopen it with the expression. */
+function initialConditional(source: string, metadata: Metadata): Conditional {
+    const binding = Object.values(metadata.bindings ?? {}).find((b) => b?.source === source);
+    const args = binding?.args as { if?: unknown; else?: unknown } | undefined;
+    const condition = readCondition(args?.if);
+    if (!condition) return {};
+    return { if: condition, else: typeof args?.else === 'string' ? args.else : undefined };
 }
 
 /** A short description of what the block is bound to, for the footer. */
@@ -84,6 +110,7 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
     const [mode, setMode] = useState<Mode>(canInline || !canBlock ? 'inline' : 'block');
     const [search, setSearch] = useState('');
     const [expression, setExpression] = useState(() => initialExpression(config.source, clientId, metadata, options));
+    const [conditional, setConditional] = useState<Conditional>(() => initialConditional(config.source, metadata));
     const [previews, setPreviews] = useState<Record<string, string | null>>({});
     const bound = boundTo(config.source, metadata, options);
     const groups = groupOptions(options, search);
@@ -101,7 +128,9 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
 
     const insert = async (args: TagArgs, label: string) => {
         if (args.expr !== undefined) lastExpressions.set(clientId, args.expr);
-        const value = args.expr !== undefined ? (await previewExpression(args.expr)).value : await previewTag(args);
+        // The chip's text is its value; the condition only decides on the front end.
+        const value =
+            args.expr !== undefined ? (await previewExpression(args.expr)).value : await previewTag(valueArgs(args));
         if (insertChip(clientId, args, storedText(value, label))) onClose();
     };
 
@@ -132,6 +161,36 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
         ['inline', __('Inline', 'taw-core'), 'editor-textcolor'],
         ['block', __('Block text', 'taw-core'), 'text'],
     ];
+
+    const modeSwitch = (
+        <>
+            <div className="taw-data-mode" role="radiogroup" aria-label={__('Insert as', 'taw-core')}>
+                <span className="taw-data-mode__label">{__('Insert as', 'taw-core')}</span>
+                <div className="taw-data-mode__options">
+                    {modes.map(([value, label, icon]) => (
+                        <button
+                            key={value}
+                            type="button"
+                            role="radio"
+                            aria-checked={mode === value}
+                            className={mode === value ? 'is-selected' : undefined}
+                            disabled={value === 'block' && !canBlock}
+                            onClick={() => setMode(value)}
+                        >
+                            <Dashicon icon={icon as never} />
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            {mode === 'inline' && !canInline && (
+                <p className="taw-data-note">
+                    <Dashicon icon="info-outline" />
+                    {__('Click into the text where the value should go, then open this again.', 'taw-core')}
+                </p>
+            )}
+        </>
+    );
 
     const fieldsTab = (
         <div className="taw-data-fields">
@@ -184,7 +243,7 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
             ? {
                   label: __('Insert inline', 'taw-core'),
                   disabled: !canInline,
-                  run: () => void insert({ expr: expression }, expression),
+                  run: () => void insert({ expr: expression, ...conditional }, expression),
               }
             : {
                   label: __('Use as block text', 'taw-core'),
@@ -192,7 +251,7 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
                   run: () => {
                       if (textAttribute) {
                           lastExpressions.set(clientId, expression);
-                          bind(withExpression(config.source, metadata, textAttribute, expression));
+                          bind(withExpression(config.source, metadata, textAttribute, expression, conditional));
                       }
                   },
               };
@@ -200,6 +259,7 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
     const expressionTab = (
         <div className="taw-data-expression">
             <ExpressionEditor value={expression} onChange={setExpression} options={options} />
+            <ConditionSection value={conditional} onChange={setConditional} options={options} />
             {mode === 'inline' && (
                 <p className="taw-data-note">
                     <Dashicon icon="info-outline" />
@@ -225,39 +285,26 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
                 <strong>{__('TAW data', 'taw-core')}</strong>
                 <Button icon="no-alt" size="small" label={__('Close', 'taw-core')} onClick={onClose} />
             </div>
-            <div className="taw-data-mode" role="radiogroup" aria-label={__('Insert as', 'taw-core')}>
-                <span className="taw-data-mode__label">{__('Insert as', 'taw-core')}</span>
-                <div className="taw-data-mode__options">
-                    {modes.map(([value, label, icon]) => (
-                        <button
-                            key={value}
-                            type="button"
-                            role="radio"
-                            aria-checked={mode === value}
-                            className={mode === value ? 'is-selected' : undefined}
-                            disabled={value === 'block' && !canBlock}
-                            onClick={() => setMode(value)}
-                        >
-                            <Dashicon icon={icon as never} />
-                            {label}
-                        </button>
-                    ))}
-                </div>
-            </div>
-            {mode === 'inline' && !canInline && (
-                <p className="taw-data-note">
-                    <Dashicon icon="info-outline" />
-                    {__('Click into the text where the value should go, then open this again.', 'taw-core')}
-                </p>
-            )}
             <TabPanel
                 className="taw-data-tabs"
                 tabs={[
                     { name: 'fields', title: __('Fields', 'taw-core') },
                     { name: 'expression', title: __('Expression', 'taw-core') },
+                    { name: 'visibility', title: __('Visibility', 'taw-core') },
                 ]}
             >
-                {(tab: { name: string }) => (tab.name === 'fields' ? fieldsTab : expressionTab)}
+                {(tab: { name: string }) =>
+                    tab.name === 'visibility' ? (
+                        <div className="taw-data-visibility">
+                            <VisibilityEditor config={config} clientId={clientId} metadata={metadata} />
+                        </div>
+                    ) : (
+                        <>
+                            {modeSwitch}
+                            {tab.name === 'fields' ? fieldsTab : expressionTab}
+                        </>
+                    )
+                }
             </TabPanel>
             {bound !== null && (
                 <div className="taw-data-footer">

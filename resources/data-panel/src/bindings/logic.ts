@@ -51,8 +51,8 @@ export interface BlockContext {
 /** One preview request: a bound attribute of a block, in its post context. */
 export interface PreviewItem {
     key: string;
-    /** Inline tags and expressions (ADR-0011/0012); bound attributes send none. */
-    kind?: 'tag' | 'expr';
+    /** Inline tags, expressions and conditions (ADR-0011/0012/0013); bound attributes send none. */
+    kind?: 'tag' | 'expr' | 'condition';
     args: BindingArgs;
     block: string;
     attribute: string;
