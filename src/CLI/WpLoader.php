@@ -71,41 +71,60 @@ final class WpLoader
      */
     public static function resolveLocalSocket(string $themeDir): ?string
     {
-        $home = getenv('HOME');
-        if (!is_string($home) || $home === '') {
-            return null;
-        }
+        $socket = self::expectedLocalSocket($themeDir);
 
-        // macOS is Local by Flywheel's primary supported platform (and the
-        // only one this has been verified against); Windows uses a
-        // differently-rooted app-data path, checked here too on a
-        // best-effort basis even though it's unverified.
-        $candidates = [
-            $home . '/Library/Application Support/Local',
-            $home . '/AppData/Roaming/Local',
-        ];
+        // NOT is_file() — a Unix domain socket isn't a "regular file" by
+        // is_file()'s definition (it explicitly excludes sockets, FIFOs,
+        // device files), so it always returns false here even when the
+        // socket exists and is live. file_exists() doesn't discriminate
+        // by type and is what's actually needed for this check.
+        return $socket !== null && file_exists($socket) ? $socket : null;
+    }
 
-        foreach ($candidates as $localDir) {
-            $sitesJsonPath = $localDir . '/sites.json';
-            if (!is_file($sitesJsonPath)) {
-                continue;
+    /**
+     * Where the Local by Flywheel socket for the theme's site would be,
+     * whether or not the site is running. Null when the theme isn't in a
+     * Local site. With resolveLocalSocket() returning null, a non-null
+     * value here means "a Local site, but stopped" — worth telling the
+     * user instead of letting MySQL fall back to /tmp/mysql.sock.
+     */
+    public static function expectedLocalSocket(string $themeDir): ?string
+    {
+        foreach (self::localDirs() as $localDir) {
+            $sites = json_decode((string) file_get_contents($localDir . '/sites.json'), true);
+            if (is_array($sites)) {
+                return self::siteSocketPath($sites, $localDir, $themeDir);
             }
-
-            $sites = json_decode((string) file_get_contents($sitesJsonPath), true);
-            if (!is_array($sites)) {
-                continue;
-            }
-
-            return self::findSiteSocket($sites, $localDir, $themeDir);
         }
 
         return null;
     }
 
     /**
+     * Local's app-data directories that have a sites.json. macOS is Local
+     * by Flywheel's primary supported platform (and the only one this has
+     * been verified against); the Windows path is checked on a best-effort
+     * basis.
+     *
+     * @return list<string>
+     */
+    private static function localDirs(): array
+    {
+        $home = getenv('HOME');
+        if (!is_string($home) || $home === '') {
+            return [];
+        }
+
+        return array_values(array_filter(
+            [$home . '/Library/Application Support/Local', $home . '/AppData/Roaming/Local'],
+            static fn (string $dir): bool => is_file($dir . '/sites.json'),
+        ));
+    }
+
+    /**
      * @param array<string, mixed> $sites Decoded sites.json — keyed by site ID.
      */
-    private static function findSiteSocket(array $sites, string $localDir, string $themeDir): ?string
+    private static function siteSocketPath(array $sites, string $localDir, string $themeDir): ?string
     {
         $realThemeDir = realpath($themeDir) ?: $themeDir;
 
@@ -127,14 +146,7 @@ final class WpLoader
                 continue;
             }
 
-            $socket = $localDir . "/run/{$id}/mysql/mysqld.sock";
-
-            // NOT is_file() — a Unix domain socket isn't a "regular file" by
-            // is_file()'s definition (it explicitly excludes sockets, FIFOs,
-            // device files), so it always returns false here even when the
-            // socket exists and is live. file_exists() doesn't discriminate
-            // by type and is what's actually needed for this check.
-            return file_exists($socket) ? $socket : null;
+            return $localDir . "/run/{$id}/mysql/mysqld.sock";
         }
 
         return null;

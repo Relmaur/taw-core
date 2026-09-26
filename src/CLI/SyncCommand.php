@@ -364,14 +364,17 @@ class SyncCommand extends Command
      * for itself.
      *
      * Rules (see resources/update-manifest.json § skillsReconcile):
-     *   - skill present in canonical  → overwrite in place (fresh copy each run)
+     *   - skill present in canonical  → overwrite in place (fresh copy each run),
+     *     unless the client's copy says `owner: site`: a site skill that
+     *     happens to share a new framework skill's name is kept and reported
+     *     as a clash (before v1.59.2 it was silently replaced)
      *   - present only in client, `owner: site` → preserve untouched, report it
      *   - present only in client, `owner: taw`  → delete (retired framework skill)
      *   - present only in client, no `owner:`   → preserve, but warn (human call)
      *
      * @param array{path: string, type: string} $entry
      * @param array{ownerKey: string, frameworkValue: string, siteValue: string} $cfg
-     * @return array{overwrite: list<string>, delete: list<string>, preserve: list<string>, warn: list<string>}
+     * @return array{overwrite: list<string>, delete: list<string>, preserve: list<string>, warn: list<string>, clash: list<string>}
      */
     private function planSkillsReconcile(array $entry, string $cloneDir, array $cfg): array
     {
@@ -381,11 +384,16 @@ class SyncCommand extends Command
         $canonicalSkills = $this->immediateSubdirs($canonical);
         $localSkills = $this->immediateSubdirs($local);
 
-        $plan = ['overwrite' => [], 'delete' => [], 'preserve' => [], 'warn' => []];
+        $plan = ['overwrite' => [], 'delete' => [], 'preserve' => [], 'warn' => [], 'clash' => []];
 
         foreach ($canonicalSkills as $name) {
             $localSkill = $local . '/' . $name;
             $canonicalSkill = $canonical . '/' . $name;
+
+            if (is_dir($localSkill) && $this->skillOwner($localSkill, $cfg['ownerKey']) === $cfg['siteValue']) {
+                $plan['clash'][] = $name;
+                continue;
+            }
 
             if (!is_dir($localSkill) || $this->treeHash($localSkill) !== $this->treeHash($canonicalSkill)) {
                 $plan['overwrite'][] = $name;
@@ -412,13 +420,14 @@ class SyncCommand extends Command
         sort($plan['delete']);
         sort($plan['preserve']);
         sort($plan['warn']);
+        sort($plan['clash']);
 
         return $plan;
     }
 
     /**
      * @param array{path: string, type: string} $entry
-     * @param array{overwrite: list<string>, delete: list<string>, preserve: list<string>, warn: list<string>} $plan
+     * @param array{overwrite: list<string>, delete: list<string>, preserve: list<string>, warn: list<string>, clash: list<string>} $plan
      */
     private function applySkillsReconcile(array $entry, string $cloneDir, array $plan): void
     {
@@ -602,6 +611,7 @@ class SyncCommand extends Command
             'delete' => is_array($reconcile['delete'] ?? null) ? $reconcile['delete'] : [],
             'preserve' => is_array($reconcile['preserve'] ?? null) ? $reconcile['preserve'] : [],
             'warn' => is_array($reconcile['warn'] ?? null) ? $reconcile['warn'] : [],
+            'clash' => is_array($reconcile['clash'] ?? null) ? $reconcile['clash'] : [],
         ];
         $printed = false;
 
@@ -641,6 +651,16 @@ class SyncCommand extends Command
                 . "Add `owner: site` to the SKILL.md frontmatter to keep it silently, or delete the folder if it's a retired framework skill.",
                 $path,
                 implode(', ', $plan['warn'])
+            ));
+            $printed = true;
+        }
+
+        if ($plan['clash'] !== []) {
+            $io->warning(sprintf(
+                "%s: site skill(s) [owner: site] share a name with a framework skill — kept yours, the framework copy was NOT installed: %s\n"
+                . "Rename your skill's folder (and its `name:`) to get both, or delete it to take the framework one.",
+                $path,
+                implode(', ', $plan['clash'])
             ));
             $printed = true;
         }
