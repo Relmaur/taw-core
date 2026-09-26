@@ -74,6 +74,12 @@ msgstr[1] ""
 msgid "%d of %d records would change. Nothing has been written."
 msgstr ""
 
+#. translators: %s: a field label. The numeric entry binds core/image's attachment ID.
+#: src/Core/Bindings/EditorFields.php
+#, php-format
+msgid "%s (image ID)"
+msgstr ""
+
 #. translators: %s: field label
 #: src/Core/Form/Form.php
 #, php-format
@@ -237,6 +243,10 @@ msgstr ""
 #: src/Core/Content/ContentAdminScreen.php
 #, php-format
 msgid "Apply %d changes"
+msgstr ""
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Author"
 msgstr ""
 
 #: src/Core/Seo/Schema.php
@@ -700,6 +710,10 @@ msgstr ""
 msgid "Open the visual content editor"
 msgstr ""
 
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Options"
+msgstr ""
+
 #: src/Core/Seo/Schema.php
 msgid "Organization"
 msgstr ""
@@ -732,6 +746,10 @@ msgstr ""
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Portal ID"
+msgstr ""
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Post"
 msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
@@ -980,6 +998,10 @@ msgstr ""
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Tells the chatbot when to use this knowledge base — be specific about what it contains."
+msgstr ""
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Term"
 msgstr ""
 
 #: src/Core/Form/Form.php

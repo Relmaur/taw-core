@@ -28,7 +28,11 @@ export default defineConfig(({ command }) => ({
         emptyOutDir: true,
         manifest: true,
         rolldownOptions: {
-            input: { 'data-panel': path.resolve(import.meta.dirname, 'src/index.tsx') },
+            input: {
+                'data-panel': path.resolve(import.meta.dirname, 'src/index.tsx'),
+                // The taw/field Block Bindings source (ADR-0010).
+                bindings: path.resolve(import.meta.dirname, 'src/bindings/index.ts'),
+            },
             output: {
                 format: 'es',
                 entryFileNames: '[name]-[hash].js',

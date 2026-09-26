@@ -179,6 +179,11 @@ if (!class_exists('WP_REST_Request')) {
             return $this->params;
         }
 
+        public function get_param(string $key): mixed
+        {
+            return $this->params[$key] ?? null;
+        }
+
         public function set_param(string $key, mixed $value): void
         {
             $this->params[$key] = $value;
@@ -202,6 +207,21 @@ if (!class_exists('WP_REST_Request')) {
         public function offsetUnset(mixed $offset): void
         {
             unset($this->params[$offset]);
+        }
+    }
+}
+
+if (!class_exists('WP_REST_Response')) {
+    /** Minimal stand-in: the data a REST callback returns. */
+    class WP_REST_Response
+    {
+        public function __construct(public mixed $data = null, public int $status = 200)
+        {
+        }
+
+        public function get_data(): mixed
+        {
+            return $this->data;
         }
     }
 }

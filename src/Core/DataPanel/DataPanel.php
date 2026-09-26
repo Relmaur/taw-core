@@ -232,6 +232,15 @@ final class DataPanel
         self::$vite = $vite;
     }
 
+    /**
+     * The adapter for taw-core's committed build (assets/data-panel), shared
+     * by the panel and the Block Bindings editor script.
+     */
+    public static function assets(): Vite
+    {
+        return self::vite();
+    }
+
     private static function vite(): Vite
     {
         return self::$vite ??= new Vite(Framework::path(), Framework::url(), 'assets/data-panel');

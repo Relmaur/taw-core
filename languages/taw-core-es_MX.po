@@ -76,6 +76,12 @@ msgstr[1] ""
 msgid "%d of %d records would change. Nothing has been written."
 msgstr ""
 
+#. translators: %s: a field label. The numeric entry binds core/image's attachment ID.
+#: src/Core/Bindings/EditorFields.php
+#, php-format
+msgid "%s (image ID)"
+msgstr "%s (ID de imagen)"
+
 #. translators: %s: field label
 #: src/Core/Form/Form.php
 #, php-format
@@ -240,6 +246,10 @@ msgstr ""
 #, php-format
 msgid "Apply %d changes"
 msgstr ""
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Author"
+msgstr "Autor"
 
 #: src/Core/Seo/Schema.php
 msgid "Automatic detection can be unreliable for plugins with no stable version constant (e.g. some SmartCrawl installs) — this overrides it explicitly. Controls SeoMeta's <title>/meta/OG tags and this page's JSON-LD together."
@@ -702,6 +712,10 @@ msgstr ""
 msgid "Open the visual content editor"
 msgstr ""
 
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Options"
+msgstr "Opciones"
+
 #: src/Core/Seo/Schema.php
 msgid "Organization"
 msgstr ""
@@ -735,6 +749,10 @@ msgstr ""
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Portal ID"
 msgstr ""
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Post"
+msgstr "Entrada"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Post type"
@@ -983,6 +1001,10 @@ msgstr "Pestaña"
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Tells the chatbot when to use this knowledge base — be specific about what it contains."
 msgstr ""
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Term"
+msgstr "Término"
 
 #: src/Core/Form/Form.php
 msgid "Thank you! Your message has been sent."

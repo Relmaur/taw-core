@@ -70,6 +70,7 @@ export const WP_EXPORT_NAMES = [
     'registerBlockType', 'unregisterBlockType', 'registerBlockVariation', 'registerBlockStyle',
     'unregisterBlockStyle', 'createBlock', 'cloneBlock', 'getBlockType', 'getBlockTypes',
     'getBlockContent', 'getSaveContent', 'serialize', 'parse', 'rawHandler', 'pasteHandler',
+    'registerBlockBindingsSource', 'unregisterBlockBindingsSource', 'getBlockBindingsSource',
     // @wordpress/block-editor
     'useBlockProps', 'useInnerBlocksProps', 'RichText', 'RichTextToolbarButton', 'InnerBlocks',
     'InspectorControls', 'BlockControls', 'MediaUpload', 'MediaUploadCheck', 'MediaPlaceholder',

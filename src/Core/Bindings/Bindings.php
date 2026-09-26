@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace TAW\Core\Bindings;
 
+use TAW\Core\DataPanel\DataPanel;
+use TAW\Core\I18n\Translations;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -14,11 +17,20 @@ if (!defined('ABSPATH')) {
  *
  *   <!-- wp:heading {"metadata":{"bindings":{"content":{"source":"taw/field","args":{"field":"book_subtitle"}}}}} -->
  *
- * Registered for every TAW theme by Boot::data() (one `init` hook).
+ * Registered for every TAW theme by Boot::data(): the source on `init`, the
+ * preview route on `rest_api_init`, the editor script on
+ * `enqueue_block_editor_assets`.
  */
 final class Bindings
 {
     public const SOURCE = 'taw/field';
+
+    public const SCRIPT_HANDLE = 'taw-bindings';
+
+    /** Source entry in resources/data-panel/ (its manifest key). */
+    public const SCRIPT_SOURCE = 'src/bindings/index.ts';
+
+    public const SCRIPT_DEPS = ['wp-blocks', 'wp-block-editor', 'wp-data', 'wp-api-fetch', 'wp-i18n'];
 
     private static bool $registered = false;
 
@@ -32,6 +44,31 @@ final class Bindings
         self::$registered = true;
 
         add_action('init', [self::class, 'registerSource']);
+        add_action('rest_api_init', [PreviewEndpoint::class, 'registerRoute']);
+        add_action('enqueue_block_editor_assets', [self::class, 'enqueueEditor']);
+    }
+
+    /**
+     * The editor side (ADR-0010 decision 8): registers `taw/field` with
+     * `getValues` (previews through PreviewEndpoint) and `getFieldsList`
+     * (EditorFields, inlined). Post and site editor alike.
+     */
+    public static function enqueueEditor(): void
+    {
+        if (!function_exists('register_block_bindings_source')) {
+            return;
+        }
+
+        DataPanel::assets()->script(self::SCRIPT_HANDLE, self::SCRIPT_SOURCE, self::SCRIPT_DEPS);
+
+        $config = ['source' => self::SOURCE, 'route' => '/' . PreviewEndpoint::NAMESPACE . PreviewEndpoint::ROUTE, 'fields' => EditorFields::all()];
+        $inline = sprintf('window.tawBindings = %s;', wp_json_encode($config));
+
+        $localeData = Translations::scriptLocaleData();
+        if ($localeData !== null) {
+            $inline .= sprintf(' wp.i18n.setLocaleData(%s, %s);', wp_json_encode($localeData), wp_json_encode(Translations::DOMAIN));
+        }
+        wp_add_inline_script(self::SCRIPT_HANDLE, $inline, 'before');
     }
 
     public static function registerSource(): void
