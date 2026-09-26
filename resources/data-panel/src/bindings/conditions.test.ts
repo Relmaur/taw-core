@@ -65,3 +65,18 @@ describe('helpers', () => {
         ).toBe(3);
     });
 });
+
+describe('templatePostType (the editor block context for templates)', () => {
+    it('maps template slugs to post types', async () => {
+        const { templatePostType } = await import('./preview');
+        const types = ['post', 'page', 'book', 'book-club'];
+        expect(templatePostType('single-book', types)).toBe('book');
+        expect(templatePostType('single-book-dune', types)).toBe('book');
+        expect(templatePostType('single-book-club', types)).toBe('book-club');
+        expect(templatePostType('single', types)).toBe('post');
+        expect(templatePostType('page', types)).toBe('page');
+        expect(templatePostType('archive-book', types)).toBe('');
+        expect(templatePostType('single-movie', types)).toBe('');
+        expect(templatePostType('single-book', []), 'post types still loading').toBe('book');
+    });
+});

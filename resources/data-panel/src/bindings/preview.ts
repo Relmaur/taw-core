@@ -19,11 +19,43 @@ export function setPreviewFetch(fetch: Fetch): void {
     fetchPreview = fetch;
 }
 
-/** The edited post (a template previews its type's latest post on the server). */
+/**
+ * The post type a template shows, as the editor's block context derives it
+ * (`page`, `single` → post, `single-book[-slug]` → book), or '' for others.
+ */
+export function templatePostType(slug: string, postTypes: string[]): string {
+    if (slug === 'page') return 'page';
+    if (slug === 'single') return 'post';
+    const match = /^single-(.+)$/.exec(slug);
+    if (!match) return '';
+    // Post types still loading: the rest of the slug (the usual `single-{type}`).
+    if (postTypes.length === 0) return match[1];
+    // Longest first: "single-book-club" is the book-club type before the book type's "club" post.
+    const found = [...postTypes]
+        .sort((a, b) => b.length - a.length)
+        .find((t) => match[1] === t || match[1].startsWith(`${t}-`));
+    return found ?? '';
+}
+
+/** The edited post; a template previews its type's latest post on the server (postId 0 + postType). */
 function context(): { postId: number; postType: string } {
     const editor = select('core/editor');
     const id: unknown = editor?.getCurrentPostId?.();
     const type: unknown = editor?.getCurrentPostType?.();
+    if (type === 'wp_template') {
+        const slug: unknown = editor?.getEditedPostAttribute?.('slug');
+        const types = (select('core')?.getPostTypes?.({ per_page: -1 }) ?? []) as { slug: string }[];
+        return {
+            postId: 0,
+            postType:
+                typeof slug === 'string'
+                    ? templatePostType(
+                          slug,
+                          types.map((t) => t.slug),
+                      )
+                    : '',
+        };
+    }
     return { postId: typeof id === 'number' ? id : 0, postType: typeof type === 'string' ? type : '' };
 }
 
