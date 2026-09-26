@@ -212,11 +212,19 @@ These are new APIs, and nothing existing changes:
 **Check:** on a Spanish site, open a form with a required field and leave it empty: the message is in
 Spanish.
 
+### v1.60.0: Block Bindings (`taw/field`)
+New and additive: core blocks can show TAW fields through the `taw/field` Block Bindings source (see
+"Block Bindings" in the README). `Boot::data()` registers it on `init`, so the theme's hook list gains
+one line. Nothing renders differently until a block uses it.
+
+**Check:** nothing to do. If you keep private data in a post, term or options field, add
+`'bindings' => false` to it; user fields never bind unless they say `'bindings' => true`.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
 - **Fields:** the data panel (`"ui": "panel"`), the `link` field, and term and user fieldsets.
-- **Reading and REST:** typed reads (`Taw::post()`), and options over REST.
+- **Reading and REST:** typed reads (`Taw::post()`), Block Bindings (`taw/field`), and options over REST.
 - **Content:** content snapshots (`bin/taw content:export` / `content:import`).
 - **Lockdown:** editing policies (`Boot::editing()`).
 - **Integrations:** Lucide icons (`Lucide::enable()`), media folders (`MediaFolders::enable()`), the

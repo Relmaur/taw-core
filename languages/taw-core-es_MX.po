@@ -966,6 +966,10 @@ msgstr ""
 msgid "TAW Media"
 msgstr ""
 
+#: src/Core/Bindings/Bindings.php
+msgid "TAW field"
+msgstr "Campo TAW"
+
 #. translators: %s: capability name.
 #: src/Core/Editing/EditingAdminScreen.php
 #, php-format

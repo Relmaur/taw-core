@@ -59,7 +59,7 @@ final class Validator
 
     /** Field keys with a known type; any other field key passes through as-is. */
     private const FIELD_STRING_KEYS = ['label', 'description', 'placeholder'];
-    private const FIELD_BOOL_KEYS = ['required', 'readonly'];
+    private const FIELD_BOOL_KEYS = ['required', 'readonly', 'bindings'];
     private const FIELD_NUMBER_KEYS = ['min', 'max', 'step'];
 
     /**

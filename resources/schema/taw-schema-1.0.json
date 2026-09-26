@@ -160,6 +160,7 @@
         "placeholder": { "type": "string" },
         "required": { "type": "boolean" },
         "readonly": { "type": "boolean" },
+        "bindings": { "type": "boolean" },
         "min": { "type": "number" },
         "max": { "type": "number" },
         "step": { "type": "number" },
