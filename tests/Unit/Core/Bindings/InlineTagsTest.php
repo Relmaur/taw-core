@@ -222,6 +222,66 @@ final class InlineTagsTest extends TestCase
         $this->assertSame('Dune – Part One', InlineTags::value(['tag' => 'post.title'], new BindingContext(5)));
     }
 
+    // --- Expressions (ADR-0012) -----------------------------------------
+
+    private static function expr(string $expression): string
+    {
+        return self::tag(['expr' => $expression]);
+    }
+
+    public function test_an_expression_chip_mixes_text_and_values(): void
+    {
+        $this->assertSame(
+            '<span class="taw-tag">Published on date(F j, Y)#5 by Frank Herbert · 1965 &amp; ACME &amp; Sons</span>',
+            self::render(self::expr("Published on @post.date.format('F j, Y') by @post.author · @book_year & @option.company_name"))
+        );
+        $this->assertSame('<span class="taw-tag">August 1, 1965</span>', self::render(self::expr("@book_released.format('F j, Y')")));
+        $this->assertSame('<span class="taw-tag">&lt;b&gt;Dune – Part One&lt;/b&gt;</span>', self::render(self::expr('<b>@post.title</b>')), 'text parts are escaped too');
+    }
+
+    public function test_expression_functions(): void
+    {
+        $this->assertSame('<span class="taw-tag">FRANK HERBERT / books &amp; more</span>', self::render(self::expr('@post.author.upper() / @site.name.lower()')));
+        $this->assertSame('<span class="taw-tag">Frank…</span>', self::render(self::expr('@post.author.truncate(5)')));
+        $this->assertSame('<span class="taw-tag">n/a</span>', self::render(self::expr("@book_missing.default('n/a')")));
+        $this->assertSame('<span class="taw-tag">Frank Herbert</span>', self::render(self::expr("@post.author.default('n/a')")), 'default only when empty');
+    }
+
+    public function test_expression_errors_and_privacy_render_empty(): void
+    {
+        $this->assertSame('<span class="taw-tag">Title:</span>', self::render(self::expr('Title: @post.title.shout()')));
+        $this->assertSame('<span class="taw-tag">x</span>', self::render(self::expr("@post.title.shout().default('x')")));
+        $this->assertSame('<span class="taw-tag">Year</span>', self::render(self::expr('Year @book_year'), 6), 'a private post');
+        $this->assertSame('<span class="taw-tag">Secret:</span>', self::render(self::expr('Secret: @book_secret')), 'bindings: false');
+        $this->assertSame('<span class="taw-tag">Fallback</span>', self::render(self::tag(['expr' => '@site.owner', 'fallback' => 'Fallback'])));
+    }
+
+    public function test_an_expression_with_excerpts_does_not_recurse(): void
+    {
+        $this->assertSame('<span class="taw-tag">A desert planet. / A desert planet.</span>', self::render(self::expr('@post.excerpt / @post.excerpt')));
+        $this->assertSame(2, $this->nestedRenders);
+    }
+
+    public function test_an_expression_as_block_text(): void
+    {
+        $block = static fn (string $name): object => (object) ['name' => $name, 'context' => ['postId' => 5]];
+
+        $this->assertSame('By Frank Herbert &amp; co', Bindings::getValue(['expr' => 'By @post.author & co'], $block('core/paragraph'), 'content'));
+        $this->assertSame('Cover of Dune – Part One & co', Bindings::getValue(['expr' => 'Cover of @post.title & co'], $block('core/image'), 'alt'), 'attributes get plain text');
+        $this->assertNull(Bindings::getValue(['expr' => '@post.url'], $block('core/button'), 'url'), 'not for URLs');
+        $this->assertNull(Bindings::getValue(['expr' => '@book_missing'], $block('core/paragraph'), 'content'), 'empty keeps the saved text');
+    }
+
+    public function test_previews_evaluate_expressions_with_errors(): void
+    {
+        $item = static fn (string $expression, int $postId = 5): array => ['key' => 'k', 'kind' => 'expr', 'args' => ['expr' => $expression], 'postId' => $postId, 'postType' => 'book'];
+
+        $this->assertSame(['value' => 'Year 1965', 'errors' => []], PreviewEndpoint::resolve($item('Year @book_year')));
+        $this->assertSame(['value' => 'Hi', 'errors' => [['code' => 'unknown_function', 'at' => 15]]], PreviewEndpoint::resolve($item('Hi @post.title.nope()')));
+        $this->assertNull(PreviewEndpoint::resolve($item('Year @book_year', 8)), 'a post the user can\'t edit');
+        $this->assertSame('Year 1965', PreviewEndpoint::resolve(['key' => 'k', 'kind' => 'tag', 'args' => ['expr' => 'Year @book_year'], 'postId' => 5]), 'an expression chip\'s preview');
+    }
+
     public function test_register_hooks_render_and_context_filters(): void
     {
         Bindings::register();

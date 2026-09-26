@@ -236,6 +236,10 @@ tags" in the README). The theme's hook list gains two lines: `render_block` (ski
 tag) and `register_block_type_args` (adds `postId`/`postType` context to rich-text blocks). Content
 without tags renders exactly as before. **Nothing to do.**
 
+### v1.64.0: expressions
+Tags and `taw/field` bindings accept expressions, `{"expr": "Published on @post.date.format('Y')"}` (see
+"Expressions" in the README). No hooks change; existing tags and bindings are unchanged. **Nothing to do.**
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

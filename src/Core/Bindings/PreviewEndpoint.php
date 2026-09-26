@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Core\Bindings;
 
+use TAW\Core\Bindings\Expression\Evaluator;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -16,6 +18,8 @@ if (!defined('ABSPATH')) {
  * Request:  {"items": [{"key", "args", "block", "attribute", "postId", "postType"}]}
  *           An inline dynamic tag (ADR-0011) sends "kind": "tag" and no block/attribute:
  *           its value is the plain text InlineTags::value() gives (fallback included).
+ *           An expression (ADR-0012) sends "kind": "expr" and args {"expr": "…"}: its value
+ *           is {"value": "…", "errors": [{code, at}]}.
  * Response: {"values": {"<key>": <value or null>}}
  *
  * Editors only (`edit_posts`), and a post's values only for users who can
@@ -62,20 +66,25 @@ final class PreviewEndpoint
     public static function resolve(array $item): mixed
     {
         $args = is_array($item['args'] ?? null) ? $item['args'] : [];
-        $ref = Reference::fromArgs($args);
-        $isTag = ($item['kind'] ?? null) === 'tag';
+        $kind = $item['kind'] ?? null;
+        if ($kind === 'expr') {
+            return self::expression($args, $item);
+        }
+        $ref = isset($args['expr']) ? null : Reference::fromArgs($args);
+        $isTag = $kind === 'tag';
+        if ($isTag && isset($args['expr'])) {
+            $postId = self::postId($item);
+            return $postId === null ? null : InlineTags::value($args, new BindingContext($postId));
+        }
         $block = is_string($item['block'] ?? null) ? $item['block'] : '';
         $attribute = is_string($item['attribute'] ?? null) ? $item['attribute'] : '';
         if ($ref === null || (!$isTag && ($block === '' || $attribute === '' || $ref->tag !== null))) {
             return null;
         }
 
-        $postId = is_numeric($item['postId'] ?? null) ? (int) $item['postId'] : 0;
-        if ($postId > 0 && !current_user_can('edit_post', $postId)) {
+        $postId = self::postId($item);
+        if ($postId === null) {
             return null;
-        }
-        if ($postId <= 0 && is_string($item['postType'] ?? null) && $item['postType'] !== '') {
-            $postId = self::samplePost($item['postType']);
         }
 
         if ($isTag) {
@@ -85,6 +94,40 @@ final class PreviewEndpoint
         $value = Bindings::resolver()->resolve($ref, new BindingContext($postId), Target::for($block, $attribute, self::attributeSchema($block, $attribute)));
 
         return $value === false ? '' : $value;
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     * @param array<string, mixed> $item
+     * @return array{value: string, errors: list<array{code: string, at: int}>}|null
+     */
+    private static function expression(array $args, array $item): ?array
+    {
+        $postId = self::postId($item);
+        if ($postId === null || !is_string($args['expr'] ?? null)) {
+            return null;
+        }
+
+        return Evaluator::evaluate($args['expr'], new BindingContext($postId));
+    }
+
+    /**
+     * The post an item previews: its own (only for users who can edit it), or
+     * for a template the latest post of its type. Null when refused.
+     *
+     * @param array<string, mixed> $item
+     */
+    private static function postId(array $item): ?int
+    {
+        $postId = is_numeric($item['postId'] ?? null) ? (int) $item['postId'] : 0;
+        if ($postId > 0 && !current_user_can('edit_post', $postId)) {
+            return null;
+        }
+        if ($postId <= 0 && is_string($item['postType'] ?? null) && $item['postType'] !== '') {
+            $postId = self::samplePost($item['postType']);
+        }
+
+        return $postId;
     }
 
     private static function samplePost(string $postType): int

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Core\Bindings;
 
+use TAW\Core\Bindings\Expression\Evaluator;
+
 use TAW\Core\DataPanel\DataPanel;
 use TAW\Core\I18n\Translations;
 
@@ -94,6 +96,10 @@ final class Bindings
      */
     public static function getValue(array $args, object $block, string $attribute): mixed
     {
+        if (isset($args['expr'])) {
+            return self::expressionValue($args['expr'], $block, $attribute);
+        }
+
         $ref = Reference::fromArgs($args);
         // Property tags (post.date…) are inline-only for now (ADR-0011).
         if ($ref === null || $ref->tag !== null) {
@@ -105,6 +111,27 @@ final class Bindings
         $schema = is_object($type) && isset($type->attributes[$attribute]) && is_array($type->attributes[$attribute]) ? $type->attributes[$attribute] : null;
 
         return self::resolver()->resolve($ref, BindingContext::fromBlock($block), Target::for($name, $attribute, $schema));
+    }
+
+    /**
+     * `args: {"expr": "…"}` (ADR-0012): an expression as a text attribute,
+     * escaped for rich text, plain for HTML attributes (alt, title). Other
+     * attributes (URLs, IDs) don't take expressions.
+     */
+    private static function expressionValue(mixed $expression, object $block, string $attribute): ?string
+    {
+        $name = property_exists($block, 'name') && is_string($block->name) ? $block->name : '';
+        $kind = Target::for($name, $attribute)->kind;
+        if (!is_string($expression) || !in_array($kind, ['text', 'plain'], true)) {
+            return null;
+        }
+
+        $value = Evaluator::evaluate($expression, BindingContext::fromBlock($block))['value'];
+        if ($value === '') {
+            return null;
+        }
+
+        return $kind === 'text' ? esc_html($value) : $value;
     }
 
     public static function resolver(): ExpressionResolver

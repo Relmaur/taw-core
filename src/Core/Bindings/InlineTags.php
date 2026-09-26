@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Core\Bindings;
 
+use TAW\Core\Bindings\Expression\Evaluator;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -20,7 +22,8 @@ if (!defined('ABSPATH')) {
  *
  * Properties (`tag`) resolve through TagResolver, fields (the `taw/field`
  * args) through the bindings resolver, so privacy, opt-outs and context are
- * the same as for Block Bindings.
+ * the same as for Block Bindings. `{"expr": "…"}` holds an expression
+ * (ADR-0012), evaluated by Expression\Evaluator from the same values.
  */
 final class InlineTags
 {
@@ -36,8 +39,12 @@ final class InlineTags
 
     private static ?TagResolver $tags = null;
 
-    /** Blocks rendered while a tag resolves (an excerpt renders content) are left alone. */
-    private static bool $resolving = false;
+    /**
+     * How many values are resolving: blocks rendered meanwhile (an excerpt
+     * renders content) are left alone. A depth, since an expression resolves
+     * several values, one inside the other's evaluation.
+     */
+    private static int $resolving = 0;
 
     public static function register(): void
     {
@@ -52,7 +59,7 @@ final class InlineTags
      */
     public static function renderBlock(string $html, array $parsed = [], ?object $block = null): string
     {
-        if (self::$resolving || !str_contains($html, self::ATTRIBUTE)) {
+        if (self::$resolving > 0 || !str_contains($html, self::ATTRIBUTE)) {
             return $html;
         }
 
@@ -94,16 +101,18 @@ final class InlineTags
      */
     public static function value(array $args, BindingContext $context): ?string
     {
-        $ref = Reference::fromArgs($args);
         $value = null;
 
-        if ($ref !== null) {
-            self::$resolving = true;
+        if (isset($args['expr'])) {
+            // An expression (ADR-0012): its tokens come back through here.
+            $value = is_string($args['expr']) ? Evaluator::evaluate($args['expr'], $context)['value'] : null;
+        } elseif (($ref = Reference::fromArgs($args)) !== null) {
+            self::$resolving++;
             try {
                 $resolver = $ref->tag !== null ? (self::$tags ??= new TagResolver()) : Bindings::resolver();
                 $value = $resolver->resolve($ref, $context, Target::inline());
             } finally {
-                self::$resolving = false;
+                self::$resolving--;
             }
         }
 
@@ -134,6 +143,6 @@ final class InlineTags
     public static function reset(): void
     {
         self::$tags = null;
-        self::$resolving = false;
+        self::$resolving = 0;
     }
 }
