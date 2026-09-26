@@ -97,15 +97,17 @@ class OptionsPage
 
         foreach ($this->get_all_fields() as $field) {
             self::$fieldRegistry[$this->prefix . $field['id']] = array_merge($field, [
-                'option_page' => $this->id,
-                'prefix'      => $this->prefix,
+                'option_page'       => $this->id,
+                'option_page_title' => $this->title,
+                'prefix'            => $this->prefix,
             ]);
         }
         foreach ($this->fields as $field) {
             if (($field['type'] ?? '') === 'group' && !empty($field['fields'])) {
                 self::$groupRegistry[$this->prefix . $field['id']] = array_merge($field, [
-                    'option_page' => $this->id,
-                    'prefix'      => $this->prefix,
+                    'option_page'       => $this->id,
+                    'option_page_title' => $this->title,
+                    'prefix'            => $this->prefix,
                 ]);
             }
         }

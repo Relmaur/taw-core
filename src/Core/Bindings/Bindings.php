@@ -8,6 +8,7 @@ use TAW\Core\Bindings\Expression\Evaluator;
 
 use TAW\Core\DataPanel\DataPanel;
 use TAW\Core\I18n\Translations;
+use TAW\Helpers\Framework;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -30,6 +31,8 @@ final class Bindings
 
     public const SCRIPT_HANDLE = 'taw-bindings';
 
+    public const CANVAS_STYLE = 'taw-tags-canvas';
+
     /** Source entry in resources/data-panel/ (its manifest key). */
     public const SCRIPT_SOURCE = 'src/bindings/index.ts';
 
@@ -49,6 +52,7 @@ final class Bindings
         add_action('init', [self::class, 'registerSource']);
         add_action('rest_api_init', [PreviewEndpoint::class, 'registerRoute']);
         add_action('enqueue_block_editor_assets', [self::class, 'enqueueEditor']);
+        add_action('enqueue_block_assets', [self::class, 'enqueueCanvasStyles']);
         InlineTags::register();
     }
 
@@ -73,6 +77,22 @@ final class Bindings
             $inline .= sprintf(' wp.i18n.setLocaleData(%s, %s);', wp_json_encode($localeData), wp_json_encode(Translations::DOMAIN));
         }
         wp_add_inline_script(self::SCRIPT_HANDLE, $inline, 'before');
+    }
+
+    /**
+     * enqueue_block_assets: the chip look of inline tags (ADR-0011/0012) in
+     * the editor canvas. That hook also runs on the front end, where tags
+     * are plain text: admin requests only.
+     */
+    public static function enqueueCanvasStyles(): void
+    {
+        if (!is_admin()) {
+            return;
+        }
+
+        wp_register_style(self::CANVAS_STYLE, false, [], Framework::version());
+        wp_enqueue_style(self::CANVAS_STYLE);
+        wp_add_inline_style(self::CANVAS_STYLE, '.taw-tag{background:rgba(56,88,233,.1);box-shadow:inset 0 0 0 1px rgba(56,88,233,.35);border-radius:3px;padding:0 .2em;white-space:nowrap;cursor:pointer}.taw-tag[data-rich-text-format-boundary],.taw-tag:focus{background:rgba(56,88,233,.22)}');
     }
 
     public static function registerSource(): void

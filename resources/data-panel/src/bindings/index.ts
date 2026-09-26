@@ -8,8 +8,11 @@ import { registerBlockBindingsSource } from '@wordpress/blocks';
 import { createReduxStore, dispatch, register, select, subscribe } from '@wordpress/data';
 import { registerPlugin } from '@wordpress/plugins';
 import { registerAllowBound } from './allowBound';
+import { registerChips } from './chips';
 import { batcher, source, STORE, type Config, type PreviewItem } from './logic';
 import { connectMenu } from './menu';
+import { setPreviewFetch } from './preview';
+import { injectStyles } from './styles';
 import { registerToolbar } from './toolbar';
 
 declare global {
@@ -58,9 +61,14 @@ if (config) {
 
     registerBlockBindingsSource(source(config));
 
+    // Inline chips and expressions (ADR-0011/0012), and the popup's look.
+    setPreviewFetch(fetchValue);
+    registerChips(config);
+    injectStyles();
+
     // "Connect to TAW field…" in each block's Options (⋮) menu.
     registerPlugin('taw-bindings-menu', { render: connectMenu(config) });
-    // A "TAW field" dropdown in the block toolbar itself.
+    // The TAW data popup (Fields / Expression) from the block toolbar.
     registerToolbar(config);
     // Bound-only blocks from the editing policy (allowBound), when there are any.
     registerAllowBound(config);

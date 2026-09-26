@@ -76,7 +76,7 @@ final class Blocks
 
     /**
      * Whether a parsed block is bound to a TAW field: one of its bindings
-     * uses BOUND_SOURCE with a field name.
+     * uses BOUND_SOURCE with a field name or an expression.
      *
      * @param array<string, mixed> $block A parse_blocks() entry.
      */
@@ -88,12 +88,14 @@ final class Blocks
         }
 
         foreach ($bindings as $binding) {
-            if (is_array($binding)
-                && ($binding['source'] ?? null) === self::BOUND_SOURCE
-                && is_string($binding['args']['field'] ?? null)
-                && trim($binding['args']['field']) !== ''
-            ) {
-                return true;
+            if (!is_array($binding) || ($binding['source'] ?? null) !== self::BOUND_SOURCE) {
+                continue;
+            }
+            // A field, or an expression (ADR-0012).
+            foreach (['field', 'expr'] as $key) {
+                if (is_string($binding['args'][$key] ?? null) && trim($binding['args'][$key]) !== '') {
+                    return true;
+                }
             }
         }
 

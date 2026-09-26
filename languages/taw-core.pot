@@ -140,6 +140,10 @@ msgstr ""
 msgid "(added to every allow list)"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "(empty for this post)"
+msgstr ""
+
 #: src/Core/Metabox/Metabox.php
 msgid "(new tab)"
 msgstr ""
@@ -156,6 +160,10 @@ msgstr ""
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid ".sqlite file"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "@ value"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -206,6 +214,10 @@ msgstr ""
 msgid "Add selected"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "Add to the expression"
+msgstr ""
+
 #: src/Core/Seo/SeoMeta.php
 msgid "Adds noindex — the page stays live but search engines are asked not to list it."
 msgstr ""
@@ -251,7 +263,7 @@ msgstr ""
 msgid "Apply %d changes"
 msgstr ""
 
-#: resources/data-panel/src/bindings/logic.ts
+#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/tags.ts
 msgid "Author"
 msgstr ""
 
@@ -265,6 +277,14 @@ msgstr ""
 
 #: src/Core/Form/Form.php
 msgid "Back"
+msgstr ""
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Block text"
+msgstr ""
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Block text:"
 msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
@@ -315,7 +335,11 @@ msgstr ""
 msgid "Clear"
 msgstr ""
 
-#: src/Core/Form/Form.php
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Click into the text where the value should go, then open this again."
+msgstr ""
+
+#: resources/data-panel/src/bindings/popup.tsx src/Core/Form/Form.php
 msgid "Close"
 msgstr ""
 
@@ -333,7 +357,7 @@ msgstr ""
 msgid "Connect these blocks to a TAW field (block toolbar → TAW field) or remove them before saving: %s."
 msgstr ""
 
-#: resources/data-panel/src/bindings/menu.tsx resources/data-panel/src/bindings/toolbar.tsx
+#: resources/data-panel/src/bindings/menu.tsx
 msgid "Connect to TAW field"
 msgstr ""
 
@@ -343,6 +367,14 @@ msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Content, per post type"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Current year"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Date"
 msgstr ""
 
 #: src/Core/Media/MediaFolders.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
@@ -361,7 +393,11 @@ msgstr ""
 msgid "Discard your changes to this field?"
 msgstr ""
 
-#: resources/data-panel/src/bindings/menu.tsx resources/data-panel/src/bindings/toolbar.tsx
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Disconnect"
+msgstr ""
+
+#: resources/data-panel/src/bindings/menu.tsx
 msgid "Disconnect TAW field"
 msgstr ""
 
@@ -401,6 +437,10 @@ msgstr ""
 msgid "Enter"
 msgstr ""
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Excerpt"
+msgstr ""
+
 #: src/Core/Editor/VisualEditor.php
 msgid "Exit Editor"
 msgstr ""
@@ -415,6 +455,10 @@ msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Export"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx resources/data-panel/src/bindings/popup.tsx
+msgid "Expression"
 msgstr ""
 
 #: src/Core/Seo/SeoMeta.php
@@ -457,6 +501,10 @@ msgstr ""
 msgid "Field-level changes"
 msgstr ""
 
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Fields"
+msgstr ""
+
 #. translators: %d: attachment ID.
 #: resources/data-panel/src/controls/MediaControls.tsx
 #, php-format
@@ -495,6 +543,10 @@ msgstr ""
 
 #: src/Core/Seo/Schema.php
 msgid "Home"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "ID"
 msgstr ""
 
 #: resources/data-panel/src/controls/IconControl.tsx
@@ -555,6 +607,18 @@ msgstr ""
 msgid "Incorrect password. Please try again."
 msgstr ""
 
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Inline"
+msgstr ""
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Insert as"
+msgstr ""
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Insert inline"
+msgstr ""
+
 #: src/Core/Form/Form.php
 msgid "Invalid email address."
 msgstr ""
@@ -584,6 +648,10 @@ msgstr ""
 
 #: src/Core/Media/MediaFolders.php
 msgid "Load more"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "Loading…"
 msgstr ""
 
 #: src/Core/Seo/Schema.php
@@ -616,6 +684,10 @@ msgstr ""
 
 #: src/Core/Seo/SeoMeta.php
 msgid "Meta Title"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Modified date"
 msgstr ""
 
 #: src/Core/Media/MediaFolders.php
@@ -738,8 +810,16 @@ msgstr ""
 msgid "No segments yet."
 msgstr ""
 
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "No values match your search."
+msgstr ""
+
 #: src/Core/Metabox/Metabox.php
 msgid "None selected"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "Not a value this post has:"
 msgstr ""
 
 #: resources/data-panel/src/controls/PostSelect.tsx
@@ -770,7 +850,7 @@ msgstr ""
 msgid "Open the visual content editor"
 msgstr ""
 
-#: resources/data-panel/src/bindings/logic.ts
+#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/tags.ts
 msgid "Options"
 msgstr ""
 
@@ -808,8 +888,12 @@ msgstr ""
 msgid "Portal ID"
 msgstr ""
 
-#: resources/data-panel/src/bindings/logic.ts
+#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/tags.ts
 msgid "Post"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Post fields"
 msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
@@ -824,6 +908,10 @@ msgstr ""
 msgid "Preset"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "Preview"
+msgstr ""
+
 #: src/Core/Seo/Schema.php
 msgid "Profile URL"
 msgstr ""
@@ -832,8 +920,16 @@ msgstr ""
 msgid "Protected Page"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "Published on @post.date.format('F j, Y') by @post.author"
+msgstr ""
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Record"
+msgstr ""
+
+#: resources/data-panel/src/bindings/chips.tsx
+msgid "Refresh"
 msgstr ""
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
@@ -844,7 +940,7 @@ msgstr ""
 msgid "Registry drift"
 msgstr ""
 
-#: resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+#: resources/data-panel/src/bindings/chips.tsx resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Remove"
 msgstr ""
 
@@ -917,6 +1013,10 @@ msgstr ""
 msgid "SVG Images"
 msgstr ""
 
+#: resources/data-panel/src/bindings/chips.tsx
+msgid "Save"
+msgstr ""
+
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Search failed."
 msgstr ""
@@ -944,6 +1044,10 @@ msgstr ""
 
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Search to add…"
+msgstr ""
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Search values"
 msgstr ""
 
 #. translators: %d: segment number.
@@ -996,8 +1100,20 @@ msgstr ""
 msgid "Shows a TAW field. Pick the field after inserting it."
 msgstr ""
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Site"
+msgstr ""
+
 #: src/Core/Editing/SiteLayer.php
 msgid "Site Editor locked"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Site URL"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Site title"
 msgstr ""
 
 #: src/Core/Seo/Schema.php
@@ -1034,6 +1150,10 @@ msgstr ""
 msgid "Submit"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "Suggestions"
+msgstr ""
+
 #: resources/data-panel/src/DataPanel.tsx src/Core/Content/ContentAdminScreen.php
 msgid "TAW Data"
 msgstr ""
@@ -1046,8 +1166,16 @@ msgstr ""
 msgid "TAW Media"
 msgstr ""
 
-#: resources/data-panel/src/bindings/toolbar.tsx src/Core/Bindings/Bindings.php
+#: resources/data-panel/src/bindings/popup.tsx resources/data-panel/src/bindings/toolbar.tsx
+msgid "TAW data"
+msgstr ""
+
+#: src/Core/Bindings/Bindings.php
 msgid "TAW field"
+msgstr ""
+
+#: resources/data-panel/src/bindings/chips.tsx
+msgid "TAW value"
 msgstr ""
 
 #. translators: %s: capability name.
@@ -1060,11 +1188,15 @@ msgstr ""
 msgid "Tab"
 msgstr ""
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Tagline"
+msgstr ""
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Tells the chatbot when to use this knowledge base — be specific about what it contains."
 msgstr ""
 
-#: resources/data-panel/src/bindings/logic.ts
+#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/tags.ts
 msgid "Term"
 msgstr ""
 
@@ -1092,6 +1224,10 @@ msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "The editing policy in effect for this site (read-only). Change it in the theme's taw-schema/editing.json, or pick a preset for this install with TAW_EDITING_PRESET in wp-config.php."
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "The expression is too long (500 characters at most)."
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -1142,6 +1278,14 @@ msgstr ""
 msgid "This page is not available."
 msgstr ""
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Title"
+msgstr ""
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "To change a value already in the text, click it there."
+msgstr ""
+
 #: src/Core/Auth/PagePassword.php
 msgid "Too many attempts. Please wait a few minutes and try again."
 msgstr ""
@@ -1150,15 +1294,27 @@ msgstr ""
 msgid "Too many attempts. Please wait a moment and try again."
 msgstr ""
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Too many values (20 at most)."
+msgstr ""
+
 #: src/Core/Seo/Schema.php
 msgid "Twitter / X Handle"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Type"
 msgstr ""
 
 #: resources/data-panel/src/rich/MiniEditor.tsx
 msgid "Type / to choose a block"
 msgstr ""
 
-#: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "Type @ to add a value, then . for a function."
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "URL"
 msgstr ""
 
@@ -1166,8 +1322,20 @@ msgstr ""
 msgid "Unauthorized"
 msgstr ""
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Unclosed parenthesis or quote."
+msgstr ""
+
 #: src/Core/Media/MediaFolders.php
 msgid "Unfiled"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Unknown function. Use format, upper, lower, default or truncate."
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Unknown value name."
 msgstr ""
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
@@ -1184,6 +1352,10 @@ msgstr ""
 
 #: src/Core/Media/MediaFolders.php
 msgid "Uploading"
+msgstr ""
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Use as block text"
 msgstr ""
 
 #: src/Core/Metabox/Metabox.php
@@ -1204,6 +1376,10 @@ msgstr ""
 
 #: resources/data-panel/src/controls/RichContent.tsx
 msgid "Write"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Wrong arguments for this function."
 msgstr ""
 
 #: src/Core/Metabox/Metabox.php
@@ -1252,6 +1428,10 @@ msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "default (no editing policy sets one)"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "function"
 msgstr ""
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php

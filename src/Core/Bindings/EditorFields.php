@@ -16,7 +16,9 @@ if (!defined('ABSPATH')) {
  * (ADR-0010 decision 8): what `getFieldsList` returns, built once per editor
  * load and inlined as `window.tawBindings.fields`.
  *
- * Each entry: `{label, args: {field, from, sub?}, type: "string"|"number"}`.
+ * Each entry: `{label, args: {field, from, sub?}, type: "string"|"number",
+ * fieldType, fieldset}`; `fieldset` is the metabox or options page title,
+ * which the TAW data popup groups by (ADR-0012).
  * WordPress only offers an entry for attributes of the same type, so images
  * (and single post selects, for their featured image) get a second, numeric
  * entry for core/image's `id`. The same bindable rules as the resolver
@@ -62,10 +64,27 @@ final class EditorFields
             if ($field === '') {
                 continue;
             }
-            array_push($entries, ...self::entriesFor($config, $field, $sub, $from, $group !== null ? self::groupLabel($config, $group) : null));
+            array_push($entries, ...self::entriesFor($config, $field, $sub, $from, $group !== null ? self::groupLabel($config, $group) : null, self::boxTitle($config)));
         }
 
         return $entries;
+    }
+
+    /**
+     * The title of the metabox a field belongs to.
+     *
+     * @param array<string, mixed> $config A registry entry.
+     */
+    private static function boxTitle(array $config): string
+    {
+        $boxId = strstr((string) ($config['qualified_id'] ?? ''), '.', true);
+        foreach (Metabox::instances() as $box) {
+            if ($box->id() === $boxId) {
+                return $box->title();
+            }
+        }
+
+        return '';
     }
 
     /**
@@ -102,14 +121,14 @@ final class EditorFields
                     continue 2; // A group's sub-field: listed below, with `sub`.
                 }
             }
-            array_push($entries, ...self::entriesFor($config, (string) ($config['id'] ?? ''), null, 'option', null));
+            array_push($entries, ...self::entriesFor($config, (string) ($config['id'] ?? ''), null, 'option', null, (string) ($config['option_page_title'] ?? '')));
         }
 
         foreach ($groups as $group) {
             foreach (is_array($group['fields'] ?? null) ? $group['fields'] : [] as $sub) {
                 if (is_array($sub)) {
                     $sub += ['bindings' => $group['bindings'] ?? null];
-                    array_push($entries, ...self::entriesFor($sub, (string) $group['id'], (string) ($sub['id'] ?? ''), 'option', (string) ($group['label'] ?? $group['id'])));
+                    array_push($entries, ...self::entriesFor($sub, (string) $group['id'], (string) ($sub['id'] ?? ''), 'option', (string) ($group['label'] ?? $group['id']), (string) ($group['option_page_title'] ?? '')));
                 }
             }
         }
@@ -121,7 +140,7 @@ final class EditorFields
      * @param array<string, mixed> $config
      * @return list<array<string, mixed>>
      */
-    private static function entriesFor(array $config, string $field, ?string $sub, string $from, ?string $groupLabel): array
+    private static function entriesFor(array $config, string $field, ?string $sub, string $from, ?string $groupLabel, string $fieldset = ''): array
     {
         $type = (string) ($config['type'] ?? 'text');
         $flag = $config['bindings'] ?? null;
@@ -140,10 +159,10 @@ final class EditorFields
         }
         $args = array_filter(['field' => $field, 'from' => $from, 'sub' => $sub], static fn ($v): bool => $v !== null && $v !== '');
 
-        $entries = [['label' => $label, 'args' => $args, 'type' => 'string', 'fieldType' => $type]];
+        $entries = [['label' => $label, 'args' => $args, 'type' => 'string', 'fieldType' => $type, 'fieldset' => $fieldset]];
         if (in_array($type, ['image', 'post_select'], true)) {
             /* translators: %s: a field label. The numeric entry binds core/image's attachment ID. */
-            $entries[] = ['label' => sprintf(__('%s (image ID)', 'taw-core'), $label), 'args' => $args, 'type' => 'number', 'fieldType' => $type];
+            $entries[] = ['label' => sprintf(__('%s (image ID)', 'taw-core'), $label), 'args' => $args, 'type' => 'number', 'fieldType' => $type, 'fieldset' => $fieldset];
         }
 
         return $entries;

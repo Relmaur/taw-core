@@ -240,6 +240,12 @@ without tags renders exactly as before. **Nothing to do.**
 Tags and `taw/field` bindings accept expressions, `{"expr": "Published on @post.date.format('Y')"}` (see
 "Expressions" in the README). No hooks change; existing tags and bindings are unchanged. **Nothing to do.**
 
+### v1.65.0: the TAW data popup
+The block toolbar's database button opens the TAW data popup (Fields and Expression tabs, inline chips or
+block text), replacing v1.61's "TAW field" dropdown. The ⋮ menu's "Connect to TAW field…" stays. The
+theme's hook list gains one line (`enqueue_block_assets`: the chip style in the editor canvas, admin only).
+Options-page field registry entries gain `option_page_title`. **Nothing to do.**
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

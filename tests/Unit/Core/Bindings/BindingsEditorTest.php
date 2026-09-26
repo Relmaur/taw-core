@@ -102,6 +102,9 @@ final class BindingsEditorTest extends TestCase
         $this->assertSame(['field' => 'address', 'from' => 'post', 'sub' => 'city'], $fields['post']['book'][3]['args']);
         $this->assertSame(['Phone [string]', 'Social › X [string]'], self::labels($fields['option']));
         $this->assertSame(['field' => 'social', 'from' => 'option', 'sub' => 'x'], $fields['option'][1]['args']);
+        $this->assertSame(['Book', 'Book', 'Book', 'Book'], array_column($fields['post']['book'], 'fieldset'), 'the metabox title');
+        $this->assertSame(['Site', 'Site'], array_column($fields['option'], 'fieldset'), 'the options page title');
+        $this->assertSame('Genre', $fields['term'][0]['fieldset']);
         $this->assertSame(['Tagline [string]'], self::labels($fields['term']));
         $this->assertSame(['Bio [string]'], self::labels($fields['user']), 'user fields only with bindings: true');
     }
@@ -127,5 +130,6 @@ final class BindingsEditorTest extends TestCase
         $this->assertSame(10, has_action('init', [Bindings::class, 'registerSource']));
         $this->assertSame(10, has_action('rest_api_init', [PreviewEndpoint::class, 'registerRoute']));
         $this->assertSame(10, has_action('enqueue_block_editor_assets', [Bindings::class, 'enqueueEditor']));
+        $this->assertSame(10, has_action('enqueue_block_assets', [Bindings::class, 'enqueueCanvasStyles']));
     }
 }
