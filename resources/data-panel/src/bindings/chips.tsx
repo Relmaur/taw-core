@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Dashicon, Popover } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
-import { registerFormatType, useAnchor } from '@wordpress/rich-text';
+import { registerFormatType, remove, useAnchor } from '@wordpress/rich-text';
 import type { RichTextValue } from '@wordpress/rich-text';
 import { ExpressionEditor } from './ExpressionEditor';
 import type { Config } from './logic';
@@ -32,23 +32,23 @@ interface EditProps {
     contentRef: { current: HTMLElement | null };
 }
 
-/** The value with the selected chip replaced (null: removed). */
+/**
+ * The value with the selected chip replaced (null: removed). The caret ends
+ * after the chip, so it is no longer selected and its popover closes.
+ */
 function withChip(value: RichTextValue, object: ReturnType<typeof chipObject> | null): RichTextValue {
     const index = value.start ?? 0;
-    if (object === null) {
-        const text = value.text.slice(0, index) + value.text.slice(index + 1);
-        return {
-            ...value,
-            text,
-            formats: [...value.formats.slice(0, index), ...value.formats.slice(index + 1)],
-            replacements: [...value.replacements.slice(0, index), ...value.replacements.slice(index + 1)],
-            start: index,
-            end: index,
-        };
-    }
+    // remove() keeps the arrays sparse: core's footnotes code breaks on `undefined` entries.
+    if (object === null) return remove(value, index, index + 1);
     const replacements = value.replacements.slice();
     replacements[index] = object as unknown as (typeof replacements)[number];
-    return { ...value, replacements };
+    return { ...value, replacements, start: index + 1, end: index + 1 };
+}
+
+/** The caret moved past the selected chip: closes its popover without a change. */
+function afterChip(value: RichTextValue): RichTextValue {
+    const index = (value.start ?? 0) + 1;
+    return { ...value, start: index, end: index };
 }
 
 function ChipPopover({ config, props, args }: { config: Config; props: EditProps; args: TagArgs }) {
@@ -78,6 +78,7 @@ function ChipPopover({ config, props, args }: { config: Config; props: EditProps
             focusOnMount={false}
             shift
             resize={false}
+            onClose={() => props.onChange(afterChip(props.value))}
         >
             <div className="taw-data-header">
                 <Dashicon icon="database" />
@@ -111,7 +112,8 @@ function ChipPopover({ config, props, args }: { config: Config; props: EditProps
 }
 
 /**
- * Backspace/Delete next to a chip removes it. Rich text leaves deleting
+ * Backspace/Delete next to a chip removes it, and Escape closes a selected
+ * chip's popover. Rich text leaves deleting
  * objects to the browser, and Chrome won't remove a non-editable element at
  * the end of the text.
  */
@@ -126,9 +128,21 @@ function useChipDelete(props: EditProps): void {
         const element = contentRef.current;
         if (!element) return undefined;
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.defaultPrevented || (event.key !== 'Backspace' && event.key !== 'Delete')) return;
+            if (event.defaultPrevented) return;
             const { value, onChange } = latest.current;
-            if (value.start === undefined || value.start !== value.end) return;
+            if (value.start === undefined) return;
+            // Escape with a chip selected closes its popover (it only sees Escape when focused).
+            if (
+                event.key === 'Escape' &&
+                value.end === value.start + 1 &&
+                value.replacements[value.start]?.type === FORMAT
+            ) {
+                event.preventDefault();
+                event.stopPropagation();
+                onChange(afterChip(value));
+                return;
+            }
+            if ((event.key !== 'Backspace' && event.key !== 'Delete') || value.start !== value.end) return;
             const index = event.key === 'Backspace' ? value.start - 1 : value.start;
             if (index < 0 || value.replacements[index]?.type !== FORMAT) return;
             event.preventDefault();

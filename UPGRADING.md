@@ -246,6 +246,10 @@ block text), replacing v1.61's "TAW field" dropdown. The ⋮ menu's "Connect to 
 theme's hook list gains one line (`enqueue_block_assets`: the chip style in the editor canvas, admin only).
 Options-page field registry entries gain `option_page_title`. **Nothing to do.**
 
+### v1.65.1: chip popover fixes
+A chip's popover closes after **Save** or **Refresh**, and on Escape or a click elsewhere. Removing a chip (its
+**Remove** button, Backspace or Delete) no longer throws an error in the editor. **Nothing to do.**
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
