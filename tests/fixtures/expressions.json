@@ -98,6 +98,8 @@
       "expr": "@a @a @a @a @a @a @a @a @a @a @a @a @a @a @a @a @a @a @a @a @a",
       "parts": [],
       "errors": [{ "code": "too_many_tokens", "at": 60 }]
-    }
+    },
+    {"name": "viewer and date names", "expr": "@viewer.role on @date.today.format('l')", "parts": [{"name": "viewer.role", "calls": [], "at": 0, "length": 12}, {"text": " on "}, {"name": "date.today", "calls": [{"fn": "format", "args": ["l"]}], "at": 16, "length": 23}], "errors": []},
+    {"name": "a namespace word used as a field, with a call", "expr": "@date.upper()", "parts": [{"name": "date", "calls": [{"fn": "upper", "args": []}], "at": 0, "length": 13}], "errors": []}
   ]
 }

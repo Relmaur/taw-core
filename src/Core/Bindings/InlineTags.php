@@ -101,6 +101,11 @@ final class InlineTags
      */
     public static function value(array $args, BindingContext $context): ?string
     {
+        // A condition (ADR-0013): when it doesn't hold, the `else` text or nothing.
+        if (array_key_exists('if', $args) && !Conditions::shown($args['if'], $context)) {
+            return Conditions::otherwise($args);
+        }
+
         $value = null;
 
         if (isset($args['expr'])) {

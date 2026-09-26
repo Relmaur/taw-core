@@ -39,7 +39,7 @@ export interface Parsed {
 
 export const MAX_LENGTH = 500;
 export const MAX_TOKENS = 20;
-export const NAMESPACES = ['post', 'site', 'option', 'term', 'author'];
+export const NAMESPACES = ['post', 'site', 'option', 'term', 'author', 'viewer', 'date'];
 export const SITE_PROPERTIES = ['name', 'tagline', 'url', 'year'];
 
 /** Function name → its argument kinds (Parser::FUNCTIONS). */
@@ -121,9 +121,10 @@ function tokenAt(chars: string[], at: number): TokenPart & { errorAt?: number } 
     let name = identAt(chars, i) as string;
     i += name.length;
 
+    // `@post.title` is a namespaced name; `@date.upper()` is a field named "date" with a call.
     if (NAMESPACES.includes(name) && chars[i] === '.') {
         const rest = identAt(chars, i + 1);
-        if (rest !== null) {
+        if (rest !== null && chars[i + 1 + rest.length] !== '(') {
             name += `.${rest}`;
             i += 1 + rest.length;
         }

@@ -38,7 +38,7 @@ final class Parser
 
     public const MAX_TOKENS = 20;
 
-    public const NAMESPACES = ['post', 'site', 'option', 'term', 'author'];
+    public const NAMESPACES = ['post', 'site', 'option', 'term', 'author', 'viewer', 'date'];
 
     /** Function name → its argument kinds. */
     public const FUNCTIONS = [
@@ -149,7 +149,11 @@ final class Parser
         $name = $m[0];
         $i += strlen($name);
 
-        if (in_array($name, self::NAMESPACES, true) && ($s[$i] ?? '') === '.' && preg_match(self::IDENT, $s, $m2, 0, $i + 1) === 1) {
+        // `@post.title` is a namespaced name; `@date.upper()` is a field named "date" with a call.
+        if (
+            in_array($name, self::NAMESPACES, true) && ($s[$i] ?? '') === '.' && preg_match(self::IDENT, $s, $m2, 0, $i + 1) === 1
+            && ($s[$i + 1 + strlen($m2[0])] ?? '') !== '('
+        ) {
             $name .= '.' . $m2[0];
             $i += 1 + strlen($m2[0]);
         }

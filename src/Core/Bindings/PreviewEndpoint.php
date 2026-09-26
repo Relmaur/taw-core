@@ -20,6 +20,8 @@ if (!defined('ABSPATH')) {
  *           its value is the plain text InlineTags::value() gives (fallback included).
  *           An expression (ADR-0012) sends "kind": "expr" and args {"expr": "…"}: its value
  *           is {"value": "…", "errors": [{code, at}]}.
+ *           A condition (ADR-0013) sends "kind": "condition" and args {"if": {…}}: its value
+ *           is {"shown": bool, "errors": [{code, path}]}.
  * Response: {"values": {"<key>": <value or null>}}
  *
  * Editors only (`edit_posts`), and a post's values only for users who can
@@ -69,6 +71,10 @@ final class PreviewEndpoint
         $kind = $item['kind'] ?? null;
         if ($kind === 'expr') {
             return self::expression($args, $item);
+        }
+        if ($kind === 'condition') {
+            $postId = self::postId($item);
+            return $postId === null ? null : Conditions::check($args['if'] ?? null, new BindingContext($postId));
         }
         $ref = isset($args['expr']) ? null : Reference::fromArgs($args);
         $isTag = $kind === 'tag';
