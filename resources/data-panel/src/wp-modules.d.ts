@@ -29,6 +29,14 @@ declare module '@wordpress/data' {
     export function useSelect<T>(mapSelect: (select: Select) => T, deps?: unknown[]): T;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     export function useDispatch(store: string): any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    export function select(store: string): any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    export function dispatch(store: string): any;
+    export function subscribe(listener: () => void): () => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    export function createReduxStore(name: string, options: Record<string, any>): unknown;
+    export function register(store: unknown): void;
 }
 
 declare module '@wordpress/blocks' {
@@ -41,6 +49,7 @@ declare module '@wordpress/blocks' {
     export function rawHandler(args: { HTML: string }): BlockInstance[];
     export function serialize(blocks: BlockInstance[]): string;
     export function createBlock(name: string, attributes?: Record<string, unknown>): BlockInstance;
+    export function registerBlockBindingsSource(source: Record<string, unknown>): void;
 }
 
 declare module '@wordpress/block-editor' {
@@ -74,10 +83,18 @@ declare module '@wordpress/block-editor' {
     }>;
     export const BlockCanvas: ComponentType<{ height?: string; styles?: unknown }>;
     export const Inserter: ComponentType<Record<string, unknown>>;
+    export const BlockControls: ComponentType<{ group?: string; children?: ReactNode }>;
+    export const BlockSettingsMenuControls: ComponentType<{
+        children: (props: { selectedClientIds: string[]; onClose: () => void }) => ReactNode;
+    }>;
 }
 
 declare module '@wordpress/api-fetch' {
-    export default function apiFetch<T = unknown>(options: { path: string; method?: string }): Promise<T>;
+    export default function apiFetch<T = unknown>(options: {
+        path: string;
+        method?: string;
+        data?: unknown;
+    }): Promise<T>;
 }
 
 declare module '@wordpress/autop' {

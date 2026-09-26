@@ -220,6 +220,11 @@ one line. Nothing renders differently until a block uses it.
 **Check:** nothing to do. If you keep private data in a post, term or options field, add
 `'bindings' => false` to it; user fields never bind unless they say `'bindings' => true`.
 
+### v1.61.0: Block Bindings in the editor
+Bound blocks preview their value in the block editor. Connectable blocks get a "TAW field" toolbar button and an Options menu (⋮) item "Connect to TAW field…", and the Attributes panel lists TAW fields to bind.
+The theme's hook list gains two lines (`rest_api_init` for the preview route, and
+`enqueue_block_editor_assets` for the editor script). **Nothing to do.**
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

@@ -70,12 +70,13 @@ export const WP_EXPORT_NAMES = [
     'registerBlockType', 'unregisterBlockType', 'registerBlockVariation', 'registerBlockStyle',
     'unregisterBlockStyle', 'createBlock', 'cloneBlock', 'getBlockType', 'getBlockTypes',
     'getBlockContent', 'getSaveContent', 'serialize', 'parse', 'rawHandler', 'pasteHandler',
+    'registerBlockBindingsSource', 'unregisterBlockBindingsSource', 'getBlockBindingsSource',
     // @wordpress/block-editor
     'useBlockProps', 'useInnerBlocksProps', 'RichText', 'RichTextToolbarButton', 'InnerBlocks',
     'InspectorControls', 'BlockControls', 'MediaUpload', 'MediaUploadCheck', 'MediaPlaceholder',
     'MediaReplaceFlow', 'PanelColorSettings', 'AlignmentControl', 'BlockAlignmentToolbar', 'URLInput',
     'URLInputButton', 'BlockEditorProvider', 'BlockList', 'BlockTools', 'BlockInspector', 'BlockIcon',
-    'WritingFlow', 'ObserveTyping', 'BlockCanvas', 'BlockEditorKeyboardShortcuts', 'Inserter',
+    'WritingFlow', 'ObserveTyping', 'BlockCanvas', 'BlockEditorKeyboardShortcuts', 'Inserter', 'BlockSettingsMenuControls',
     'useSetting', 'useSettings', 'useBlockEditingMode', 'withColors',
     // @wordpress/components
     'BaseControl', 'Button', 'Card', 'CardBody', 'CardHeader', 'CheckboxControl', 'ColorIndicator', 'ColorPalette',
@@ -84,7 +85,7 @@ export const WP_EXPORT_NAMES = [
     'MenuGroup', 'MenuItem', 'Modal', 'Notice', 'PanelBody', 'PanelRow', 'Placeholder', 'Popover',
     'RadioControl', 'RangeControl', 'SearchControl', 'SelectControl', 'Slot', 'SlotFillProvider',
     'Spinner', 'TabPanel', 'TextControl', 'TextareaControl', 'ToggleControl', 'Toolbar',
-    'ToolbarButton', 'ToolbarGroup', 'Tooltip', 'VisuallyHidden',
+    'ToolbarButton', 'ToolbarDropdownMenu', 'ToolbarGroup', 'Tooltip', 'VisuallyHidden',
     // @wordpress/element, react, react-dom, react/jsx-runtime
     'Children', 'Fragment', 'RawHTML', 'StrictMode', 'cloneElement', 'createContext', 'createElement',
     'createPortal', 'createRoot', 'forwardRef', 'isValidElement', 'memo', 'render', 'useCallback',

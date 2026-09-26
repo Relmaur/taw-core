@@ -74,6 +74,12 @@ msgstr[1] ""
 msgid "%d of %d records would change. Nothing has been written."
 msgstr ""
 
+#. translators: %s: a field label. The numeric entry binds core/image's attachment ID.
+#: src/Core/Bindings/EditorFields.php
+#, php-format
+msgid "%s (image ID)"
+msgstr ""
+
 #. translators: %s: field label
 #: src/Core/Form/Form.php
 #, php-format
@@ -239,6 +245,10 @@ msgstr ""
 msgid "Apply %d changes"
 msgstr ""
 
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Author"
+msgstr ""
+
 #: src/Core/Seo/Schema.php
 msgid "Automatic detection can be unreliable for plugins with no stable version constant (e.g. some SmartCrawl installs) — this overrides it explicitly. Controls SeoMeta's <title>/meta/OG tags and this page's JSON-LD together."
 msgstr ""
@@ -307,6 +317,14 @@ msgstr ""
 msgid "Collapse all"
 msgstr ""
 
+#: resources/data-panel/src/bindings/menu.tsx resources/data-panel/src/bindings/toolbar.tsx
+msgid "Connect to TAW field"
+msgstr ""
+
+#: resources/data-panel/src/bindings/menu.tsx
+msgid "Connect to TAW field…"
+msgstr ""
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Content, per post type"
 msgstr ""
@@ -325,6 +343,10 @@ msgstr ""
 
 #: resources/data-panel/src/rich/MiniEditor.tsx
 msgid "Discard your changes to this field?"
+msgstr ""
+
+#: resources/data-panel/src/bindings/menu.tsx resources/data-panel/src/bindings/toolbar.tsx
+msgid "Disconnect TAW field"
 msgstr ""
 
 #: src/Support/performance.php
@@ -628,6 +650,10 @@ msgstr ""
 msgid "No"
 msgstr ""
 
+#: resources/data-panel/src/bindings/menu.tsx
+msgid "No TAW field fits this block."
+msgstr ""
+
 #: resources/data-panel/src/controls/RichContent.tsx
 msgid "No content yet"
 msgstr ""
@@ -700,6 +726,10 @@ msgstr ""
 msgid "Open the visual content editor"
 msgstr ""
 
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Options"
+msgstr ""
+
 #: src/Core/Seo/Schema.php
 msgid "Organization"
 msgstr ""
@@ -732,6 +762,10 @@ msgstr ""
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Portal ID"
+msgstr ""
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Post"
 msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
@@ -964,7 +998,7 @@ msgstr ""
 msgid "TAW Media"
 msgstr ""
 
-#: src/Core/Bindings/Bindings.php
+#: resources/data-panel/src/bindings/toolbar.tsx src/Core/Bindings/Bindings.php
 msgid "TAW field"
 msgstr ""
 
@@ -980,6 +1014,10 @@ msgstr ""
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Tells the chatbot when to use this knowledge base — be specific about what it contains."
+msgstr ""
+
+#: resources/data-panel/src/bindings/logic.ts
+msgid "Term"
 msgstr ""
 
 #: src/Core/Form/Form.php

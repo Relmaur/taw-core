@@ -1,9 +1,25 @@
 {
+  "_blocks-CG1shWgY.js": {
+    "file": "blocks-CG1shWgY.js",
+    "name": "blocks"
+  },
+  "src/bindings/index.ts": {
+    "file": "bindings-DEIWQKHs.js",
+    "name": "bindings",
+    "src": "src/bindings/index.ts",
+    "isEntry": true,
+    "imports": [
+      "_blocks-CG1shWgY.js"
+    ]
+  },
   "src/index.tsx": {
-    "file": "data-panel-DRWuw0RQ.js",
+    "file": "data-panel-CRKdar0P.js",
     "name": "data-panel",
     "src": "src/index.tsx",
     "isEntry": true,
+    "imports": [
+      "_blocks-CG1shWgY.js"
+    ],
     "css": [
       "data-panel-BQs4lIbe.css"
     ]
