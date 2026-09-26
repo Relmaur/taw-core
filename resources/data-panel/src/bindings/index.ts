@@ -6,7 +6,9 @@
 import apiFetch from '@wordpress/api-fetch';
 import { registerBlockBindingsSource } from '@wordpress/blocks';
 import { createReduxStore, dispatch, register, select, subscribe } from '@wordpress/data';
+import { registerPlugin } from '@wordpress/plugins';
 import { batcher, source, STORE, type Config, type PreviewItem } from './logic';
+import { connectMenu } from './menu';
 
 declare global {
     interface Window {
@@ -53,6 +55,9 @@ if (config) {
     register(store);
 
     registerBlockBindingsSource(source(config));
+
+    // "Connect to TAW field…" in each block's Options (⋮) menu.
+    registerPlugin('taw-bindings-menu', { render: connectMenu(config) });
 
     // Previews show saved values: refresh them after each (non-auto) save.
     let wasSaving = false;

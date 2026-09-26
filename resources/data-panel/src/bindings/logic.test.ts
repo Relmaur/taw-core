@@ -1,5 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
-import { batcher, fieldsList, placeholder, previewItem, source, STORE, type Config } from './logic';
+import {
+    batcher,
+    candidatesFor,
+    fieldsList,
+    placeholder,
+    planFor,
+    previewItem,
+    source,
+    STORE,
+    withoutTawBindings,
+    type Config,
+} from './logic';
 
 const config: Config = {
     source: 'taw/field',
@@ -87,5 +98,79 @@ describe('taw/field in the editor', () => {
         const b = previewItem({ field: 'cover' }, 'core/image', 'url', { postId: 5 });
         await expect(Promise.all([fetchValue(a), fetchValue(b)])).resolves.toEqual([`v:${a.key}`, `v:${b.key}`]);
         expect(send).toHaveBeenCalledTimes(1);
+    });
+
+    it('plans the attributes one pick binds, per block', () => {
+        const entry = (fieldType: string, type: 'string' | 'number' = 'string') => ({
+            label: 'x',
+            args: { field: 'f' },
+            type,
+            fieldType,
+        });
+        const attrs = (block: string, fieldType: string) =>
+            Object.keys(planFor('taw/field', block, entry(fieldType)) ?? {});
+        expect(attrs('core/heading', 'text')).toEqual(['content']);
+        expect(attrs('core/paragraph', 'wysiwyg')).toEqual(['content']);
+        expect(attrs('core/paragraph', 'image')).toEqual([]);
+        expect(attrs('core/button', 'link')).toEqual(['url', 'text', 'linkTarget', 'rel']);
+        expect(attrs('core/button', 'url')).toEqual(['url']);
+        expect(attrs('core/button', 'text')).toEqual(['text']);
+        expect(attrs('core/image', 'image')).toEqual(['id', 'url', 'alt']);
+        expect(attrs('core/image', 'text')).toEqual([]);
+        expect(attrs('core/post-date', 'datepicker')).toEqual(['datetime']);
+        expect(planFor('taw/field', 'core/image', entry('image', 'number'))).toBeNull();
+        expect(planFor('taw/field', 'core/heading', entry('text'))).toEqual({
+            content: { source: 'taw/field', args: { field: 'f' } },
+        });
+    });
+
+    it('offers only fitting fields, and disconnects only its own bindings', () => {
+        const withTypes: Config = {
+            ...config,
+            fields: {
+                ...config.fields,
+                post: {
+                    book: [
+                        {
+                            label: 'Subtitle',
+                            args: { field: 'subtitle', from: 'post' },
+                            type: 'string',
+                            fieldType: 'text',
+                        },
+                        { label: 'Cover', args: { field: 'cover', from: 'post' }, type: 'string', fieldType: 'image' },
+                        {
+                            label: 'Cover (image ID)',
+                            args: { field: 'cover', from: 'post' },
+                            type: 'number',
+                            fieldType: 'image',
+                        },
+                    ],
+                },
+                option: [
+                    {
+                        label: 'Phone',
+                        args: { field: 'company_phone', from: 'option' },
+                        type: 'string',
+                        fieldType: 'text',
+                    },
+                ],
+                term: [],
+                user: [],
+            },
+        };
+        expect(candidatesFor(withTypes, 'core/image', { postType: 'book' }).map((e) => e.label)).toEqual([
+            'Post: Cover',
+        ]);
+        expect(candidatesFor(withTypes, 'core/heading', { postType: 'book' }).map((e) => e.label)).toEqual([
+            'Post: Subtitle',
+            'Options: Phone',
+        ]);
+
+        const bindings = {
+            content: { source: 'taw/field', args: { field: 'subtitle' } },
+            url: { source: 'core/post-meta', args: { field: 'k' } },
+        };
+        expect(withoutTawBindings('taw/field', bindings)).toEqual({ url: bindings.url });
+        expect(withoutTawBindings('taw/field', { content: bindings.content })).toBeUndefined();
     });
 });

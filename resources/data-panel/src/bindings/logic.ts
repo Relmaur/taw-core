@@ -200,3 +200,67 @@ export function batcher(send: (items: PreviewItem[]) => Promise<Record<string, u
             }
         });
 }
+
+/* ------------------------------------------------------------------ */
+/* "Connect to TAW field…" in the block's Options menu (menu.tsx).      */
+/* ------------------------------------------------------------------ */
+
+export type Bindings = Record<string, { source: string; args: BindingArgs }>;
+
+const TEXT_BLOCKS = ['core/paragraph', 'core/heading', 'core/list-item'];
+const TEXT_TYPES = [
+    'text',
+    'textarea',
+    'wysiwyg',
+    'select',
+    'number',
+    'range',
+    'color',
+    'icon',
+    'datepicker',
+    'url',
+    'link',
+    'post_select',
+];
+
+/** Blocks the Options menu offers to connect. */
+export const CONNECTABLE_BLOCKS = [...TEXT_BLOCKS, 'core/button', 'core/image', 'core/post-date'];
+
+/**
+ * The attributes one click binds when a field is picked for a block, or null
+ * when the field doesn't fit it. Mirrors the server's AttributeMap.
+ */
+export function planFor(source: string, block: string, entry: FieldEntry): Bindings | null {
+    if (entry.type !== 'string') return null;
+    const type = entry.fieldType ?? 'text';
+    const bind = (...attributes: string[]): Bindings =>
+        Object.fromEntries(attributes.map((attribute) => [attribute, { source, args: entry.args }]));
+
+    if (TEXT_BLOCKS.includes(block)) {
+        return TEXT_TYPES.includes(type) ? bind('content') : null;
+    }
+    switch (block) {
+        case 'core/button':
+            if (type === 'link') return bind('url', 'text', 'linkTarget', 'rel');
+            if (type === 'url') return bind('url');
+            if (type === 'post_select') return bind('url', 'text');
+            return TEXT_TYPES.includes(type) ? bind('text') : null;
+        case 'core/image':
+            return type === 'image' || type === 'post_select' ? bind('id', 'url', 'alt') : null;
+        case 'core/post-date':
+            return type === 'datepicker' ? bind('datetime') : null;
+        default:
+            return null;
+    }
+}
+
+/** The fields the menu offers for a block, labelled like the Attributes panel. */
+export function candidatesFor(config: Config, block: string, context: BlockContext): FieldEntry[] {
+    return fieldsList(config, context).filter((entry) => planFor(config.source, block, entry) !== null);
+}
+
+/** The block's bindings with every `taw/field` one removed (null when none are left). */
+export function withoutTawBindings(source: string, bindings: Bindings | undefined): Bindings | undefined {
+    const kept = Object.fromEntries(Object.entries(bindings ?? {}).filter(([, binding]) => binding?.source !== source));
+    return Object.keys(kept).length > 0 ? kept : undefined;
+}

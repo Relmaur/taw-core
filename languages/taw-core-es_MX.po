@@ -319,6 +319,14 @@ msgstr "Contraer"
 msgid "Collapse all"
 msgstr ""
 
+#: resources/data-panel/src/bindings/menu.tsx
+msgid "Connect to TAW field"
+msgstr "Conectar a campo TAW"
+
+#: resources/data-panel/src/bindings/menu.tsx
+msgid "Connect to TAW field…"
+msgstr "Conectar a campo TAW…"
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Content, per post type"
 msgstr ""
@@ -338,6 +346,10 @@ msgstr "Descripción"
 #: resources/data-panel/src/rich/MiniEditor.tsx
 msgid "Discard your changes to this field?"
 msgstr ""
+
+#: resources/data-panel/src/bindings/menu.tsx
+msgid "Disconnect TAW field"
+msgstr "Desconectar campo TAW"
 
 #: src/Support/performance.php
 msgid "Dismiss"
@@ -639,6 +651,10 @@ msgstr ""
 #: src/Core/Metabox/Metabox.php
 msgid "No"
 msgstr ""
+
+#: resources/data-panel/src/bindings/menu.tsx
+msgid "No TAW field fits this block."
+msgstr "Ningún campo TAW encaja con este bloque."
 
 #: resources/data-panel/src/controls/RichContent.tsx
 msgid "No content yet"

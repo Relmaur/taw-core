@@ -1,24 +1,24 @@
 {
-  "_blocks-BL40-yFF.js": {
-    "file": "blocks-BL40-yFF.js",
+  "_blocks-Cy6eAUTv.js": {
+    "file": "blocks-Cy6eAUTv.js",
     "name": "blocks"
   },
   "src/bindings/index.ts": {
-    "file": "bindings-6zuBR4O-.js",
+    "file": "bindings-SSnOBlcm.js",
     "name": "bindings",
     "src": "src/bindings/index.ts",
     "isEntry": true,
     "imports": [
-      "_blocks-BL40-yFF.js"
+      "_blocks-Cy6eAUTv.js"
     ]
   },
   "src/index.tsx": {
-    "file": "data-panel-CS1cI0m0.js",
+    "file": "data-panel-DY6JZIvW.js",
     "name": "data-panel",
     "src": "src/index.tsx",
     "isEntry": true,
     "imports": [
-      "_blocks-BL40-yFF.js"
+      "_blocks-Cy6eAUTv.js"
     ],
     "css": [
       "data-panel-BQs4lIbe.css"

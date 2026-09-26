@@ -221,7 +221,7 @@ one line. Nothing renders differently until a block uses it.
 `'bindings' => false` to it; user fields never bind unless they say `'bindings' => true`.
 
 ### v1.61.0: Block Bindings in the editor
-Bound blocks preview their value in the block editor, and the Attributes panel lists TAW fields to bind.
+Bound blocks preview their value in the block editor. A block's Options menu (⋮) gets "Connect to TAW field…", and the Attributes panel lists TAW fields to bind.
 The theme's hook list gains two lines (`rest_api_init` for the preview route, and
 `enqueue_block_editor_assets` for the editor script). **Nothing to do.**
 

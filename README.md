@@ -405,7 +405,13 @@ Core blocks can show TAW fields through WordPress's Block Bindings API (ADR-0010
   - any other field can opt out with `'bindings' => false` (`Field::…->bindings(false)`, JSON `"bindings": false`).
 - The values come from the typed API (`Taw::post()` and friends), so a bound block renders a field the same way a template does.
 - **In the editor (v1.61.0+):**
-  - Select a block, and the sidebar's **Attributes** panel lists TAW fields (Post / Options / Term / Author) that fit each attribute; images also get an "(image ID)" entry for core/image's `id`.
+  - **The quick way:** a block's Options menu (⋮) has **Connect to TAW field…**. It lists only the fields that fit that block and binds every attribute the field fills in one click:
+    - a paragraph, heading or list item gets its text;
+    - a button gets its URL, text and new-tab setting from a link field;
+    - an image gets its ID, URL and alt.
+
+    **Disconnect TAW field** removes the TAW bindings.
+  - **Per attribute:** select a block, and the sidebar's **Attributes** panel lists TAW fields (Post / Options / Term / Author) that fit each attribute; images also get an "(image ID)" entry for core/image's `id`.
   - Bound blocks preview the real value in the canvas. The preview comes from `POST /wp-json/taw/v1/bindings/preview` (editors only, and only for posts they can edit), which runs the same resolver as the front end.
   - Templates with no post preview the most recent post of their type.
   - Bound blocks are read-only: edit the value in the metabox or data panel, and the preview refreshes after saving.
