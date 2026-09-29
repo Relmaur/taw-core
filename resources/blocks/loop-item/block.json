@@ -1,0 +1,19 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "taw/loop-item",
+	"title": "Loop item",
+	"category": "theme",
+	"parent": [ "taw/loop" ],
+	"description": "The design repeated for each item of a TAW Loop.",
+	"textdomain": "taw-core",
+	"usesContext": [ "postId", "postType", "taw/loopItem", "taw/loopTag" ],
+	"supports": {
+		"html": false,
+		"reusable": false,
+		"spacing": { "padding": true, "blockGap": true },
+		"color": { "background": true, "text": true },
+		"__experimentalBorder": { "radius": true, "width": true, "color": true, "style": true },
+		"layout": true
+	}
+}

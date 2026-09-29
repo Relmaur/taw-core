@@ -840,9 +840,9 @@ msgstr ""
 msgid "Newest first"
 msgstr ""
 
-#: src/Core/Form/Form.php
+#: src/Core/Form/Form.php src/Core/Loop/Loop.php
 msgid "Next"
-msgstr ""
+msgstr "Siguiente"
 
 #: src/Core/Metabox/Metabox.php
 msgid "No"
@@ -964,6 +964,10 @@ msgstr ""
 msgid "Otherwise show"
 msgstr "Si no, mostrar"
 
+#: src/Core/Loop/Loop.php
+msgid "Pagination"
+msgstr "Paginación"
+
 #: src/Core/Auth/PagePassword.php
 msgid "Password"
 msgstr ""
@@ -1017,6 +1021,10 @@ msgstr ""
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Preview"
 msgstr "Vista previa"
+
+#: src/Core/Loop/Loop.php
+msgid "Previous"
+msgstr "Anterior"
 
 #: src/Core/Seo/Schema.php
 msgid "Profile URL"

@@ -1,0 +1,12 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "taw/loop-empty",
+	"title": "Loop: no items",
+	"category": "theme",
+	"parent": [ "taw/loop" ],
+	"description": "Shown when the TAW Loop has no items.",
+	"textdomain": "taw-core",
+	"usesContext": [ "taw/loopEmpty" ],
+	"supports": { "html": false, "reusable": false, "color": { "background": true, "text": true }, "spacing": { "padding": true } }
+}

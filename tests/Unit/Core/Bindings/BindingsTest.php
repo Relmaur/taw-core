@@ -252,7 +252,7 @@ final class BindingsTest extends TestCase
         $this->assertSame(10, has_action('init', [Bindings::class, 'registerSource']));
 
         Bindings::registerSource();
-        $this->assertSame(['postId', 'postType'], $registered['taw/field']['uses_context']);
+        $this->assertSame(['postId', 'postType', 'taw/loopItem'], $registered['taw/field']['uses_context'], 'the loop item too (ADR-0014)');
         $this->assertSame([Bindings::class, 'getValue'], $registered['taw/field']['get_value_callback']);
     }
 }

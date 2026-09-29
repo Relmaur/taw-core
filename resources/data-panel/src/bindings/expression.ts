@@ -39,7 +39,7 @@ export interface Parsed {
 
 export const MAX_LENGTH = 500;
 export const MAX_TOKENS = 20;
-export const NAMESPACES = ['post', 'site', 'option', 'term', 'author', 'viewer', 'date'];
+export const NAMESPACES = ['post', 'site', 'option', 'term', 'author', 'viewer', 'date', 'row', 'loop'];
 export const SITE_PROPERTIES = ['name', 'tagline', 'url', 'year'];
 
 /** Function name → its argument kinds (Parser::FUNCTIONS). */

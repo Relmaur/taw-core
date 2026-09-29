@@ -1,0 +1,30 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "taw/loop",
+	"title": "TAW Loop",
+	"category": "theme",
+	"description": "Repeat a design for each item: a repeater's rows, related posts, a query, terms or images.",
+	"keywords": [ "loop", "repeater", "query", "list", "grid", "taw" ],
+	"textdomain": "taw-core",
+	"attributes": {
+		"loopId": { "type": "number" },
+		"source": { "type": "object", "default": {} },
+		"order": { "type": "object", "default": {} },
+		"limit": { "type": "number", "default": 0 },
+		"offset": { "type": "number", "default": 0 },
+		"perPage": { "type": "number", "default": 0 },
+		"filter": { "type": "object" },
+		"layout": { "type": "object", "default": { "type": "list" } },
+		"ordered": { "type": "boolean", "default": false }
+	},
+	"usesContext": [ "postId", "postType", "taw/loopItem", "queryId", "query" ],
+	"supports": {
+		"html": false,
+		"align": [ "wide", "full" ],
+		"anchor": true,
+		"spacing": { "margin": true, "padding": true },
+		"color": { "background": true, "text": true, "link": true },
+		"typography": { "fontSize": true }
+	}
+}

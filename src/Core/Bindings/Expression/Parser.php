@@ -38,7 +38,7 @@ final class Parser
 
     public const MAX_TOKENS = 20;
 
-    public const NAMESPACES = ['post', 'site', 'option', 'term', 'author', 'viewer', 'date'];
+    public const NAMESPACES = ['post', 'site', 'option', 'term', 'author', 'viewer', 'date', 'row', 'loop'];
 
     /** Function name → its argument kinds. */
     public const FUNCTIONS = [

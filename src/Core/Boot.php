@@ -10,6 +10,7 @@ use TAW\Core\DataPanel\DataPanel;
 use TAW\Core\Icons\Lucide;
 use TAW\Core\Editing\Editing;
 use TAW\Core\I18n\Translations;
+use TAW\Core\Loop\Loop;
 use TAW\Core\Rest\ContentEndpoint;
 use TAW\Core\Rest\FieldMetaRegistrar;
 use TAW\Core\Schema\Compiler;
@@ -92,6 +93,8 @@ final class Boot
         // The `taw/field` Block Bindings source (ADR-0010). Last, so the hooks
         // above keep their positions.
         Bindings::register();
+        // The TAW Loop blocks (ADR-0014), after the bindings they build on.
+        Loop::register();
     }
 
     /**
