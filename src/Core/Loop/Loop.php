@@ -138,6 +138,9 @@ final class Loop
         $inner   = is_array($block->parsed_block['innerBlocks'] ?? null) ? $block->parsed_block['innerBlocks'] : [];
         $base    = self::baseContext($block);
         $tag     = ($attributes['layout']['type'] ?? 'list') === 'list' && ($attributes['ordered'] ?? false) === true ? 'ol' : 'ul';
+        if (!self::shows($inner, $plan['items'] !== [])) {
+            return '';
+        }
 
         $html = '';
         foreach ($inner as $child) {
@@ -165,6 +168,26 @@ final class Loop
         }
 
         return sprintf('<div %s>%s</div>', get_block_wrapper_attributes(['class' => 'taw-loop']), $html);
+    }
+
+    /**
+     * Whether the loop renders at all: with no items and no "No items" block it
+     * renders nothing, so a heading placed inside it never stands alone.
+     *
+     * @param array<int, mixed> $inner The loop's parsed inner blocks.
+     */
+    public static function shows(array $inner, bool $hasItems): bool
+    {
+        if ($hasItems) {
+            return true;
+        }
+        foreach ($inner as $child) {
+            if (is_array($child) && ($child['blockName'] ?? '') === 'taw/loop-empty') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

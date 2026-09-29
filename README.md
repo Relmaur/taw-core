@@ -555,7 +555,8 @@ Four dynamic blocks (ADR-0014), rendered on the server; registered by `Boot::dat
 ```
 
 - **`taw/loop-item`** is repeated for each item; **`taw/loop-empty`** shows when there are none;
-  **`taw/loop-pagination`** links the pages; any other inner block renders once.
+  **`taw/loop-pagination`** links the pages; any other inner block renders once. A loop with no items
+  and no `taw/loop-empty` renders nothing at all (v1.69.1+), so a heading inside it never stands alone.
 - **Sources** (`source.type`):
   - `repeater`: a repeater's rows (`field`; `from`: `post` (default), `option`, `term`, `user`, or `row`
     for the enclosing item's own repeater);

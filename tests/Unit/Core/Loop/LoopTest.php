@@ -284,6 +284,18 @@ final class LoopTest extends TestCase
         $this->assertSame('', Loop::renderPagination([], '', $block(['taw/loopPages' => ['current' => 1, 'total' => 1, 'param' => 'p']])));
     }
 
+    public function test_an_empty_loop_without_a_no_items_block_renders_nothing(): void
+    {
+        $heading = ['blockName' => 'core/heading'];
+        $item    = ['blockName' => 'taw/loop-item'];
+        $empty   = ['blockName' => 'taw/loop-empty'];
+
+        $this->assertTrue(Loop::shows([$heading, $item], true));
+        $this->assertFalse(Loop::shows([$heading, $item], false));
+        $this->assertTrue(Loop::shows([$heading, $item, $empty], false));
+        $this->assertFalse(Loop::shows([], false));
+    }
+
     public function test_previews_inside_a_loop_read_its_first_item(): void
     {
         Functions\when('current_user_can')->alias(static fn (string $cap, int $id = 0): bool => $cap === 'edit_post' && $id === 5);
