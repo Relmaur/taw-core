@@ -91,8 +91,8 @@ final class Blocks
             if (!is_array($binding) || ($binding['source'] ?? null) !== self::BOUND_SOURCE) {
                 continue;
             }
-            // A field, or an expression (ADR-0012).
-            foreach (['field', 'expr'] as $key) {
+            // A field, an expression (ADR-0012), or a TAW Loop item's value (ADR-0014).
+            foreach (['field', 'expr', 'row', 'loop'] as $key) {
                 if (is_string($binding['args'][$key] ?? null) && trim($binding['args'][$key]) !== '') {
                     return true;
                 }

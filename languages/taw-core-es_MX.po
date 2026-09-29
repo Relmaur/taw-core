@@ -33,6 +33,14 @@ msgstr ""
 msgid "#%d (not published)"
 msgstr ""
 
+#. translators: 1: items shown, 2: all items
+#: resources/data-panel/src/bindings/loop/parts.tsx
+#, php-format
+msgid "%1$d item. You’re editing the first; the others follow its design."
+msgid_plural "Showing %1$d of %2$d items. You’re editing the first; the others follow its design."
+msgstr[0] "%1$d elemento. Estás editando el primero; los demás siguen su diseño."
+msgstr[1] "Se muestran %1$d de %2$d elementos. Estás editando el primero; los demás siguen su diseño."
+
 #. translators: 1: files chosen, 2: most allowed.
 #. translators: 1: items, 2: most allowed.
 #: resources/data-panel/src/controls/MediaControls.tsx resources/data-panel/src/controls/Repeater.tsx
@@ -164,6 +172,14 @@ msgstr ""
 msgid ".sqlite file"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "0 = all (up to 200)"
+msgstr "0 = todos (hasta 200)"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "0 = no pages. Each loop pages on its own."
+msgstr "0 = sin páginas. Cada bucle pagina por su cuenta."
+
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "@ value"
 msgstr "@ valor"
@@ -171,6 +187,18 @@ msgstr "@ valor"
 #: src/Core/Content/ContentAdminScreen.php
 msgid "A full rollback snapshot is written to wp-content/uploads/taw-private/ before anything changes."
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "A grid"
+msgstr "Una cuadrícula"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "A grid of cards."
+msgstr "Una cuadrícula de tarjetas."
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "A list"
+msgstr "Una lista"
 
 #: src/Core/Form/Form.php
 msgid "A network error occurred. Please try again."
@@ -208,6 +236,14 @@ msgstr ""
 msgid "Add a condition"
 msgstr "Agregar una condición"
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Add a filter"
+msgstr "Agregar un filtro"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Add blocks for each item…"
+msgstr "Agrega bloques para cada elemento…"
+
 #: resources/data-panel/src/controls/MediaControls.tsx
 msgid "Add files"
 msgstr ""
@@ -219,6 +255,10 @@ msgstr "Agregar grupo"
 #: resources/data-panel/src/controls/Repeater.tsx
 msgid "Add item"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Add page links"
+msgstr "Agregar enlaces de páginas"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Add rule"
@@ -252,6 +292,10 @@ msgstr ""
 msgid "All folders"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "All terms"
+msgstr "Todos los términos"
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Allowed blocks"
 msgstr ""
@@ -260,6 +304,10 @@ msgstr ""
 msgid "Also apply environment-settings options (permalinks, timezone, sticky posts, …)"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Alt text"
+msgstr "Texto alternativo"
+
 #: src/Core/Seo/Schema.php
 msgid "Always off — defer entirely to another SEO plugin"
 msgstr ""
@@ -267,6 +315,10 @@ msgstr ""
 #: src/Core/Seo/Schema.php
 msgid "Always on — ignore detection, always use TAW's own SEO output"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "An empty item to design yourself."
+msgstr "Un elemento vacío para diseñarlo tú."
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Any .sqlite file uploaded here becomes searchable by the chatbot — every table and text column is chunked, embedded, and semantically searched. No particular schema is required."
@@ -281,7 +333,15 @@ msgstr ""
 msgid "Apply %d changes"
 msgstr ""
 
-#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/tags.ts
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "As the source gives them"
+msgstr "Como los da la fuente"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Ascending (A → Z, 1 → 9)"
+msgstr "Ascendente (A → Z, 1 → 9)"
+
+#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "Author"
 msgstr "Autor"
 
@@ -293,9 +353,9 @@ msgstr ""
 msgid "Automatic — detect Yoast/RankMath/SmartCrawl and stand down if one is active"
 msgstr ""
 
-#: src/Core/Form/Form.php
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Form/Form.php
 msgid "Back"
-msgstr ""
+msgstr "Atrás"
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Block text"
@@ -312,6 +372,18 @@ msgstr ""
 #: resources/data-panel/src/rich/MiniEditor.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Cancel"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Caption"
+msgstr "Leyenda"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Cards"
+msgstr "Tarjetas"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Categories, tags or any taxonomy: the post’s own, or all of them."
+msgstr "Categorías, etiquetas o cualquier taxonomía: las de la entrada o todas."
 
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Change"
@@ -337,9 +409,21 @@ msgstr ""
 msgid "Choose a date"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Choose a field…"
+msgstr "Elige un campo…"
+
 #: src/Core/Media/MediaFolders.php
 msgid "Choose a folder…"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Choose a post type…"
+msgstr "Elige un tipo de contenido…"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Choose a taxonomy…"
+msgstr "Elige una taxonomía…"
 
 #: resources/data-panel/src/controls/IconControl.tsx
 msgid "Choose an icon"
@@ -372,6 +456,14 @@ msgstr "Contraer"
 #: resources/data-panel/src/controls/Repeater.tsx
 msgid "Collapse all"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Columns"
+msgstr "Columnas"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Compare as"
+msgstr "Comparar como"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Compare with"
@@ -431,7 +523,7 @@ msgstr "Valor personalizado…"
 msgid "Date"
 msgstr "Fecha"
 
-#: resources/data-panel/src/bindings/conditions.ts
+#: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Dates"
 msgstr "Fechas"
 
@@ -443,9 +535,17 @@ msgstr ""
 msgid "Delete this knowledge base?"
 msgstr ""
 
-#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Descending (Z → A, 9 → 1)"
+msgstr "Descendente (Z → A, 9 → 1)"
+
+#: resources/data-panel/src/bindings/loop/data.ts src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Description"
 msgstr "Descripción"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Direction"
+msgstr "Dirección"
 
 #: resources/data-panel/src/rich/MiniEditor.tsx
 msgid "Discard your changes to this field?"
@@ -531,6 +631,10 @@ msgstr ""
 msgid "Feeds the \"sameAs\" entity signal — link every profile that represents this same organization/brand (LinkedIn, Instagram, etc.)."
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Field"
+msgstr "Campo"
+
 #: resources/data-panel/src/bindings/logic.ts
 msgid "Field button"
 msgstr "Botón de campo"
@@ -575,6 +679,10 @@ msgstr ""
 msgid "Fill in the required data before saving: %s."
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Filter"
+msgstr "Filtro"
+
 #: src/Core/Media/MediaFolders.php
 msgid "Folder"
 msgstr ""
@@ -595,6 +703,10 @@ msgstr "Desde"
 msgid "Group"
 msgstr "Grupo"
 
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Height"
+msgstr "Alto"
+
 #: resources/data-panel/src/bindings/visibility.tsx
 msgid "Hidden blocks are still in the post content: this changes what shows, not who can read it."
 msgstr "Los bloques ocultos siguen en el contenido de la entrada: esto cambia lo que se muestra, no quién puede leerlo."
@@ -611,6 +723,10 @@ msgstr ""
 msgid "Hide from search engines"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Hide terms without posts"
+msgstr "Ocultar términos sin entradas"
+
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Highlighted"
 msgstr ""
@@ -619,7 +735,7 @@ msgstr ""
 msgid "Home"
 msgstr ""
 
-#: resources/data-panel/src/bindings/tags.ts
+#: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "ID"
 msgstr "ID"
 
@@ -635,11 +751,19 @@ msgstr ""
 msgid "Icons couldn’t be loaded."
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Image"
+msgstr "Imagen"
+
 #. translators: %d: attachment ID.
 #: resources/data-panel/src/controls/MediaControls.tsx
 #, php-format
 msgid "Image #%d is no longer in the media library"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Images"
+msgstr "Imágenes"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Import"
@@ -648,6 +772,10 @@ msgstr ""
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Import applied."
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Include"
+msgstr "Incluir"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Include comments on exported posts"
@@ -702,11 +830,40 @@ msgstr ""
 msgid "Invalid parameter(s): %s"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Is even"
+msgstr "Es par"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Is first"
+msgstr "Es el primero"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Is last"
+msgstr "Es el último"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Is odd"
+msgstr "Es impar"
+
 #. translators: %d: item number.
 #: resources/data-panel/src/controls/Repeater.tsx
 #, php-format
 msgid "Item %d"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/data.ts
+#, php-format
+msgid "Item: %s"
+msgstr "Elemento: %s"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Items"
+msgstr "Elementos"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Items per page"
+msgstr "Elementos por página"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Items, separated by commas"
@@ -720,9 +877,29 @@ msgstr ""
 msgid "Knowledge base deleted."
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Layout"
+msgstr "Diseño"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Leave out"
+msgstr "Excluir"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Leave out this post"
+msgstr "Excluir esta entrada"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Link"
+msgstr "Enlace"
+
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Link text"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "List"
+msgstr "Lista"
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "Lists"
@@ -731,6 +908,10 @@ msgstr "Listas"
 #: src/Core/Media/MediaFolders.php
 msgid "Load more"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/parts.tsx
+msgid "Loading items…"
+msgstr "Cargando elementos…"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Loading…"
@@ -748,6 +929,19 @@ msgstr ""
 msgid "Logo"
 msgstr "Logo"
 
+#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/loop/data.ts
+msgid "Loop"
+msgstr "Bucle"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Loop over"
+msgstr "Recorrer"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+#, php-format
+msgid "Loop over: %s"
+msgstr "Recorrer: %s"
+
 #: src/Core/Metabox/Metabox.php
 msgid "Lucide icons aren't enabled for this site — call TAW\\Core\\Icons\\Lucide::enable() in customizations.php before Theme::boot()."
 msgstr ""
@@ -756,6 +950,10 @@ msgstr ""
 msgid "Managed externally — read-only"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Marks the items up as an ordered list (<ol>)."
+msgstr "Marca los elementos como una lista ordenada (<ol>)."
+
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Match"
 msgstr "Coincidencia"
@@ -763,6 +961,10 @@ msgstr "Coincidencia"
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Media sideloaded"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Menu order"
+msgstr "Orden del menú"
 
 #: src/Core/Seo/SeoMeta.php
 msgid "Meta Description"
@@ -783,6 +985,10 @@ msgstr ""
 #: src/Core/Form/Form.php
 msgid "More information"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Most comments"
+msgstr "Más comentarios"
 
 #. translators: %s: item title.
 #: resources/data-panel/src/controls/Repeater.tsx
@@ -816,7 +1022,7 @@ msgid_plural "Moved %d files to the selected folder."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+#: resources/data-panel/src/bindings/loop/data.ts src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Name"
 msgstr "Nombre"
 
@@ -836,11 +1042,11 @@ msgstr ""
 msgid "New Folder"
 msgstr ""
 
-#: src/Core/Media/MediaFolders.php
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Media/MediaFolders.php
 msgid "Newest first"
-msgstr ""
+msgstr "Más recientes primero"
 
-#: src/Core/Form/Form.php src/Core/Loop/Loop.php
+#: resources/data-panel/src/bindings/loop/parts.tsx src/Core/Form/Form.php src/Core/Loop/Loop.php
 msgid "Next"
 msgstr "Siguiente"
 
@@ -872,6 +1078,10 @@ msgstr ""
 msgid "No files in this folder."
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "No files or image fields here. Add one to a fieldset first."
+msgstr "No hay campos de archivos o imagen aquí. Agrega uno a un grupo de campos primero."
+
 #: src/Core/Metabox/Metabox.php
 msgid "No icon selected"
 msgstr ""
@@ -884,17 +1094,33 @@ msgstr ""
 msgid "No image"
 msgstr ""
 
-#: resources/data-panel/src/controls/Repeater.tsx
+#: resources/data-panel/src/bindings/loop/parts.tsx
+msgid "No items for this post: the “No items” blocks show instead. The design above is what each item will use."
+msgstr "No hay elementos para esta entrada: se muestran los bloques de “Sin elementos”. El diseño de arriba es el que usará cada elemento."
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/data-panel/src/bindings/loop/parts.tsx resources/data-panel/src/controls/Repeater.tsx
 msgid "No items yet."
-msgstr ""
+msgstr "Aún no hay elementos."
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "No post select fields here. Add one to a fieldset first."
+msgstr "No hay campos de selección de entradas aquí. Agrega uno a un grupo de campos primero."
 
 #: src/Core/Metabox/Metabox.php
 msgid "No posts found."
 msgstr "No se encontraron publicaciones."
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "No repeater fields here. Add one to a fieldset first."
+msgstr "No hay campos repetidores aquí. Agrega uno a un grupo de campos primero."
+
 #: resources/data-panel/src/controls/CompositeControls.tsx
 msgid "No segments yet."
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "No source"
+msgstr "Sin fuente"
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "No values match your search."
@@ -916,17 +1142,37 @@ msgstr "Nada"
 msgid "Nothing found."
 msgstr ""
 
-#: resources/data-panel/src/bindings/conditions.ts
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Number of items"
+msgstr "Número de elementos"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Numbered list"
+msgstr "Lista numerada"
+
+#: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Numbers"
 msgstr "Números"
 
-#: src/Core/Media/MediaFolders.php
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Media/MediaFolders.php
 msgid "Oldest first"
-msgstr ""
+msgstr "Más antiguas primero"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "One item per row of a repeater field, e.g. a book’s awards."
+msgstr "Un elemento por fila de un campo repetidor, p. ej. los premios de un libro."
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "One line per item."
+msgstr "Una línea por elemento."
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Only bound to a TAW field"
 msgstr "Solo conectados a un campo TAW"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Only sticky posts"
+msgstr "Solo entradas fijas"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Op"
@@ -944,9 +1190,13 @@ msgstr ""
 msgid "Open the visual content editor"
 msgstr ""
 
-#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/tags.ts
+#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "Options"
 msgstr "Opciones"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Order by"
+msgstr "Ordenar por"
 
 #: src/Core/Seo/Schema.php
 msgid "Organization"
@@ -964,7 +1214,11 @@ msgstr ""
 msgid "Otherwise show"
 msgstr "Si no, mostrar"
 
-#: src/Core/Loop/Loop.php
+#: resources/data-panel/src/bindings/loop/parts.tsx
+msgid "Page links"
+msgstr "Enlaces de páginas"
+
+#: resources/data-panel/src/bindings/loop/parts.tsx src/Core/Loop/Loop.php
 msgid "Pagination"
 msgstr "Paginación"
 
@@ -975,6 +1229,10 @@ msgstr ""
 #: src/Core/Seo/Schema.php
 msgid "Phone"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Pick a starting design. You can change every block afterwards."
+msgstr "Elige un diseño inicial. Después puedes cambiar cada bloque."
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Pick a value…"
@@ -994,21 +1252,37 @@ msgstr ""
 msgid "Portal ID"
 msgstr ""
 
-#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/tags.ts
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Position (1, 2, 3…)"
+msgstr "Posición (1, 2, 3…)"
+
+#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "Post"
 msgstr "Entrada"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Post count"
+msgstr "Número de entradas"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Post fields"
 msgstr "Campos de la entrada"
 
-#: src/Core/Editing/EditingAdminScreen.php
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Editing/EditingAdminScreen.php
 msgid "Post type"
-msgstr ""
+msgstr "Tipo de contenido"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Post types not listed keep the normal editor."
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Posts (query)"
+msgstr "Entradas (consulta)"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Posts by type, terms, author or search, like core’s Query Loop."
+msgstr "Entradas por tipo, términos, autor o búsqueda, como el Bucle de consulta de WordPress."
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "Presence"
@@ -1022,7 +1296,7 @@ msgstr ""
 msgid "Preview"
 msgstr "Vista previa"
 
-#: src/Core/Loop/Loop.php
+#: resources/data-panel/src/bindings/loop/parts.tsx src/Core/Loop/Loop.php
 msgid "Previous"
 msgstr "Anterior"
 
@@ -1037,6 +1311,18 @@ msgstr ""
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Published on @post.date.format('F j, Y') by @post.author"
 msgstr "Publicado el @post.date.format('j F Y') por @post.author"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Query order"
+msgstr "Orden de la consulta"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Random"
+msgstr "Aleatorio"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Recently updated"
+msgstr "Actualizadas recientemente"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Record"
@@ -1053,6 +1339,10 @@ msgstr ""
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Registry drift"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Related posts"
+msgstr "Entradas relacionadas"
 
 #: resources/data-panel/src/bindings/chips.tsx resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Remove"
@@ -1074,6 +1364,10 @@ msgstr "Remover imagen"
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx resources/data-panel/src/bindings/visibility.tsx
 msgid "Remove condition"
 msgstr "Quitar condición"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Remove filter"
+msgstr "Quitar filtro"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Remove group"
@@ -1097,6 +1391,14 @@ msgstr ""
 msgid "Rename"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Repeat a design for each item. What should it loop over?"
+msgstr "Repite un diseño para cada elemento. ¿Qué debe recorrer?"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Repeater rows"
+msgstr "Filas de repetidor"
+
 #: resources/data-panel/src/controls/MediaControls.tsx
 msgid "Replace"
 msgstr ""
@@ -1109,6 +1411,10 @@ msgstr ""
 msgid "Return to normal view"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Reversed"
+msgstr "Invertido"
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Review changes"
 msgstr ""
@@ -1116,6 +1422,10 @@ msgstr ""
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Rollback snapshot"
 msgstr ""
+
+#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/loop/data.ts
+msgid "Row"
+msgstr "Fila"
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "Rule"
@@ -1143,9 +1453,22 @@ msgstr ""
 msgid "SVG Images"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+#, php-format
+msgid "Same %s as this post"
+msgstr "Mismas %s que esta entrada"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Same author as this post"
+msgstr "Mismo autor que esta entrada"
+
 #: resources/data-panel/src/bindings/chips.tsx
 msgid "Save"
 msgstr "Guardar"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Search"
+msgstr "Búsqueda"
 
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Search failed."
@@ -1227,9 +1550,25 @@ msgstr ""
 msgid "Show %s when"
 msgstr "Mostrar %s cuando"
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Show at most"
+msgstr "Mostrar como máximo"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Show items as"
+msgstr "Mostrar elementos como"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Show only the items whose values match, e.g. awards from before 1970."
+msgstr "Muestra solo los elementos cuyos valores coincidan, p. ej. premios anteriores a 1970."
+
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Show only when…"
 msgstr "Mostrar solo cuando…"
+
+#: resources/data-panel/src/bindings/loop/parts.tsx
+msgid "Show page numbers"
+msgstr "Mostrar números de página"
 
 #: resources/data-panel/src/bindings/visibility.tsx
 msgid "Show this block only when values match, e.g. a Buy button only when the buy link is set."
@@ -1247,11 +1586,19 @@ msgstr ""
 msgid "Shown only when…"
 msgstr "Visible solo cuando…"
 
+#: resources/data-panel/src/bindings/loop/parts.tsx
+msgid "Shown when the loop has more than one page"
+msgstr "Se muestra cuando el bucle tiene más de una página"
+
+#: resources/data-panel/src/bindings/loop/parts.tsx
+msgid "Shown when there are no items"
+msgstr "Se muestra cuando no hay elementos"
+
 #: resources/data-panel/src/bindings/logic.ts
 msgid "Shows a TAW field. Pick the field after inserting it."
 msgstr "Muestra un campo TAW. Elige el campo después de insertarlo."
 
-#: resources/data-panel/src/bindings/tags.ts
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/data-panel/src/bindings/tags.ts
 msgid "Site"
 msgstr "Sitio"
 
@@ -1266,6 +1613,14 @@ msgstr "URL del sitio"
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Site title"
 msgstr "Título del sitio"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Skip the first"
+msgstr "Omitir los primeros"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Slug"
+msgstr "Slug"
 
 #: src/Core/Seo/Schema.php
 msgid "Social Profile Links"
@@ -1289,6 +1644,18 @@ msgstr ""
 msgid "Sort folders"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Source"
+msgstr "Fuente"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Space between items"
+msgstr "Espacio entre elementos"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Start blank"
+msgstr "Empezar en blanco"
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Starting template"
 msgstr ""
@@ -1296,6 +1663,10 @@ msgstr ""
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Status"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Sticky posts"
+msgstr "Entradas fijas"
 
 #: src/Core/Form/Form.php
 msgid "Submit"
@@ -1312,6 +1683,10 @@ msgstr ""
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "TAW Editing"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "TAW Loop"
+msgstr "Bucle TAW"
 
 #: src/Core/Media/MediaFolders.php
 msgid "TAW Media"
@@ -1347,15 +1722,23 @@ msgstr "Pestaña"
 msgid "Tagline"
 msgstr "Descripción corta"
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Taxonomy"
+msgstr "Taxonomía"
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Tells the chatbot when to use this knowledge base — be specific about what it contains."
 msgstr ""
 
-#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/tags.ts
+#: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "Term"
 msgstr "Término"
 
-#: resources/data-panel/src/bindings/conditions.ts
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Terms"
+msgstr "Términos"
+
+#: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Text"
 msgstr "Texto"
 
@@ -1393,9 +1776,17 @@ msgstr ""
 msgid "The expression is too long (500 characters at most)."
 msgstr "La expresión es demasiado larga (500 caracteres como máximo)."
 
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "The images of a files or image field, e.g. a gallery."
+msgstr "Las imágenes de un campo de archivos o imagen, p. ej. una galería."
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "The pending import expired — please upload the file again."
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "The posts picked in a post select field, e.g. books in this series."
+msgstr "Las entradas elegidas en un campo de selección de entradas, p. ej. libros de esta serie."
 
 #: src/Core/Editing/SiteLayer.php
 msgid "The site's editing policy doesn't allow changing this part of the site design."
@@ -1404,6 +1795,10 @@ msgstr ""
 #: src/Core/Editing/SiteLayer.php
 msgid "The site's editing policy doesn't allow using the Site Editor."
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "The source’s order"
+msgstr "El orden de la fuente"
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "The upload failed — please try again."
@@ -1441,9 +1836,26 @@ msgstr ""
 msgid "This page is not available."
 msgstr ""
 
-#: resources/data-panel/src/bindings/tags.ts
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "This post’s terms"
+msgstr "Los términos de esta entrada"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+#, php-format
+msgid "This row: %s"
+msgstr "Esta fila: %s"
+
+#: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "Title"
 msgstr "Título"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Title A → Z"
+msgstr "Título A → Z"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Title Z → A"
+msgstr "Título Z → A"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "To"
@@ -1485,9 +1897,9 @@ msgstr ""
 msgid "Type @ to add a value, then . for a function."
 msgstr "Escribe @ para añadir un valor y luego . para una función."
 
-#: resources/data-panel/src/bindings/tags.ts resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
+#: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "URL"
-msgstr ""
+msgstr "URL"
 
 #: src/Core/Content/ContentAdminScreen.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Unauthorized"
@@ -1553,6 +1965,14 @@ msgstr ""
 msgid "When a record already exists:"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Which terms"
+msgstr "Qué términos"
+
+#: resources/data-panel/src/bindings/loop/data.ts
+msgid "Width"
+msgstr "Ancho"
+
 #: resources/data-panel/src/controls/RichContent.tsx
 msgid "Write"
 msgstr ""
@@ -1601,6 +2021,10 @@ msgstr "todas"
 msgid "allowed"
 msgstr ""
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "an item"
+msgstr "un elemento"
+
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "and"
 msgstr "y"
@@ -1632,6 +2056,10 @@ msgstr "no contiene"
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "does not have the item"
 msgstr "no tiene el elemento"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "e.g. 1.5rem or 24px"
+msgstr "p. ej. 1.5rem o 24px"
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "ends with"
@@ -1796,3 +2224,81 @@ msgstr ""
 #: resources/data-panel/src/controls/ChoiceControls.tsx
 msgid "— Select —"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/parts.tsx
+msgid "“Next” text"
+msgstr "Texto de “Siguiente”"
+
+#: resources/data-panel/src/bindings/loop/parts.tsx
+msgid "“Previous” text"
+msgstr "Texto de “Anterior”"
+
+#: resources/blocks/loop-pagination/block.json
+msgctxt "block description"
+msgid "Links to the TAW Loop's other pages, when it has more than one."
+msgstr "Enlaces a las otras páginas del Bucle TAW, cuando tiene más de una."
+
+#: resources/blocks/loop/block.json
+msgctxt "block description"
+msgid "Repeat a design for each item: a repeater's rows, related posts, a query, terms or images."
+msgstr "Repite un diseño para cada elemento: las filas de un repetidor, entradas relacionadas, una consulta, términos o imágenes."
+
+#: resources/blocks/loop-empty/block.json
+msgctxt "block description"
+msgid "Shown when the TAW Loop has no items."
+msgstr "Se muestra cuando el Bucle TAW no tiene elementos."
+
+#: resources/blocks/loop-item/block.json
+msgctxt "block description"
+msgid "The design repeated for each item of a TAW Loop."
+msgstr "El diseño que se repite para cada elemento de un Bucle TAW."
+
+#: resources/blocks/loop/block.json
+msgctxt "block keyword"
+msgid "grid"
+msgstr "cuadrícula"
+
+#: resources/blocks/loop/block.json
+msgctxt "block keyword"
+msgid "list"
+msgstr "lista"
+
+#: resources/blocks/loop/block.json
+msgctxt "block keyword"
+msgid "loop"
+msgstr "bucle"
+
+#: resources/blocks/loop/block.json
+msgctxt "block keyword"
+msgid "query"
+msgstr "consulta"
+
+#: resources/blocks/loop/block.json
+msgctxt "block keyword"
+msgid "repeater"
+msgstr "repetidor"
+
+#: resources/blocks/loop/block.json
+msgctxt "block keyword"
+msgid "taw"
+msgstr "taw"
+
+#: resources/blocks/loop-item/block.json
+msgctxt "block title"
+msgid "Loop item"
+msgstr "Elemento del bucle"
+
+#: resources/blocks/loop-pagination/block.json
+msgctxt "block title"
+msgid "Loop pagination"
+msgstr "Paginación del bucle"
+
+#: resources/blocks/loop-empty/block.json
+msgctxt "block title"
+msgid "Loop: no items"
+msgstr "Bucle: sin elementos"
+
+#: resources/blocks/loop/block.json
+msgctxt "block title"
+msgid "TAW Loop"
+msgstr "Bucle TAW"

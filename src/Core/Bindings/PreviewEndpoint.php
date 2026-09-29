@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace TAW\Core\Bindings;
 
 use TAW\Core\Bindings\Expression\Evaluator;
+use TAW\Core\Loop\Loop;
+use TAW\Core\Loop\RowValues;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -22,6 +24,9 @@ if (!defined('ABSPATH')) {
  *           is {"value": "…", "errors": [{code, at}]}.
  *           A condition (ADR-0013) sends "kind": "condition" and args {"if": {…}}: its value
  *           is {"shown": bool, "errors": [{code, path}]}.
+ *           Inside a TAW Loop (ADR-0014), "loops" lists the enclosing loops' attributes, outermost
+ *           first: values then read each loop's first item (the item the editor edits), so
+ *           `@row.*`, `@loop.*` and bindings with {"row": …} preview real values.
  * Response: {"values": {"<key>": <value or null>}}
  *
  * Editors only (`edit_posts`), and a post's values only for users who can
@@ -34,6 +39,11 @@ final class PreviewEndpoint
 
     public const ROUTE = '/bindings/preview';
 
+    public const LOOP_ROUTE = '/loop/render';
+
+    /** Items a loop preview renders. */
+    public const PREVIEW_ITEMS = 12;
+
     /** A page of bound blocks, not a bulk export. */
     public const MAX_ITEMS = 200;
 
@@ -45,6 +55,35 @@ final class PreviewEndpoint
             'permission_callback' => static fn (): bool => current_user_can('edit_posts'),
             'args'                => ['items' => ['type' => 'array', 'required' => true]],
         ]);
+        // The TAW Loop's item previews (ADR-0014), with the same rules.
+        register_rest_route(self::NAMESPACE, self::LOOP_ROUTE, [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'handleLoop'],
+            'permission_callback' => static fn (): bool => current_user_can('edit_posts'),
+            'args'                => ['attributes' => ['type' => 'object', 'required' => true], 'content' => ['type' => 'string', 'required' => true]],
+        ]);
+    }
+
+    /**
+     * `POST taw/v1/loop/render`: a TAW Loop's items rendered for the editor
+     * canvas: {"items": [{"index", "html"}], "total"}. At most PREVIEW_ITEMS.
+     */
+    public static function handleLoop(\WP_REST_Request $request): \WP_REST_Response
+    {
+        $item = $request->get_params();
+        $postId = self::postId($item);
+        if ($postId === null) {
+            return new \WP_REST_Response(['items' => [], 'total' => 0], 403);
+        }
+        $attributes = $request->get_param('attributes');
+        $content = $request->get_param('content');
+
+        return new \WP_REST_Response(Loop::renderPreview(
+            is_array($attributes) ? $attributes : [],
+            is_string($content) ? $content : '',
+            self::context($item, $postId),
+            self::PREVIEW_ITEMS
+        ));
     }
 
     public static function handle(\WP_REST_Request $request): \WP_REST_Response
@@ -74,13 +113,24 @@ final class PreviewEndpoint
         }
         if ($kind === 'condition') {
             $postId = self::postId($item);
-            return $postId === null ? null : Conditions::check($args['if'] ?? null, new BindingContext($postId));
+            return $postId === null ? null : Conditions::check($args['if'] ?? null, self::context($item, $postId));
         }
         $ref = isset($args['expr']) ? null : Reference::fromArgs($args);
         $isTag = $kind === 'tag';
-        if ($isTag && isset($args['expr'])) {
+        if ($isTag && (isset($args['expr']) || isset($args['row']) || isset($args['loop']))) {
             $postId = self::postId($item);
-            return $postId === null ? null : InlineTags::value($args, new BindingContext($postId));
+            return $postId === null ? null : InlineTags::value($args, self::context($item, $postId));
+        }
+        // A loop item's value bound to an attribute: {"row": "photo"}.
+        if (!$isTag && (isset($args['row']) || isset($args['loop']))) {
+            $postId = self::postId($item);
+            $block = is_string($item['block'] ?? null) ? $item['block'] : '';
+            $attribute = is_string($item['attribute'] ?? null) ? $item['attribute'] : '';
+            if ($postId === null || $block === '' || $attribute === '') {
+                return null;
+            }
+            $value = RowValues::forTarget($args, self::context($item, $postId), Target::for($block, $attribute, self::attributeSchema($block, $attribute)));
+            return $value === false ? '' : $value;
         }
         $block = is_string($item['block'] ?? null) ? $item['block'] : '';
         $attribute = is_string($item['attribute'] ?? null) ? $item['attribute'] : '';
@@ -94,10 +144,10 @@ final class PreviewEndpoint
         }
 
         if ($isTag) {
-            return InlineTags::value($args, new BindingContext($postId));
+            return InlineTags::value($args, self::context($item, $postId));
         }
 
-        $value = Bindings::resolver()->resolve($ref, new BindingContext($postId), Target::for($block, $attribute, self::attributeSchema($block, $attribute)));
+        $value = Bindings::resolver()->resolve($ref, self::context($item, $postId), Target::for($block, $attribute, self::attributeSchema($block, $attribute)));
 
         return $value === false ? '' : $value;
     }
@@ -114,7 +164,28 @@ final class PreviewEndpoint
             return null;
         }
 
-        return Evaluator::evaluate($args['expr'], new BindingContext($postId));
+        return Evaluator::evaluate($args['expr'], self::context($item, $postId));
+    }
+
+    /**
+     * The context a preview reads: the post, then, inside TAW Loops, each
+     * enclosing loop's first item (outermost first).
+     *
+     * @param array<string, mixed> $item
+     */
+    private static function context(array $item, int $postId): BindingContext
+    {
+        $context = new BindingContext($postId);
+        $loops = is_array($item['loops'] ?? null) ? array_slice(array_values($item['loops']), 0, Loop::MAX_DEPTH) : [];
+        foreach ($loops as $attributes) {
+            $first = is_array($attributes) ? (Loop::items(array_merge($attributes, ['perPage' => 0]), $context)['items'][0] ?? null) : null;
+            if ($first === null) {
+                break;
+            }
+            $context = $context->forItem($first);
+        }
+
+        return $context;
     }
 
     /**

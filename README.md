@@ -583,8 +583,26 @@ Four dynamic blocks (ADR-0014), rendered on the server; registered by `Boot::dat
 - **Context:** every block type gets `taw/loopItem`, `postId` and `postType` in `uses_context`
   (`register_block_type_args`), so chips and conditions on any block inside an item read it (this also fixes
   whole-block conditions on non-text blocks inside core Query Loops). `BindingContext` carries the item.
-- Classes: `Loop\Loop` (blocks, `items()`), `Loop\Sources`, `Loop\Item`, `Loop\RowValues`. The editor side
-  comes in v1.69.0.
+- Classes: `Loop\Loop` (blocks, `items()`, `renderPreview()`), `Loop\Sources`, `Loop\Item`, `Loop\RowValues`,
+  `Loop\EditorData`.
+
+#### In the editor (v1.69.0+)
+
+- **Insert "TAW Loop"**: a setup asks what to loop over (repeater rows, related posts, posts, terms, images),
+  then the field, taxonomy or post type, then a starting design (**List**, **Cards**, **Start blank**). Only
+  fields that exist here are offered; inside a repeater item, "This row: …" offers its nested repeaters.
+- **The first item is the one you edit**; the others are the server's rendering of the same design for each
+  item, refreshed as you edit (`POST taw/v1/loop/render`, at most 12). Post items give the editable item their
+  `postId` context, so Post Title and friends show the first item.
+- **Sidebar:** Source (for posts also: same terms as this post, leave out this post, same author, search,
+  sticky, query order), Items (order by any item value, direction, compare as, show at most, skip, items per
+  page + **Add page links**), Filter (the condition builder, per item), Layout (list or grid, columns, space,
+  numbered list). The toolbar switches the source.
+- **The TAW data popup** inside an item lists **Row** and **Loop** values first (with the first item's values),
+  in the Fields tab, the Expression suggestions and the condition builders. Previews inside loops send the
+  enclosing loops (`loops`), and the server reads each one's first item.
+- The starting designs bind with expressions (`{"expr": "@row.name (@row.count)"}`), so the editable item
+  previews live values.
 
 ### Term fields (v1.53.0+)
 

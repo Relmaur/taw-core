@@ -11,11 +11,15 @@
  * Read-only: no setValues. Values are edited in the metabox or data panel.
  */
 import { __ } from '@wordpress/i18n';
+import { loopsFor } from './loop/chain';
 
 export type From = 'post' | 'option' | 'term' | 'user';
 
 export interface BindingArgs {
     field: string;
+    /** A TAW Loop item's value (ADR-0014): `{"row": "name"}`, `{"loop": "index"}`. */
+    row?: string;
+    loop?: string;
     /** An expression binding (ADR-0012) has `expr` and no field. */
     expr?: string;
     from?: From;
@@ -35,6 +39,9 @@ export interface FieldEntry {
 export interface Config {
     source: string;
     route: string;
+    /** The TAW Loop's editor data and item-preview route (ADR-0014). */
+    loop?: import('./loop/data').LoopConfig;
+    loopRoute?: string;
     fields: {
         post: Record<string, FieldEntry[]>;
         option: FieldEntry[];
@@ -54,6 +61,8 @@ export interface PreviewItem {
     /** Inline tags, expressions and conditions (ADR-0011/0012/0013); bound attributes send none. */
     kind?: 'tag' | 'expr' | 'condition';
     args: BindingArgs;
+    /** The enclosing TAW Loops, outermost first (ADR-0014). */
+    loops?: unknown[];
     block: string;
     attribute: string;
     postId: number;
@@ -63,24 +72,37 @@ export interface PreviewItem {
 /** Attributes whose placeholder is the field's label (text shown in the canvas). */
 const TEXT_ATTRIBUTES = ['content', 'text', 'caption', 'alt', 'title'];
 
-export function previewItem(args: BindingArgs, block: string, attribute: string, context: BlockContext): PreviewItem {
+export function previewItem(
+    args: BindingArgs,
+    block: string,
+    attribute: string,
+    context: BlockContext,
+    loops: unknown[] = [],
+): PreviewItem {
     const postId = typeof context.postId === 'number' ? context.postId : 0;
     const postType = typeof context.postType === 'string' ? context.postType : '';
-    const normalized: BindingArgs = { field: args.field, from: args.from ?? 'post' };
-    if (args.sub) normalized.sub = args.sub;
+    let normalized: BindingArgs;
+    if (args.row !== undefined || args.loop !== undefined) {
+        // A loop item's value (ADR-0014).
+        normalized = { field: '', ...(args.row !== undefined ? { row: args.row } : { loop: args.loop }) };
+    } else {
+        normalized = { field: args.field, from: args.from ?? 'post' };
+        if (args.sub) normalized.sub = args.sub;
+    }
     if (args.size) normalized.size = args.size;
 
     // Options don't depend on the post; one key serves every block.
-    const where = normalized.from === 'option' ? '' : `${postId}|${postType}`;
-
-    return {
-        key: `${block}|${attribute}|${where}|${JSON.stringify(normalized)}`,
+    const where = normalized.from === 'option' && loops.length === 0 ? '' : `${postId}|${postType}`;
+    const item: PreviewItem = {
+        key: `${block}|${attribute}|${where}|${JSON.stringify(normalized)}${loops.length ? `|${JSON.stringify(loops)}` : ''}`,
         args: normalized,
         block,
         attribute,
         postId,
         postType,
     };
+    if (loops.length) item.loops = loops;
+    return item;
 }
 
 function groupLabel(from: From): string {
@@ -128,7 +150,9 @@ export function fieldsList(config: Config, context: BlockContext): FieldEntry[] 
 /** The label a binding shows while its preview loads, or when the field is empty. */
 export function placeholder(config: Config, args: BindingArgs, attribute: string): string | undefined {
     if (!TEXT_ATTRIBUTES.includes(attribute)) return undefined;
-    if (args.field.trim() === '') return __('Choose a TAW field', 'taw-core');
+    if (args.row !== undefined) return `${__('Row', 'taw-core')}: ${args.row}`;
+    if (args.loop !== undefined) return `${__('Loop', 'taw-core')}: ${args.loop}`;
+    if ((args.field ?? '').trim() === '') return __('Choose a TAW field', 'taw-core');
     const from = args.from ?? 'post';
     const pool = from === 'post' ? Object.values(config.fields.post).flat() : config.fields[from];
     const entry = pool.find((e) => e.args.field === args.field && (e.args.sub ?? '') === (args.sub ?? ''));
@@ -166,11 +190,17 @@ function escapeText(text: string): string {
  * An expression binding's preview: the server's value (plain text, escaped
  * here for rich-text attributes), or the expression itself while it loads.
  */
-function expressionPreview(select: Select, expr: string, attribute: string, context: BlockContext): unknown {
+function expressionPreview(
+    select: Select,
+    expr: string,
+    attribute: string,
+    context: BlockContext,
+    loops: unknown[] = [],
+): unknown {
     const postId = typeof context.postId === 'number' ? context.postId : 0;
     const postType = typeof context.postType === 'string' ? context.postType : '';
     const item: PreviewItem = {
-        key: `tag|${postId}|${postType}|${JSON.stringify({ expr })}`,
+        key: `tag|${postId}|${postType}|${JSON.stringify({ expr })}${loops.length ? `|${JSON.stringify(loops)}` : ''}`,
         kind: 'tag',
         args: { expr } as unknown as BindingArgs,
         block: '',
@@ -178,6 +208,7 @@ function expressionPreview(select: Select, expr: string, attribute: string, cont
         postId,
         postType,
     };
+    if (loops.length) item.loops = loops;
     const value = select(STORE).getValue?.(item);
     const text = typeof value === 'string' && value !== '' ? value : expr;
     return TEXT_ATTRIBUTES.includes(attribute) && attribute !== 'alt' && attribute !== 'title'
@@ -206,19 +237,22 @@ export function source(config: Config) {
             clientId?: string;
         }): Record<string, unknown> {
             const block = (clientId && select('core/block-editor').getBlockName?.(clientId)) || '';
+            // Inside TAW Loops (ADR-0014), values read each loop's first item.
+            const loops = loopsFor(clientId, select);
             const result: Record<string, unknown> = {};
             for (const [attribute, binding] of Object.entries(bindings)) {
                 const args = binding?.args;
                 if (args && typeof args.expr === 'string') {
-                    result[attribute] = expressionPreview(select, args.expr, attribute, context ?? {});
+                    result[attribute] = expressionPreview(select, args.expr, attribute, context ?? {}, loops);
                     continue;
                 }
-                if (!args || typeof args.field !== 'string') continue;
+                const isItemValue = Boolean(args && (args.row !== undefined || args.loop !== undefined));
+                if (!args || (typeof args.field !== 'string' && !isItemValue)) continue;
                 // No field picked yet (a fresh "Field …" block): nothing to ask the server.
                 const value =
-                    args.field.trim() === ''
+                    !isItemValue && args.field.trim() === ''
                         ? undefined
-                        : select(STORE).getValue?.(previewItem(args, block, attribute, context ?? {}));
+                        : select(STORE).getValue?.(previewItem(args, block, attribute, context ?? {}, loops));
                 result[attribute] =
                     value === undefined || value === null || value === ''
                         ? placeholder(config, args, attribute)
@@ -370,7 +404,10 @@ export function isBound(source: string, bindings: Bindings | undefined): boolean
         (b) =>
             b?.source === source &&
             ((typeof b.args?.field === 'string' && b.args.field.trim() !== '') ||
-                (typeof b.args?.expr === 'string' && b.args.expr.trim() !== '')),
+                (typeof b.args?.expr === 'string' && b.args.expr.trim() !== '') ||
+                // A TAW Loop item's value (ADR-0014).
+                (typeof b.args?.row === 'string' && b.args.row.trim() !== '') ||
+                (typeof b.args?.loop === 'string' && b.args.loop.trim() !== '')),
     );
 }
 

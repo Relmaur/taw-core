@@ -9,8 +9,8 @@
 	"textdomain": "taw-core",
 	"attributes": {
 		"loopId": { "type": "number" },
-		"source": { "type": "object", "default": {} },
-		"order": { "type": "object", "default": {} },
+		"source": { "type": "object", "default": { "type": "" } },
+		"order": { "type": "object", "default": { "dir": "asc" } },
 		"limit": { "type": "number", "default": 0 },
 		"offset": { "type": "number", "default": 0 },
 		"perPage": { "type": "number", "default": 0 },

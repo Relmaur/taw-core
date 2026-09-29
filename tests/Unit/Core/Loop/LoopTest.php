@@ -6,6 +6,8 @@ namespace TAW\Tests\Unit\Core\Loop;
 
 use Brain\Monkey\Functions;
 use TAW\Core\Bindings\BindingContext;
+use TAW\Core\Bindings\PreviewEndpoint;
+use TAW\Core\Loop\EditorData;
 use TAW\Core\Bindings\Bindings;
 use TAW\Core\Bindings\InlineTags;
 use TAW\Core\Bindings\Target;
@@ -280,6 +282,40 @@ final class LoopTest extends TestCase
         $this->assertStringContainsString('aria-current="page">2</span>', $nav);
         $this->assertStringContainsString('href="/books/?taw-loop-4=3">Next</a>', $nav);
         $this->assertSame('', Loop::renderPagination([], '', $block(['taw/loopPages' => ['current' => 1, 'total' => 1, 'param' => 'p']])));
+    }
+
+    public function test_previews_inside_a_loop_read_its_first_item(): void
+    {
+        Functions\when('current_user_can')->alias(static fn (string $cap, int $id = 0): bool => $cap === 'edit_post' && $id === 5);
+        $awards = ['source' => ['type' => 'repeater', 'field' => 'book_awards'], 'order' => ['by' => '@row.year', 'as' => 'number']];
+        $item = static fn (array $extra): array => $extra + ['key' => 'k', 'postId' => 5, 'postType' => 'book', 'loops' => [$awards]];
+
+        $this->assertSame('Nebula (1965) 1/3', PreviewEndpoint::resolve($item(['kind' => 'tag', 'args' => ['expr' => '@row.name (@row.year) @loop.index/@loop.count']])));
+        $this->assertSame('Nebula', PreviewEndpoint::resolve($item(['args' => ['field' => '', 'row' => 'name'], 'block' => 'core/paragraph', 'attribute' => 'content'])));
+        $this->assertSame(['shown' => true, 'errors' => []], PreviewEndpoint::resolve($item(['kind' => 'condition', 'args' => ['if' => ['rules' => [['value' => '@row.year', 'op' => 'lt', 'to' => 1966]]]]])));
+        $this->assertSame(['value' => 'Ann', 'errors' => []], PreviewEndpoint::resolve($item(['kind' => 'expr', 'args' => ['expr' => '@row.person'], 'loops' => [
+            ['source' => ['type' => 'repeater', 'field' => 'book_awards']],
+            ['source' => ['type' => 'repeater', 'field' => 'jury', 'from' => 'row']],
+        ]])), 'nested loops: each first item');
+        $this->assertNull(PreviewEndpoint::resolve(['key' => 'k', 'postId' => 8, 'kind' => 'tag', 'args' => ['expr' => '@row.name'], 'loops' => [$awards]]), 'a post the user can\'t edit');
+    }
+
+    public function test_editor_data_lists_loop_sources(): void
+    {
+        Functions\when('get_taxonomies')->alias(static fn (array $args = [], string $output = 'names') => $output === 'objects'
+            ? ['genre' => (object) ['labels' => (object) ['name' => 'Genres'], 'object_type' => ['book']], 'post_format' => (object) ['labels' => (object) ['name' => 'Formats'], 'object_type' => ['post']]]
+            : ['genre' => 'genre']);
+        Functions\when('get_post_types')->justReturn(['book' => (object) ['labels' => (object) ['singular_name' => 'Book']], 'attachment' => (object) ['labels' => (object) ['singular_name' => 'Media']]]);
+
+        $data = EditorData::all();
+        $book = $data['sources']['post']['book'];
+
+        $this->assertSame(['book_awards', 'book_related', 'book_gallery'], array_column($book, 'field'), 'bindings: false is left out');
+        $this->assertSame(['repeater', 'related', 'images'], array_column($book, 'type'));
+        $this->assertSame(['name', 'year', 'won', 'jury'], array_column($book[0]['subs'], 'id'));
+        $this->assertSame([['id' => 'person', 'label' => 'Person', 'type' => 'text']], $book[0]['subs'][3]['subs'], 'nested repeaters');
+        $this->assertSame([['name' => 'book', 'label' => 'Book']], $data['postTypes']);
+        $this->assertSame([['name' => 'genre', 'label' => 'Genres', 'postTypes' => ['book']]], $data['taxonomies']);
     }
 
     public function test_register_and_context_for_every_block(): void

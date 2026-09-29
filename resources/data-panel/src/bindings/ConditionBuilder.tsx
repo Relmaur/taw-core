@@ -256,7 +256,11 @@ function RuleList({
 }
 
 /** Whether the condition holds for the edited post, debounced; stale answers aren't shown. */
-export function useConditionAnswer(condition: Condition, enabled: boolean): { shown: boolean } | null {
+export function useConditionAnswer(
+    condition: Condition,
+    enabled: boolean,
+    clientId?: string | null,
+): { shown: boolean } | null {
     const json = JSON.stringify(condition);
     const [answer, setAnswer] = useState<{ for: string; shown: boolean } | null>(null);
 
@@ -264,7 +268,7 @@ export function useConditionAnswer(condition: Condition, enabled: boolean): { sh
         if (!enabled) return undefined;
         let current = true;
         const timer = setTimeout(() => {
-            void previewCondition(JSON.parse(json)).then((result) => {
+            void previewCondition(JSON.parse(json), clientId).then((result) => {
                 if (current && result) setAnswer({ for: json, shown: result.shown });
             });
         }, 300);
@@ -272,7 +276,7 @@ export function useConditionAnswer(condition: Condition, enabled: boolean): { sh
             current = false;
             clearTimeout(timer);
         };
-    }, [json, enabled]);
+    }, [json, enabled, clientId]);
 
     return answer && answer.for === json ? { shown: answer.shown } : null;
 }
@@ -282,15 +286,21 @@ export function ConditionBuilder({
     onChange,
     options,
     subject,
+    clientId,
+    showAnswer = true,
 }: {
     value: Condition;
     onChange: (next: Condition) => void;
     options: ValueOption[];
     /** What is shown or hidden: "this block", "this value" (goes into "Show %s when"). */
     subject: string;
+    /** The block the answer is for (default: the selected block). */
+    clientId?: string | null;
+    /** A loop filter has no single answer (it runs per item). */
+    showAnswer?: boolean;
 }) {
     const errors = conditionErrors(value);
-    const answer = useConditionAnswer(value, errors.length === 0);
+    const answer = useConditionAnswer(value, showAnswer && errors.length === 0, clientId);
     const canAdd = ruleCount(value) < MAX_RULES;
 
     return (
@@ -311,7 +321,7 @@ export function ConditionBuilder({
                         </li>
                     ))}
                 </ul>
-            ) : (
+            ) : !showAnswer ? null : (
                 <p className={`taw-cond-answer${answer ? (answer.shown ? ' is-shown' : ' is-hidden') : ''}`}>
                     <Dashicon icon={answer?.shown === false ? 'hidden' : 'visibility'} />
                     {answer === null

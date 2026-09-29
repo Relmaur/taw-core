@@ -253,6 +253,27 @@ function scan(string $root): array
         $sources[] = [$file, jsCalls((string) file_get_contents("$root/$file")), $jsSpecs];
     }
 
+    // block.json (the TAW Loop blocks): WordPress translates these fields with fixed contexts.
+    foreach (files($root, 'resources/blocks', ['json']) as $file) {
+        if (basename($file) !== 'block.json') {
+            continue;
+        }
+        $json = json_decode((string) file_get_contents("$root/$file"), true);
+        if (!is_array($json) || ($json['textdomain'] ?? null) !== DOMAIN) {
+            continue;
+        }
+        $calls = [];
+        foreach (['title' => 'block title', 'description' => 'block description'] as $field => $context) {
+            if (is_string($json[$field] ?? null) && $json[$field] !== '') {
+                $calls[] = ['fn' => '_x', 'args' => [$json[$field], $context, DOMAIN], 'line' => 1, 'comment' => ''];
+            }
+        }
+        foreach (is_array($json['keywords'] ?? null) ? $json['keywords'] : [] as $keyword) {
+            $calls[] = ['fn' => '_x', 'args' => [(string) $keyword, 'block keyword', DOMAIN], 'line' => 1, 'comment' => ''];
+        }
+        $sources[] = [$file, $calls, SPECS];
+    }
+
     foreach ($sources as [$file, $calls, $specs]) {
         foreach ($calls as $call) {
             $roles = $specs[$call['fn']];

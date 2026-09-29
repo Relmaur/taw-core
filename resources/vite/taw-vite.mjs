@@ -77,7 +77,7 @@ export const WP_EXPORT_NAMES = [
     'MediaReplaceFlow', 'PanelColorSettings', 'AlignmentControl', 'BlockAlignmentToolbar', 'URLInput',
     'URLInputButton', 'BlockEditorProvider', 'BlockList', 'BlockTools', 'BlockInspector', 'BlockIcon',
     'WritingFlow', 'ObserveTyping', 'BlockCanvas', 'BlockEditorKeyboardShortcuts', 'Inserter', 'BlockSettingsMenuControls',
-    'useSetting', 'useSettings', 'useBlockEditingMode', 'withColors',
+    'useSetting', 'useSettings', 'useBlockEditingMode', 'withColors', 'BlockContextProvider',
     // @wordpress/components
     'BaseControl', 'Button', 'Card', 'CardBody', 'CardHeader', 'CheckboxControl', 'ColorIndicator', 'ColorPalette',
     'ColorPicker', 'ComboboxControl', 'DatePicker', 'DateTimePicker', 'Dashicon', 'Dropdown',
