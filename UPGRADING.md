@@ -266,6 +266,13 @@ No hooks change. **Nothing to do.**
 In the Site Editor, a template's conditions are checked against the latest post of its type (as its field
 previews are), not against the template itself, which always read "hidden". **Nothing to do.**
 
+### v1.68.0: the TAW Loop blocks (server side)
+`taw/loop`, `taw/loop-item`, `taw/loop-empty` and `taw/loop-pagination` render repeater rows, related posts,
+queries, terms and images (ADR-0014; see "TAW Loop" in the README). The theme's hook list gains two lines
+(`init`: block registration; `register_block_type_args`: every block type also `uses_context`
+`taw/loopItem`, `postId` and `postType`). Checkbox values now read as `1` inside loops (`@row.x`). The editor UI
+comes in v1.69.0. **Nothing to do.**
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

@@ -100,6 +100,7 @@
       "errors": [{ "code": "too_many_tokens", "at": 60 }]
     },
     {"name": "viewer and date names", "expr": "@viewer.role on @date.today.format('l')", "parts": [{"name": "viewer.role", "calls": [], "at": 0, "length": 12}, {"text": " on "}, {"name": "date.today", "calls": [{"fn": "format", "args": ["l"]}], "at": 16, "length": 23}], "errors": []},
-    {"name": "a namespace word used as a field, with a call", "expr": "@date.upper()", "parts": [{"name": "date", "calls": [{"fn": "upper", "args": []}], "at": 0, "length": 13}], "errors": []}
+    {"name": "a namespace word used as a field, with a call", "expr": "@date.upper()", "parts": [{"name": "date", "calls": [{"fn": "upper", "args": []}], "at": 0, "length": 13}], "errors": []},
+    {"name": "loop row and position", "expr": "@loop.index. @row.award (@row.year)", "parts": [{"name": "loop.index", "calls": [], "at": 0, "length": 11}, {"text": ". "}, {"name": "row.award", "calls": [], "at": 13, "length": 10}, {"text": " ("}, {"name": "row.year", "calls": [], "at": 25, "length": 9}, {"text": ")"}], "errors": []}
   ]
 }

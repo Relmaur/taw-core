@@ -539,6 +539,53 @@ icon) in its toolbar:
   - in the canvas, a conditional block has a dashed outline and a label ("Conditional · hidden for this
     post", dimmed when hidden), and a conditional chip a dashed border. The chip's text stays its value.
 
+### TAW Loop: repeat a design for each item (v1.68.0+)
+
+Four dynamic blocks (ADR-0014), rendered on the server; registered by `Boot::data()`, so both themes have them:
+
+```html
+<!-- wp:taw/loop {"loopId":1,"source":{"type":"repeater","field":"book_awards"},"order":{"by":"@row.year","as":"number"}} -->
+<div class="wp-block-taw-loop">
+  <!-- wp:heading --><h2>Awards</h2><!-- /wp:heading -->
+  <!-- wp:taw/loop-item --><!-- wp:paragraph --><p><span class="taw-tag" data-taw-tag='{"expr":"@row.name (@row.year)"}'></span></p><!-- /wp:paragraph --><!-- /wp:taw/loop-item -->
+  <!-- wp:taw/loop-empty --><!-- wp:paragraph --><p>No awards yet</p><!-- /wp:paragraph --><!-- /wp:taw/loop-empty -->
+  <!-- wp:taw/loop-pagination /-->
+</div>
+<!-- /wp:taw/loop -->
+```
+
+- **`taw/loop-item`** is repeated for each item; **`taw/loop-empty`** shows when there are none;
+  **`taw/loop-pagination`** links the pages; any other inner block renders once.
+- **Sources** (`source.type`):
+  - `repeater`: a repeater's rows (`field`; `from`: `post` (default), `option`, `term`, `user`, or `row`
+    for the enclosing item's own repeater);
+  - `related`: a post_select field's posts (unreadable ones are left out);
+  - `images`: a files (or image) field's images;
+  - `terms`: a taxonomy's terms, of the post (`scope: "post"`, default) or all (`"all"`, with
+    `orderBy`/`order`/`hideEmpty`/`parent`);
+  - `query`: published posts: `postType` (public types), `terms` (`{"genre": [3]}` or `{"genre": "current"}`),
+    `author` (an ID or `"current"`), `search`, `include`, `exclude`, `excludeCurrent`, `sticky`
+    (`only`/`exclude`), `orderBy` (`date`, `modified`, `title`, `menu_order`, `rand`, `comment_count`, `ID`),
+    `order`.
+- **Item values** (chips, expressions, bindings `args: {"row": "…"}`, conditions):
+  - `@row.<sub-field>` for repeater rows;
+  - a post item is the post: `@post.*`, its fields, and `@row.<same>`; core post blocks (Post Title…) work
+    per item (the loop sets the global post, as core's Post Template does);
+  - terms: `@row.id|name|slug|url|description|count|taxonomy` and the term's TAW fields;
+  - images: `@row.id|url|alt|caption|title|description|width|height`; `{"row": "image"}` binds an image
+    block's URL, ID and alt;
+  - `@loop.index|count|first|last|even|odd` (booleans are `1` or empty).
+- **Options:** `order` (`{"by": "@row.year", "dir": "desc", "as": "number"|"date"|"text"}`, or `"random"`,
+  or just `dir` to reverse the source's order), `limit`, `offset`, `filter` (a condition per item, ADR-0013),
+  `perPage` (pages in `?taw-loop-<loopId>=N`), `layout` (`{"type": "list"|"grid", "columns": 1–6, "gap":
+  "1rem"}`), `ordered` (an `<ol>`).
+- **Limits:** 200 items per loop, 3 levels of nesting. Queries never ask for more than that.
+- **Context:** every block type gets `taw/loopItem`, `postId` and `postType` in `uses_context`
+  (`register_block_type_args`), so chips and conditions on any block inside an item read it (this also fixes
+  whole-block conditions on non-text blocks inside core Query Loops). `BindingContext` carries the item.
+- Classes: `Loop\Loop` (blocks, `items()`), `Loop\Sources`, `Loop\Item`, `Loop\RowValues`. The editor side
+  comes in v1.69.0.
+
 ### Term fields (v1.53.0+)
 
 A fieldset can target a taxonomy's terms with `term:<taxonomy>` in its screens (JSON/PHP `on`), alone or mixed

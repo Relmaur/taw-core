@@ -73,6 +73,8 @@ final class Evaluator
             'author' => ['field' => $rest, 'from' => 'user'],
             'viewer' => TagResolver::knows("viewer.{$rest}") ? ['tag' => "viewer.{$rest}"] : null,
             'date'   => TagResolver::knows("date.{$rest}") ? ['tag' => "date.{$rest}"] : null,
+            'row'    => ['row' => $rest],
+            'loop'   => ['loop' => $rest],
             default  => null,
         };
     }

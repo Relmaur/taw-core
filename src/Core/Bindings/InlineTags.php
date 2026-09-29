@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Core\Bindings;
 
+use TAW\Core\Loop\RowValues;
+
 use TAW\Core\Bindings\Expression\Evaluator;
 
 if (!defined('ABSPATH')) {
@@ -108,7 +110,10 @@ final class InlineTags
 
         $value = null;
 
-        if (isset($args['expr'])) {
+        if (isset($args['row']) || isset($args['loop'])) {
+            // A TAW Loop item's value (ADR-0014).
+            $value = RowValues::text($args, $context);
+        } elseif (isset($args['expr'])) {
             // An expression (ADR-0012): its tokens come back through here.
             $value = is_string($args['expr']) ? Evaluator::evaluate($args['expr'], $context)['value'] : null;
         } elseif (($ref = Reference::fromArgs($args)) !== null) {

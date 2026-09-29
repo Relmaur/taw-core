@@ -1,0 +1,17 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "taw/loop-pagination",
+	"title": "Loop pagination",
+	"category": "theme",
+	"parent": [ "taw/loop" ],
+	"description": "Links to the TAW Loop's other pages, when it has more than one.",
+	"textdomain": "taw-core",
+	"attributes": {
+		"previousLabel": { "type": "string", "default": "" },
+		"nextLabel": { "type": "string", "default": "" },
+		"showNumbers": { "type": "boolean", "default": true }
+	},
+	"usesContext": [ "taw/loopPages" ],
+	"supports": { "html": false, "reusable": false, "color": { "text": true, "link": true }, "typography": { "fontSize": true } }
+}

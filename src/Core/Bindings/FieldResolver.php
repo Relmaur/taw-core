@@ -25,6 +25,18 @@ final class FieldResolver implements ExpressionResolver
 {
     public function resolve(Reference $ref, BindingContext $context, Target $target): mixed
     {
+        $value = $this->value($ref, $context);
+
+        return $value === null ? null : AttributeMap::valueFor($value, $target, $ref);
+    }
+
+    /**
+     * A field's value when it may be shown, else null: the same privacy as a
+     * binding. TAW Loop sources (ADR-0014) read repeaters, related posts and
+     * images through it.
+     */
+    public function value(Reference $ref, BindingContext $context): ?Value
+    {
         $fields = $this->fieldsFor($ref, $context);
         if ($fields === null || !$fields->exists()) {
             return null;
@@ -37,11 +49,13 @@ final class FieldResolver implements ExpressionResolver
             $value = $value->field($ref->sub);
         }
 
-        if ($value->type() === null || !self::bindable($value, $group, $ref->from)) {
-            return null;
-        }
+        return $value->type() === null || !self::bindable($value, $group, $ref->from) ? null : $value;
+    }
 
-        return AttributeMap::valueFor($value, $target, $ref);
+    /** A post the visitor may read (as core/post-meta decides), or null. */
+    public static function readablePost(int $postId): ?\WP_Post
+    {
+        return self::visiblePost($postId);
     }
 
     private function fieldsFor(Reference $ref, BindingContext $context): ?Fields
@@ -80,7 +94,8 @@ final class FieldResolver implements ExpressionResolver
         return $post;
     }
 
-    private static function bindable(Value $value, ?Value $group, string $from): bool
+    /** Whether a field may be shown (its `bindings` flag; user fields opt in). */
+    public static function bindable(Value $value, ?Value $group, string $from): bool
     {
         $flag = $value->config()['bindings'] ?? $group?->config()['bindings'] ?? null;
 

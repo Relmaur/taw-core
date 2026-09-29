@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-09-26). Plan: umbrella `docs/plans/data-layer-phase-5.md` (roadmap row 5). Builds on
+Accepted (2026-09-29). Plan: umbrella `docs/plans/data-layer-phase-5.md` (roadmap row 5). Builds on
 ADR-0010 (Block Bindings), ADR-0011/0012 (tags, expressions) and ADR-0013 (conditions).
 
 ## Context

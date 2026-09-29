@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\Bindings;
 
 use TAW\Core\Bindings\Expression\Evaluator;
+use TAW\Core\Loop\RowValues;
 
 use TAW\Core\DataPanel\DataPanel;
 use TAW\Core\I18n\Translations;
@@ -116,7 +117,7 @@ final class Bindings
         register_block_bindings_source(self::SOURCE, [
             'label'              => __('TAW field', 'taw-core'),
             'get_value_callback' => [self::class, 'getValue'],
-            'uses_context'       => ['postId', 'postType'],
+            'uses_context'       => ['postId', 'postType', BindingContext::ITEM],
         ]);
     }
 
@@ -135,6 +136,15 @@ final class Bindings
 
         if (isset($args['expr'])) {
             return self::expressionValue($args['expr'], $block, $attribute);
+        }
+
+        // A TAW Loop item's value (ADR-0014): {"row": "award"}, {"loop": "index"}.
+        if (isset($args['row']) || isset($args['loop'])) {
+            $name   = property_exists($block, 'name') && is_string($block->name) ? $block->name : '';
+            $type   = property_exists($block, 'block_type') ? $block->block_type : null;
+            $schema = is_object($type) && isset($type->attributes[$attribute]) && is_array($type->attributes[$attribute]) ? $type->attributes[$attribute] : null;
+
+            return RowValues::forTarget($args, BindingContext::fromBlock($block), Target::for($name, $attribute, $schema));
         }
 
         $ref = Reference::fromArgs($args);
