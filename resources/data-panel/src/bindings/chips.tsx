@@ -4,7 +4,7 @@
  * popover: edit its expression and condition (ADR-0013), refresh its stored
  * text, or remove it.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button, Dashicon, Popover } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
@@ -14,6 +14,7 @@ import type { RichTextValue } from '@wordpress/rich-text';
 import { ConditionSection, type Conditional } from './ConditionBuilder';
 import { readCondition } from './conditions';
 import { ExpressionEditor } from './ExpressionEditor';
+import { useValueOptions } from './loop/options';
 import type { Config } from './logic';
 import { previewExpression, previewTag } from './preview';
 import {
@@ -25,7 +26,6 @@ import {
     storedText,
     toExpression,
     valueArgs,
-    valueOptions,
     type TagArgs,
 } from './tags';
 
@@ -57,8 +57,9 @@ function afterChip(value: RichTextValue): RichTextValue {
 }
 
 function ChipPopover({ config, props, args }: { config: Config; props: EditProps; args: TagArgs }) {
-    const postType = useSelect((select) => select('core/editor')?.getCurrentPostType?.() as string | undefined, []);
-    const options = useMemo(() => valueOptions(config, postType), [config, postType]);
+    // Inside a TAW Loop item, its Row and Loop values first (ADR-0014).
+    const clientId = useSelect((select) => select('core/block-editor').getSelectedBlockClientId() as string | null, []);
+    const options = useValueOptions(config, clientId);
     const [expression, setExpression] = useState(() => toExpression(valueArgs(args), options));
     const [conditional, setConditional] = useState<Conditional>(() => {
         const condition = readCondition(args.if);

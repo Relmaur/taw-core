@@ -92,6 +92,9 @@ const CSS = `
 .taw-vis__intro,.taw-vis__note{margin:0 0 10px;color:#757575;font-size:12px;line-height:1.5}
 .taw-vis__note{margin:10px 0 0}
 .taw-vis-panel .taw-data-actions{margin-top:8px}
+.taw-loop-panel .components-base-control,.taw-loop-panel .components-toggle-control{margin-bottom:16px}
+.taw-loop-numbers{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.taw-loop-panel .taw-cond{margin-bottom:8px}
 `;
 
 export function injectStyles(): void {

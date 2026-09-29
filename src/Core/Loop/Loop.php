@@ -432,6 +432,53 @@ final class Loop
         return sprintf('<nav %s>%s</nav>', $wrapper, implode('', $parts));
     }
 
+    /**
+     * The editor's item previews (PreviewEndpoint `loop/render`): each item's
+     * `taw/loop-item` rendered as on the front end, the first $max of them,
+     * without paging. $content is the loop's inner blocks, as the editor has them.
+     *
+     * @param array<string, mixed> $attributes
+     * @return array{items: list<array{index: int, html: string, postId: int, postType: string}>, total: int}
+     */
+    public static function renderPreview(array $attributes, string $content, BindingContext $context, int $max): array
+    {
+        $template = null;
+        foreach (parse_blocks($content) as $block) {
+            if (($block['blockName'] ?? '') === 'taw/loop-item') {
+                $template = $block;
+                break;
+            }
+        }
+        $plan = self::items(array_merge($attributes, ['perPage' => 0]), $context);
+        if ($template === null || self::$depth >= self::MAX_DEPTH) {
+            return ['items' => [], 'total' => count($plan['items'])];
+        }
+
+        $base = ['postId' => $context->postId, 'postType' => (string) get_post_type($context->postId)];
+        if ($context->item !== null) {
+            $base[BindingContext::ITEM] = $context->item;
+        }
+
+        self::$depth++;
+        try {
+            $items = [];
+            foreach (array_slice($plan['items'], 0, $max) as $item) {
+                $isPost  = $item->kind === Item::POST;
+                $items[] = [
+                    'index'    => $item->index,
+                    'html'     => self::withPost($item, static fn (): string => self::renderChild($template, array_merge($base, self::itemContext($item), [self::TAG => 'li']))),
+                    // A post item's post: the editor gives the editable first item its context.
+                    'postId'   => $isPost ? $item->postId : 0,
+                    'postType' => $isPost ? (string) get_post_type($item->postId) : '',
+                ];
+            }
+        } finally {
+            self::$depth--;
+        }
+
+        return ['items' => $items, 'total' => count($plan['items'])];
+    }
+
     /** @internal For tests. */
     public static function reset(): void
     {

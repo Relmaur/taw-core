@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\Bindings;
 
 use TAW\Core\Bindings\Expression\Evaluator;
+use TAW\Core\Loop\EditorData;
 use TAW\Core\Loop\RowValues;
 
 use TAW\Core\DataPanel\DataPanel;
@@ -43,7 +44,24 @@ final class Bindings
         . '.taw-tag[data-taw-tag*=\'"if":\']{box-shadow:none;outline:1px dashed rgba(56,88,233,.8);outline-offset:-1px}'
         . '.taw-conditional{position:relative;outline:1px dashed rgba(56,88,233,.55);outline-offset:4px}'
         . '.taw-conditional::after{content:attr(data-taw-condition);position:absolute;top:-6px;right:0;transform:translateY(-100%);z-index:2;padding:0 6px;border-radius:2px;background:#3858e9;color:#fff;font:500 10px/16px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;letter-spacing:.02em;white-space:nowrap;pointer-events:none}'
-        . '.taw-conditional.is-taw-hidden{opacity:.5}.taw-conditional.is-taw-hidden::after{background:#8a6100}';
+        . '.taw-conditional.is-taw-hidden{opacity:.5}.taw-conditional.is-taw-hidden::after{background:#8a6100}'
+        // The TAW Loop in the canvas (ADR-0014): setup, the editable first item, previews, "no items".
+        . '.taw-loop-setup .components-placeholder__fieldset{flex-direction:column;align-items:stretch}'
+        . '.taw-loop-setup__sources{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;width:100%}'
+        . '.taw-loop-setup__designs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%;margin-bottom:8px}'
+        . '.taw-loop-setup__source{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px;border:1px solid #dcdcde;border-radius:4px;background:#fff;color:#1e1e1e;text-align:left;cursor:pointer;font:inherit;font-size:13px;line-height:1.4}'
+        . '.taw-loop-setup__source:hover,.taw-loop-setup__source:focus-visible{border-color:#3858e9;box-shadow:0 0 0 1px #3858e9;outline:none}'
+        . '.taw-loop-setup__source .dashicon{color:#3858e9}.taw-loop-setup__source span{color:#757575;font-size:12px}'
+        . '.taw-loop-setup__details{display:flex;flex-direction:column;align-items:flex-start;gap:12px;width:100%;max-width:440px}'
+        . '.taw-loop-setup__details .components-base-control{width:100%}'
+        . '.taw-loop-setup__none{display:flex;gap:6px;margin:0;color:#757575;font-size:13px}'
+        . '.taw-loop-template{outline:1px dashed rgba(56,88,233,.6);outline-offset:4px}'
+        . '.taw-loop-preview{pointer-events:none;opacity:.85}'
+        . '.taw-loop-note{margin:.75em 0 0;color:#757575;font:12px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}'
+        . '.taw-loop-empty-edit{margin-top:1em;padding:.75em 1em;border:1px dashed #c3c4c7;border-radius:2px}'
+        . '.taw-loop-empty-edit::before{content:attr(data-label);display:block;margin-bottom:.4em;color:#757575;font:500 11px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;text-transform:uppercase;letter-spacing:.04em}'
+        . '.taw-loop-pagination-edit{display:flex;flex-wrap:wrap;align-items:center;gap:.6em;margin-top:1em}'
+        . '.taw-loop-pagination-edit em{margin-left:auto;color:#757575;font:11px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-style:normal}';
 
     /** Source entry in resources/data-panel/ (its manifest key). */
     public const SCRIPT_SOURCE = 'src/bindings/index.ts';
@@ -82,7 +100,14 @@ final class Bindings
 
         DataPanel::assets()->script(self::SCRIPT_HANDLE, self::SCRIPT_SOURCE, self::SCRIPT_DEPS);
 
-        $config = ['source' => self::SOURCE, 'route' => '/' . PreviewEndpoint::NAMESPACE . PreviewEndpoint::ROUTE, 'fields' => EditorFields::all()];
+        $config = [
+            'source'    => self::SOURCE,
+            'route'     => '/' . PreviewEndpoint::NAMESPACE . PreviewEndpoint::ROUTE,
+            'fields'    => EditorFields::all(),
+            // The TAW Loop's editor (ADR-0014): its sources and item previews.
+            'loop'      => EditorData::all(),
+            'loopRoute' => '/' . PreviewEndpoint::NAMESPACE . PreviewEndpoint::LOOP_ROUTE,
+        ];
         $inline = sprintf('window.tawBindings = %s;', wp_json_encode($config));
 
         $localeData = Translations::scriptLocaleData();
@@ -103,7 +128,8 @@ final class Bindings
             return;
         }
 
-        wp_register_style(self::CANVAS_STYLE, false, [], Framework::version());
+        // Dashicons for the TAW Loop's setup in the canvas iframe (it doesn't load them by itself).
+        wp_register_style(self::CANVAS_STYLE, false, ['dashicons'], Framework::version());
         wp_enqueue_style(self::CANVAS_STYLE);
         wp_add_inline_style(self::CANVAS_STYLE, self::CANVAS_CSS);
     }

@@ -4,17 +4,17 @@
  * block. Conditional blocks get a dashed outline and a label in the canvas;
  * blocks hidden for the edited post are dimmed.
  */
-import React, { useMemo } from 'react';
+import React from 'react';
 import { InspectorControls } from '@wordpress/block-editor';
 import { Button, PanelBody } from '@wordpress/components';
 import { createHigherOrderComponent } from '@wordpress/compose';
-import { useDispatch, useSelect } from '@wordpress/data';
+import { useDispatch } from '@wordpress/data';
 import { addFilter } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
 import { ConditionBuilder, useConditionAnswer } from './ConditionBuilder';
 import { conditionErrors, newCondition, readCondition, type Condition } from './conditions';
 import type { Config } from './logic';
-import { valueOptions } from './tags';
+import { useValueOptions } from './loop/options';
 
 export const KEY = 'tawShowIf';
 
@@ -31,8 +31,7 @@ export function VisibilityEditor({
     clientId: string;
     metadata: Metadata;
 }) {
-    const postType = useSelect((select) => select('core/editor')?.getCurrentPostType?.() as string | undefined, []);
-    const options = useMemo(() => valueOptions(config, postType), [config, postType]);
+    const options = useValueOptions(config, clientId);
     const { updateBlockAttributes } = useDispatch('core/block-editor');
     const condition = readCondition(metadata[KEY]);
 
@@ -69,6 +68,7 @@ export function VisibilityEditor({
                 onChange={save}
                 options={options}
                 subject={__('this block', 'taw-core')}
+                clientId={clientId}
             />
             <div className="taw-data-actions">
                 <Button variant="link" isDestructive onClick={() => save(null)}>
@@ -141,7 +141,7 @@ export function registerVisibility(config: Config): void {
                     // One element type either way: switching would remount the block (and close its popup).
                     const condition = readCondition(props.attributes?.metadata?.[KEY]);
                     const valid = condition !== null && conditionErrors(condition).length === 0;
-                    const answer = useConditionAnswer(condition ?? NONE, valid);
+                    const answer = useConditionAnswer(condition ?? NONE, valid, props.clientId);
                     if (!condition) return <BlockListBlock {...props} />;
 
                     const label = !valid

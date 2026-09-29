@@ -11,7 +11,7 @@
  * The Expression tab can add a condition (ADR-0013) to what it inserts; the
  * Visibility tab puts one on the whole block.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Dashicon, SearchControl, TabPanel } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
@@ -21,8 +21,9 @@ import { ExpressionEditor } from './ExpressionEditor';
 import { connectedMetadata, planFor, withoutTawBindings, type BindingArgs, type Bindings, type Config } from './logic';
 import { previewExpression, previewTag } from './preview';
 import { caretIn, insertChip } from './richText';
-import { groupOptions, storedText, valueArgs, valueOptions, type TagArgs, type ValueOption } from './tags';
+import { groupOptions, storedText, valueArgs, type TagArgs, type ValueOption } from './tags';
 import { VisibilityEditor } from './visibility';
+import { useValueOptions } from './loop/options';
 
 /** The text attribute an expression binds, per block. */
 export const TEXT_ATTRIBUTE: Record<string, string> = {
@@ -80,6 +81,9 @@ function boundTo(source: string, metadata: Metadata, options: ValueOption[]): st
     if (!binding) return null;
     const args = binding.args;
     if (typeof args.expr === 'string') return args.expr;
+    // A TAW Loop item's value (ADR-0014).
+    if (typeof args.row === 'string') return `@row.${args.row}`;
+    if (typeof args.loop === 'string') return `@loop.${args.loop}`;
     const option = options.find(
         (o) => o.entry && o.entry.args.field === args.field && (o.entry.args.sub ?? '') === (args.sub ?? ''),
     );
@@ -98,11 +102,10 @@ function initialExpression(source: string, clientId: string, metadata: Metadata,
 }
 
 export function DataPopup({ config, clientId, blockName, metadata, onClose }: PopupProps) {
-    const postType = useSelect((select) => select('core/editor')?.getCurrentPostType?.() as string | undefined, []);
     // Re-read on selection changes: the caret decides whether inline works.
     useSelect((select) => select('core/block-editor').getSelectionStart(), []);
     const { updateBlockAttributes } = useDispatch('core/block-editor');
-    const options = useMemo(() => valueOptions(config, postType), [config, postType]);
+    const options = useValueOptions(config, clientId);
 
     const canInline = caretIn(clientId) !== null;
     const textAttribute = TEXT_ATTRIBUTE[blockName];
@@ -118,19 +121,23 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
     // One batched request for every value's preview.
     useEffect(() => {
         let current = true;
-        void Promise.all(options.map(async (o) => [o.key, await previewTag(o.args)] as const)).then((entries) => {
-            if (current) setPreviews(Object.fromEntries(entries));
-        });
+        void Promise.all(options.map(async (o) => [o.key, await previewTag(o.args, clientId)] as const)).then(
+            (entries) => {
+                if (current) setPreviews(Object.fromEntries(entries));
+            },
+        );
         return () => {
             current = false;
         };
-    }, [options]);
+    }, [options, clientId]);
 
     const insert = async (args: TagArgs, label: string) => {
         if (args.expr !== undefined) lastExpressions.set(clientId, args.expr);
         // The chip's text is its value; the condition only decides on the front end.
         const value =
-            args.expr !== undefined ? (await previewExpression(args.expr)).value : await previewTag(valueArgs(args));
+            args.expr !== undefined
+                ? (await previewExpression(args.expr, clientId)).value
+                : await previewTag(valueArgs(args), clientId);
         if (insertChip(clientId, args, storedText(value, label))) onClose();
     };
 

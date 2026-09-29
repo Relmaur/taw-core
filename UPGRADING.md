@@ -273,6 +273,12 @@ queries, terms and images (ADR-0014; see "TAW Loop" in the README). The theme's 
 `taw/loopItem`, `postId` and `postType`). Checkbox values now read as `1` inside loops (`@row.x`). The editor UI
 comes in v1.69.0. **Nothing to do.**
 
+### v1.69.0: the TAW Loop in the editor
+Insert **TAW Loop** from the inserter: a setup (source, field, starting design), a sidebar (source, order,
+limits, pages, filter, layout), live previews of every item, and Row/Loop values in the TAW data popup. The
+preview route gains `POST taw/v1/loop/render` (same permissions as `bindings/preview`). No hooks change.
+`{"row": …}` and `{"loop": …}` bindings count as bound for `allowBound`. **Nothing to do.**
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

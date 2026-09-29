@@ -8,6 +8,7 @@ import { select } from '@wordpress/data';
 import type { ExpressionError } from './expression';
 import type { PreviewItem } from './logic';
 import type { ConditionError } from './conditions';
+import { loopsFor } from './loop/chain';
 import type { TagArgs } from './tags';
 
 type Fetch = (item: PreviewItem) => Promise<unknown>;
@@ -38,7 +39,7 @@ export function templatePostType(slug: string, postTypes: string[]): string {
 }
 
 /** The edited post; a template previews its type's latest post on the server (postId 0 + postType). */
-function context(): { postId: number; postType: string } {
+export function context(): { postId: number; postType: string } {
     const editor = select('core/editor');
     const id: unknown = editor?.getCurrentPostId?.();
     const type: unknown = editor?.getCurrentPostType?.();
@@ -59,10 +60,17 @@ function context(): { postId: number; postType: string } {
     return { postId: typeof id === 'number' ? id : 0, postType: typeof type === 'string' ? type : '' };
 }
 
-function item(kind: 'tag' | 'expr' | 'condition', args: object): PreviewItem {
+/**
+ * A preview request. Inside TAW Loops (ADR-0014) it carries the enclosing
+ * loops of `clientId` (default: the selected block), so values read the item.
+ */
+function item(kind: 'tag' | 'expr' | 'condition', args: object, clientId?: string | null): PreviewItem {
     const { postId, postType } = context();
-    return {
-        key: `${kind}|${postId}|${postType}|${JSON.stringify(args)}`,
+    const loops = loopsFor(
+        clientId === undefined ? select('core/block-editor')?.getSelectedBlockClientId?.() : clientId,
+    );
+    const request: PreviewItem = {
+        key: `${kind}|${postId}|${postType}|${JSON.stringify(args)}${loops.length ? `|${JSON.stringify(loops)}` : ''}`,
         kind,
         args: args as unknown as PreviewItem['args'],
         block: '',
@@ -70,13 +78,15 @@ function item(kind: 'tag' | 'expr' | 'condition', args: object): PreviewItem {
         postId,
         postType,
     };
+    if (loops.length) request.loops = loops;
+    return request;
 }
 
 /** A chip's plain-text value, or null. */
-export async function previewTag(args: TagArgs): Promise<string | null> {
+export async function previewTag(args: TagArgs, clientId?: string | null): Promise<string | null> {
     if (!fetchPreview) return null;
     try {
-        const value = await fetchPreview(item('tag', args));
+        const value = await fetchPreview(item('tag', args, clientId));
         return typeof value === 'string' ? value : null;
     } catch {
         return null;
@@ -84,10 +94,16 @@ export async function previewTag(args: TagArgs): Promise<string | null> {
 }
 
 /** An expression's value and the server's errors. */
-export async function previewExpression(expr: string): Promise<{ value: string; errors: ExpressionError[] }> {
+export async function previewExpression(
+    expr: string,
+    clientId?: string | null,
+): Promise<{ value: string; errors: ExpressionError[] }> {
     if (!fetchPreview) return { value: '', errors: [] };
     try {
-        const result = (await fetchPreview(item('expr', { expr }))) as { value?: unknown; errors?: unknown } | null;
+        const result = (await fetchPreview(item('expr', { expr }, clientId))) as {
+            value?: unknown;
+            errors?: unknown;
+        } | null;
         return {
             value: typeof result?.value === 'string' ? result.value : '',
             errors: Array.isArray(result?.errors) ? (result.errors as ExpressionError[]) : [],
@@ -100,10 +116,11 @@ export async function previewExpression(expr: string): Promise<{ value: string; 
 /** Whether a condition holds for the edited post; null when it can't be asked. */
 export async function previewCondition(
     condition: unknown,
+    clientId?: string | null,
 ): Promise<{ shown: boolean; errors: ConditionError[] } | null> {
     if (!fetchPreview) return null;
     try {
-        const result = (await fetchPreview(item('condition', { if: condition }))) as {
+        const result = (await fetchPreview(item('condition', { if: condition }, clientId))) as {
             shown?: unknown;
             errors?: unknown;
         } | null;

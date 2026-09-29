@@ -48,7 +48,12 @@ declare module '@wordpress/blocks' {
     }
     export function rawHandler(args: { HTML: string }): BlockInstance[];
     export function serialize(blocks: BlockInstance[]): string;
-    export function createBlock(name: string, attributes?: Record<string, unknown>): BlockInstance;
+    export function createBlock(
+        name: string,
+        attributes?: Record<string, unknown>,
+        innerBlocks?: BlockInstance[],
+    ): BlockInstance;
+    export function registerBlockType(name: string, settings: Record<string, unknown>): unknown;
     export function registerBlockBindingsSource(source: Record<string, unknown>): void;
     export function registerBlockVariation(block: string, variation: Record<string, unknown>): void;
     export function getBlockType(name: string): { attributes?: Record<string, unknown> } | undefined;
@@ -87,6 +92,18 @@ declare module '@wordpress/block-editor' {
     export const BlockCanvas: ComponentType<{ height?: string; styles?: unknown }>;
     export const Inserter: ComponentType<Record<string, unknown>>;
     export const InspectorControls: ComponentType<{ children?: ReactNode; group?: string }>;
+    export const BlockContextProvider: ComponentType<{ value: Record<string, unknown>; children?: ReactNode }>;
+    export function useBlockProps(props?: Record<string, unknown>): Record<string, unknown>;
+    export namespace useBlockProps {
+        function save(props?: Record<string, unknown>): Record<string, unknown>;
+    }
+    export function useInnerBlocksProps(
+        props?: Record<string, unknown>,
+        options?: Record<string, unknown>,
+    ): Record<string, unknown> & { children?: ReactNode };
+    export const InnerBlocks: ComponentType<Record<string, unknown>> & {
+        Content: ComponentType<Record<string, unknown>>;
+    };
     export const BlockControls: ComponentType<{ group?: string; children?: ReactNode }>;
     export const BlockSettingsMenuControls: ComponentType<{
         children: (props: { selectedClientIds: string[]; onClose: () => void }) => ReactNode;

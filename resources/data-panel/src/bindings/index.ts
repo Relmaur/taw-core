@@ -15,6 +15,7 @@ import { setPreviewFetch } from './preview';
 import { injectStyles } from './styles';
 import { registerToolbar } from './toolbar';
 import { registerVisibility } from './visibility';
+import { registerLoop } from './loop/register';
 
 declare global {
     interface Window {
@@ -73,6 +74,8 @@ if (config) {
     registerToolbar(config);
     // Whole-block conditions (ADR-0013): a sidebar panel on every block, and canvas cues.
     registerVisibility(config);
+    // The TAW Loop blocks' editors (ADR-0014).
+    registerLoop(config);
     // Bound-only blocks from the editing policy (allowBound), when there are any.
     registerAllowBound(config);
 
