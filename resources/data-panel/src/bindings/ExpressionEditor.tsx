@@ -1,12 +1,15 @@
 /**
- * The Expression tab's editor (ADR-0012): a plain textarea with `@` name
- * suggestions and `.` function suggestions, a live preview from the server
- * and errors from the TypeScript parser.
+ * The Expression tab's editor (ADR-0012, ADR-0015): a plain textarea with `@`
+ * suggestions (values, then functions) and `.` function suggestions, a
+ * Functions picker, a live preview from the server, and errors from the
+ * TypeScript parser and the server, with "did you mean" for misspelled
+ * functions.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Dashicon } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import { completionAt, namesIn, parseExpression } from './expression';
+import { didYouMean, functionDocs, groupLabel, type FunctionDoc } from './functionDocs';
 import type { ExpressionError } from './expression';
 import { previewExpression } from './preview';
 import {
@@ -17,6 +20,63 @@ import {
     nameSuggestions,
     type ValueOption,
 } from './tags';
+
+interface Problem {
+    key: string;
+    text: string;
+    name: string;
+    /** A function the author probably meant. */
+    hint?: string;
+}
+
+/** The identifier at a character offset (an error's position). */
+function wordAt(value: string, at: number): string {
+    return /^[A-Za-z_][A-Za-z0-9_]*/.exec(Array.from(value).slice(at).join(''))?.[0] ?? '';
+}
+
+/** The Functions picker: every function by group, searchable; picking one types `@name()`. */
+function FunctionPicker({ onPick }: { onPick: (doc: FunctionDoc) => void }) {
+    const [search, setSearch] = useState('');
+    const needle = search.trim().toLowerCase();
+    const docs = functionDocs().filter(
+        (d) => !needle || `${d.name} ${d.description} ${groupLabel(d.group)}`.toLowerCase().includes(needle),
+    );
+    const groups = [...new Set(docs.map((d) => d.group))];
+    return (
+        <div className="taw-function-picker">
+            <input
+                type="search"
+                className="taw-function-picker__search"
+                aria-label={__('Search functions', 'taw-core')}
+                placeholder={__('Search functions', 'taw-core')}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+            />
+            <div className="taw-function-picker__list">
+                {groups.map((group) => (
+                    <div key={group} role="group" aria-label={groupLabel(group)}>
+                        <h4>{groupLabel(group)}</h4>
+                        {docs
+                            .filter((d) => d.group === group)
+                            .map((d) => (
+                                <button
+                                    key={d.name}
+                                    type="button"
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={() => onPick(d)}
+                                >
+                                    <code>{d.usage}</code>
+                                    <span>{d.description}</span>
+                                    <small>{d.example}</small>
+                                </button>
+                            ))}
+                    </div>
+                ))}
+                {docs.length === 0 && <p>{__('No functions match your search.', 'taw-core')}</p>}
+            </div>
+        </div>
+    );
+}
 
 interface Suggestion {
     key: string;
@@ -51,6 +111,7 @@ export function ExpressionEditor({
     const [dismissed, setDismissed] = useState(value !== '');
     // The preview and the expression it belongs to (a stale one isn't shown).
     const [preview, setPreview] = useState<{ for: string; value: string; errors: ExpressionError[] } | null>(null);
+    const [picking, setPicking] = useState(false);
 
     const parsed = useMemo(() => parseExpression(value), [value]);
     const unknown = unknownNames(namesIn(parsed), options);
@@ -66,12 +127,27 @@ export function ExpressionEditor({
                 insert: s.insert,
             }));
         }
-        return nameSuggestions(options, completion.prefix).map((o) => ({
+        const values = nameSuggestions(options, completion.prefix).map((o) => ({
             key: o.key,
             label: `@${o.name}`,
             detail: `${o.group} › ${o.label}`,
             insert: o.name,
         }));
+        // Functions too, after the values: `@ro` → `@round(`.
+        const prefix = completion.prefix.toLowerCase();
+        const functions =
+            prefix === '' || prefix.includes('.')
+                ? []
+                : functionDocs()
+                      .filter((d) => d.name.toLowerCase().startsWith(prefix))
+                      .slice(0, 5)
+                      .map((d) => ({
+                          key: `fn:${d.name}`,
+                          label: `@${d.name}(…)`,
+                          detail: d.description,
+                          insert: `${d.name}(`,
+                      }));
+        return [...values, ...functions];
     }, [value, caret, options]);
 
     const open = !dismissed && suggestions.length > 0;
@@ -143,17 +219,25 @@ export function ExpressionEditor({
     const serverOnly = showPreview
         ? preview.errors.filter((e) => !parsed.errors.some((p) => p.code === e.code && p.at === e.at))
         : [];
-    const problems = [
-        ...[...parsed.errors, ...serverOnly].map((error) => ({
-            key: `${error.code}-${error.at}`,
-            text: errorMessage(error.code),
-            name: '',
-        })),
-        ...unknown.map((name) => ({
-            key: `unknown-${name}`,
-            text: __('Not a value this post has:', 'taw-core'),
-            name,
-        })),
+    const chars = Array.from(value);
+    const problems: Problem[] = [
+        ...[...parsed.errors, ...serverOnly].map((error) => {
+            const hint = error.code === 'unknown_function' ? didYouMean(wordAt(value, error.at)) : null;
+            return {
+                key: `${error.code}-${error.at}`,
+                text: errorMessage(error.code),
+                name: '',
+                hint: hint ?? undefined,
+            };
+        }),
+        ...unknown.map((name): Problem => {
+            // `@rond(2)` reads as a value named "rond" (then text): it was probably a function.
+            const called = !name.includes('.') && chars.join('').includes(`@${name}(`);
+            const hint = called ? didYouMean(name) : null;
+            return hint
+                ? { key: `unknown-${name}`, text: __('Unknown function:', 'taw-core'), name, hint }
+                : { key: `unknown-${name}`, text: __('Not a value this post has:', 'taw-core'), name };
+        }),
     ];
 
     return (
@@ -219,6 +303,15 @@ export function ExpressionEditor({
                 >
                     {__('@if( … )', 'taw-core')}
                 </button>
+                <button
+                    type="button"
+                    className={picking ? 'is-pressed' : undefined}
+                    aria-expanded={picking}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => setPicking(!picking)}
+                >
+                    {__('ƒ Functions', 'taw-core')}
+                </button>
                 {functionSuggestions('')
                     .filter((f) => HELPER_FUNCTIONS.includes(f.fn))
                     .map((f) => (
@@ -232,6 +325,14 @@ export function ExpressionEditor({
                         </button>
                     ))}
             </div>
+            {picking && (
+                <FunctionPicker
+                    onPick={(doc) => {
+                        setPicking(false);
+                        typeAtCaret(`@${doc.name}()`, 1);
+                    }}
+                />
+            )}
             <div className="taw-expression-preview" aria-live="polite">
                 <span className="taw-expression-preview__label">{__('Preview', 'taw-core')}</span>
                 <span className="taw-expression-preview__value">
@@ -257,6 +358,12 @@ export function ExpressionEditor({
                                     <>
                                         {' '}
                                         <code>@{problem.name}</code>
+                                    </>
+                                )}
+                                {problem.hint && (
+                                    <>
+                                        {' '}
+                                        {__('Did you mean', 'taw-core')} <code>{`@${problem.hint}(…)`}</code>?
                                     </>
                                 )}
                             </span>

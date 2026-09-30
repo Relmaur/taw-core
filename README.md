@@ -501,6 +501,10 @@ Published on @post.date.format('F j, Y') by @post.author · @option.company_phon
   });
   ```
 
+  **In the editor (v1.73.0+):** the Expression tab's **ƒ Functions** picker lists every function by group
+  (site functions under "This site"), `@` suggestions include functions, and a misspelled function gets
+  "Did you mean `@round(…)`?". A 4-digit year given to `ago()` counts calendar years ("32 years ago").
+
   `@with_tax(@price).currency('MXN')` then works in chips, bindings, conditions and loops, and the editor's
   parser knows it (`window.tawBindings.functions`). Optional keys: `required` (default: every arg),
   `variadic`. Built-in names can't be replaced. Callbacks run only on the server (the editor previews through

@@ -35,7 +35,7 @@ final class Library
 
         return match ($fn) {
             'format'       => wp_date(Value::text($args[1] ?? ''), self::time($value)),
-            'ago'          => self::relative(self::time($value)),
+            'ago'          => self::isYear($value) ? self::yearsAgo((int) Value::toNumber($value)) : self::relative(self::time($value)),
             'until'        => ($t = self::time($value)) > self::now() ? human_time_diff(self::now(), $t) : '',
             'days_between' => Value::isEmpty($args[1] ?? '') ? '' : (int) floor((self::time($args[1]) - self::time($value)) / DAY_IN_SECONDS),
             'add_days'     => self::date(self::time($value))->modify(sprintf('%+d days', (int) Value::toNumber($args[1] ?? 0)))->format('Y-m-d'),
@@ -82,6 +82,27 @@ final class Library
         $date = is_int($value) ? new \DateTimeImmutable('@' . $value) : new \DateTimeImmutable($value, wp_timezone());
 
         return $date->setTimezone(wp_timezone());
+    }
+
+    /** A 4-digit number: a year, not a timestamp. */
+    private static function isYear(mixed $value): bool
+    {
+        return (is_int($value) || (is_string($value) && preg_match('/^\s*\d{4}\s*$/', $value) === 1)) && (int) Value::toNumber($value) >= 1000;
+    }
+
+    /** A year counts calendar years: 1994 in 2026 is "32 years ago" (not 32.75, rounded). */
+    private static function yearsAgo(int $year): string
+    {
+        $years = (int) wp_date('Y', self::now()) - $year;
+        if ($years === 0) {
+            return __('this year', 'taw-core');
+        }
+
+        return $years > 0
+            /* translators: %s: a number of years */
+            ? sprintf(_n('%s year ago', '%s years ago', $years, 'taw-core'), number_format_i18n($years))
+            /* translators: %s: a number of years */
+            : sprintf(_n('in %s year', 'in %s years', -$years, 'taw-core'), number_format_i18n(-$years));
     }
 
     /** "3 days ago", or "in 2 weeks" for a future date. */
