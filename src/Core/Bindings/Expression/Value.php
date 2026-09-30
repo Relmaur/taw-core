@@ -44,6 +44,27 @@ final class Value
         return (bool) $value;
     }
 
+    /**
+     * A value as a list: a list as is, '' as none, text as its comma-separated
+     * items ("a, b"), anything else as one item.
+     *
+     * @return list<mixed>
+     */
+    public static function toList(mixed $value): array
+    {
+        if (is_array($value)) {
+            return array_values($value);
+        }
+        if (self::isEmpty($value)) {
+            return [];
+        }
+        if (is_string($value)) {
+            return array_values(array_filter(array_map('trim', explode(',', $value)), static fn (string $item): bool => $item !== ''));
+        }
+
+        return [$value];
+    }
+
     public static function isNumeric(mixed $value): bool
     {
         return is_int($value) || is_float($value) || (is_string($value) && is_numeric(trim($value)));

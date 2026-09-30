@@ -1,0 +1,304 @@
+{
+    "about": "The built-in expression functions (ADR-0015): TAW\\Core\\Bindings\\Expression\\Functions::SIGNATURES and SIGNATURES in resources/data-panel/src/bindings/expression.ts must both equal this.",
+    "signatures": {
+        "format": {
+            "params": [
+                "date",
+                "string"
+            ],
+            "required": 2
+        },
+        "upper": {
+            "params": [
+                "any"
+            ],
+            "required": 1
+        },
+        "lower": {
+            "params": [
+                "any"
+            ],
+            "required": 1
+        },
+        "capitalize": {
+            "params": [
+                "any"
+            ],
+            "required": 1
+        },
+        "default": {
+            "params": [
+                "any",
+                "string"
+            ],
+            "required": 2
+        },
+        "truncate": {
+            "params": [
+                "any",
+                "int"
+            ],
+            "required": 2
+        },
+        "words": {
+            "params": [
+                "any",
+                "int"
+            ],
+            "required": 2
+        },
+        "word_count": {
+            "params": [
+                "any"
+            ],
+            "required": 1
+        },
+        "replace": {
+            "params": [
+                "any",
+                "any",
+                "any"
+            ],
+            "required": 3
+        },
+        "strip": {
+            "params": [
+                "any"
+            ],
+            "required": 1
+        },
+        "slug": {
+            "params": [
+                "any"
+            ],
+            "required": 1
+        },
+        "urlencode": {
+            "params": [
+                "any"
+            ],
+            "required": 1
+        },
+        "trim": {
+            "params": [
+                "any"
+            ],
+            "required": 1
+        },
+        "plural": {
+            "params": [
+                "any",
+                "any",
+                "any"
+            ],
+            "required": 3
+        },
+        "concat": {
+            "params": [
+                "any"
+            ],
+            "required": 1,
+            "variadic": true
+        },
+        "if": {
+            "params": [
+                "any",
+                "any",
+                "any"
+            ],
+            "required": 2
+        },
+        "coalesce": {
+            "params": [
+                "any"
+            ],
+            "required": 1,
+            "variadic": true
+        },
+        "empty": {
+            "params": [
+                "any"
+            ],
+            "required": 1
+        },
+        "round": {
+            "params": [
+                "any",
+                "any"
+            ],
+            "required": 1
+        },
+        "floor": {
+            "params": [
+                "any"
+            ],
+            "required": 1
+        },
+        "ceil": {
+            "params": [
+                "any"
+            ],
+            "required": 1
+        },
+        "abs": {
+            "params": [
+                "any"
+            ],
+            "required": 1
+        },
+        "min": {
+            "params": [
+                "list"
+            ],
+            "required": 1,
+            "variadic": true
+        },
+        "max": {
+            "params": [
+                "list"
+            ],
+            "required": 1,
+            "variadic": true
+        },
+        "number": {
+            "params": [
+                "any",
+                "any"
+            ],
+            "required": 1
+        },
+        "currency": {
+            "params": [
+                "any",
+                "string"
+            ],
+            "required": 1
+        },
+        "percent": {
+            "params": [
+                "any",
+                "any"
+            ],
+            "required": 1
+        },
+        "ago": {
+            "params": [
+                "date"
+            ],
+            "required": 1
+        },
+        "until": {
+            "params": [
+                "date"
+            ],
+            "required": 1
+        },
+        "days_between": {
+            "params": [
+                "date",
+                "date"
+            ],
+            "required": 2
+        },
+        "add_days": {
+            "params": [
+                "date",
+                "any"
+            ],
+            "required": 2
+        },
+        "year": {
+            "params": [
+                "date"
+            ],
+            "required": 1
+        },
+        "month": {
+            "params": [
+                "date"
+            ],
+            "required": 1
+        },
+        "day": {
+            "params": [
+                "date"
+            ],
+            "required": 1
+        },
+        "weekday": {
+            "params": [
+                "date"
+            ],
+            "required": 1
+        },
+        "terms": {
+            "params": [
+                "string"
+            ],
+            "required": 1
+        },
+        "column": {
+            "params": [
+                "list",
+                "any"
+            ],
+            "required": 2
+        },
+        "count": {
+            "params": [
+                "list"
+            ],
+            "required": 1
+        },
+        "join": {
+            "params": [
+                "list",
+                "any"
+            ],
+            "required": 1
+        },
+        "first": {
+            "params": [
+                "list"
+            ],
+            "required": 1
+        },
+        "last": {
+            "params": [
+                "list"
+            ],
+            "required": 1
+        },
+        "sort": {
+            "params": [
+                "list"
+            ],
+            "required": 1
+        },
+        "reverse": {
+            "params": [
+                "list"
+            ],
+            "required": 1
+        },
+        "contains": {
+            "params": [
+                "list",
+                "any"
+            ],
+            "required": 2
+        },
+        "sum": {
+            "params": [
+                "list"
+            ],
+            "required": 1
+        },
+        "avg": {
+            "params": [
+                "list"
+            ],
+            "required": 1
+        }
+    }
+}

@@ -10,7 +10,8 @@
  * always renders the live value (Bindings\InlineTags).
  */
 import { __ } from '@wordpress/i18n';
-import { SIGNATURES } from './expression';
+import { SIGNATURES, siteFunctions } from './expression';
+import type { LoopConfig } from './loop/data';
 import type { BindingArgs, Config, FieldEntry } from './logic';
 
 export const FORMAT = 'taw/tag';
@@ -50,6 +51,7 @@ export interface ValueOption {
 function properties(): ValueOption[] {
     const post = __('Post', 'taw-core');
     const site = __('Site', 'taw-core');
+    const visitor = __('Visitor and date', 'taw-core');
     const list: [string, string, string, boolean][] = [
         [post, 'post.title', __('Title', 'taw-core'), false],
         [post, 'post.date', __('Date', 'taw-core'), true],
@@ -63,6 +65,10 @@ function properties(): ValueOption[] {
         [site, 'site.tagline', __('Tagline', 'taw-core'), false],
         [site, 'site.url', __('Site URL', 'taw-core'), false],
         [site, 'site.year', __('Current year', 'taw-core'), false],
+        [visitor, 'viewer.logged_in', __('Logged in', 'taw-core'), false],
+        [visitor, 'viewer.role', __('Role', 'taw-core'), false],
+        [visitor, 'date.today', __('Today', 'taw-core'), true],
+        [visitor, 'date.now', __('Now', 'taw-core'), true],
     ];
     return list.map(([group, tag, label, isDate]) => ({ key: tag, group, label, name: tag, args: { tag }, isDate }));
 }
@@ -118,6 +124,19 @@ export function valueOptions(config: Config, postType: string | undefined): Valu
     return [...fields, ...properties()];
 }
 
+/**
+ * Fields that expressions read as lists (repeaters, related posts, files), as
+ * names: they aren't text values the popup offers, but `@count(@book_awards)`
+ * reads them (ADR-0015).
+ */
+export function listNames(loop: LoopConfig | undefined): string[] {
+    if (!loop) return [];
+    const { post, option, term, user } = loop.sources;
+    return [...Object.values(post).flat(), ...option, ...term, ...user].map(
+        (source) => `${NAMESPACE[source.from] ?? ''}${source.field}`,
+    );
+}
+
 /** Options grouped by heading, in first-seen order, filtered by a search. */
 export function groupOptions(options: ValueOption[], search: string): [string, ValueOption[]][] {
     const needle = search.trim().toLowerCase();
@@ -140,13 +159,16 @@ export function nameSuggestions(options: ValueOption[], prefix: string, limit = 
     return [...starts, ...contains].slice(0, limit);
 }
 
-/** Functions that read naturally as methods (`@x.fn(…)`); `if`/`coalesce` are written `@if(…)`. */
-const NOT_METHODS = ['if', 'coalesce'];
+/** Functions that read oddly as methods (`@x.fn(…)`): they're written `@if(…)`, `@terms('genre')`… */
+const NOT_METHODS = ['if', 'coalesce', 'concat', 'min', 'max', 'terms', 'days_between'];
+
+/** The helper buttons under the Expression field (the function picker lists them all). */
+export const HELPER_FUNCTIONS = ['format', 'upper', 'lower', 'default', 'truncate'];
 
 /** Function suggestions after `name.`, as the text they insert. */
 export function functionSuggestions(prefix: string): { fn: string; insert: string }[] {
-    return Object.entries(SIGNATURES)
-        .filter(([fn]) => fn.startsWith(prefix) && !NOT_METHODS.includes(fn))
+    return Object.entries({ ...SIGNATURES, ...siteFunctions() })
+        .filter(([fn, signature]) => fn.startsWith(prefix) && !NOT_METHODS.includes(fn) && signature.params.length > 0)
         .map(([fn, signature]) => {
             const kinds = signature.params.slice(1, signature.required);
             return {
@@ -262,6 +284,8 @@ export function errorMessage(code: string): string {
             return __('Division by zero.', 'taw-core');
         case 'not_a_number':
             return __('Arithmetic needs numbers; this value is text.', 'taw-core');
+        case 'not_a_date':
+            return __('This value isn’t a date.', 'taw-core');
         case 'unknown_name':
             return __('Unknown value name.', 'taw-core');
         case 'too_long':

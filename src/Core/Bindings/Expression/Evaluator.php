@@ -5,8 +5,16 @@ declare(strict_types=1);
 namespace TAW\Core\Bindings\Expression;
 
 use TAW\Core\Bindings\BindingContext;
+use TAW\Core\Bindings\Conditions;
+use TAW\Core\Bindings\FieldResolver;
 use TAW\Core\Bindings\InlineTags;
+use TAW\Core\Bindings\Reference;
 use TAW\Core\Bindings\TagResolver;
+use TAW\Core\Fields\Image;
+use TAW\Core\Fields\PostRef;
+use TAW\Core\Fields\Row;
+use TAW\Core\Fields\Value as FieldValue;
+use TAW\Core\Loop\Item;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -24,8 +32,12 @@ if (!defined('ABSPATH')) {
  */
 final class Evaluator
 {
+    /** @var array<string, array{params: list<string>, required: int, variadic?: bool}> */
+    private readonly array $functions;
+
     private function __construct(private readonly BindingContext $context, private readonly ?string $format)
     {
+        $this->functions = Functions::all();
     }
 
     /**
@@ -113,9 +125,24 @@ final class Evaluator
         $calls = is_array($part['calls'] ?? null) ? $part['calls'] : [];
         // A token with an error reads nothing, but its calls still run (so `default()` applies).
         $broken = isset($part['error']);
-        $value  = $broken ? '' : $this->read((string) ($part['name'] ?? ''), $this->formatIn($calls));
+        $name   = (string) ($part['name'] ?? '');
+        $first  = null;
         foreach ($calls as $call) {
-            if ($call['fn'] === 'format' || !isset(Functions::SIGNATURES[$call['fn']])) {
+            if ($call['fn'] !== 'format') {
+                $first = $call['fn'];
+                break;
+            }
+        }
+        // `@book_awards.count()` reads the rows; `@book_released.ago()` a date.
+        $kind  = $first !== null && isset($this->functions[$first]) ? Functions::kindAt($this->functions[$first], 0) : 'any';
+        $value = match (true) {
+            $broken         => '',
+            $kind === 'list' => $this->readList($name),
+            $kind === 'date' && $this->formatIn($calls) === $this->format => $this->read($name, Conditions::DATE_FORMAT),
+            default         => $this->read($name, $this->formatIn($calls)),
+        };
+        foreach ($calls as $call) {
+            if ($call['fn'] === 'format' || !isset($this->functions[$call['fn']])) {
                 continue;
             }
             try {
@@ -169,8 +196,89 @@ final class Evaluator
         if ($fn === 'format' && ($args[0]['type'] ?? '') === 'ref') {
             return $this->read((string) $args[0]['name'], Value::text($this->node($args[1])));
         }
+        if ($fn === 'terms') {
+            return $this->terms(Value::text($this->node($args[0])));
+        }
 
-        return Functions::apply($fn, array_map($this->node(...), $args));
+        $signature = $this->functions[$fn] ?? null;
+        if ($signature === null) {
+            throw new EvaluationError('unknown_function');
+        }
+        $values = [];
+        foreach ($args as $k => $arg) {
+            $kind = Functions::kindAt($signature, $k);
+            $values[] = ($arg['type'] ?? '') !== 'ref' ? $this->node($arg) : match ($kind) {
+                'list'  => $this->readList((string) $arg['name']),
+                'date'  => $this->read((string) $arg['name'], Conditions::DATE_FORMAT),
+                default => $this->node($arg),
+            };
+        }
+
+        return Functions::apply($fn, $values);
+    }
+
+    /**
+     * A value by name as a list: a repeater's rows (arrays of sub-values),
+     * checked options, related posts' titles (readable ones), files' URLs.
+     * Anything else is its text, split at commas.
+     *
+     * @return list<mixed>
+     */
+    private function readList(string $name): array
+    {
+        $args = self::argsFor($name);
+        if ($args === null) {
+            return [];
+        }
+
+        $value = null;
+        if (isset($args['row'])) {
+            $row   = $this->context->item?->data;
+            $value = $row instanceof Row ? $row->field($args['row']) : null;
+            if ($value !== null && ($value->type() === null || !FieldResolver::bindable($value, null, 'post'))) {
+                return [];
+            }
+        } elseif (isset($args['field'])) {
+            $ref   = Reference::fromArgs($args);
+            $value = $ref === null ? null : (new FieldResolver())->value($ref, $this->context);
+            if ($value === null) {
+                return [];
+            }
+        }
+
+        return $value === null ? Value::toList($this->read($name, $this->format)) : self::listOf($value);
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private static function listOf(FieldValue $value): array
+    {
+        return match ($value->type()) {
+            'repeater'      => $value->rows()->value(),
+            'post_select'   => array_values(array_map(
+                static fn (PostRef $post): string => html_entity_decode(wp_strip_all_tags($post->title()), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                array_filter($value->posts(), static fn (PostRef $post): bool => FieldResolver::readablePost($post->id()) !== null)
+            )),
+            'files', 'image' => array_values(array_filter(array_map(static fn (Image $image): string => $image->url(), $value->images()))),
+            default         => is_array($decoded = $value->value()) ? array_values(array_map(Value::text(...), $decoded)) : Value::toList(Value::text($decoded)),
+        };
+    }
+
+    /**
+     * The names of the post's terms in a taxonomy (in a loop: the item's post).
+     *
+     * @return list<string>
+     */
+    private function terms(string $taxonomy): array
+    {
+        $postId = $this->context->item?->kind === Item::POST ? $this->context->item->postId : $this->context->postId;
+        if ($taxonomy === '' || !taxonomy_exists($taxonomy) || !is_taxonomy_viewable($taxonomy) || FieldResolver::readablePost($postId) === null) {
+            return [];
+        }
+        $terms = get_the_terms($postId, $taxonomy);
+
+        return is_array($terms) ? array_values(array_map(static fn (\WP_Term $term): string => html_entity_decode($term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8'), $terms)) : [];
     }
 
     /**

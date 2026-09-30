@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\Bindings;
 
 use TAW\Core\Bindings\Expression\Evaluator;
+use TAW\Core\Bindings\Expression\Functions;
 use TAW\Core\Loop\EditorData;
 use TAW\Core\Loop\RowValues;
 
@@ -107,6 +108,8 @@ final class Bindings
             // The TAW Loop's editor (ADR-0014): its sources and item previews.
             'loop'      => EditorData::all(),
             'loopRoute' => '/' . PreviewEndpoint::NAMESPACE . PreviewEndpoint::LOOP_ROUTE,
+            // The site's own expression functions (ADR-0015), for the editor's parser.
+            'functions' => (object) Functions::forEditor(),
         ];
         $inline = sprintf('window.tawBindings = %s;', wp_json_encode($config));
 

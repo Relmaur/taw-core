@@ -60,7 +60,7 @@ final class InlineTagsTest extends TestCase
             '_taw_company_name' => 'ACME & Sons',
             default             => $default,
         });
-        Functions\when('get_the_title')->alias(static fn (\WP_Post $post): string => $post->ID === 5 ? 'Dune &#8211; <em>Part One</em>' : $post->post_title);
+        Functions\when('get_the_title')->alias(static fn (\WP_Post|int $post): string => ($post = $posts[$post instanceof \WP_Post ? $post->ID : $post])->ID === 5 ? 'Dune &#8211; <em>Part One</em>' : $post->post_title);
         Functions\when('get_the_date')->alias(static fn (string $format, \WP_Post $post): string => "date({$format})#{$post->ID}");
         Functions\when('get_the_modified_date')->alias(static fn (string $format, \WP_Post $post): string => "modified({$format})#{$post->ID}");
         Functions\when('get_permalink')->alias(static fn (\WP_Post $post): string => "https://site.test/books/{$post->ID}/");
@@ -94,6 +94,11 @@ final class InlineTagsTest extends TestCase
             ['id' => 'book_blurb', 'type' => 'wysiwyg', 'label' => 'Blurb'],
             ['id' => 'book_note', 'type' => 'text', 'label' => 'Note'],
             ['id' => 'book_secret', 'type' => 'text', 'bindings' => false],
+            ['id' => 'book_awards', 'type' => 'repeater', 'label' => 'Awards', 'fields' => [
+                ['id' => 'name', 'type' => 'text', 'label' => 'Award'],
+                ['id' => 'year', 'type' => 'number', 'label' => 'Year'],
+            ]],
+            ['id' => 'book_related', 'type' => 'post_select', 'multiple' => true, 'label' => 'Related'],
         ]]);
         new OptionsPage(['id' => 'site', 'title' => 'Site', 'fields' => [['id' => 'company_name', 'type' => 'text', 'label' => 'Company']]]);
 
@@ -105,6 +110,8 @@ final class InlineTagsTest extends TestCase
             '5|_taw_book_secret'   => 'hidden',
             '8|_taw_book_year'     => '1969',
             '6|_taw_book_year'     => '2000',
+            '5|_taw_book_awards'   => '[{"name":"Hugo","year":"1966"},{"name":"Nebula","year":"1965"}]',
+            '5|_taw_book_related'  => '[8,6,5]',
         ];
     }
 
@@ -325,6 +332,31 @@ final class InlineTagsTest extends TestCase
         $formula = '@(' . implode('+', array_fill(0, 499, '1')) . ')';
         $this->assertSame(1000, mb_strlen($formula));
         $this->assertSame(['value' => '499', 'errors' => []], Evaluator::evaluate($formula, new BindingContext(5)));
+    }
+
+    public function test_lists_read_fields_as_their_values(): void
+    {
+        Functions\when('taxonomy_exists')->alias(static fn (string $t): bool => $t === 'genre');
+        Functions\when('is_taxonomy_viewable')->justReturn(true);
+        Functions\when('get_the_terms')->alias(static fn (int $id, string $t): array => $id === 5 ? [new \WP_Term((object) ['name' => 'Science &amp; Fiction']), new \WP_Term((object) ['name' => 'Classic'])] : []);
+
+        $this->assertSame(
+            '<span class="taw-tag">2 awards: Hugo &amp; Nebula · last 1966</span>',
+            self::render(self::expr("@plural(@count(@book_awards), 'award', 'awards'): @join(@column(@book_awards, 'name'), ' & ') · last @max(@column(@book_awards, 'year'))"))
+        );
+        $this->assertSame('<span class="taw-tag">2</span>', self::render(self::expr('@book_awards.count()')), 'a method reads the list too');
+        $this->assertSame('<span class="taw-tag">Second, Dune – Part One</span>', self::render(self::expr('@join(@book_related)')), 'related posts: readable ones, as titles');
+        $this->assertSame('<span class="taw-tag">Classic, Science &amp; Fiction · yes</span>', self::render(self::expr("@join(@sort(@terms('genre'))) · @if(@contains(@terms('genre'), 'classic'), 'yes', 'no')")));
+        $this->assertSame('<span class="taw-tag">0</span>', self::render(self::expr('@count(@book_secret)')), 'bindings: false reads no list');
+    }
+
+    public function test_date_functions_read_dates_whatever_their_display(): void
+    {
+        Functions\when('human_time_diff')->alias(static fn (int $from, int $to): string => sprintf('%d years', (int) round(abs($to - $from) / 31557600)));
+        Functions\when('get_the_date')->alias(static fn (string $format, \WP_Post $post): string => $format === 'Y-m-d H:i:s' ? '2026-09-20 10:00:00' : "date({$format})#{$post->ID}");
+
+        $this->assertSame('<span class="taw-tag">61 years ago · 1965 · 6</span>', self::render(self::expr('@ago(@book_released) · @year(@book_released) · @days_between(@post.date, @date.today)')));
+        $this->assertSame('<span class="taw-tag">61 years ago</span>', self::render(self::expr('@book_released.ago()')));
     }
 
     public function test_conditions_read_formulas(): void

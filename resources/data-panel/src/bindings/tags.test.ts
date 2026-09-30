@@ -4,6 +4,7 @@ import {
     chipObject,
     functionSuggestions,
     groupOptions,
+    listNames,
     nameSuggestions,
     parseTag,
     serializeTag,
@@ -92,8 +93,27 @@ describe('the TAW data popup values', () => {
                 ],
             ],
             ['Site', ['site.name', 'site.tagline', 'site.url', 'site.year']],
+            ['Visitor and date', ['viewer.logged_in', 'viewer.role', 'date.today', 'date.now']],
         ]);
         expect(options.find((o) => o.name === 'book_released')?.isDate).toBe(true);
+        expect(options.find((o) => o.name === 'date.today')?.isDate).toBe(true);
+    });
+
+    it('names the fields expressions read as lists', () => {
+        const loop = {
+            sources: {
+                post: {
+                    book: [{ field: 'book_awards', from: 'post' as const, type: 'repeater' as const, label: 'Awards' }],
+                },
+                option: [{ field: 'team', from: 'option' as const, type: 'repeater' as const, label: 'Team' }],
+                term: [],
+                user: [],
+            },
+            postTypes: [],
+            taxonomies: [],
+        };
+        expect(listNames(loop)).toStrictEqual(['book_awards', 'option.team']);
+        expect(listNames(undefined)).toStrictEqual([]);
     });
 
     it('searches labels, names and groups', () => {
@@ -107,15 +127,21 @@ describe('the TAW data popup values', () => {
     });
 
     it('suggests functions with starter arguments', () => {
-        expect(functionSuggestions('')).toStrictEqual([
+        const all = functionSuggestions('');
+        expect(all.slice(0, 5)).toStrictEqual([
             { fn: 'format', insert: "format('F j, Y')" },
             { fn: 'upper', insert: 'upper()' },
             { fn: 'lower', insert: 'lower()' },
+            { fn: 'capitalize', insert: 'capitalize()' },
             { fn: 'default', insert: "default('')" },
-            { fn: 'truncate', insert: 'truncate(20)' },
-            { fn: 'empty', insert: 'empty()' },
         ]);
-        expect(functionSuggestions('i')).toStrictEqual([]); // if() is written @if(…), not as a method
+        expect(all.map((f) => f.fn)).toEqual(
+            expect.arrayContaining(['truncate', 'round', 'currency', 'ago', 'count', 'join']),
+        );
+        // Written @if(…), @terms('genre')…, not as methods.
+        expect(all.map((f) => f.fn)).not.toEqual(expect.arrayContaining(['if']));
+        expect(functionSuggestions('ter')).toStrictEqual([]);
+        expect(functionSuggestions('cur')).toStrictEqual([{ fn: 'currency', insert: 'currency()' }]);
     });
 });
 

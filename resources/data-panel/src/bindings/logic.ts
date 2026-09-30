@@ -42,6 +42,8 @@ export interface Config {
     /** The TAW Loop's editor data and item-preview route (ADR-0014). */
     loop?: import('./loop/data').LoopConfig;
     loopRoute?: string;
+    /** The site's own expression functions (ADR-0015); `[]` when there are none. */
+    functions?: Record<string, import('./expression').SiteFunction> | unknown[];
     fields: {
         post: Record<string, FieldEntry[]>;
         option: FieldEntry[];
