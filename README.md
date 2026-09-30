@@ -461,14 +461,29 @@ Published on @post.date.format('F j, Y') by @post.author · @option.company_phon
   - `default('…')`: when empty;
   - `truncate(n)`: characters, adds `…`.
 - **Plain text:** `@` inside a word (e-mail addresses) and a `.` not followed by `name(` stay text; `@@` is a
-  literal `@`. Limits: 500 characters and 20 tokens.
+  literal `@`. Limits: 1,000 characters, 50 tokens and 10 nested parentheses (v1.70.0+; 500 and 20 before).
+- **Formulas and calls (v1.70.0+, ADR-0015):** `@( … )` is a formula and `@fn( … )` calls a known function:
+
+  ```text
+  Item @(@loop.index + 1) of @loop.count · @if(@stock > 0, 'In stock', 'Sold out') · @(@price * 1.16)
+  ```
+
+  Inside them: values (`@…`), numbers, `'text'`, `true`/`false`, `+ - * / %`, `== != < <= > >=`, `and`,
+  `or`, `not`, parentheses and calls (`@fn(…)` or `fn(…)`; methods `x.fn(…)` too). Values are typed: text
+  that reads as a number is a number. An empty value in arithmetic gives an empty result; division by zero
+  or text in arithmetic empties the token and reports `division_by_zero`/`not_a_number` (the Expression tab
+  shows them). An unknown name before `(` stays v1 text: `@book_year(1965)` is the field, then `(1965)`.
+  Logic functions: `if(test, then, else?)`, `coalesce(a, b, …)`, `empty(x)`. Conditions' `value` and the
+  loop's `order.by` take formulas too (`@(@book_year + 1)`).
 - **Where:**
   - an inline chip: `data-taw-tag='{"expr": "…"}'`;
   - a whole text attribute: a `taw/field` binding with `args: {"expr": "…"}` on paragraph, heading or
     list-item content, button text, or image alt/caption. It's escaped for rich text and plain for HTML
     attributes; URLs and IDs don't take expressions.
-- **Evaluation:** a small parser (`Bindings\Expression\Parser`) plus the same resolvers as tags and
-  bindings. Nothing is executed, and an unknown name or function renders empty unless `default()` is used.
+- **Evaluation:** a small parser (`Bindings\Expression\Parser`, formulas in `Formula`) plus the same
+  resolvers as tags and bindings, on typed values (`Value`); functions live in `Functions` (signatures shared
+  with the editor's parser). Nothing is executed, and an unknown name or function renders empty unless
+  `default()` is used.
 
 #### Conditions (v1.66.0+)
 

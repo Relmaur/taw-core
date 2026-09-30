@@ -73,7 +73,7 @@ export function isToken(operand: string): boolean {
 export function isValidToken(token: string): boolean {
     if (!token.startsWith('@')) return false;
     const { parts, errors } = parseExpression(token);
-    return errors.length === 0 && parts.length === 1 && 'name' in parts[0] && !parts[0].error;
+    return errors.length === 0 && parts.length === 1 && !('text' in parts[0]) && !parts[0].error;
 }
 
 function join(path: string, key: string): string {

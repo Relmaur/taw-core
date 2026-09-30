@@ -8,6 +8,7 @@ use Brain\Monkey\Functions;
 use TAW\Core\Bindings\BindingContext;
 use TAW\Core\Bindings\Bindings;
 use TAW\Core\Bindings\BlockVisibility;
+use TAW\Core\Bindings\Expression\Evaluator;
 use TAW\Core\Bindings\InlineTags;
 use TAW\Core\Bindings\PreviewEndpoint;
 use TAW\Core\Bindings\Reference;
@@ -289,6 +290,49 @@ final class InlineTagsTest extends TestCase
         $this->assertSame(['value' => 'Hi', 'errors' => [['code' => 'unknown_function', 'at' => 15]]], PreviewEndpoint::resolve($item('Hi @post.title.nope()')));
         $this->assertNull(PreviewEndpoint::resolve($item('Year @book_year', 8)), 'a post the user can\'t edit');
         $this->assertSame('Year 1965', PreviewEndpoint::resolve(['key' => 'k', 'kind' => 'tag', 'args' => ['expr' => 'Year @book_year'], 'postId' => 5]), 'an expression chip\'s preview');
+    }
+
+    // --- Expressions v2 (ADR-0015) --------------------------------------
+
+    public function test_formulas_and_if(): void
+    {
+        $this->assertSame('<span class="taw-tag">Item 65 of 2.5</span>', self::render(self::expr('Item @(@book_year - 1900) of @(10 / 4)')));
+        $this->assertSame('<span class="taw-tag">2279.4 · 7 · -3 · 1</span>', self::render(self::expr('@(@book_year * 1.16) · @(1 + 2 * 3) · @(-(1 + 2)) · @(7 % 3)')));
+        $this->assertSame('<span class="taw-tag">Modern</span>', self::render(self::expr("@if(@book_year > 1960, 'Modern', 'Classic')")));
+        $this->assertSame('<span class="taw-tag">Classic</span>', self::render(self::expr("@if(@book_year >= 1970 or @book_missing, 'Modern', 'Classic')")));
+        $this->assertSame('<span class="taw-tag">none</span>', self::render(self::expr("@if(not @book_missing, 'none')")));
+        $this->assertSame('<span class="taw-tag">FRANK HERBERT</span>', self::render(self::expr('@coalesce(@book_missing, @post.author).upper()')));
+        $this->assertSame('<span class="taw-tag">1 /</span>', self::render(self::expr('@empty(@book_missing) / @empty(@book_year)')), 'true reads as 1, false as nothing');
+        $this->assertSame('<span class="taw-tag">1966</span>', self::render(self::expr("@(@book_released.format('Y') + 1)")), 'a format reads the value in it');
+        $this->assertSame('<span class="taw-tag">yes</span>', self::render(self::expr("@if(@post.author == 'Frank Herbert' and @book_year == '1965.0', 'yes', 'no')")), 'numbers compare as numbers');
+    }
+
+    public function test_formula_errors_empty_their_token_and_are_reported(): void
+    {
+        $context = new BindingContext(5);
+
+        $this->assertSame(['value' => 'A  B', 'errors' => [['code' => 'division_by_zero', 'at' => 2]]], Evaluator::evaluate('A @(@book_year / 0) B', $context));
+        $this->assertSame(['value' => 'Total', 'errors' => [['code' => 'not_a_number', 'at' => 6]]], Evaluator::evaluate('Total @(@post.author * 2)', $context));
+        $this->assertSame(['value' => 'Total', 'errors' => []], Evaluator::evaluate('Total @(@book_missing * 2)', $context), 'an empty value empties the result, no error');
+        $this->assertSame(['value' => '', 'errors' => [['code' => 'wrong_arguments', 'at' => 1]]], Evaluator::evaluate('@if(@book_year)', $context));
+        $this->assertSame('', Evaluator::tokenValue('@(1 / 0)', $context));
+        $this->assertSame('1965', Evaluator::tokenValue('@(@book_year)', $context));
+    }
+
+    public function test_the_longest_formula_still_evaluates(): void
+    {
+        // 1,000 characters (the limit) bound the work a formula can do.
+        $formula = '@(' . implode('+', array_fill(0, 499, '1')) . ')';
+        $this->assertSame(1000, mb_strlen($formula));
+        $this->assertSame(['value' => '499', 'errors' => []], Evaluator::evaluate($formula, new BindingContext(5)));
+    }
+
+    public function test_conditions_read_formulas(): void
+    {
+        $rule = static fn (string $value, string $op, mixed $to = null): array => array_filter(['value' => $value, 'op' => $op, 'to' => $to], static fn ($v): bool => $v !== null);
+
+        $this->assertSame('<span class="taw-tag">shown</span>', self::render(self::tag(['expr' => 'shown', 'if' => self::when([$rule('@(@book_year + 1)', 'equals', '1966')])])));
+        $this->assertSame('<span class="taw-tag"></span>', self::render(self::tag(['expr' => 'shown', 'if' => self::when([$rule("@if(@book_year > 2000, 'new', '')", 'not_empty')])])));
     }
 
     // --- Conditions (ADR-0013) ------------------------------------------

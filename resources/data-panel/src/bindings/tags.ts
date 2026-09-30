@@ -10,7 +10,7 @@
  * always renders the live value (Bindings\InlineTags).
  */
 import { __ } from '@wordpress/i18n';
-import { FUNCTIONS } from './expression';
+import { SIGNATURES } from './expression';
 import type { BindingArgs, Config, FieldEntry } from './logic';
 
 export const FORMAT = 'taw/tag';
@@ -140,21 +140,27 @@ export function nameSuggestions(options: ValueOption[], prefix: string, limit = 
     return [...starts, ...contains].slice(0, limit);
 }
 
+/** Functions that read naturally as methods (`@x.fn(…)`); `if`/`coalesce` are written `@if(…)`. */
+const NOT_METHODS = ['if', 'coalesce'];
+
 /** Function suggestions after `name.`, as the text they insert. */
 export function functionSuggestions(prefix: string): { fn: string; insert: string }[] {
-    return Object.entries(FUNCTIONS)
-        .filter(([fn]) => fn.startsWith(prefix))
-        .map(([fn, kinds]) => ({
-            fn,
-            insert:
-                kinds.length === 0
-                    ? `${fn}()`
-                    : kinds[0] === 'int'
-                      ? `${fn}(20)`
-                      : fn === 'format'
-                        ? `${fn}('F j, Y')`
-                        : `${fn}('')`,
-        }));
+    return Object.entries(SIGNATURES)
+        .filter(([fn]) => fn.startsWith(prefix) && !NOT_METHODS.includes(fn))
+        .map(([fn, signature]) => {
+            const kinds = signature.params.slice(1, signature.required);
+            return {
+                fn,
+                insert:
+                    kinds.length === 0
+                        ? `${fn}()`
+                        : kinds[0] === 'int'
+                          ? `${fn}(20)`
+                          : fn === 'format'
+                            ? `${fn}('F j, Y')`
+                            : `${fn}('')`,
+            };
+        });
 }
 
 /** The identity of a tag: what it reads, without its formatting. */
@@ -240,17 +246,28 @@ export function chipObject(
 export function errorMessage(code: string): string {
     switch (code) {
         case 'unknown_function':
-            return __('Unknown function. Use format, upper, lower, default or truncate.', 'taw-core');
+            return __('Unknown function.', 'taw-core');
         case 'wrong_arguments':
             return __('Wrong arguments for this function.', 'taw-core');
         case 'bad_arguments':
             return __('Unclosed parenthesis or quote.', 'taw-core');
+        case 'bad_formula':
+            return __(
+                'This formula doesn’t read right here: check operators, commas, quotes and parentheses.',
+                'taw-core',
+            );
+        case 'too_deep':
+            return __('Too many nested parentheses (10 at most).', 'taw-core');
+        case 'division_by_zero':
+            return __('Division by zero.', 'taw-core');
+        case 'not_a_number':
+            return __('Arithmetic needs numbers; this value is text.', 'taw-core');
         case 'unknown_name':
             return __('Unknown value name.', 'taw-core');
         case 'too_long':
-            return __('The expression is too long (500 characters at most).', 'taw-core');
+            return __('The expression is too long (1,000 characters at most).', 'taw-core');
         case 'too_many_tokens':
-            return __('Too many values (20 at most).', 'taw-core');
+            return __('Too many values (50 at most).', 'taw-core');
         default:
             return code;
     }

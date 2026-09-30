@@ -7,7 +7,13 @@ namespace TAW\Core\Bindings\Expression;
 // No ABSPATH guard: pure class (no WordPress calls), like Editing\Blocks.
 
 /**
- * The expression grammar (ADR-0012), v1:
+ * The expression grammar (ADR-0012, extended by ADR-0015). v2 adds two token
+ * forms, parsed by Formula into a tree: `@( … )` (a formula) and `@fn( … )`
+ * (a known function), e.g. `@if(@stock > 0, 'In stock', 'Sold out')`, as
+ * parts `['expr' => node, 'at' => …, 'length' => …]`. Everything below (v1)
+ * is unchanged.
+ *
+ * v1:
  *
  *   Published on @book_date.format('F j, Y') by @post.author · @option.phone.default('—')
  *
@@ -34,28 +40,27 @@ namespace TAW\Core\Bindings\Expression;
  */
 final class Parser
 {
-    public const MAX_LENGTH = 500;
+    public const MAX_LENGTH = 1000;
 
-    public const MAX_TOKENS = 20;
+    public const MAX_TOKENS = 50;
+
+    /** Nested parentheses and calls in a formula. */
+    public const MAX_DEPTH = 10;
 
     public const NAMESPACES = ['post', 'site', 'option', 'term', 'author', 'viewer', 'date', 'row', 'loop'];
 
-    /** Function name → its argument kinds. */
-    public const FUNCTIONS = [
-        'format'   => ['string'],
-        'upper'    => [],
-        'lower'    => [],
-        'default'  => ['string'],
-        'truncate' => ['int'],
-    ];
+    public const SITE_PROPERTIES = ['name', 'tagline', 'url', 'year'];
 
     private const IDENT = '/\G[A-Za-z_][A-Za-z0-9_]*/';
 
     /**
+     * @param array<string, array{params: list<string>, required: int, variadic?: bool}>|null $functions
+     *        The known functions (default: the built-in ones, Functions::SIGNATURES).
      * @return array{parts: list<array<string, mixed>>, errors: list<array{code: string, at: int}>}
      */
-    public static function parse(string $expression): array
+    public static function parse(string $expression, ?array $functions = null): array
     {
+        $functions ??= Functions::SIGNATURES;
         if (mb_strlen($expression) > self::MAX_LENGTH) {
             return ['parts' => [], 'errors' => [['code' => 'too_long', 'at' => 0]]];
         }
@@ -77,7 +82,9 @@ final class Parser
             }
 
             if ($char === '@' && self::startsToken($expression, $i)) {
-                $token = self::token($expression, $i);
+                $token = Formula::startsAt($expression, $i, $functions)
+                    ? self::formula($expression, $i, $functions)
+                    : self::token($expression, $i, $functions);
                 if ($text !== '') {
                     $parts[] = ['text' => $text];
                     $text    = '';
@@ -131,18 +138,40 @@ final class Parser
         return ['parts' => $parts, 'errors' => $errors];
     }
 
-    /** An `@` followed by a name, at the start or after a non-word character. */
+    /** An `@` followed by a name or `(`, at the start or after a non-word character. */
     private static function startsToken(string $s, int $i): bool
     {
         $before = $i > 0 ? $s[$i - 1] : ' ';
 
-        return preg_match('/[A-Za-z0-9_]/', $before) !== 1 && preg_match(self::IDENT, $s, $m, 0, $i + 1) === 1;
+        return preg_match('/[A-Za-z0-9_]/', $before) !== 1
+            && (($s[$i + 1] ?? '') === '(' || preg_match(self::IDENT, $s, $m, 0, $i + 1) === 1);
     }
 
     /**
+     * A v2 token: `['expr' => node|null, 'at', 'length']` (+ error).
+     *
+     * @param array<string, array{params: list<string>, required: int, variadic?: bool}> $functions
      * @return array<string, mixed>
      */
-    private static function token(string $s, int $at): array
+    private static function formula(string $s, int $at, array $functions): array
+    {
+        $parsed = Formula::token($s, $at, $functions);
+        $token  = ['expr' => $parsed['expr'], 'at' => $at, 'length' => $parsed['end'] - $at];
+        if (isset($parsed['error'])) {
+            $token['error']   = $parsed['error'];
+            $token['errorAt'] = $parsed['errorAt'];
+        }
+
+        return $token;
+    }
+
+    /**
+     * A v1 token: a name and literal-argument calls.
+     *
+     * @param array<string, array{params: list<string>, required: int, variadic?: bool}> $functions
+     * @return array<string, mixed>
+     */
+    private static function token(string $s, int $at, array $functions): array
     {
         $i = $at + 1;
         preg_match(self::IDENT, $s, $m, 0, $i);
@@ -177,14 +206,14 @@ final class Parser
             [$values, $i] = $args;
 
             $token['calls'][] = ['fn' => $fn, 'args' => $values];
-            $error = self::checkCall($fn, $values);
+            $error = self::checkCall($fn, $values, $functions);
             if ($error !== null && !isset($token['error'])) {
                 $token['error']   = $error;
                 $token['errorAt'] = $fnAt;
             }
         }
 
-        if ($name === 'site' || str_starts_with($name, 'site.') && !in_array(substr($name, 5), ['name', 'tagline', 'url', 'year'], true)) {
+        if ($name === 'site' || str_starts_with($name, 'site.') && !in_array(substr($name, 5), self::SITE_PROPERTIES, true)) {
             $token['error'] ??= 'unknown_name';
             $token['errorAt'] ??= $at;
         }
@@ -272,25 +301,22 @@ final class Parser
     }
 
     /**
+     * A v1 method call: its literal arguments after the receiver.
+     *
      * @param list<string|int|float> $args
+     * @param array<string, array{params: list<string>, required: int, variadic?: bool}> $functions
      */
-    private static function checkCall(string $fn, array $args): ?string
+    private static function checkCall(string $fn, array $args, array $functions): ?string
     {
-        if (!isset(self::FUNCTIONS[$fn])) {
+        if (!isset($functions[$fn])) {
             return 'unknown_function';
         }
 
-        $kinds = self::FUNCTIONS[$fn];
-        if (count($args) !== count($kinds)) {
-            return 'wrong_arguments';
-        }
-        foreach ($kinds as $k => $kind) {
-            $ok = $kind === 'string' ? is_string($args[$k]) : (is_int($args[$k]) && $args[$k] > 0);
-            if (!$ok) {
-                return 'wrong_arguments';
-            }
+        $nodes = [['type' => 'ref', 'name' => '']];
+        foreach ($args as $arg) {
+            $nodes[] = is_string($arg) ? ['type' => 'text', 'value' => $arg] : ['type' => 'number', 'value' => $arg];
         }
 
-        return null;
+        return Functions::check($functions[$fn], $nodes);
     }
 }

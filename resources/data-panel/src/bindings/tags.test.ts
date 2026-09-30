@@ -113,7 +113,9 @@ describe('the TAW data popup values', () => {
             { fn: 'lower', insert: 'lower()' },
             { fn: 'default', insert: "default('')" },
             { fn: 'truncate', insert: 'truncate(20)' },
+            { fn: 'empty', insert: 'empty()' },
         ]);
+        expect(functionSuggestions('i')).toStrictEqual([]); // if() is written @if(…), not as a method
     });
 });
 

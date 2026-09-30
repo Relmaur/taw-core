@@ -6,7 +6,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Dashicon } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
-import { completionAt, parseExpression, type TokenPart } from './expression';
+import { completionAt, namesIn, parseExpression } from './expression';
+import type { ExpressionError } from './expression';
 import { previewExpression } from './preview';
 import { errorMessage, functionSuggestions, nameSuggestions, type ValueOption } from './tags';
 
@@ -18,12 +19,11 @@ interface Suggestion {
 }
 
 /** Names that aren't values the popup knows (after the parser's own errors). */
-function unknownNames(tokens: TokenPart[], options: ValueOption[]): string[] {
+function unknownNames(names: string[], options: ValueOption[]): string[] {
     const known = new Set(options.map((o) => o.name));
-    return tokens
-        .filter((t) => !t.error)
-        .map((t) => t.name)
-        .filter((name) => !known.has(name) && !(name.startsWith('post.') && known.has(name.slice(5))));
+    return [...new Set(names)].filter(
+        (name) => !known.has(name) && !(name.startsWith('post.') && known.has(name.slice(5))),
+    );
 }
 
 export function ExpressionEditor({
@@ -43,11 +43,10 @@ export function ExpressionEditor({
     // Suggestions open once the user types, not for a prefilled expression.
     const [dismissed, setDismissed] = useState(value !== '');
     // The preview and the expression it belongs to (a stale one isn't shown).
-    const [preview, setPreview] = useState<{ for: string; value: string } | null>(null);
+    const [preview, setPreview] = useState<{ for: string; value: string; errors: ExpressionError[] } | null>(null);
 
     const parsed = useMemo(() => parseExpression(value), [value]);
-    const tokens = parsed.parts.filter((p): p is TokenPart => 'name' in p);
-    const unknown = unknownNames(tokens, options);
+    const unknown = unknownNames(namesIn(parsed), options);
 
     const suggestions: Suggestion[] = useMemo(() => {
         const completion = completionAt(value.slice(0, caret));
@@ -76,7 +75,7 @@ export function ExpressionEditor({
         let current = true;
         const timer = setTimeout(() => {
             void previewExpression(value).then((result) => {
-                if (current) setPreview({ for: value, value: result.value });
+                if (current) setPreview({ for: value, value: result.value, errors: result.errors });
             });
         }, 350);
         return () => {
@@ -118,10 +117,10 @@ export function ExpressionEditor({
 
     const track = () => setCaret(ref.current?.selectionStart ?? value.length);
 
-    /** Type text at the caret (the helper chips). */
-    const typeAtCaret = (text: string) => {
+    /** Type text at the caret (the helper chips); `back` leaves the caret that many characters before its end. */
+    const typeAtCaret = (text: string, back = 0) => {
         const next = value.slice(0, caret) + text + value.slice(caret);
-        const at = caret + text.length;
+        const at = caret + text.length - back;
         onChange(next);
         setDismissed(false);
         setActive(0);
@@ -133,8 +132,12 @@ export function ExpressionEditor({
     };
 
     const showPreview = value.trim() !== '' && preview !== null && preview.for === value;
+    // The server also reports what only evaluation finds (division by zero, text in arithmetic).
+    const serverOnly = showPreview
+        ? preview.errors.filter((e) => !parsed.errors.some((p) => p.code === e.code && p.at === e.at))
+        : [];
     const problems = [
-        ...parsed.errors.map((error) => ({
+        ...[...parsed.errors, ...serverOnly].map((error) => ({
             key: `${error.code}-${error.at}`,
             text: errorMessage(error.code),
             name: '',
@@ -192,6 +195,22 @@ export function ExpressionEditor({
             <div className="taw-expression-helpers" aria-label={__('Add to the expression', 'taw-core')}>
                 <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => typeAtCaret('@')}>
                     {__('@ value', 'taw-core')}
+                </button>
+                <button
+                    type="button"
+                    title={__('A formula, e.g. @(@price * 1.16)', 'taw-core')}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => typeAtCaret('@()', 1)}
+                >
+                    {__('@( formula )', 'taw-core')}
+                </button>
+                <button
+                    type="button"
+                    title={__("Choose text: @if(@stock > 0, 'In stock', 'Sold out')", 'taw-core')}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => typeAtCaret("@if(, '', '')", 9)}
+                >
+                    {__('@if( … )', 'taw-core')}
                 </button>
                 {functionSuggestions('').map((f) => (
                     <button
