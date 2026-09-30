@@ -93,6 +93,17 @@ final class EditingAdminScreen
         ];
     }
 
+    /** A layer's heading: its translated name, or the key for one this screen doesn't know. */
+    public static function layerLabel(string $layer): string
+    {
+        return match ($layer) {
+            'site'     => __('Site structure', 'taw-core'),
+            'design'   => __('Design', 'taw-core'),
+            'features' => __('Editor features', 'taw-core'),
+            default    => ucfirst($layer),
+        };
+    }
+
     /**
      * @param array<string, array<string, mixed>> $content
      * @return list<string>
@@ -209,7 +220,7 @@ final class EditingAdminScreen
             </table>
 
             <?php foreach ($report['layers'] as $layer => $settings) : ?>
-                <h2><?php echo esc_html(ucfirst($layer)); ?></h2>
+                <h2><?php echo esc_html(self::layerLabel($layer)); ?></h2>
                 <table class="widefat striped" style="max-width:48rem">
                     <tbody>
                         <?php foreach ($settings as $setting => $allowed) : ?>
