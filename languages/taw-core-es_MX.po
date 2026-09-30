@@ -13,7 +13,7 @@ msgstr ""
 #: src/Core/Editing/EditingAdminScreen.php
 #, php-format
 msgid "\"%1$s\" in the %2$s allow list matches no registered block."
-msgstr ""
+msgstr "“%1$s” en la lista de permitidos de %2$s no coincide con ningún bloque registrado."
 
 #. translators: 1: block name or glob, 2: post type.
 #: src/Core/Editing/EditingAdminScreen.php
@@ -25,13 +25,13 @@ msgstr "\"%1$s\" en la lista allowBound de %2$s no coincide con ningún bloque r
 #: src/Core/Editing/EditingAdminScreen.php
 #, php-format
 msgid "\"%s\" in themeBlocks matches no registered block."
-msgstr ""
+msgstr "“%s” en themeBlocks no coincide con ningún bloque registrado."
 
 #. translators: %d: post ID.
 #: resources/data-panel/src/controls/PostSelect.tsx
 #, php-format
 msgid "#%d (not published)"
-msgstr ""
+msgstr "#%d (no publicado)"
 
 #. translators: 1: items shown, 2: all items
 #: resources/data-panel/src/bindings/loop/parts.tsx
@@ -46,49 +46,49 @@ msgstr[1] "Se muestran %1$d de %2$d elementos. Estás editando el primero; los d
 #: resources/data-panel/src/controls/MediaControls.tsx resources/data-panel/src/controls/Repeater.tsx
 #, php-format
 msgid "%1$d of %2$d"
-msgstr ""
+msgstr "%1$d de %2$d"
 
 #. translators: 1: field label, 2: field type.
 #: resources/data-panel/src/FieldControl.tsx
 #, php-format
 msgid "%1$s (%2$s) can’t be edited in the panel yet."
-msgstr ""
+msgstr "%1$s (%2$s) aún no se puede editar en el panel."
 
 #. translators: 1: field label, 2: minimum length
 #: src/Core/Form/Form.php
 #, php-format
 msgid "%1$s must be at least %2$d characters."
-msgstr ""
+msgstr "%1$s debe tener al menos %2$d caracteres."
 
 #. translators: 1: field label, 2: minimum value
 #: src/Core/Form/Form.php
 #, php-format
 msgid "%1$s must be at least %2$s."
-msgstr ""
+msgstr "%1$s debe ser al menos %2$s."
 
 #. translators: 1: field label, 2: maximum length
 #: src/Core/Form/Form.php
 #, php-format
 msgid "%1$s must be no more than %2$d characters."
-msgstr ""
+msgstr "%1$s no debe tener más de %2$d caracteres."
 
 #. translators: 1: field label, 2: maximum value
 #: src/Core/Form/Form.php
 #, php-format
 msgid "%1$s must be no more than %2$s."
-msgstr ""
+msgstr "%1$s no debe ser mayor que %2$s."
 
 #: src/Core/Editing/EditingAdminScreen.php
 #, php-format
 msgid "%d block"
 msgid_plural "%d blocks"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%d bloque"
+msgstr[1] "%d bloques"
 
 #: src/Core/Content/ContentAdminScreen.php
 #, php-format
 msgid "%d of %d records would change. Nothing has been written."
-msgstr ""
+msgstr "Cambiarían %d de %d registros. Todavía no se ha escrito nada."
 
 #. translators: %s: a field label. The numeric entry binds core/image's attachment ID.
 #: src/Core/Bindings/EditorFields.php
@@ -106,12 +106,12 @@ msgstr "hace %s"
 #: src/Core/Form/Form.php
 #, php-format
 msgid "%s could not be uploaded. Please try a different file."
-msgstr ""
+msgstr "No se pudo subir %s. Intenta con otro archivo."
 
 #: src/Core/Form/Form.php
 #, php-format
 msgid "%s could not be validated."
-msgstr ""
+msgstr "No se pudo validar %s."
 
 #. translators: %s: field label
 #: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
@@ -122,7 +122,7 @@ msgstr "%s no es válido."
 #: src/Core/Form/Form.php
 #, php-format
 msgid "%s is not in the correct format."
-msgstr ""
+msgstr "%s no tiene el formato correcto."
 
 #. translators: %s: field label
 #. translators: %s: field label.
@@ -134,23 +134,23 @@ msgstr "%s es requerido."
 #: src/Core/OptionsPage/OptionsPage.php
 #, php-format
 msgid "%s must be a valid URL."
-msgstr ""
+msgstr "%s debe ser una URL válida."
 
 #. translators: %s: field label
 #: src/Core/Form/Form.php
 #, php-format
 msgid "%s must be an image file."
-msgstr ""
+msgstr "%s debe ser un archivo de imagen."
 
 #: src/Core/OptionsPage/OptionsPage.php
 #, php-format
 msgid "%s must be at least %s."
-msgstr ""
+msgstr "%s debe ser al menos %s."
 
 #: src/Core/OptionsPage/OptionsPage.php
 #, php-format
 msgid "%s must be at most %s."
-msgstr ""
+msgstr "%s debe ser como máximo %s."
 
 #. translators: %s: a number of years
 #: src/Core/Bindings/Expression/Library.php
@@ -162,7 +162,7 @@ msgstr[1] "hace %s años"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "(added to every allow list)"
-msgstr ""
+msgstr "(se agrega a todas las listas de permitidos)"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "(empty for this post)"
@@ -170,7 +170,7 @@ msgstr "(vacío en esta entrada)"
 
 #: src/Core/Metabox/Metabox.php
 msgid "(new tab)"
-msgstr ""
+msgstr "(nueva pestaña)"
 
 #: src/Core/Metabox/Metabox.php
 msgid "(no title)"
@@ -180,11 +180,11 @@ msgstr "(sin título)"
 #: resources/data-panel/src/controls/PostSelect.tsx
 #, php-format
 msgid "(no title) #%d"
-msgstr ""
+msgstr "(sin título) #%d"
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid ".sqlite file"
-msgstr ""
+msgstr "Archivo .sqlite"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "0 = all (up to 200)"
@@ -228,7 +228,7 @@ msgstr "Una fórmula, p. ej. @(@price * 1.16)"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "A full rollback snapshot is written to wp-content/uploads/taw-private/ before anything changes."
-msgstr ""
+msgstr "Antes de cambiar nada se guarda una instantánea completa para revertir en wp-content/uploads/taw-private/."
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "A grid"
@@ -244,7 +244,7 @@ msgstr "Una lista"
 
 #: src/Core/Form/Form.php
 msgid "A network error occurred. Please try again."
-msgstr ""
+msgstr "Ocurrió un error de red. Inténtalo de nuevo."
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "A number"
@@ -260,19 +260,19 @@ msgstr "Un precio con el símbolo de su moneda."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "A snapshot or change-set JSON file. The next screen shows exactly what would change — nothing is written yet."
-msgstr ""
+msgstr "Un archivo JSON de instantánea o de conjunto de cambios. La siguiente pantalla muestra exactamente qué cambiaría; todavía no se escribe nada."
 
 #: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Add Files"
-msgstr ""
+msgstr "Agregar archivos"
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Add Knowledge Base"
-msgstr ""
+msgstr "Agregar base de conocimiento"
 
 #: src/Core/Seo/Schema.php
 msgid "Add Profile"
-msgstr ""
+msgstr "Agregar perfil"
 
 #: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Add Row"
@@ -280,7 +280,7 @@ msgstr "Agregar Renglón"
 
 #: src/Core/Metabox/Metabox.php
 msgid "Add Segment"
-msgstr ""
+msgstr "Agregar segmento"
 
 #: resources/data-panel/src/bindings/visibility.tsx
 msgid "Add a condition"
@@ -296,7 +296,7 @@ msgstr "Agrega bloques para cada elemento…"
 
 #: resources/data-panel/src/controls/MediaControls.tsx
 msgid "Add files"
-msgstr ""
+msgstr "Agregar archivos"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Add group"
@@ -304,7 +304,7 @@ msgstr "Agregar grupo"
 
 #: resources/data-panel/src/controls/Repeater.tsx
 msgid "Add item"
-msgstr ""
+msgstr "Agregar elemento"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Add page links"
@@ -316,11 +316,11 @@ msgstr "Agregar regla"
 
 #: resources/data-panel/src/controls/CompositeControls.tsx
 msgid "Add segment"
-msgstr ""
+msgstr "Agregar segmento"
 
 #: src/Core/Metabox/Metabox.php
 msgid "Add selected"
-msgstr ""
+msgstr "Agregar seleccionados"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Add to the expression"
@@ -328,7 +328,7 @@ msgstr "Añadir a la expresión"
 
 #: src/Core/Seo/SeoMeta.php
 msgid "Adds noindex — the page stays live but search engines are asked not to list it."
-msgstr ""
+msgstr "Agrega noindex: la página sigue publicada, pero se pide a los buscadores que no la muestren."
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Adds the numbers up."
@@ -336,15 +336,15 @@ msgstr "Suma los números."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Advanced"
-msgstr ""
+msgstr "Avanzado"
 
 #: src/Core/Media/MediaFolders.php
 msgid "All Files"
-msgstr ""
+msgstr "Todos los archivos"
 
 #: src/Core/Media/MediaFolders.php
 msgid "All folders"
-msgstr ""
+msgstr "Todas las carpetas"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "All terms"
@@ -352,11 +352,11 @@ msgstr "Todos los términos"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Allowed blocks"
-msgstr ""
+msgstr "Bloques permitidos"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Also apply environment-settings options (permalinks, timezone, sticky posts, …)"
-msgstr ""
+msgstr "Aplicar también los ajustes del entorno (enlaces permanentes, zona horaria, entradas fijas, …)"
 
 #: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/targets.ts
 msgid "Alt text"
@@ -364,11 +364,11 @@ msgstr "Texto alternativo"
 
 #: src/Core/Seo/Schema.php
 msgid "Always off — defer entirely to another SEO plugin"
-msgstr ""
+msgstr "Siempre desactivado: dejarlo todo a otro plugin de SEO"
 
 #: src/Core/Seo/Schema.php
 msgid "Always on — ignore detection, always use TAW's own SEO output"
-msgstr ""
+msgstr "Siempre activado: ignorar la detección y usar siempre el SEO de TAW"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "An empty item to design yourself."
@@ -376,16 +376,16 @@ msgstr "Un elemento vacío para diseñarlo tú."
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Any .sqlite file uploaded here becomes searchable by the chatbot — every table and text column is chunked, embedded, and semantically searched. No particular schema is required."
-msgstr ""
+msgstr "Cualquier archivo .sqlite que subas aquí se vuelve consultable por el chatbot: cada tabla y columna de texto se divide en fragmentos, se vectoriza y se busca por significado. No se requiere ningún esquema en particular."
 
 #: resources/data-panel/src/rich/MiniEditor.tsx
 msgid "Apply"
-msgstr ""
+msgstr "Aplicar"
 
 #: src/Core/Content/ContentAdminScreen.php
 #, php-format
 msgid "Apply %d changes"
-msgstr ""
+msgstr "Aplicar %d cambios"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Arithmetic needs numbers; this value is text."
@@ -409,11 +409,11 @@ msgstr "Autor"
 
 #: src/Core/Seo/Schema.php
 msgid "Automatic detection can be unreliable for plugins with no stable version constant (e.g. some SmartCrawl installs) — this overrides it explicitly. Controls SeoMeta's <title>/meta/OG tags and this page's JSON-LD together."
-msgstr ""
+msgstr "La detección automática puede fallar con plugins que no tienen una constante de versión estable (p. ej. algunas instalaciones de SmartCrawl); esto la reemplaza de forma explícita. Controla a la vez las etiquetas <title>/meta/OG de SeoMeta y el JSON-LD de esta página."
 
 #: src/Core/Seo/Schema.php
 msgid "Automatic — detect Yoast/RankMath/SmartCrawl and stand down if one is active"
-msgstr ""
+msgstr "Automático: detectar Yoast/RankMath/SmartCrawl y hacerse a un lado si alguno está activo"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Form/Form.php
 msgid "Back"
@@ -433,11 +433,11 @@ msgstr "Texto del botón"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Bypass"
-msgstr ""
+msgstr "Exención"
 
 #: resources/data-panel/src/rich/MiniEditor.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Cancel"
-msgstr ""
+msgstr "Cancelar"
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Caption"
@@ -453,7 +453,7 @@ msgstr "Categorías, etiquetas o cualquier taxonomía: las de la entrada o todas
 
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Change"
-msgstr ""
+msgstr "Cambiar"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Checking this post…"
@@ -461,7 +461,7 @@ msgstr "Revisando esta entrada…"
 
 #: src/Core/Metabox/Metabox.php
 msgid "Choose Icon"
-msgstr ""
+msgstr "Elegir ícono"
 
 #: resources/data-panel/src/bindings/logic.ts
 msgid "Choose a TAW field"
@@ -469,11 +469,11 @@ msgstr "Elige un campo TAW"
 
 #: resources/data-panel/src/controls/PickerControls.tsx
 msgid "Choose a color"
-msgstr ""
+msgstr "Elige un color"
 
 #: resources/data-panel/src/controls/PickerControls.tsx
 msgid "Choose a date"
-msgstr ""
+msgstr "Elige una fecha"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Choose a field…"
@@ -481,7 +481,7 @@ msgstr "Elige un campo…"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Choose a folder…"
-msgstr ""
+msgstr "Elige una carpeta…"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Choose a post type…"
@@ -493,11 +493,11 @@ msgstr "Elige una taxonomía…"
 
 #: resources/data-panel/src/controls/IconControl.tsx
 msgid "Choose an icon"
-msgstr ""
+msgstr "Elige un ícono"
 
 #: resources/data-panel/src/controls/MediaControls.tsx
 msgid "Choose an image"
-msgstr ""
+msgstr "Elige una imagen"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Choose text: @if(@stock > 0, 'In stock', 'Sold out')"
@@ -509,11 +509,11 @@ msgstr "Elige: el primero si la prueba se cumple; si no, el segundo."
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Chunks"
-msgstr ""
+msgstr "Fragmentos"
 
 #: resources/data-panel/src/controls/PickerControls.tsx src/Core/Media/MediaFolders.php
 msgid "Clear"
-msgstr ""
+msgstr "Borrar"
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Click into the text where the value should go, then open this again."
@@ -521,7 +521,7 @@ msgstr "Haz clic en el texto donde debe ir el valor y vuelve a abrir esto."
 
 #: resources/data-panel/src/bindings/popup.tsx src/Core/Form/Form.php
 msgid "Close"
-msgstr ""
+msgstr "Cerrar"
 
 #: src/Core/Media/MediaFolders.php src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Collapse"
@@ -529,7 +529,7 @@ msgstr "Contraer"
 
 #: resources/data-panel/src/controls/Repeater.tsx
 msgid "Collapse all"
-msgstr ""
+msgstr "Contraer todo"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Columns"
@@ -579,7 +579,7 @@ msgstr "Conectar a campo TAW…"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Content, per post type"
-msgstr ""
+msgstr "Contenido, por tipo de contenido"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Current year"
@@ -607,11 +607,11 @@ msgstr "Fechas"
 
 #: src/Core/Media/MediaFolders.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Delete"
-msgstr ""
+msgstr "Eliminar"
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Delete this knowledge base?"
-msgstr ""
+msgstr "¿Eliminar esta base de conocimiento?"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Descending (Z → A, 9 → 1)"
@@ -620,6 +620,10 @@ msgstr "Descendente (Z → A, 9 → 1)"
 #: resources/data-panel/src/bindings/loop/data.ts src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Description"
 msgstr "Descripción"
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Design"
+msgstr "Diseño"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Did you mean"
@@ -631,7 +635,7 @@ msgstr "Dirección"
 
 #: resources/data-panel/src/rich/MiniEditor.tsx
 msgid "Discard your changes to this field?"
-msgstr ""
+msgstr "¿Descartar tus cambios en este campo?"
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Disconnect"
@@ -643,11 +647,11 @@ msgstr "Desconectar campo TAW"
 
 #: src/Support/Performance.php
 msgid "Dismiss"
-msgstr ""
+msgstr "Descartar"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Display folder IDs"
-msgstr ""
+msgstr "Mostrar los ID de carpeta"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Division by zero."
@@ -655,7 +659,7 @@ msgstr "División entre cero."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Download snapshot"
-msgstr ""
+msgstr "Descargar instantánea"
 
 #: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Drag to reorder"
@@ -663,23 +667,27 @@ msgstr "Arrastre para reordenar"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Drop to upload here"
-msgstr ""
+msgstr "Suelta aquí para subir"
 
 #: resources/data-panel/src/controls/RichContent.tsx
 msgid "Edit"
-msgstr ""
+msgstr "Editar"
 
 #: src/Core/Editor/VisualEditor.php
 msgid "Edit Visually"
-msgstr ""
+msgstr "Editar visualmente"
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Editor features"
+msgstr "Funciones del editor"
 
 #: src/Core/Metabox/Metabox.php
 msgid "Empty"
-msgstr ""
+msgstr "Vacío"
 
 #: src/Core/Auth/PagePassword.php
 msgid "Enter"
-msgstr ""
+msgstr "Entrar"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Excerpt"
@@ -687,19 +695,19 @@ msgstr "Extracto"
 
 #: src/Core/Editor/VisualEditor.php
 msgid "Exit Editor"
-msgstr ""
+msgstr "Salir del editor"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Expand"
-msgstr ""
+msgstr "Expandir"
 
 #: resources/data-panel/src/controls/Repeater.tsx src/Core/Media/MediaFolders.php
 msgid "Expand all"
-msgstr ""
+msgstr "Expandir todo"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Export"
-msgstr ""
+msgstr "Exportar"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx resources/data-panel/src/bindings/popup.tsx
 msgid "Expression"
@@ -707,15 +715,15 @@ msgstr "Expresión"
 
 #: src/Core/Seo/SeoMeta.php
 msgid "Falls back to the post title when empty. Also used as the <title> tag itself, not just social previews."
-msgstr ""
+msgstr "Si está vacío, se usa el título de la entrada. También se usa como la etiqueta <title>, no solo en las vistas previas de redes sociales."
 
 #: src/Core/Seo/Schema.php
 msgid "Falls back to the site title when empty."
-msgstr ""
+msgstr "Si está vacío, se usa el título del sitio."
 
 #: src/Core/Seo/Schema.php
 msgid "Feeds the \"sameAs\" entity signal — link every profile that represents this same organization/brand (LinkedIn, Instagram, etc.)."
-msgstr ""
+msgstr "Alimenta la señal de entidad “sameAs”: enlaza cada perfil que represente a esta misma organización o marca (LinkedIn, Instagram, etc.)."
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Field"
@@ -747,7 +755,7 @@ msgstr "Texto de campo"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Field-level changes"
-msgstr ""
+msgstr "Cambios por campo"
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Fields"
@@ -757,13 +765,13 @@ msgstr "Campos"
 #: resources/data-panel/src/controls/MediaControls.tsx
 #, php-format
 msgid "File #%d (missing)"
-msgstr ""
+msgstr "Archivo #%d (no encontrado)"
 
 #. translators: %s: field labels.
 #: resources/data-panel/src/SaveLock.tsx
 #, php-format
 msgid "Fill in the required data before saving: %s."
-msgstr ""
+msgstr "Completa los datos requeridos antes de guardar: %s."
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Filter"
@@ -771,15 +779,15 @@ msgstr "Filtro"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Folder"
-msgstr ""
+msgstr "Carpeta"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Folders"
-msgstr ""
+msgstr "Carpetas"
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Form ID"
-msgstr ""
+msgstr "ID del formulario"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "From"
@@ -803,11 +811,11 @@ msgstr "Oculto en esta entrada"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Hide folder IDs"
-msgstr ""
+msgstr "Ocultar los ID de carpeta"
 
 #: src/Core/Seo/SeoMeta.php
 msgid "Hide from search engines"
-msgstr ""
+msgstr "Ocultar de los buscadores"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Hide terms without posts"
@@ -815,11 +823,11 @@ msgstr "Ocultar términos sin entradas"
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Highlighted"
-msgstr ""
+msgstr "Resaltado"
 
 #: src/Core/Seo/Schema.php
 msgid "Home"
-msgstr ""
+msgstr "Inicio"
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "How long ago: “3 days ago”, or “in 2 weeks”."
@@ -839,15 +847,15 @@ msgstr "ID"
 
 #: resources/data-panel/src/controls/IconControl.tsx
 msgid "Icons"
-msgstr ""
+msgstr "Íconos"
 
 #: resources/data-panel/src/controls/IconControl.tsx
 msgid "Icons aren’t switched on for this site (Lucide::enable())."
-msgstr ""
+msgstr "Los íconos no están activados en este sitio (Lucide::enable())."
 
 #: resources/data-panel/src/controls/IconControl.tsx
 msgid "Icons couldn’t be loaded."
-msgstr ""
+msgstr "No se pudieron cargar los íconos."
 
 #: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/targets.ts
 msgid "Image"
@@ -857,7 +865,7 @@ msgstr "Imagen"
 #: resources/data-panel/src/controls/MediaControls.tsx
 #, php-format
 msgid "Image #%d is no longer in the media library"
-msgstr ""
+msgstr "La imagen #%d ya no está en la biblioteca de medios"
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Images"
@@ -865,11 +873,11 @@ msgstr "Imágenes"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Import"
-msgstr ""
+msgstr "Importar"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Import applied."
-msgstr ""
+msgstr "Importación aplicada."
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Include"
@@ -877,35 +885,35 @@ msgstr "Incluir"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Include comments on exported posts"
-msgstr ""
+msgstr "Incluir los comentarios de las entradas exportadas"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Include draft / pending posts"
-msgstr ""
+msgstr "Incluir entradas en borrador o pendientes"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Include environment settings (permalinks, timezone, sticky posts, …)"
-msgstr ""
+msgstr "Incluir los ajustes del entorno (enlaces permanentes, zona horaria, entradas fijas, …)"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Include portable password hashes"
-msgstr ""
+msgstr "Incluir hashes de contraseña portables"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Include referenced media (URLs + metadata)"
-msgstr ""
+msgstr "Incluir los medios referenciados (URL y metadatos)"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Include unreferenced media (orphans, widget images)"
-msgstr ""
+msgstr "Incluir los medios no referenciados (huérfanos, imágenes de widgets)"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Include users (login, email, roles, profile — no passwords)"
-msgstr ""
+msgstr "Incluir usuarios (usuario, correo, roles, perfil; sin contraseñas)"
 
 #: src/Core/Auth/PagePassword.php
 msgid "Incorrect password. Please try again."
-msgstr ""
+msgstr "Contraseña incorrecta. Inténtalo de nuevo."
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Inline"
@@ -921,12 +929,12 @@ msgstr "Insertar en el texto"
 
 #: src/Core/Form/Form.php
 msgid "Invalid email address."
-msgstr ""
+msgstr "Correo electrónico no válido."
 
 #: src/Core/OptionsPage/OptionsPage.php
 #, php-format
 msgid "Invalid parameter(s): %s"
-msgstr ""
+msgstr "Parámetro(s) no válido(s): %s"
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Is even"
@@ -948,7 +956,7 @@ msgstr "Es impar"
 #: resources/data-panel/src/controls/Repeater.tsx
 #, php-format
 msgid "Item %d"
-msgstr ""
+msgstr "Elemento %d"
 
 #: resources/data-panel/src/bindings/loop/data.ts
 #, php-format
@@ -985,11 +993,11 @@ msgstr "Une textos."
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Knowledge Bases"
-msgstr ""
+msgstr "Bases de conocimiento"
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Knowledge base deleted."
-msgstr ""
+msgstr "Base de conocimiento eliminada."
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Layout"
@@ -1009,7 +1017,7 @@ msgstr "Enlace"
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Link text"
-msgstr ""
+msgstr "Texto del enlace"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "List"
@@ -1021,7 +1029,7 @@ msgstr "Listas"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Load more"
-msgstr ""
+msgstr "Cargar más"
 
 #: resources/data-panel/src/bindings/loop/parts.tsx
 msgid "Loading items…"
@@ -1033,11 +1041,11 @@ msgstr "Cargando…"
 
 #: src/Core/Seo/Schema.php
 msgid "Local Business"
-msgstr ""
+msgstr "Negocio local"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Lock"
-msgstr ""
+msgstr "Bloqueo"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Logged in"
@@ -1066,11 +1074,11 @@ msgstr "Recorrer: %s"
 
 #: src/Core/Metabox/Metabox.php
 msgid "Lucide icons aren't enabled for this site — call TAW\\Core\\Icons\\Lucide::enable() in customizations.php before Theme::boot()."
-msgstr ""
+msgstr "Los íconos de Lucide no están activados en este sitio: llama a TAW\\Core\\Icons\\Lucide::enable() en customizations.php antes de Theme::boot()."
 
 #: src/Core/Metabox/Metabox.php
 msgid "Managed externally — read-only"
-msgstr ""
+msgstr "Administrado externamente: solo lectura"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Marks the items up as an ordered list (<ol>)."
@@ -1082,7 +1090,7 @@ msgstr "Coincidencia"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Media sideloaded"
-msgstr ""
+msgstr "Medios descargados"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Menu order"
@@ -1090,11 +1098,11 @@ msgstr "Orden del menú"
 
 #: src/Core/Seo/SeoMeta.php
 msgid "Meta Description"
-msgstr ""
+msgstr "Meta descripción"
 
 #: src/Core/Seo/SeoMeta.php
 msgid "Meta Title"
-msgstr ""
+msgstr "Meta título"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Modified date"
@@ -1102,11 +1110,11 @@ msgstr "Fecha de modificación"
 
 #: src/Core/Media/MediaFolders.php
 msgid "More"
-msgstr ""
+msgstr "Más"
 
 #: src/Core/Form/Form.php
 msgid "More information"
-msgstr ""
+msgstr "Más información"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Most comments"
@@ -1116,33 +1124,33 @@ msgstr "Más comentarios"
 #: resources/data-panel/src/controls/Repeater.tsx
 #, php-format
 msgid "Move %s down"
-msgstr ""
+msgstr "Bajar %s"
 
 #. translators: %s: item title.
 #: resources/data-panel/src/controls/Repeater.tsx
 #, php-format
 msgid "Move %s up"
-msgstr ""
+msgstr "Subir %s"
 
 #: resources/data-panel/src/controls/MediaControls.tsx resources/data-panel/src/controls/PostSelect.tsx
 msgid "Move down"
-msgstr ""
+msgstr "Bajar"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Move to folder…"
-msgstr ""
+msgstr "Mover a carpeta…"
 
 #: resources/data-panel/src/controls/MediaControls.tsx resources/data-panel/src/controls/PostSelect.tsx
 msgid "Move up"
-msgstr ""
+msgstr "Subir"
 
 #. translators: %d: number of files moved
 #: src/Core/Media/MediaFolders.php
 #, php-format
 msgid "Moved %d file to the selected folder."
 msgid_plural "Moved %d files to the selected folder."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Se movió %d archivo a la carpeta seleccionada."
+msgstr[1] "Se movieron %d archivos a la carpeta seleccionada."
 
 #: resources/data-panel/src/bindings/loop/data.ts src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Name"
@@ -1150,19 +1158,19 @@ msgstr "Nombre"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Name (A–Z)"
-msgstr ""
+msgstr "Nombre (A–Z)"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Name (Z–A)"
-msgstr ""
+msgstr "Nombre (Z–A)"
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Name and description are required."
-msgstr ""
+msgstr "El nombre y la descripción son obligatorios."
 
 #: src/Core/Media/MediaFolders.php
 msgid "New Folder"
-msgstr ""
+msgstr "Nueva carpeta"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Media/MediaFolders.php
 msgid "Newest first"
@@ -1174,7 +1182,7 @@ msgstr "Siguiente"
 
 #: src/Core/Metabox/Metabox.php
 msgid "No"
-msgstr ""
+msgstr "No"
 
 #: resources/data-panel/src/bindings/menu.tsx
 msgid "No TAW field fits this block."
@@ -1182,23 +1190,23 @@ msgstr "Ningún campo TAW encaja con este bloque."
 
 #: resources/data-panel/src/controls/RichContent.tsx
 msgid "No content yet"
-msgstr ""
+msgstr "Aún no hay contenido"
 
 #: resources/data-panel/src/DataPanel.tsx
 msgid "No data fields apply to this template."
-msgstr ""
+msgstr "Ningún campo de datos aplica a esta plantilla."
 
 #: src/Core/Content/ContentAdminScreen.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "No file was uploaded."
-msgstr ""
+msgstr "No se subió ningún archivo."
 
 #: src/Core/Metabox/Metabox.php
 msgid "No files"
-msgstr ""
+msgstr "Sin archivos"
 
 #: src/Core/Media/MediaFolders.php
 msgid "No files in this folder."
-msgstr ""
+msgstr "No hay archivos en esta carpeta."
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "No files or image fields here. Add one to a fieldset first."
@@ -1210,15 +1218,15 @@ msgstr "Ninguna función coincide con tu búsqueda."
 
 #: src/Core/Metabox/Metabox.php
 msgid "No icon selected"
-msgstr ""
+msgstr "Ningún ícono seleccionado"
 
 #: resources/data-panel/src/controls/IconControl.tsx
 msgid "No icons found."
-msgstr ""
+msgstr "No se encontraron íconos."
 
 #: src/Core/Metabox/Metabox.php
 msgid "No image"
-msgstr ""
+msgstr "Sin imagen"
 
 #: resources/data-panel/src/bindings/loop/parts.tsx
 msgid "No items for this post: the “No items” blocks show instead. The design above is what each item will use."
@@ -1242,7 +1250,7 @@ msgstr "No hay campos repetidores aquí. Agrega uno a un grupo de campos primero
 
 #: resources/data-panel/src/controls/CompositeControls.tsx
 msgid "No segments yet."
-msgstr ""
+msgstr "Aún no hay segmentos."
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "No source"
@@ -1254,7 +1262,7 @@ msgstr "Ningún valor coincide con tu búsqueda."
 
 #: src/Core/Metabox/Metabox.php
 msgid "None selected"
-msgstr ""
+msgstr "Nada seleccionado"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Not a value this post has:"
@@ -1266,7 +1274,7 @@ msgstr "Nada"
 
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Nothing found."
-msgstr ""
+msgstr "No se encontró nada."
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Now"
@@ -1318,19 +1326,19 @@ msgstr "Solo entradas fijas"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Op"
-msgstr ""
+msgstr "Op."
 
 #: resources/data-panel/src/SaveLock.tsx
 msgid "Open TAW Data"
-msgstr ""
+msgstr "Abrir TAW Data"
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Open in a new tab"
-msgstr ""
+msgstr "Abrir en una pestaña nueva"
 
 #: src/Core/Editor/VisualEditor.php
 msgid "Open the visual content editor"
-msgstr ""
+msgstr "Abrir el editor visual de contenido"
 
 #: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "Options"
@@ -1346,15 +1354,15 @@ msgstr "Ordenar por esta expresión"
 
 #: src/Core/Seo/Schema.php
 msgid "Organization"
-msgstr ""
+msgstr "Organización"
 
 #: src/Core/Seo/Schema.php
 msgid "Organization Name"
-msgstr ""
+msgstr "Nombre de la organización"
 
 #: src/Core/Seo/Schema.php
 msgid "Organization Type"
-msgstr ""
+msgstr "Tipo de organización"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Otherwise show"
@@ -1370,11 +1378,11 @@ msgstr "Paginación"
 
 #: src/Core/Auth/PagePassword.php
 msgid "Password"
-msgstr ""
+msgstr "Contraseña"
 
 #: src/Core/Seo/Schema.php
 msgid "Phone"
-msgstr ""
+msgstr "Teléfono"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Pick a starting design. You can change every block afterwards."
@@ -1386,17 +1394,17 @@ msgstr "Elige un valor…"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Portable content interchange — export a reviewable snapshot of this site's posts, TAW fields, options, terms and referenced media, or import one into it."
-msgstr ""
+msgstr "Intercambio portátil de contenido: exporta una instantánea revisable de las entradas, campos TAW, opciones, términos y medios referenciados de este sitio, o importa una."
 
 #. translators: 1: HubSpot portal ID, 2: HubSpot form ID, 3: HubSpot region
 #: src/Core/Metabox/Metabox.php
 #, php-format
 msgid "Portal %1$s / Form %2$s (%3$s)"
-msgstr ""
+msgstr "Portal %1$s / Formulario %2$s (%3$s)"
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Portal ID"
-msgstr ""
+msgstr "ID del portal"
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Position (1, 2, 3…)"
@@ -1420,7 +1428,7 @@ msgstr "Tipo de contenido"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Post types not listed keep the normal editor."
-msgstr ""
+msgstr "Los tipos de contenido que no aparecen conservan el editor normal."
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Posts (query)"
@@ -1436,7 +1444,7 @@ msgstr "Presencia"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Preset"
-msgstr ""
+msgstr "Nivel predefinido"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Preview"
@@ -1448,11 +1456,11 @@ msgstr "Anterior"
 
 #: src/Core/Seo/Schema.php
 msgid "Profile URL"
-msgstr ""
+msgstr "URL del perfil"
 
 #: src/Core/Auth/PagePassword.php
 msgid "Protected Page"
-msgstr ""
+msgstr "Página protegida"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Published on @post.date.format('F j, Y') by @post.author"
@@ -1472,7 +1480,7 @@ msgstr "Actualizadas recientemente"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Record"
-msgstr ""
+msgstr "Registro"
 
 #: resources/data-panel/src/bindings/chips.tsx
 msgid "Refresh"
@@ -1480,11 +1488,11 @@ msgstr "Actualizar"
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Region"
-msgstr ""
+msgstr "Región"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Registry drift"
-msgstr ""
+msgstr "Diferencias con el registro"
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Related posts"
@@ -1501,7 +1509,7 @@ msgstr "Eliminar"
 #: resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx resources/data-panel/src/controls/PostSelect.tsx resources/data-panel/src/controls/Repeater.tsx
 #, php-format
 msgid "Remove %s"
-msgstr ""
+msgstr "Quitar %s"
 
 #: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Remove Image"
@@ -1531,11 +1539,11 @@ msgstr "Quitar regla"
 #: resources/data-panel/src/controls/CompositeControls.tsx
 #, php-format
 msgid "Remove segment %d"
-msgstr ""
+msgstr "Quitar el segmento %d"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Rename"
-msgstr ""
+msgstr "Renombrar"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Repeat a design for each item. What should it loop over?"
@@ -1547,11 +1555,11 @@ msgstr "Filas de repetidor"
 
 #: resources/data-panel/src/controls/MediaControls.tsx
 msgid "Replace"
-msgstr ""
+msgstr "Reemplazar"
 
 #: resources/data-panel/src/controls/MediaControls.tsx
 msgid "Replace image"
-msgstr ""
+msgstr "Reemplazar imagen"
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Replaces text."
@@ -1559,7 +1567,7 @@ msgstr "Reemplaza texto."
 
 #: src/Core/Editor/VisualEditor.php
 msgid "Return to normal view"
-msgstr ""
+msgstr "Volver a la vista normal"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Reversed"
@@ -1567,7 +1575,7 @@ msgstr "Invertido"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Review changes"
-msgstr ""
+msgstr "Revisar cambios"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Role"
@@ -1575,7 +1583,7 @@ msgstr "Rol"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Rollback snapshot"
-msgstr ""
+msgstr "Instantánea para revertir"
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Rounds a number."
@@ -1601,23 +1609,23 @@ msgstr "Regla"
 #: src/Core/Assets/Vite.php
 #, php-format
 msgid "Run %1$s in that folder (%2$s while developing)."
-msgstr ""
+msgstr "Ejecuta %1$s en esa carpeta (%2$s mientras desarrollas)."
 
 #: src/Core/Seo/SeoMeta.php
 msgid "SEO & Social"
-msgstr ""
+msgstr "SEO y redes sociales"
 
 #: src/Core/Seo/Schema.php
 msgid "SEO Output"
-msgstr ""
+msgstr "Salida de SEO"
 
 #: src/Core/Seo/Schema.php
 msgid "SEO Schema"
-msgstr ""
+msgstr "Esquema SEO"
 
 #: src/Helpers/Svg.php
 msgid "SVG Images"
-msgstr ""
+msgstr "Imágenes SVG"
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Safe inside a link."
@@ -1642,7 +1650,7 @@ msgstr "Búsqueda"
 
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Search failed."
-msgstr ""
+msgstr "La búsqueda falló."
 
 #: src/Core/Metabox/Metabox.php
 msgid "Search failed. Please try again."
@@ -1658,12 +1666,12 @@ msgstr "Buscar funciones"
 
 #: resources/data-panel/src/controls/IconControl.tsx
 msgid "Search icons"
-msgstr ""
+msgstr "Buscar íconos"
 
 #: src/Core/Seo/SeoMeta.php
 #, php-format
 msgid "Search results for \"%s\""
-msgstr ""
+msgstr "Resultados de búsqueda para “%s”"
 
 #: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Search to add posts…"
@@ -1671,7 +1679,7 @@ msgstr "Buscar para agregar publicaciones…"
 
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Search to add…"
-msgstr ""
+msgstr "Busca para agregar…"
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Search values"
@@ -1681,11 +1689,11 @@ msgstr "Buscar valores"
 #: resources/data-panel/src/controls/CompositeControls.tsx
 #, php-format
 msgid "Segment %d"
-msgstr ""
+msgstr "Segmento %d"
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Segment text"
-msgstr ""
+msgstr "Texto del segmento"
 
 #: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Select Image"
@@ -1693,11 +1701,11 @@ msgstr "Seleccionar imagen"
 
 #: src/Core/Form/Form.php
 msgid "Select an option…"
-msgstr ""
+msgstr "Selecciona una opción…"
 
 #: src/Core/Metabox/Metabox.php
 msgid "Select or Upload Files"
-msgstr ""
+msgstr "Seleccionar o subir archivos"
 
 #: src/Core/Metabox/Metabox.php
 msgid "Select or Upload Image"
@@ -1705,19 +1713,19 @@ msgstr "Seleccionar o Subir Imagen"
 
 #: src/Core/Form/Form.php
 msgid "Send Message"
-msgstr ""
+msgstr "Enviar mensaje"
 
 #: src/Core/Form/Form.php
 msgid "Sending..."
-msgstr ""
+msgstr "Enviando..."
 
 #: src/Core/Form/Form.php
 msgid "Sending…"
-msgstr ""
+msgstr "Enviando…"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Set by"
-msgstr ""
+msgstr "Definido por"
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Shortens to a number of characters, with “…”."
@@ -1758,7 +1766,7 @@ msgstr "Visible en esta entrada"
 
 #: src/Core/Seo/SeoMeta.php
 msgid "Shown in search results and link previews. ~155 characters is the practical limit before truncation."
-msgstr ""
+msgstr "Se muestra en los resultados de búsqueda y en las vistas previas de enlaces. Unos 155 caracteres es el límite práctico antes de que se corte."
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Shown only when…"
@@ -1782,11 +1790,15 @@ msgstr "Sitio"
 
 #: src/Core/Editing/SiteLayer.php
 msgid "Site Editor locked"
-msgstr ""
+msgstr "Editor del sitio bloqueado"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Site URL"
 msgstr "URL del sitio"
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Site structure"
+msgstr "Estructura del sitio"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Site title"
@@ -1802,25 +1814,25 @@ msgstr "Slug"
 
 #: src/Core/Seo/Schema.php
 msgid "Social Profile Links"
-msgstr ""
+msgstr "Enlaces a perfiles sociales"
 
 #: src/Core/Seo/SeoMeta.php
 msgid "Social Share Image"
-msgstr ""
+msgstr "Imagen para compartir en redes"
 
 #. translators: %s: folder name of the theme or package.
 #: src/Core/Assets/Vite.php
 #, php-format
 msgid "Some assets in “%s” aren’t built, so they aren’t loaded."
-msgstr ""
+msgstr "Algunos recursos de “%s” no están compilados, así que no se cargan."
 
 #: src/Core/Form/Form.php
 msgid "Something went wrong. Please try again."
-msgstr ""
+msgstr "Algo salió mal. Inténtalo de nuevo."
 
 #: src/Core/Media/MediaFolders.php
 msgid "Sort folders"
-msgstr ""
+msgstr "Ordenar carpetas"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Source"
@@ -1836,11 +1848,11 @@ msgstr "Empezar en blanco"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Starting template"
-msgstr ""
+msgstr "Plantilla inicial"
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Status"
-msgstr ""
+msgstr "Estado"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Sticky posts"
@@ -1848,7 +1860,7 @@ msgstr "Entradas fijas"
 
 #: src/Core/Form/Form.php
 msgid "Submit"
-msgstr ""
+msgstr "Enviar"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Suggestions"
@@ -1856,11 +1868,11 @@ msgstr "Sugerencias"
 
 #: resources/data-panel/src/DataPanel.tsx src/Core/Content/ContentAdminScreen.php
 msgid "TAW Data"
-msgstr ""
+msgstr "TAW Data"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "TAW Editing"
-msgstr ""
+msgstr "Edición TAW"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "TAW Loop"
@@ -1868,7 +1880,7 @@ msgstr "Bucle TAW"
 
 #: src/Core/Media/MediaFolders.php
 msgid "TAW Media"
-msgstr ""
+msgstr "Medios TAW"
 
 #: resources/data-panel/src/bindings/popup.tsx resources/data-panel/src/bindings/toolbar.tsx
 msgid "TAW data"
@@ -1890,7 +1902,7 @@ msgstr "Visibilidad TAW"
 #: src/Core/Editing/EditingAdminScreen.php
 #, php-format
 msgid "TAW_EDITING_BYPASS_USERS is empty, so only users granted the %s capability are exempt. Add your developer logins to it in wp-config.php."
-msgstr ""
+msgstr "TAW_EDITING_BYPASS_USERS está vacío, así que solo están exentos los usuarios con la capacidad %s. Agrega ahí los usuarios de tus desarrolladores en wp-config.php."
 
 #: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Tab"
@@ -1906,7 +1918,7 @@ msgstr "Taxonomía"
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Tells the chatbot when to use this knowledge base — be specific about what it contains."
-msgstr ""
+msgstr "Le indica al chatbot cuándo usar esta base de conocimiento; sé específico sobre lo que contiene."
 
 #: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "Term"
@@ -1926,15 +1938,15 @@ msgstr "Texto, u @otro_valor"
 
 #: src/Core/Form/Form.php
 msgid "Thank you! Your message has been sent."
-msgstr ""
+msgstr "¡Gracias! Tu mensaje se envió."
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "That file is not a valid SQLite database."
-msgstr ""
+msgstr "Ese archivo no es una base de datos SQLite válida."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "That file is not valid JSON."
-msgstr ""
+msgstr "Ese archivo no es un JSON válido."
 
 #. translators: %s: post type.
 #: src/Core/Editing/EditingAdminScreen.php
@@ -1948,7 +1960,7 @@ msgstr "El promedio de los números."
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "The built-in \"This site's content\" knowledge base cannot be deleted."
-msgstr ""
+msgstr "La base de conocimiento integrada “Contenido de este sitio” no se puede eliminar."
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "The day of the month."
@@ -1956,7 +1968,7 @@ msgstr "El día del mes."
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "The editing policy in effect for this site (read-only). Change it in the theme's taw-schema/editing.json, or pick a preset for this install with TAW_EDITING_PRESET in wp-config.php."
-msgstr ""
+msgstr "La política de edición vigente en este sitio (solo lectura). Cámbiala en taw-schema/editing.json del tema, o elige un nivel predefinido para esta instalación con TAW_EDITING_PRESET en wp-config.php."
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "The expression is too long (1,000 characters at most)."
@@ -1996,7 +2008,7 @@ msgstr "El número y la palabra que le corresponde: “3 premios”."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "The pending import expired — please upload the file again."
-msgstr ""
+msgstr "La importación pendiente expiró; vuelve a subir el archivo."
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "The posts picked in a post select field, e.g. books in this series."
@@ -2016,11 +2028,11 @@ msgstr "El resultado debe ser una imagen de la biblioteca de medios (un campo de
 
 #: src/Core/Editing/SiteLayer.php
 msgid "The site's editing policy doesn't allow changing this part of the site design."
-msgstr ""
+msgstr "La política de edición del sitio no permite cambiar esta parte del diseño del sitio."
 
 #: src/Core/Editing/SiteLayer.php
 msgid "The site's editing policy doesn't allow using the Site Editor."
-msgstr ""
+msgstr "La política de edición del sitio no permite usar el Editor del sitio."
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "The smallest number."
@@ -2036,7 +2048,7 @@ msgstr "El texto cuando el valor está vacío."
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "The upload failed — please try again."
-msgstr ""
+msgstr "La subida falló; inténtalo de nuevo."
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "The weekday’s name."
@@ -2048,7 +2060,7 @@ msgstr "El año. Un número de 4 dígitos se lee como año."
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Theme blocks"
-msgstr ""
+msgstr "Bloques del tema"
 
 #. translators: 1: comma-separated block names, 2: post type.
 #: src/Core/Editing/ContentLayer.php
@@ -2060,19 +2072,19 @@ msgstr "Estos bloques solo se pueden añadir aquí conectados a un campo TAW: %1
 #: src/Core/Editing/ContentLayer.php
 #, php-format
 msgid "These blocks can't be added here: %1$s. The editing policy for \"%2$s\" doesn't allow them."
-msgstr ""
+msgstr "Estos bloques no se pueden agregar aquí: %1$s. La política de edición de “%2$s” no los permite."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "These carry sensitive or bulky data — only for a deliberate full-site migration."
-msgstr ""
+msgstr "Contienen datos sensibles o voluminosos; úsalos solo en una migración completa del sitio hecha a propósito."
 
 #: src/Helpers/Svg.php
 msgid "This SVG file could not be safely sanitized and was rejected."
-msgstr ""
+msgstr "Este archivo SVG no se pudo limpiar de forma segura y se rechazó."
 
 #: src/Core/Form/Form.php
 msgid "This field is required."
-msgstr ""
+msgstr "Este campo es obligatorio."
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "This formula doesn’t read right here: check operators, commas, quotes and parentheses."
@@ -2080,7 +2092,7 @@ msgstr "Esta fórmula no se entiende aquí: revisa operadores, comas, comillas y
 
 #: src/Core/Auth/PagePassword.php
 msgid "This page is not available."
-msgstr ""
+msgstr "Esta página no está disponible."
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "This post’s terms"
@@ -2129,11 +2141,11 @@ msgstr "Hoy"
 
 #: src/Core/Auth/PagePassword.php
 msgid "Too many attempts. Please wait a few minutes and try again."
-msgstr ""
+msgstr "Demasiados intentos. Espera unos minutos e inténtalo de nuevo."
 
 #: src/Core/Form/Form.php
 msgid "Too many attempts. Please wait a moment and try again."
-msgstr ""
+msgstr "Demasiados intentos. Espera un momento e inténtalo de nuevo."
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Too many nested parentheses (10 at most)."
@@ -2149,7 +2161,7 @@ msgstr "Demasiados valores (50 como máximo)."
 
 #: src/Core/Seo/Schema.php
 msgid "Twitter / X Handle"
-msgstr ""
+msgstr "Usuario de Twitter / X"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Type"
@@ -2157,7 +2169,7 @@ msgstr "Tipo"
 
 #: resources/data-panel/src/rich/MiniEditor.tsx
 msgid "Type / to choose a block"
-msgstr ""
+msgstr "Escribe / para elegir un bloque"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Type @ to add a value, then . for a function."
@@ -2173,7 +2185,7 @@ msgstr "URL"
 
 #: src/Core/Content/ContentAdminScreen.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Unauthorized"
-msgstr ""
+msgstr "No autorizado"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Unclosed parenthesis or quote."
@@ -2181,7 +2193,7 @@ msgstr "Paréntesis o comilla sin cerrar."
 
 #: src/Core/Media/MediaFolders.php
 msgid "Unfiled"
-msgstr ""
+msgstr "Sin carpeta"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Unknown function."
@@ -2197,19 +2209,19 @@ msgstr "Nombre de valor desconocido."
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Upload"
-msgstr ""
+msgstr "Subir"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Upload Files"
-msgstr ""
+msgstr "Subir archivos"
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Uploaded — indexing runs in the background and may take a few minutes."
-msgstr ""
+msgstr "Subido: la indexación se hace en segundo plano y puede tardar unos minutos."
 
 #: src/Core/Media/MediaFolders.php
 msgid "Uploading"
-msgstr ""
+msgstr "Subiendo"
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Use as block text"
@@ -2230,7 +2242,7 @@ msgstr "Usar esta imagen"
 
 #: src/Core/Seo/SeoMeta.php
 msgid "Used for Open Graph/Twitter card previews. Falls back to the featured image when empty."
-msgstr ""
+msgstr "Se usa en las vistas previas de Open Graph y Twitter. Si está vacía, se usa la imagen destacada."
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Value"
@@ -2238,7 +2250,7 @@ msgstr "Valor"
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Visibility"
-msgstr ""
+msgstr "Visibilidad"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Visitor and date"
@@ -2246,11 +2258,11 @@ msgstr "Visitante y fecha"
 
 #: src/Core/Form/Form.php
 msgid "We could not verify you are human. Please try again."
-msgstr ""
+msgstr "No pudimos verificar que eres humano. Inténtalo de nuevo."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "When a record already exists:"
-msgstr ""
+msgstr "Cuando un registro ya existe:"
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Whether a list has a value (any case)."
@@ -2286,7 +2298,7 @@ msgstr "Sin espacios en los extremos."
 
 #: resources/data-panel/src/controls/RichContent.tsx
 msgid "Write"
-msgstr ""
+msgstr "Escribir"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Write one value or formula, e.g. @count(@row.members) or @(@row.price * 2)."
@@ -2298,7 +2310,7 @@ msgstr "Argumentos incorrectos para esta función."
 
 #: src/Core/Metabox/Metabox.php
 msgid "Yes"
-msgstr ""
+msgstr "Sí"
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "Yes / no"
@@ -2306,27 +2318,27 @@ msgstr "Sí / no"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "You"
-msgstr ""
+msgstr "Tú"
 
 #: resources/data-panel/src/controls/MediaControls.tsx
 msgid "You can’t upload or choose media."
-msgstr ""
+msgstr "No puedes subir ni elegir medios."
 
 #: src/Core/Content/ContentAdminScreen.php src/Core/Editing/EditingAdminScreen.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "You do not have permission to access this page."
-msgstr ""
+msgstr "No tienes permiso para acceder a esta página."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "You do not have permission to import content."
-msgstr ""
+msgstr "No tienes permiso para importar contenido."
 
 #: src/Support/Performance.php
 msgid "Your build assets aren't getting cache headers — this site appears to run nginx, which doesn't read .htaccess. Add this to your nginx server block:"
-msgstr ""
+msgstr "Tus recursos compilados no reciben encabezados de caché: este sitio parece usar nginx, que no lee .htaccess. Agrega esto al bloque server de nginx:"
 
 #: src/Core/Auth/PagePassword.php
 msgid "Your session expired. Please try again."
-msgstr ""
+msgstr "Tu sesión expiró. Inténtalo de nuevo."
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx src/Core/Editing/EditingAdminScreen.php
 msgid "all"
@@ -2334,7 +2346,7 @@ msgstr "todas"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "allowed"
-msgstr ""
+msgstr "permitido"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "an item"
@@ -2350,11 +2362,11 @@ msgstr "cualquiera"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "are exempt (bypass)"
-msgstr ""
+msgstr "estás exento (exención)"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "are locked like everyone else"
-msgstr ""
+msgstr "estás bloqueado como todos los demás"
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "contains"
@@ -2362,7 +2374,7 @@ msgstr "contiene"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "default (no editing policy sets one)"
-msgstr ""
+msgstr "predeterminado (ninguna política de edición lo define)"
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "does not contain"
@@ -2402,7 +2414,7 @@ msgstr "tiene el elemento"
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "https:// or /path"
-msgstr ""
+msgstr "https:// o /ruta"
 
 #. translators: %s: a time span, e.g. "2 weeks"
 #: src/Core/Bindings/Expression/Library.php
@@ -2488,7 +2500,7 @@ msgstr "es sí / encendido"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "locked"
-msgstr ""
+msgstr "bloqueado"
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "lower case."
@@ -2496,7 +2508,7 @@ msgstr "minúsculas."
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "none"
-msgstr ""
+msgstr "ninguno"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "of these are true:"
@@ -2524,11 +2536,11 @@ msgstr "seleccionado"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "skip everything (no writes)"
-msgstr ""
+msgstr "omitir todo (sin escribir)"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "skip it (only create new)"
-msgstr ""
+msgstr "omitirlo (solo crear nuevos)"
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "starts with"
@@ -2556,7 +2568,7 @@ msgstr "today, -30 days o 2025-01-31"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "update it (overwrite)"
-msgstr ""
+msgstr "actualizarlo (sobrescribir)"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "ƒ Functions"
@@ -2564,7 +2576,7 @@ msgstr "ƒ Funciones"
 
 #: resources/data-panel/src/controls/ChoiceControls.tsx
 msgid "— Select —"
-msgstr ""
+msgstr "— Seleccionar —"
 
 #: resources/data-panel/src/bindings/loop/parts.tsx
 msgid "“Next” text"

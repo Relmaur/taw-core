@@ -45,6 +45,14 @@ final class EditingAdminScreenTest extends TestCase
         $this->assertSame([], $report['warnings']);
     }
 
+    public function test_every_layer_has_a_translatable_heading(): void
+    {
+        $this->assertSame('Site structure', EditingAdminScreen::layerLabel('site'));
+        $this->assertSame('Design', EditingAdminScreen::layerLabel('design'));
+        $this->assertSame('Editor features', EditingAdminScreen::layerLabel('features'));
+        $this->assertSame('Other', EditingAdminScreen::layerLabel('other'));
+    }
+
     public function test_constant_is_named_as_the_source(): void
     {
         $report = $this->screen(Schema::editing()->preset('guided'), ['marco'], 'locked')->report('json:/x.json');

@@ -619,6 +619,10 @@ msgstr ""
 msgid "Description"
 msgstr ""
 
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Design"
+msgstr ""
+
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Did you mean"
 msgstr ""
@@ -669,6 +673,10 @@ msgstr ""
 
 #: src/Core/Editor/VisualEditor.php
 msgid "Edit Visually"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Editor features"
 msgstr ""
 
 #: src/Core/Metabox/Metabox.php
@@ -1784,6 +1792,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Site URL"
+msgstr ""
+
+#: src/Core/Editing/EditingAdminScreen.php
+msgid "Site structure"
 msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
