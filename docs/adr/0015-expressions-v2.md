@@ -35,7 +35,7 @@ link and image attributes, and custom functions that themes register in PHP.
    protocols; anything unsafe becomes empty), image ID/URL/alt (the result must be an image value or an
    attachment the visitor may see) and alt/title text. Condition values and the loop's Order by accept any
    expression.
-7. **Limits:** 1,000 characters, 50 tokens, depth 10, and a per-expression work cap. Locale-aware output uses
+7. **Limits:** 1,000 characters, 50 tokens and depth 10, which also bound the work a formula can do. Locale-aware output uses
    WordPress (`number_format_i18n`, `wp_date`, `human_time_diff`).
 
 ## Consequences

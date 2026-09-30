@@ -87,7 +87,7 @@ final class Condition
         return str_starts_with($operand, '@') && !str_starts_with($operand, '@@');
     }
 
-    /** A single, valid expression token: `@name` and calls, nothing else. */
+    /** A single, valid expression token: `@name` and calls, or a formula (`@( … )`, `@fn( … )`), nothing else. */
     public static function isValidToken(string $token): bool
     {
         if (!str_starts_with($token, '@')) {
@@ -96,7 +96,7 @@ final class Condition
         $parsed = Parser::parse($token);
         $parts  = $parsed['parts'];
 
-        return $parsed['errors'] === [] && count($parts) === 1 && isset($parts[0]['name']) && !isset($parts[0]['error']);
+        return $parsed['errors'] === [] && count($parts) === 1 && !isset($parts[0]['text']) && !isset($parts[0]['error']);
     }
 
     /**

@@ -182,6 +182,18 @@ msgstr ""
 msgid "@ value"
 msgstr ""
 
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "@( formula )"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "@if( … )"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "A formula, e.g. @(@price * 1.16)"
+msgstr ""
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "A full rollback snapshot is written to wp-content/uploads/taw-private/ before anything changes."
 msgstr ""
@@ -331,6 +343,10 @@ msgstr ""
 msgid "Apply %d changes"
 msgstr ""
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Arithmetic needs numbers; this value is text."
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "As the source gives them"
 msgstr ""
@@ -429,6 +445,10 @@ msgstr ""
 
 #: resources/data-panel/src/controls/MediaControls.tsx
 msgid "Choose an image"
+msgstr ""
+
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "Choose text: @if(@stock > 0, 'In stock', 'Sold out')"
 msgstr ""
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
@@ -563,6 +583,10 @@ msgstr ""
 
 #: src/Core/Media/MediaFolders.php
 msgid "Display folder IDs"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Division by zero."
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -1771,7 +1795,7 @@ msgid "The editing policy in effect for this site (read-only). Change it in the 
 msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
-msgid "The expression is too long (500 characters at most)."
+msgid "The expression is too long (1,000 characters at most)."
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/data.ts
@@ -1830,6 +1854,10 @@ msgstr ""
 msgid "This field is required."
 msgstr ""
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "This formula doesn’t read right here: check operators, commas, quotes and parentheses."
+msgstr ""
+
 #: src/Core/Auth/PagePassword.php
 msgid "This page is not available."
 msgstr ""
@@ -1871,12 +1899,16 @@ msgstr ""
 msgid "Too many attempts. Please wait a moment and try again."
 msgstr ""
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Too many nested parentheses (10 at most)."
+msgstr ""
+
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "Too many rules (20 at most)."
 msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
-msgid "Too many values (20 at most)."
+msgid "Too many values (50 at most)."
 msgstr ""
 
 #: src/Core/Seo/Schema.php
@@ -1912,7 +1944,7 @@ msgid "Unfiled"
 msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
-msgid "Unknown function. Use format, upper, lower, default or truncate."
+msgid "Unknown function."
 msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts

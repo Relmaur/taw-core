@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { completionAt, MAX_LENGTH, parseExpression, type Parsed } from './expression';
+import { completionAt, MAX_LENGTH, namesIn, parseExpression, SIGNATURES, type Parsed } from './expression';
 
 interface Case extends Parsed {
     name: string;
@@ -25,6 +25,30 @@ describe('the expression grammar', () => {
             errors: [{ code: 'too_long', at: 0 }],
         });
         expect(parseExpression('é'.repeat(MAX_LENGTH)).parts).toHaveLength(1);
+    });
+
+    it('knows the functions it is given (a site’s own, from PHP)', () => {
+        const custom = { ...SIGNATURES, with_tax: { params: ['any' as const], required: 1 } };
+        expect(parseExpression('@with_tax(@price)', custom).parts).toStrictEqual([
+            { expr: { type: 'call', fn: 'with_tax', args: [{ type: 'ref', name: 'price' }] }, at: 0, length: 17 },
+        ]);
+        // Unknown without it: the field, then text.
+        expect(parseExpression('@with_tax(@price)').parts[0]).toStrictEqual({
+            name: 'with_tax',
+            calls: [],
+            at: 0,
+            length: 9,
+        });
+    });
+
+    it('lists every value name, inside formulas too', () => {
+        expect(namesIn(parseExpression("@a and @if(@b > @post.c, @d.upper(), 'x') @(@e + 1)"))).toStrictEqual([
+            'a',
+            'b',
+            'post.c',
+            'd',
+            'e',
+        ]);
     });
 });
 
