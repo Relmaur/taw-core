@@ -117,6 +117,16 @@ final class PreviewEndpoint
         }
         $ref = isset($args['expr']) ? null : Reference::fromArgs($args);
         $isTag = $kind === 'tag';
+        // An expression bound to an attribute (ADR-0015): a link, an image's ID/URL/alt.
+        if (!$isTag && isset($args['expr'])) {
+            $postId = self::postId($item);
+            $block = is_string($item['block'] ?? null) ? $item['block'] : '';
+            $attribute = is_string($item['attribute'] ?? null) ? $item['attribute'] : '';
+            if ($postId === null || $block === '' || $attribute === '') {
+                return null;
+            }
+            return Bindings::expressionValue($args, self::context($item, $postId), Target::for($block, $attribute, self::attributeSchema($block, $attribute)));
+        }
         if ($isTag && (isset($args['expr']) || isset($args['row']) || isset($args['loop']))) {
             $postId = self::postId($item);
             return $postId === null ? null : InlineTags::value($args, self::context($item, $postId));

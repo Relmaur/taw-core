@@ -6,6 +6,7 @@ namespace TAW\Core\Bindings;
 
 use TAW\Core\Bindings\Expression\Evaluator;
 use TAW\Core\Bindings\Expression\Functions;
+use TAW\Core\Fields\Image;
 use TAW\Core\Loop\EditorData;
 use TAW\Core\Loop\RowValues;
 
@@ -164,7 +165,11 @@ final class Bindings
         }
 
         if (isset($args['expr'])) {
-            return self::expressionValue($args['expr'], $block, $attribute);
+            $name   = property_exists($block, 'name') && is_string($block->name) ? $block->name : '';
+            $type   = property_exists($block, 'block_type') ? $block->block_type : null;
+            $schema = is_object($type) && isset($type->attributes[$attribute]) && is_array($type->attributes[$attribute]) ? $type->attributes[$attribute] : null;
+
+            return self::expressionValue($args, BindingContext::fromBlock($block), Target::for($name, $attribute, $schema));
         }
 
         // A TAW Loop item's value (ADR-0014): {"row": "award"}, {"loop": "index"}.
@@ -190,24 +195,60 @@ final class Bindings
     }
 
     /**
-     * `args: {"expr": "…"}` (ADR-0012): an expression as a text attribute,
-     * escaped for rich text, plain for HTML attributes (alt, title). Other
-     * attributes (URLs, IDs) don't take expressions.
+     * `args: {"expr": "…"}` (ADR-0012, ADR-0015): an expression's value for an
+     * attribute. Text is escaped for rich text and plain for HTML attributes
+     * (alt, title); a link goes through esc_url_raw() (an unsafe or empty
+     * result keeps the saved link); an image ID must be an image the visitor
+     * may see. With `as: "image"` the expression names an image (an ID or an
+     * image URL, e.g. `@coalesce(@book_cover, @option.placeholder)`), and each
+     * attribute takes that image's part: ID, URL (in `size`), alt, title,
+     * caption. An empty value keeps the saved content.
+     *
+     * @param array<string, mixed> $args
      */
-    private static function expressionValue(mixed $expression, object $block, string $attribute): ?string
+    public static function expressionValue(array $args, BindingContext $context, Target $target): mixed
     {
-        $name = property_exists($block, 'name') && is_string($block->name) ? $block->name : '';
-        $kind = Target::for($name, $attribute)->kind;
-        if (!is_string($expression) || !in_array($kind, ['text', 'plain'], true)) {
+        $expression = $args['expr'] ?? null;
+        if (!is_string($expression)) {
             return null;
         }
 
-        $value = Evaluator::evaluate($expression, BindingContext::fromBlock($block))['value'];
+        $value = Evaluator::evaluate($expression, $context)['value'];
         if ($value === '') {
             return null;
         }
 
-        return $kind === 'text' ? esc_html($value) : $value;
+        if (($args['as'] ?? null) === 'image') {
+            $id   = self::attachment($value);
+            $size = is_string($args['size'] ?? null) && $args['size'] !== '' ? $args['size'] : 'full';
+
+            return $id === 0 ? null : AttributeMap::imageFor(new Image($id), $target, $size);
+        }
+
+        return match ($target->kind) {
+            'text'  => esc_html($value),
+            'plain' => $value,
+            'url'   => ($url = esc_url_raw($value)) === '' ? null : $url,
+            'id'    => ($id = self::attachment($value)) === 0 ? null : $id,
+            default => null,
+        };
+    }
+
+    /**
+     * An image attachment from an expression's value (an ID or the image's
+     * URL), or 0: it must be an image, and its parent post (if any) readable.
+     */
+    private static function attachment(string $value): int
+    {
+        $value = trim($value);
+        $id    = ctype_digit($value) ? (int) $value : attachment_url_to_postid(esc_url_raw($value));
+        if ($id < 1 || !wp_attachment_is_image($id)) {
+            return 0;
+        }
+        $attachment = get_post($id);
+        $parent     = $attachment instanceof \WP_Post ? (int) $attachment->post_parent : 0;
+
+        return $parent > 0 && FieldResolver::readablePost($parent) === null ? 0 : $id;
     }
 
     /**

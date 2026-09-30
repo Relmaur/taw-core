@@ -124,8 +124,21 @@ final class AttributeMap
         };
     }
 
-    private static function image(Image $image, Target $target, Reference $ref): mixed
+    /**
+     * An image's value for an attribute (ID, URL in $size, alt, title,
+     * caption): what an image field gives, and what an expression bound
+     * `as: "image"` gives (ADR-0015).
+     */
+    public static function imageFor(Image $image, Target $target, string $size = 'full'): mixed
     {
+        return self::image($image, $target, Reference::fromArgs(['field' => 'image', 'size' => $size]) ?? Reference::fromArgs(['field' => 'image']));
+    }
+
+    private static function image(Image $image, Target $target, ?Reference $ref): mixed
+    {
+        if ($ref === null) {
+            return null;
+        }
         if (!$image->exists()) {
             return null;
         }

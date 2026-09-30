@@ -509,7 +509,14 @@ Published on @post.date.format('F j, Y') by @post.author · @option.company_phon
   - an inline chip: `data-taw-tag='{"expr": "…"}'`;
   - a whole text attribute: a `taw/field` binding with `args: {"expr": "…"}` on paragraph, heading or
     list-item content, button text, or image alt/caption. It's escaped for rich text and plain for HTML
-    attributes; URLs and IDs don't take expressions.
+    attributes;
+  - **a link or an image (v1.72.0+, ADR-0015):** a button's (or navigation link's) `url` takes the result
+    through `esc_url_raw()` (`/?s=@urlencode(@post.title)`, `mailto:…`); an unsafe or empty result keeps
+    the saved link. An image `id` takes an attachment ID or an image URL from the media library. With
+    `args: {"expr": "@coalesce(@book_cover, 49)", "as": "image"}` on `id`, `url` and `alt`, each attribute
+    gets that image's part (URL in `size`, the image's own alt); an image attached to a post the visitor
+    can't read is left out. In the popup: **Block text** mode → **Use it for** Button text / Link, or
+    Image / Alt text. The loop's **Order by** has **Custom expression…** (`@(0 - @row.year)`).
 - **Evaluation:** a small parser (`Bindings\Expression\Parser`, formulas in `Formula`) plus the same
   resolvers as tags and bindings, on typed values (`Value`); functions live in `Functions` (signatures shared
   with the editor's parser). Nothing is executed, and an unknown name or function renders empty unless

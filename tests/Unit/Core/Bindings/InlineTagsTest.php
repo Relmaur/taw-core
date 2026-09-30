@@ -99,6 +99,7 @@ final class InlineTagsTest extends TestCase
                 ['id' => 'year', 'type' => 'number', 'label' => 'Year'],
             ]],
             ['id' => 'book_related', 'type' => 'post_select', 'multiple' => true, 'label' => 'Related'],
+            ['id' => 'book_cover', 'type' => 'image', 'label' => 'Cover'],
         ]]);
         new OptionsPage(['id' => 'site', 'title' => 'Site', 'fields' => [['id' => 'company_name', 'type' => 'text', 'label' => 'Company']]]);
 
@@ -285,8 +286,75 @@ final class InlineTagsTest extends TestCase
 
         $this->assertSame('By Frank Herbert &amp; co', Bindings::getValue(['expr' => 'By @post.author & co'], $block('core/paragraph'), 'content'));
         $this->assertSame('Cover of Dune – Part One & co', Bindings::getValue(['expr' => 'Cover of @post.title & co'], $block('core/image'), 'alt'), 'attributes get plain text');
-        $this->assertNull(Bindings::getValue(['expr' => '@post.url'], $block('core/button'), 'url'), 'not for URLs');
         $this->assertNull(Bindings::getValue(['expr' => '@book_missing'], $block('core/paragraph'), 'content'), 'empty keeps the saved text');
+    }
+
+    // --- Attribute expressions (ADR-0015) --------------------------------
+
+    private function withImages(): void
+    {
+        $attachments = [
+            41 => new \WP_Post(['ID' => 41, 'post_type' => 'attachment', 'post_parent' => 5]),
+            50 => new \WP_Post(['ID' => 50, 'post_type' => 'attachment', 'post_parent' => 0]),
+            60 => new \WP_Post(['ID' => 60, 'post_type' => 'attachment', 'post_parent' => 6]),
+            70 => new \WP_Post(['ID' => 70, 'post_type' => 'attachment', 'post_parent' => 0]),
+        ];
+        $posts = [
+            5 => new \WP_Post(['ID' => 5, 'post_type' => 'book', 'post_author' => 3, 'post_title' => 'Dune']),
+            6 => new \WP_Post(['ID' => 6, 'post_type' => 'book', 'post_author' => 3, 'post_title' => 'Private']),
+            8 => new \WP_Post(['ID' => 8, 'post_type' => 'book', 'post_author' => 3, 'post_title' => 'Second']),
+        ] + $attachments;
+        Functions\when('get_post')->alias(static fn ($id) => $posts[$id instanceof \WP_Post ? $id->ID : (int) $id] ?? null);
+        Functions\when('wp_attachment_is_image')->alias(static fn (int $id): bool => in_array($id, [41, 50, 60], true));
+        Functions\when('wp_get_attachment_image_url')->alias(static fn (int $id, string $size = 'full'): string => "https://site.test/uploads/{$id}-{$size}.jpg");
+        Functions\when('attachment_url_to_postid')->alias(static fn (string $url): int => preg_match('#/uploads/(\d+)-full\.jpg$#', $url, $m) === 1 ? (int) $m[1] : 0);
+        Functions\when('esc_url_raw')->alias(static fn (string $url): string => preg_match('#^(https?:|mailto:|/)#', $url) === 1 ? $url : '');
+        $this->meta['5|_taw_book_cover'] = '41';
+        $this->meta['41|_wp_attachment_image_alt'] = 'Dune cover';
+        $this->meta['50|_wp_attachment_image_alt'] = 'Placeholder';
+    }
+
+    public function test_links_take_expressions_safely(): void
+    {
+        $this->withImages();
+        $button = (object) ['name' => 'core/button', 'context' => ['postId' => 5]];
+
+        $this->assertSame('https://site.test/books/5/', Bindings::getValue(['expr' => '@post.url'], $button, 'url'));
+        $this->assertSame('/search?q=Dune%20%E2%80%93%20Part%20One', Bindings::getValue(['expr' => '/search?q=@urlencode(@post.title)'], $button, 'url'));
+        $this->assertSame('mailto:books@site.test', Bindings::getValue(['expr' => 'mailto:books@site.test'], $button, 'url'), 'an @ inside a word is text');
+        $this->assertNull(Bindings::getValue(['expr' => 'javascript:alert(@book_year)'], $button, 'url'), 'unsafe: the saved link stays');
+        $this->assertNull(Bindings::getValue(['expr' => '@book_missing'], $button, 'url'), 'empty: the saved link stays');
+        $this->assertSame('/x', Bindings::getValue(['expr' => "@if(@book_year > 1960, '/x', '/y')"], $button, 'url'));
+    }
+
+    public function test_images_take_expressions(): void
+    {
+        $this->withImages();
+        $image = (object) ['name' => 'core/image', 'context' => ['postId' => 5]];
+        $cover = ['expr' => '@coalesce(@book_cover, 50)', 'as' => 'image'];
+
+        $this->assertSame(41, Bindings::getValue($cover, $image, 'id'));
+        $this->assertSame('https://site.test/uploads/41-full.jpg', Bindings::getValue($cover, $image, 'url'));
+        $this->assertSame('https://site.test/uploads/41-large.jpg', Bindings::getValue($cover + ['size' => 'large'], $image, 'url'));
+        $this->assertSame('Dune cover', Bindings::getValue($cover, $image, 'alt'), 'the image\'s own alt, not the expression\'s text');
+
+        unset($this->meta['5|_taw_book_cover']);
+        $this->assertSame(50, Bindings::getValue($cover, $image, 'id'), 'the fallback image');
+        $this->assertSame('Placeholder', Bindings::getValue($cover, $image, 'alt'));
+
+        $this->assertSame(50, Bindings::getValue(['expr' => '50'], $image, 'id'), 'an ID without as: image');
+        $this->assertNull(Bindings::getValue(['expr' => '70', 'as' => 'image'], $image, 'id'), 'not an image');
+        $this->assertNull(Bindings::getValue(['expr' => '60', 'as' => 'image'], $image, 'url'), 'attached to a private post');
+        $this->assertNull(Bindings::getValue(['expr' => 'https://elsewhere.test/x.jpg', 'as' => 'image'], $image, 'id'), 'not in the media library');
+    }
+
+    public function test_attribute_expressions_preview(): void
+    {
+        $this->withImages();
+        $item = static fn (array $args, string $block, string $attribute): array => ['key' => 'k', 'args' => $args, 'block' => $block, 'attribute' => $attribute, 'postId' => 5, 'postType' => 'book'];
+
+        $this->assertSame(41, PreviewEndpoint::resolve($item(['expr' => '@book_cover', 'as' => 'image'], 'core/image', 'id')));
+        $this->assertSame('https://site.test/books/5/', PreviewEndpoint::resolve($item(['expr' => '@post.url'], 'core/button', 'url')));
     }
 
     public function test_previews_evaluate_expressions_with_errors(): void
