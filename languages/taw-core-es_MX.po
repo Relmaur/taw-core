@@ -152,6 +152,14 @@ msgstr ""
 msgid "%s must be at most %s."
 msgstr ""
 
+#. translators: %s: a number of years
+#: src/Core/Bindings/Expression/Library.php
+#, php-format
+msgid "%s year ago"
+msgid_plural "%s years ago"
+msgstr[0] "hace %s año"
+msgstr[1] "hace %s años"
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "(added to every allow list)"
 msgstr ""
@@ -186,6 +194,10 @@ msgstr "0 = todos (hasta 200)"
 msgid "0 = no pages. Each loop pages on its own."
 msgstr "0 = sin páginas. Cada bucle pagina por su cuenta."
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "0.25 as 25%."
+msgstr "0.25 como 25%."
+
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "@ value"
 msgstr "@ valor"
@@ -197,6 +209,18 @@ msgstr "@( fórmula )"
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "@if( … )"
 msgstr "@if( … )"
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "A capital first letter."
+msgstr "La primera letra en mayúscula."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "A date in a PHP date format."
+msgstr "Una fecha en un formato de fecha de PHP."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "A date some days later (or earlier, with a negative number)."
+msgstr "Una fecha unos días después (o antes, con un número negativo)."
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "A formula, e.g. @(@price * 1.16)"
@@ -225,6 +249,14 @@ msgstr ""
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "A number"
 msgstr "Un número"
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "A number with the site’s thousands and decimal separators."
+msgstr "Un número con los separadores de miles y decimales del sitio."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "A price with its currency symbol."
+msgstr "Un precio con el símbolo de su moneda."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "A snapshot or change-set JSON file. The next screen shows exactly what would change — nothing is written yet."
@@ -298,6 +330,10 @@ msgstr "Añadir a la expresión"
 msgid "Adds noindex — the page stays live but search engines are asked not to list it."
 msgstr ""
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Adds the numbers up."
+msgstr "Suma los números."
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Advanced"
 msgstr ""
@@ -354,6 +390,10 @@ msgstr ""
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Arithmetic needs numbers; this value is text."
 msgstr "Las operaciones necesitan números; este valor es texto."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "As a URL slug: “my-title”."
+msgstr "Como slug de URL: “mi-titulo”."
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "As the source gives them"
@@ -463,6 +503,10 @@ msgstr ""
 msgid "Choose text: @if(@stock > 0, 'In stock', 'Sold out')"
 msgstr "Elige un texto: @if(@stock > 0, 'Disponible', 'Agotado')"
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Chooses: then when the test holds, else otherwise."
+msgstr "Elige: el primero si la prueba se cumple; si no, el segundo."
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Chunks"
 msgstr ""
@@ -557,7 +601,7 @@ msgstr "Valor personalizado…"
 msgid "Date"
 msgstr "Fecha"
 
-#: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx
+#: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/functionDocs.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Dates"
 msgstr "Fechas"
 
@@ -576,6 +620,10 @@ msgstr "Descendente (Z → A, 9 → 1)"
 #: resources/data-panel/src/bindings/loop/data.ts src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Description"
 msgstr "Descripción"
+
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "Did you mean"
+msgstr "¿Quisiste decir"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Direction"
@@ -773,6 +821,18 @@ msgstr ""
 msgid "Home"
 msgstr ""
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "How long ago: “3 days ago”, or “in 2 weeks”."
+msgstr "Hace cuánto: “hace 3 días” o “en 2 semanas”."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "How many items: rows, related posts, files…"
+msgstr "Cuántos elementos: filas, entradas relacionadas, archivos…"
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "How many words."
+msgstr "Cuántas palabras."
+
 #: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "ID"
 msgstr "ID"
@@ -899,6 +959,18 @@ msgstr "Elemento: %s"
 msgid "Items"
 msgstr "Elementos"
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Items as text, with a separator."
+msgstr "Los elementos como texto, con un separador."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Items in order (numbers as numbers)."
+msgstr "Los elementos en orden (los números como números)."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Items in reverse order."
+msgstr "Los elementos en orden inverso."
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Items per page"
 msgstr "Elementos por página"
@@ -906,6 +978,10 @@ msgstr "Elementos por página"
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Items, separated by commas"
 msgstr "Elementos, separados por comas"
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Joins text together."
+msgstr "Une textos."
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Knowledge Bases"
@@ -939,7 +1015,7 @@ msgstr ""
 msgid "List"
 msgstr "Lista"
 
-#: resources/data-panel/src/bindings/conditions.ts
+#: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/functionDocs.ts
 msgid "Lists"
 msgstr "Listas"
 
@@ -966,6 +1042,10 @@ msgstr ""
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Logged in"
 msgstr "Sesión iniciada"
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Logic"
+msgstr "Lógica"
 
 #: src/Core/Seo/Schema.php
 msgid "Logo"
@@ -1124,6 +1204,10 @@ msgstr ""
 msgid "No files or image fields here. Add one to a fieldset first."
 msgstr "No hay campos de archivos o imagen aquí. Agrega uno a un grupo de campos primero."
 
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "No functions match your search."
+msgstr "Ninguna función coincide con tu búsqueda."
+
 #: src/Core/Metabox/Metabox.php
 msgid "No icon selected"
 msgstr ""
@@ -1200,6 +1284,10 @@ msgstr "Lista numerada"
 msgid "Numbers"
 msgstr "Números"
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Numbers and money"
+msgstr "Números y dinero"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Media/MediaFolders.php
 msgid "Oldest first"
 msgstr "Más antiguas primero"
@@ -1211,6 +1299,10 @@ msgstr "Un elemento por fila de un campo repetidor, p. ej. los premios de un lib
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "One line per item."
 msgstr "Una línea por elemento."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "One sub-field of every repeater row."
+msgstr "Un subcampo de cada fila del repetidor."
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "One value or formula for each item, e.g. @count(@row.members)."
@@ -1461,6 +1553,10 @@ msgstr ""
 msgid "Replace image"
 msgstr ""
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Replaces text."
+msgstr "Reemplaza texto."
+
 #: src/Core/Editor/VisualEditor.php
 msgid "Return to normal view"
 msgstr ""
@@ -1480,6 +1576,18 @@ msgstr "Rol"
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Rollback snapshot"
 msgstr ""
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Rounds a number."
+msgstr "Redondea un número."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Rounds down."
+msgstr "Redondea hacia abajo."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Rounds up."
+msgstr "Redondea hacia arriba."
 
 #: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/loop/data.ts
 msgid "Row"
@@ -1511,6 +1619,10 @@ msgstr ""
 msgid "SVG Images"
 msgstr ""
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Safe inside a link."
+msgstr "Seguro dentro de un enlace."
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 #, php-format
 msgid "Same %s as this post"
@@ -1539,6 +1651,10 @@ msgstr "La búsqueda no ha tenido éxito. Inténtalo de nuevo."
 #: resources/data-panel/src/controls/PostSelect.tsx src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Search for a post…"
 msgstr "Buscar una publicación…"
+
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "Search functions"
+msgstr "Buscar funciones"
 
 #: resources/data-panel/src/controls/IconControl.tsx
 msgid "Search icons"
@@ -1602,6 +1718,10 @@ msgstr ""
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Set by"
 msgstr ""
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Shortens to a number of characters, with “…”."
+msgstr "Acorta a un número de caracteres, con “…”."
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 #, php-format
@@ -1796,7 +1916,7 @@ msgstr "Término"
 msgid "Terms"
 msgstr "Términos"
 
-#: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/data-panel/src/bindings/targets.ts
+#: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/functionDocs.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/data-panel/src/bindings/targets.ts
 msgid "Text"
 msgstr "Texto"
 
@@ -1822,9 +1942,17 @@ msgstr ""
 msgid "The %s rule allows every block, so its allowBound list has no effect."
 msgstr "La regla de %s permite todos los bloques, así que su lista allowBound no tiene efecto."
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The average of the numbers."
+msgstr "El promedio de los números."
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "The built-in \"This site's content\" knowledge base cannot be deleted."
 msgstr ""
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The day of the month."
+msgstr "El día del mes."
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "The editing policy in effect for this site (read-only). Change it in the theme's taw-schema/editing.json, or pick a preset for this install with TAW_EDITING_PRESET in wp-config.php."
@@ -1834,9 +1962,37 @@ msgstr ""
 msgid "The expression is too long (1,000 characters at most)."
 msgstr "La expresión es demasiado larga (1,000 caracteres como máximo)."
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The first item."
+msgstr "El primer elemento."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The first value that isn’t empty."
+msgstr "El primer valor que no está vacío."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The first words, with “…”."
+msgstr "Las primeras palabras, con “…”."
+
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "The images of a files or image field, e.g. a gallery."
 msgstr "Las imágenes de un campo de archivos o imagen, p. ej. una galería."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The largest number."
+msgstr "El número más grande."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The last item."
+msgstr "El último elemento."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The month’s name."
+msgstr "El nombre del mes."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The number and the word that fits it: “3 awards”."
+msgstr "El número y la palabra que le corresponde: “3 premios”."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "The pending import expired — please upload the file again."
@@ -1845,6 +2001,10 @@ msgstr ""
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "The posts picked in a post select field, e.g. books in this series."
 msgstr "Las entradas elegidas en un campo de selección de entradas, p. ej. libros de esta serie."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The post’s terms in a taxonomy."
+msgstr "Los términos de la entrada en una taxonomía."
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "The result is used as the link. Unsafe or empty links keep the button’s own link."
@@ -1862,13 +2022,29 @@ msgstr ""
 msgid "The site's editing policy doesn't allow using the Site Editor."
 msgstr ""
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The smallest number."
+msgstr "El número más pequeño."
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "The source’s order"
 msgstr "El orden de la fuente"
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The text when the value is empty."
+msgstr "El texto cuando el valor está vacío."
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "The upload failed — please try again."
 msgstr ""
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The weekday’s name."
+msgstr "El nombre del día de la semana."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "The year. A 4-digit number is read as a year."
+msgstr "El año. Un número de 4 dígitos se lee como año."
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Theme blocks"
@@ -1915,9 +2091,17 @@ msgstr "Los términos de esta entrada"
 msgid "This row: %s"
 msgstr "Esta fila: %s"
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "This site"
+msgstr "Este sitio"
+
 #: resources/data-panel/src/bindings/tags.ts
 msgid "This value isn’t a date."
 msgstr "Este valor no es una fecha."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Time left until a date: “2 weeks”; empty once it’s past."
+msgstr "Tiempo que falta para una fecha: “2 semanas”; vacío cuando ya pasó."
 
 #: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "Title"
@@ -1979,6 +2163,10 @@ msgstr ""
 msgid "Type @ to add a value, then . for a function."
 msgstr "Escribe @ para añadir un valor y luego . para una función."
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "UPPER CASE."
+msgstr "MAYÚSCULAS."
+
 #: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "URL"
 msgstr "URL"
@@ -1998,6 +2186,10 @@ msgstr ""
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Unknown function."
 msgstr "Función desconocida."
+
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "Unknown function:"
+msgstr "Función desconocida:"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Unknown value name."
@@ -2060,13 +2252,37 @@ msgstr ""
 msgid "When a record already exists:"
 msgstr ""
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Whether a list has a value (any case)."
+msgstr "Si una lista tiene un valor (sin importar mayúsculas)."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Whether a value is empty."
+msgstr "Si un valor está vacío."
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Which terms"
 msgstr "Qué términos"
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Whole days from one date to another."
+msgstr "Días completos de una fecha a otra."
+
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Width"
 msgstr "Ancho"
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Without HTML."
+msgstr "Sin HTML."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Without its sign."
+msgstr "Sin su signo."
+
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "Without spaces at either end."
+msgstr "Sin espacios en los extremos."
 
 #: resources/data-panel/src/controls/RichContent.tsx
 msgid "Write"
@@ -2194,6 +2410,14 @@ msgstr ""
 msgid "in %s"
 msgstr "en %s"
 
+#. translators: %s: a number of years
+#: src/Core/Bindings/Expression/Library.php
+#, php-format
+msgid "in %s year"
+msgid_plural "in %s years"
+msgstr[0] "en %s año"
+msgstr[1] "en %s años"
+
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "is"
 msgstr "es"
@@ -2266,6 +2490,10 @@ msgstr "es sí / encendido"
 msgid "locked"
 msgstr ""
 
+#: resources/data-panel/src/bindings/functionDocs.ts
+msgid "lower case."
+msgstr "minúsculas."
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "none"
 msgstr ""
@@ -2318,6 +2546,10 @@ msgstr "esta regla está incompleta."
 msgid "this value"
 msgstr "este valor"
 
+#: src/Core/Bindings/Expression/Library.php
+msgid "this year"
+msgstr "este año"
+
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "today, -30 days or 2025-01-31"
 msgstr "today, -30 days o 2025-01-31"
@@ -2325,6 +2557,10 @@ msgstr "today, -30 days o 2025-01-31"
 #: src/Core/Content/ContentAdminScreen.php
 msgid "update it (overwrite)"
 msgstr ""
+
+#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+msgid "ƒ Functions"
+msgstr "ƒ Funciones"
 
 #: resources/data-panel/src/controls/ChoiceControls.tsx
 msgid "— Select —"

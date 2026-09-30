@@ -35,6 +35,7 @@ final class ExpressionFunctionsTest extends TestCase
         WP\when('sanitize_title')->alias(static fn (string $t): string => trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($t)), '-'));
         WP\when('wp_strip_all_tags')->alias(static fn (string $t): string => strip_tags($t));
         WP\when('__')->returnArg(1);
+        WP\when('_n')->alias(static fn (string $one, string $many, int $n): string => $n === 1 ? $one : $many);
         WP\when('esc_html')->returnArg(1);
     }
 
@@ -82,6 +83,10 @@ final class ExpressionFunctionsTest extends TestCase
         yield 'format a date value' => ['format', ['2026-09-27 08:00:00', 'j M Y'], '27 Sep 2026'];
         yield 'ago' => ['ago', ['2026-09-27 12:00:00'], '3 days ago'];
         yield 'ago, in the future' => ['ago', ['2026-10-07'], 'in 7 days'];
+        yield 'ago, a year counts calendar years' => ['ago', [1994], '32 years ago'];
+        yield 'ago, a year as text' => ['ago', ['2025'], '1 year ago'];
+        yield 'ago, this year' => ['ago', [2026], 'this year'];
+        yield 'ago, a future year' => ['ago', ['2028'], 'in 2 years'];
         yield 'until' => ['until', ['2026-10-07 12:00:00'], '7 days'];
         yield 'until, past' => ['until', ['2026-09-01'], ''];
         yield 'days_between' => ['days_between', ['2026-09-01', '2026-09-30'], 29];

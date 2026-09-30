@@ -51,6 +51,18 @@ const CSS = `
 .taw-expression-helpers{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
 .taw-expression-helpers button{border:1px solid #e0e0e0;background:#fff;border-radius:12px;padding:2px 8px;font-family:Menlo,Consolas,monospace;font-size:11px;color:#1e1e1e;cursor:pointer}
 .taw-expression-helpers button:hover{border-color:var(--wp-admin-theme-color,#3858e9);color:var(--wp-admin-theme-color,#3858e9)}
+.taw-expression-helpers button.is-pressed{background:var(--wp-admin-theme-color,#3858e9);border-color:var(--wp-admin-theme-color,#3858e9);color:#fff}
+.taw-function-picker{margin-top:8px;border:1px solid #e0e0e0;border-radius:2px;background:#fff}
+.taw-function-picker__search{box-sizing:border-box;width:100%;margin:0;padding:6px 8px;border:0;border-bottom:1px solid #e0e0e0;font-size:12px}
+.taw-function-picker__list{max-height:260px;overflow:auto;padding:4px}
+.taw-function-picker h4{margin:8px 4px 2px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:#757575}
+.taw-function-picker button{display:grid;gap:1px;width:100%;text-align:left;border:0;background:none;border-radius:2px;padding:5px 6px;cursor:pointer;color:#1e1e1e}
+.taw-function-picker button:hover,.taw-function-picker button:focus{background:#f0f0f0}
+.taw-function-picker code{background:none;padding:0;font-size:12px;color:var(--wp-admin-theme-color,#3858e9)}
+.taw-function-picker span{font-size:12px}
+.taw-function-picker small{font-family:Menlo,Consolas,monospace;font-size:11px;color:#757575;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.taw-function-picker p{margin:8px 4px;font-size:12px;color:#757575}
+.taw-expression-errors code{background:none;padding:0}
 .taw-expression-preview{display:flex;flex-direction:column;gap:4px;margin-top:12px;padding:10px 12px;background:#f6f7f7;border-radius:2px}
 .taw-expression-preview__label{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:#757575}
 .taw-expression-preview__value{word-break:break-word;line-height:1.5}
