@@ -45,7 +45,7 @@
             "TAW\\": "src/"
         },
         "files": [
-            "src/Support/performance.php",
+            "src/Support/performance-autoload.php",
             "src/Support/utilities.php"
         ]
     },

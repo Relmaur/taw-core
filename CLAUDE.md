@@ -21,7 +21,7 @@
 ## Architecture
 
 - `TAW\` → `src/` (PSR-4). No other namespace roots.
-- `src/Support/utilities.php` and `src/Support/performance.php` are file-autoloaded. **Loading them must have no WordPress side effects** (ADR-0003): `performance.php` only defines the class — `Performance::register()` is called by `Theme::boot()`/`bootstrapFullSite()` (escape hatch: `TAW_PERFORMANCE_AUTOLOAD`); global helpers in `utilities.php` are all `function_exists`-guarded. `AutoloadSideEffectsTest` enforces both.
+- `src/Support/utilities.php` and `src/Support/performance-autoload.php` are file-autoloaded; `Performance` itself is PSR-4 (`src/Support/Performance.php`, v1.69.3+). **Loading them must have no WordPress side effects** (ADR-0003): `Performance::register()` is called by `Theme::boot()`/`bootstrapFullSite()`; `performance-autoload.php` only holds the escape hatch (`TAW_PERFORMANCE_AUTOLOAD`); global helpers in `utilities.php` are all `function_exists`-guarded. `AutoloadSideEffectsTest` enforces both.
 - `src/Core/` — framework features (Block, Metabox, Form, OptionsPage, etc.)
 - `src/Support/` — infrastructure (ViteLoader, Performance)
 - `src/Helpers/` — stateless utility classes (Framework, Image, Svg, Dump)
