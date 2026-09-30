@@ -9,30 +9,24 @@
  *   an image field on an image, its ID/URL/alt as before).
  *
  * The Expression tab can add a condition (ADR-0013) to what it inserts; the
- * Visibility tab puts one on the whole block.
+ * Visibility tab puts one on the whole block. In block mode it binds the
+ * expression to a part of the block: a button's text or link, an image
+ * (its ID, URL and alt, `as: "image"`) or its alt text (ADR-0015).
  */
 import React, { useEffect, useState } from 'react';
 import { Button, Dashicon, SearchControl, TabPanel } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import { ConditionSection, type Conditional } from './ConditionBuilder';
 import { readCondition } from './conditions';
 import { ExpressionEditor } from './ExpressionEditor';
-import { connectedMetadata, planFor, withoutTawBindings, type BindingArgs, type Bindings, type Config } from './logic';
+import { connectedMetadata, planFor, withoutTawBindings, type Bindings, type Config } from './logic';
 import { previewExpression, previewTag } from './preview';
 import { caretIn, insertChip } from './richText';
 import { groupOptions, storedText, valueArgs, type TagArgs, type ValueOption } from './tags';
+import { expressionTargets, TEXT_ATTRIBUTE, withExpression } from './targets';
 import { VisibilityEditor } from './visibility';
 import { useValueOptions } from './loop/options';
-
-/** The text attribute an expression binds, per block. */
-export const TEXT_ATTRIBUTE: Record<string, string> = {
-    'core/paragraph': 'content',
-    'core/heading': 'content',
-    'core/list-item': 'content',
-    'core/button': 'text',
-    'core/image': 'alt',
-};
 
 type Metadata = { bindings?: Bindings; [key: string]: unknown };
 type Mode = 'inline' | 'block';
@@ -43,27 +37,6 @@ export interface PopupProps {
     blockName: string;
     metadata: Metadata;
     onClose: () => void;
-}
-
-function withExpression(
-    source: string,
-    metadata: Metadata,
-    attribute: string,
-    expr: string,
-    conditional: Conditional = {},
-): Metadata {
-    const args: Record<string, unknown> = { expr };
-    if (conditional.if !== undefined) {
-        args.if = conditional.if;
-        if (conditional.else?.trim()) args.else = conditional.else;
-    }
-    return {
-        ...metadata,
-        bindings: {
-            ...(withoutTawBindings(source, metadata.bindings) ?? {}),
-            [attribute]: { source, args: args as unknown as BindingArgs },
-        },
-    };
 }
 
 /** The block text binding's condition, to reopen it with the expression. */
@@ -110,6 +83,24 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
     const canInline = caretIn(clientId) !== null;
     const textAttribute = TEXT_ATTRIBUTE[blockName];
     const canBlock = textAttribute !== undefined || blockName === 'core/post-date';
+    const targets = expressionTargets(blockName);
+    const [targetKey, setTargetKey] = useState(() => {
+        // Reopen on the part the block's expression already fills.
+        const boundAttribute = Object.entries(metadata.bindings ?? {}).find(
+            ([, b]) => b?.source === config.source && typeof b.args?.expr === 'string',
+        )?.[0];
+        return (
+            targets.find(
+                (t) =>
+                    boundAttribute !== undefined &&
+                    t.attributes.includes(boundAttribute) &&
+                    (t.as === undefined) === (metadata.bindings?.[boundAttribute]?.args?.as === undefined),
+            )?.key ??
+            targets[0]?.key ??
+            'text'
+        );
+    });
+    const target = targets.find((t) => t.key === targetKey) ?? targets[0];
     const [mode, setMode] = useState<Mode>(canInline || !canBlock ? 'inline' : 'block');
     const [search, setSearch] = useState('');
     const [expression, setExpression] = useState(() => initialExpression(config.source, clientId, metadata, options));
@@ -253,19 +244,62 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
                   run: () => void insert({ expr: expression, ...conditional }, expression),
               }
             : {
-                  label: __('Use as block text', 'taw-core'),
-                  disabled: !textAttribute,
+                  label:
+                      targets.length > 1 && target
+                          ? /* translators: %s: what the expression fills, e.g. "Link" */
+                            sprintf(__('Use for: %s', 'taw-core'), target.label)
+                          : __('Use as block text', 'taw-core'),
+                  disabled: !target,
                   run: () => {
-                      if (textAttribute) {
+                      if (target) {
                           lastExpressions.set(clientId, expression);
-                          bind(withExpression(config.source, metadata, textAttribute, expression, conditional));
+                          bind(withExpression(config.source, metadata, target, expression, conditional));
                       }
                   },
               };
 
     const expressionTab = (
         <div className="taw-data-expression">
+            {mode === 'block' && targets.length > 1 && (
+                <div
+                    className="taw-data-mode taw-data-target"
+                    role="radiogroup"
+                    aria-label={__('Use it for', 'taw-core')}
+                >
+                    <span className="taw-data-mode__label">{__('Use it for', 'taw-core')}</span>
+                    {targets.map((t) => (
+                        <button
+                            key={t.key}
+                            type="button"
+                            role="radio"
+                            aria-checked={t.key === target?.key}
+                            className={t.key === target?.key ? 'is-selected' : undefined}
+                            onClick={() => setTargetKey(t.key)}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+            )}
             <ExpressionEditor value={expression} onChange={setExpression} options={options} />
+            {mode === 'block' && target?.key === 'link' && (
+                <p className="taw-data-note">
+                    <Dashicon icon="info-outline" />
+                    {__(
+                        'The result is used as the link. Unsafe or empty links keep the button’s own link.',
+                        'taw-core',
+                    )}
+                </p>
+            )}
+            {mode === 'block' && target?.as === 'image' && (
+                <p className="taw-data-note">
+                    <Dashicon icon="info-outline" />
+                    {__(
+                        'The result must be an image from the media library (an image field, or an image ID). Its alt text comes along.',
+                        'taw-core',
+                    )}
+                </p>
+            )}
             <ConditionSection value={conditional} onChange={setConditional} options={options} />
             {mode === 'inline' && (
                 <p className="taw-data-note">

@@ -322,7 +322,7 @@ msgstr ""
 msgid "Also apply environment-settings options (permalinks, timezone, sticky posts, …)"
 msgstr ""
 
-#: resources/data-panel/src/bindings/loop/data.ts
+#: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/targets.ts
 msgid "Alt text"
 msgstr "Texto alternativo"
 
@@ -386,6 +386,10 @@ msgstr "Texto del bloque"
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Block text:"
 msgstr "Texto del bloque:"
+
+#: resources/data-panel/src/bindings/targets.ts
+msgid "Button text"
+msgstr "Texto del botón"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Bypass"
@@ -536,6 +540,10 @@ msgstr ""
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Current year"
 msgstr "Año actual"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Custom expression…"
+msgstr "Expresión personalizada…"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Custom value"
@@ -781,7 +789,7 @@ msgstr ""
 msgid "Icons couldn’t be loaded."
 msgstr ""
 
-#: resources/data-panel/src/bindings/loop/data.ts
+#: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/targets.ts
 msgid "Image"
 msgstr "Imagen"
 
@@ -919,7 +927,7 @@ msgstr "Excluir"
 msgid "Leave out this post"
 msgstr "Excluir esta entrada"
 
-#: resources/data-panel/src/bindings/loop/data.ts
+#: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/targets.ts
 msgid "Link"
 msgstr "Enlace"
 
@@ -1204,6 +1212,10 @@ msgstr "Un elemento por fila de un campo repetidor, p. ej. los premios de un lib
 msgid "One line per item."
 msgstr "Una línea por elemento."
 
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "One value or formula for each item, e.g. @count(@row.members)."
+msgstr "Un valor o una fórmula por elemento, p. ej. @count(@row.members)."
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Only bound to a TAW field"
 msgstr "Solo conectados a un campo TAW"
@@ -1235,6 +1247,10 @@ msgstr "Opciones"
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Order by"
 msgstr "Ordenar por"
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Order by this expression"
+msgstr "Ordenar por esta expresión"
 
 #: src/Core/Seo/Schema.php
 msgid "Organization"
@@ -1780,7 +1796,7 @@ msgstr "Término"
 msgid "Terms"
 msgstr "Términos"
 
-#: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx
+#: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/data-panel/src/bindings/targets.ts
 msgid "Text"
 msgstr "Texto"
 
@@ -1829,6 +1845,14 @@ msgstr ""
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "The posts picked in a post select field, e.g. books in this series."
 msgstr "Las entradas elegidas en un campo de selección de entradas, p. ej. libros de esta serie."
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "The result is used as the link. Unsafe or empty links keep the button’s own link."
+msgstr "El resultado se usa como enlace. Si no es seguro o está vacío, el botón conserva su propio enlace."
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "The result must be an image from the media library (an image field, or an image ID). Its alt text comes along."
+msgstr "El resultado debe ser una imagen de la biblioteca de medios (un campo de imagen o el ID de una imagen). Su texto alternativo la acompaña."
 
 #: src/Core/Editing/SiteLayer.php
 msgid "The site's editing policy doesn't allow changing this part of the site design."
@@ -1999,6 +2023,15 @@ msgstr ""
 msgid "Use as block text"
 msgstr "Usar como texto del bloque"
 
+#: resources/data-panel/src/bindings/popup.tsx
+#, php-format
+msgid "Use for: %s"
+msgstr "Usar para: %s"
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Use it for"
+msgstr "Usarlo para"
+
 #: src/Core/Metabox/Metabox.php
 msgid "Use this image"
 msgstr "Usar esta imagen"
@@ -2038,6 +2071,10 @@ msgstr "Ancho"
 #: resources/data-panel/src/controls/RichContent.tsx
 msgid "Write"
 msgstr ""
+
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+msgid "Write one value or formula, e.g. @count(@row.members) or @(@row.price * 2)."
+msgstr "Escribe un valor o una fórmula, p. ej. @count(@row.members) o @(@row.price * 2)."
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Wrong arguments for this function."

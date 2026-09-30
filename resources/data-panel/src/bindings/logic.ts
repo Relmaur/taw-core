@@ -22,6 +22,8 @@ export interface BindingArgs {
     loop?: string;
     /** An expression binding (ADR-0012) has `expr` and no field. */
     expr?: string;
+    /** `image`: the expression names an image, and each attribute takes its part (ADR-0015). */
+    as?: 'image';
     from?: From;
     sub?: string;
     size?: string;
@@ -194,13 +196,32 @@ function escapeText(text: string): string {
  */
 function expressionPreview(
     select: Select,
-    expr: string,
+    args: BindingArgs,
+    block: string,
     attribute: string,
     context: BlockContext,
     loops: unknown[] = [],
 ): unknown {
+    const expr = args.expr ?? '';
     const postId = typeof context.postId === 'number' ? context.postId : 0;
     const postType = typeof context.postType === 'string' ? context.postType : '';
+    // A link or an image (ADR-0015): the server's value for that attribute, as on the front end.
+    if (args.as === 'image' || !TEXT_ATTRIBUTES.includes(attribute)) {
+        const bound: Record<string, unknown> = { expr };
+        if (args.as) bound.as = args.as;
+        if (args.size) bound.size = args.size;
+        const item: PreviewItem = {
+            key: `${block}|${attribute}|${postId}|${postType}|${JSON.stringify(bound)}${loops.length ? `|${JSON.stringify(loops)}` : ''}`,
+            args: bound as unknown as BindingArgs,
+            block,
+            attribute,
+            postId,
+            postType,
+        };
+        if (loops.length) item.loops = loops;
+        const value = select(STORE).getValue?.(item);
+        return value === null || value === '' ? undefined : value;
+    }
     const item: PreviewItem = {
         key: `tag|${postId}|${postType}|${JSON.stringify({ expr })}${loops.length ? `|${JSON.stringify(loops)}` : ''}`,
         kind: 'tag',
@@ -245,7 +266,7 @@ export function source(config: Config) {
             for (const [attribute, binding] of Object.entries(bindings)) {
                 const args = binding?.args;
                 if (args && typeof args.expr === 'string') {
-                    result[attribute] = expressionPreview(select, args.expr, attribute, context ?? {}, loops);
+                    result[attribute] = expressionPreview(select, args, block, attribute, context ?? {}, loops);
                     continue;
                 }
                 const isItemValue = Boolean(args && (args.row !== undefined || args.loop !== undefined));

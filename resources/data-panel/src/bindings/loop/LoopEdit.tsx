@@ -20,7 +20,7 @@ import {
 import { useDispatch, useSelect } from '@wordpress/data';
 import { __, sprintf } from '@wordpress/i18n';
 import { ConditionBuilder } from '../ConditionBuilder';
-import { newCondition } from '../conditions';
+import { isValidToken, newCondition } from '../conditions';
 import type { Config } from '../logic';
 import { valueOptions } from '../tags';
 import { loopChain } from './chain';
@@ -37,6 +37,9 @@ import {
     type LoopSource,
     type SourceType,
 } from './data';
+
+/** The Order by choice that opens an expression field. */
+const CUSTOM_ORDER = '__custom';
 
 interface EditProps {
     clientId: string;
@@ -281,6 +284,10 @@ function Inspector({ config, clientId, attributes, setAttributes }: EditProps & 
     const number = (value: string) => Math.max(0, Math.floor(Number(value) || 0));
     const taxonomies = (config.loop?.taxonomies ?? []).filter((t) => t.postTypes.includes(source.postType ?? ''));
     const sortable = itemOptions.filter((o) => !o.name.startsWith('loop.') && o.group !== __('Site', 'taw-core'));
+    // Order by any expression (ADR-0015): a value not in the list, e.g. @(0 - @row.year).
+    const [customOrder, setCustomOrder] = useState(
+        () => !!order.by && order.by !== 'random' && !sortable.some((o) => `@${o.name}` === order.by),
+    );
 
     return (
         <InspectorControls>
@@ -396,8 +403,13 @@ function Inspector({ config, clientId, attributes, setAttributes }: EditProps & 
             <PanelBody title={__('Items', 'taw-core')} className="taw-loop-panel">
                 <SelectControl
                     label={__('Order by', 'taw-core')}
-                    value={order.by ?? ''}
+                    value={customOrder ? CUSTOM_ORDER : (order.by ?? '')}
                     onChange={(by: string) => {
+                        if (by === CUSTOM_ORDER) {
+                            setCustomOrder(true);
+                            return;
+                        }
+                        setCustomOrder(false);
                         const option = sortable.find((o) => `@${o.name}` === by);
                         setAttributes({ order: { ...order, by, as: option?.isDate ? 'date' : order.as } });
                     }}
@@ -411,7 +423,26 @@ function Inspector({ config, clientId, attributes, setAttributes }: EditProps & 
                             {`${o.group}: ${o.label}`}
                         </option>
                     ))}
+                    <option value={CUSTOM_ORDER}>{__('Custom expression…', 'taw-core')}</option>
                 </SelectControl>
+                {customOrder && (
+                    <TextControl
+                        label={__('Order by this expression', 'taw-core')}
+                        placeholder="@(0 - @row.year)"
+                        value={order.by ?? ''}
+                        onChange={(by: string) => setAttributes({ order: { ...order, by } })}
+                        help={
+                            (order.by ?? '').trim() !== '' && !isValidToken((order.by ?? '').trim())
+                                ? __(
+                                      'Write one value or formula, e.g. @count(@row.members) or @(@row.price * 2).',
+                                      'taw-core',
+                                  )
+                                : __('One value or formula for each item, e.g. @count(@row.members).', 'taw-core')
+                        }
+                        __nextHasNoMarginBottom
+                        __next40pxDefaultSize
+                    />
+                )}
                 {order.by !== 'random' && (
                     <SelectControl
                         label={__('Direction', 'taw-core')}
