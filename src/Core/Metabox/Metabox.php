@@ -2800,7 +2800,7 @@ class Metabox
         <div class="taw-gradient-text-field"
             id="taw-gradient-text-<?php echo esc_attr($alpine_id); ?>"
             x-data="{ segments: <?php echo esc_attr(wp_json_encode(array_values($segments), JSON_UNESCAPED_UNICODE)); ?> }"
-            x-init="$watch('segments', function (v) { $refs.input.value = JSON.stringify(v); $refs.input.dispatchEvent(new Event('change')); })">
+            x-init="$watch('segments', function (v) { $refs.input.value = JSON.stringify(v); $refs.input.dispatchEvent(new Event('change', { bubbles: true })); })">
             <input type="hidden"
                 class="taw-gradient-text-input"
                 x-ref="input"
@@ -2889,7 +2889,7 @@ class Metabox
     ?>
         <div class="taw-hubspot-form-field"
             x-data="{ hs: <?php echo esc_attr(wp_json_encode($initial, JSON_UNESCAPED_UNICODE)); ?> }"
-            x-init="$watch('hs', function (v) { $refs.input.value = JSON.stringify(v); $refs.input.dispatchEvent(new Event('change')); }, { deep: true })">
+            x-init="$watch('hs', function (v) { $refs.input.value = JSON.stringify(v); $refs.input.dispatchEvent(new Event('change', { bubbles: true })); }, { deep: true })">
             <input type="hidden"
                 class="taw-hubspot-form-input"
                 x-ref="input"
