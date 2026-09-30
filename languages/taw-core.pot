@@ -94,6 +94,12 @@ msgstr ""
 msgid "%s (image ID)"
 msgstr ""
 
+#. translators: %s: a time span, e.g. "3 days"
+#: src/Core/Bindings/Expression/Library.php
+#, php-format
+msgid "%s ago"
+msgstr ""
+
 #. translators: %s: field label
 #: src/Core/Form/Form.php
 #, php-format
@@ -947,6 +953,10 @@ msgstr ""
 msgid "Lock"
 msgstr ""
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Logged in"
+msgstr ""
+
 #: src/Core/Seo/Schema.php
 msgid "Logo"
 msgstr ""
@@ -1162,6 +1172,10 @@ msgstr ""
 
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Nothing found."
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Now"
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/data.ts
@@ -1439,6 +1453,10 @@ msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Review changes"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Role"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -1871,6 +1889,10 @@ msgstr ""
 msgid "This row: %s"
 msgstr ""
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "This value isn’t a date."
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "Title"
 msgstr ""
@@ -1889,6 +1911,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "To change a value already in the text, click it there."
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Today"
 msgstr ""
 
 #: src/Core/Auth/PagePassword.php
@@ -1985,6 +2011,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Visibility"
+msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Visitor and date"
 msgstr ""
 
 #: src/Core/Form/Form.php
@@ -2117,6 +2147,12 @@ msgstr ""
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "https:// or /path"
+msgstr ""
+
+#. translators: %s: a time span, e.g. "2 weeks"
+#: src/Core/Bindings/Expression/Library.php
+#, php-format
+msgid "in %s"
 msgstr ""
 
 #: resources/data-panel/src/bindings/conditions.ts

@@ -96,6 +96,12 @@ msgstr ""
 msgid "%s (image ID)"
 msgstr "%s (ID de imagen)"
 
+#. translators: %s: a time span, e.g. "3 days"
+#: src/Core/Bindings/Expression/Library.php
+#, php-format
+msgid "%s ago"
+msgstr "hace %s"
+
 #. translators: %s: field label
 #: src/Core/Form/Form.php
 #, php-format
@@ -949,6 +955,10 @@ msgstr ""
 msgid "Lock"
 msgstr ""
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Logged in"
+msgstr "Sesión iniciada"
+
 #: src/Core/Seo/Schema.php
 msgid "Logo"
 msgstr "Logo"
@@ -1165,6 +1175,10 @@ msgstr "Nada"
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Nothing found."
 msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Now"
+msgstr "Ahora"
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Number of items"
@@ -1442,6 +1456,10 @@ msgstr "Invertido"
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Review changes"
 msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Role"
+msgstr "Rol"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Rollback snapshot"
@@ -1873,6 +1891,10 @@ msgstr "Los términos de esta entrada"
 msgid "This row: %s"
 msgstr "Esta fila: %s"
 
+#: resources/data-panel/src/bindings/tags.ts
+msgid "This value isn’t a date."
+msgstr "Este valor no es una fecha."
+
 #: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "Title"
 msgstr "Título"
@@ -1892,6 +1914,10 @@ msgstr "Hasta"
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "To change a value already in the text, click it there."
 msgstr "Para cambiar un valor que ya está en el texto, haz clic en él."
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Today"
+msgstr "Hoy"
 
 #: src/Core/Auth/PagePassword.php
 msgid "Too many attempts. Please wait a few minutes and try again."
@@ -1988,6 +2014,10 @@ msgstr "Valor"
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Visibility"
 msgstr ""
+
+#: resources/data-panel/src/bindings/tags.ts
+msgid "Visitor and date"
+msgstr "Visitante y fecha"
 
 #: src/Core/Form/Form.php
 msgid "We could not verify you are human. Please try again."
@@ -2120,6 +2150,12 @@ msgstr "tiene el elemento"
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "https:// or /path"
 msgstr ""
+
+#. translators: %s: a time span, e.g. "2 weeks"
+#: src/Core/Bindings/Expression/Library.php
+#, php-format
+msgid "in %s"
+msgstr "en %s"
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "is"

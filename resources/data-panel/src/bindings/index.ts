@@ -9,6 +9,7 @@ import { createReduxStore, dispatch, register, select, subscribe } from '@wordpr
 import { registerPlugin } from '@wordpress/plugins';
 import { registerAllowBound } from './allowBound';
 import { registerChips } from './chips';
+import { registerFunctions } from './expression';
 import { batcher, source, STORE, type Config, type PreviewItem } from './logic';
 import { connectMenu } from './menu';
 import { setPreviewFetch } from './preview';
@@ -26,6 +27,7 @@ declare global {
 const config = window.tawBindings;
 
 if (config) {
+    registerFunctions(config.functions);
     const fetchValue = batcher((items: PreviewItem[]) =>
         apiFetch<{ values: Record<string, unknown> }>({ path: config.route, method: 'POST', data: { items } }).then(
             (response) => response.values ?? {},

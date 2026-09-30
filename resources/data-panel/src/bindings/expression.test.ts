@@ -1,7 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { completionAt, MAX_LENGTH, namesIn, parseExpression, SIGNATURES, type Parsed } from './expression';
+import {
+    completionAt,
+    MAX_LENGTH,
+    namesIn,
+    parseExpression,
+    registerFunctions,
+    SIGNATURES,
+    siteFunctions,
+    type Parsed,
+} from './expression';
 
 interface Case extends Parsed {
     name: string;
@@ -39,6 +48,21 @@ describe('the expression grammar', () => {
             at: 0,
             length: 9,
         });
+    });
+
+    it('has the same built-in functions as PHP', () => {
+        const shared = JSON.parse(
+            readFileSync(resolve(process.cwd(), '../../tests/fixtures/expression-functions.json'), 'utf8'),
+        ) as { signatures: unknown };
+        expect(SIGNATURES).toStrictEqual(shared.signatures);
+    });
+
+    it("registers the site's own functions from the editor config", () => {
+        registerFunctions({ with_tax: { params: ['any'], required: 1, label: 'Price with tax', description: '' } });
+        expect(parseExpression('@with_tax(@price)').parts[0]).toHaveProperty('expr.fn', 'with_tax');
+        expect(siteFunctions()).toHaveProperty('with_tax.label', 'Price with tax');
+        registerFunctions([]); // PHP's empty array
+        expect(parseExpression('@with_tax(@price)').parts[0]).toHaveProperty('name', 'with_tax');
     });
 
     it('lists every value name, inside formulas too', () => {

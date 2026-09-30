@@ -9,7 +9,14 @@ import { __ } from '@wordpress/i18n';
 import { completionAt, namesIn, parseExpression } from './expression';
 import type { ExpressionError } from './expression';
 import { previewExpression } from './preview';
-import { errorMessage, functionSuggestions, nameSuggestions, type ValueOption } from './tags';
+import {
+    errorMessage,
+    functionSuggestions,
+    HELPER_FUNCTIONS,
+    listNames,
+    nameSuggestions,
+    type ValueOption,
+} from './tags';
 
 interface Suggestion {
     key: string;
@@ -20,7 +27,7 @@ interface Suggestion {
 
 /** Names that aren't values the popup knows (after the parser's own errors). */
 function unknownNames(names: string[], options: ValueOption[]): string[] {
-    const known = new Set(options.map((o) => o.name));
+    const known = new Set([...options.map((o) => o.name), ...listNames(window.tawBindings?.loop)]);
     return [...new Set(names)].filter(
         (name) => !known.has(name) && !(name.startsWith('post.') && known.has(name.slice(5))),
     );
@@ -212,16 +219,18 @@ export function ExpressionEditor({
                 >
                     {__('@if( … )', 'taw-core')}
                 </button>
-                {functionSuggestions('').map((f) => (
-                    <button
-                        key={f.fn}
-                        type="button"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => typeAtCaret(`.${f.insert}`)}
-                    >
-                        .{f.insert}
-                    </button>
-                ))}
+                {functionSuggestions('')
+                    .filter((f) => HELPER_FUNCTIONS.includes(f.fn))
+                    .map((f) => (
+                        <button
+                            key={f.fn}
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => typeAtCaret(`.${f.insert}`)}
+                        >
+                            .{f.insert}
+                        </button>
+                    ))}
             </div>
             <div className="taw-expression-preview" aria-live="polite">
                 <span className="taw-expression-preview__label">{__('Preview', 'taw-core')}</span>

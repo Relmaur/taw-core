@@ -63,7 +63,8 @@ export const MAX_DEPTH = 10;
 export const NAMESPACES = ['post', 'site', 'option', 'term', 'author', 'viewer', 'date', 'row', 'loop'];
 export const SITE_PROPERTIES = ['name', 'tagline', 'url', 'year'];
 
-export type ParamKind = 'any' | 'string' | 'int';
+/** Literal checks: `string` must be quoted, `int` a whole number above zero; `list`/`date` tell PHP how to read a value. */
+export type ParamKind = 'any' | 'string' | 'int' | 'list' | 'date';
 
 /** Parameter kinds (receiver first), how many are required, and whether the last repeats. */
 export interface Signature {
@@ -74,15 +75,73 @@ export interface Signature {
 
 /** The built-in functions (Functions::SIGNATURES). */
 export const SIGNATURES: Record<string, Signature> = {
-    format: { params: ['any', 'string'], required: 2 },
+    format: { params: ['date', 'string'], required: 2 },
     upper: { params: ['any'], required: 1 },
     lower: { params: ['any'], required: 1 },
+    capitalize: { params: ['any'], required: 1 },
     default: { params: ['any', 'string'], required: 2 },
     truncate: { params: ['any', 'int'], required: 2 },
+    words: { params: ['any', 'int'], required: 2 },
+    word_count: { params: ['any'], required: 1 },
+    replace: { params: ['any', 'any', 'any'], required: 3 },
+    strip: { params: ['any'], required: 1 },
+    slug: { params: ['any'], required: 1 },
+    urlencode: { params: ['any'], required: 1 },
+    trim: { params: ['any'], required: 1 },
+    plural: { params: ['any', 'any', 'any'], required: 3 },
+    concat: { params: ['any'], required: 1, variadic: true },
     if: { params: ['any', 'any', 'any'], required: 2 },
     coalesce: { params: ['any'], required: 1, variadic: true },
     empty: { params: ['any'], required: 1 },
+    round: { params: ['any', 'any'], required: 1 },
+    floor: { params: ['any'], required: 1 },
+    ceil: { params: ['any'], required: 1 },
+    abs: { params: ['any'], required: 1 },
+    min: { params: ['list'], required: 1, variadic: true },
+    max: { params: ['list'], required: 1, variadic: true },
+    number: { params: ['any', 'any'], required: 1 },
+    currency: { params: ['any', 'string'], required: 1 },
+    percent: { params: ['any', 'any'], required: 1 },
+    ago: { params: ['date'], required: 1 },
+    until: { params: ['date'], required: 1 },
+    days_between: { params: ['date', 'date'], required: 2 },
+    add_days: { params: ['date', 'any'], required: 2 },
+    year: { params: ['date'], required: 1 },
+    month: { params: ['date'], required: 1 },
+    day: { params: ['date'], required: 1 },
+    weekday: { params: ['date'], required: 1 },
+    terms: { params: ['string'], required: 1 },
+    column: { params: ['list', 'any'], required: 2 },
+    count: { params: ['list'], required: 1 },
+    join: { params: ['list', 'any'], required: 1 },
+    first: { params: ['list'], required: 1 },
+    last: { params: ['list'], required: 1 },
+    sort: { params: ['list'], required: 1 },
+    reverse: { params: ['list'], required: 1 },
+    contains: { params: ['list', 'any'], required: 2 },
+    sum: { params: ['list'], required: 1 },
+    avg: { params: ['list'], required: 1 },
 };
+
+/** A site's own function, from PHP's `taw_expression_functions` (no callback: PHP runs it). */
+export interface SiteFunction extends Signature {
+    label: string;
+    description: string;
+}
+
+let known: Record<string, Signature> = SIGNATURES;
+let site: Record<string, SiteFunction> = {};
+
+/** The site's own functions (window.tawBindings.functions); the built-ins keep their names. */
+export function registerFunctions(functions: Record<string, SiteFunction> | unknown[] | undefined): void {
+    site = functions && !Array.isArray(functions) ? functions : {};
+    known = { ...site, ...SIGNATURES };
+}
+
+/** The site's own functions, as registered. */
+export function siteFunctions(): Record<string, SiteFunction> {
+    return site;
+}
 
 /** Functions::check(): 'wrong_arguments' or null; only literals are kind-checked. */
 export function checkArguments(signature: Signature, args: ExpressionNode[]): string | null {
@@ -503,7 +562,7 @@ function tokenAt(chars: string[], at: number, functions: Record<string, Signatur
 }
 
 /** Same result as Bindings\Expression\Parser::parse(), key order included. */
-export function parseExpression(expression: string, functions: Record<string, Signature> = SIGNATURES): Parsed {
+export function parseExpression(expression: string, functions: Record<string, Signature> = known): Parsed {
     const chars = Array.from(expression);
     if (chars.length > MAX_LENGTH) return { parts: [], errors: [{ code: 'too_long', at: 0 }] };
 

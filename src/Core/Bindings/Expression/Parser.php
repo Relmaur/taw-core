@@ -55,12 +55,12 @@ final class Parser
 
     /**
      * @param array<string, array{params: list<string>, required: int, variadic?: bool}>|null $functions
-     *        The known functions (default: the built-in ones, Functions::SIGNATURES).
+     *        The known functions (default: Functions::all(), the built-ins and the site's own).
      * @return array{parts: list<array<string, mixed>>, errors: list<array{code: string, at: int}>}
      */
     public static function parse(string $expression, ?array $functions = null): array
     {
-        $functions ??= Functions::SIGNATURES;
+        $functions ??= Functions::all();
         if (mb_strlen($expression) > self::MAX_LENGTH) {
             return ['parts' => [], 'errors' => [['code' => 'too_long', 'at' => 0]]];
         }

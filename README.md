@@ -475,6 +475,36 @@ Published on @post.date.format('F j, Y') by @post.author · @option.company_phon
   shows them). An unknown name before `(` stays v1 text: `@book_year(1965)` is the field, then `(1965)`.
   Logic functions: `if(test, then, else?)`, `coalesce(a, b, …)`, `empty(x)`. Conditions' `value` and the
   loop's `order.by` take formulas too (`@(@book_year + 1)`).
+- **Functions (v1.71.0+)**, each callable as `@fn(x, …)` or `@x.fn(…)`:
+
+  | Group | Functions |
+  |---|---|
+  | Text | `upper`, `lower`, `capitalize`, `default(x, 'text')`, `truncate(x, n)`, `words(x, n)`, `word_count`, `replace(x, find, with)`, `strip` (HTML), `slug`, `urlencode`, `trim`, `plural(n, 'award', 'awards')` → "3 awards", `concat(a, b, …)` |
+  | Numbers | `round(x, digits?)`, `floor`, `ceil`, `abs`, `min(…)`, `max(…)`, `number(x, digits?)` (site locale), `currency(x, 'MXN')` → "$1,234.50" (default code: filter `taw_expression_currency`, `USD`), `percent(x, digits?)` (0.25 → "25%") |
+  | Dates | `format(d, 'F j, Y')`, `ago(d)` ("3 days ago" / "in 2 weeks"), `until(d)` ("2 weeks", empty once past), `days_between(a, b)`, `add_days(d, n)` (→ `Y-m-d`), `year`, `month` (name), `day`, `weekday` (name). A 4-digit number is a year (`@ago(@book_year)`). |
+  | Lists | `terms('genre')` (the post's terms), `column(rows, 'name')`, `count`, `join(list, sep?)`, `first`, `last`, `sort`, `reverse`, `contains(list, x)`, `sum`, `avg` |
+
+  A list parameter reads a field as its values: a repeater's rows, a post select's (readable) post titles, a
+  files field's URLs; other text splits at commas. A date parameter reads a field as `Y-m-d H:i:s`, whatever
+  its display format. New errors: `not_a_date`.
+- **Your own functions (v1.71.0+):**
+
+  ```php
+  add_filter('taw_expression_functions', function (array $functions): array {
+      $functions['with_tax'] = [
+          'args'        => ['number'],   // any, text, number, int, list, date
+          'callback'    => fn (float $price): float => $price * 1.16,
+          'label'       => __('Price with tax', 'my-theme'),
+          'description' => __('Adds 16% VAT.', 'my-theme'),
+      ];
+      return $functions;
+  });
+  ```
+
+  `@with_tax(@price).currency('MXN')` then works in chips, bindings, conditions and loops, and the editor's
+  parser knows it (`window.tawBindings.functions`). Optional keys: `required` (default: every arg),
+  `variadic`. Built-in names can't be replaced. Callbacks run only on the server (the editor previews through
+  the preview route); one that throws gives an empty value and logs `expression.function_failed`.
 - **Where:**
   - an inline chip: `data-taw-tag='{"expr": "…"}'`;
   - a whole text attribute: a `taw/field` binding with `args: {"expr": "…"}` on paragraph, heading or
