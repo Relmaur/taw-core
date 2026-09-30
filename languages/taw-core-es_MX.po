@@ -559,7 +559,7 @@ msgstr "Desconectar"
 msgid "Disconnect TAW field"
 msgstr "Desconectar campo TAW"
 
-#: src/Support/performance.php
+#: src/Support/Performance.php
 msgid "Dismiss"
 msgstr ""
 
@@ -2005,7 +2005,7 @@ msgstr ""
 msgid "You do not have permission to import content."
 msgstr ""
 
-#: src/Support/performance.php
+#: src/Support/Performance.php
 msgid "Your build assets aren't getting cache headers — this site appears to run nginx, which doesn't read .htaccess. Add this to your nginx server block:"
 msgstr ""
 

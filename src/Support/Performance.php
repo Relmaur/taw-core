@@ -483,14 +483,4 @@ class Performance
             );
         }
     }
-
-}
-
-// Escape hatch only (ADR-0003). This file is still a Composer `files` entry
-// because it defines the class, but it no longer registers hooks on load:
-// Theme::boot() / bootstrapFullSite() do that. A consumer that depended on the
-// old load-time registration (without ever booting) can opt back in by
-// defining TAW_PERFORMANCE_AUTOLOAD before the autoloader runs (wp-config.php).
-if (defined('ABSPATH') && defined('TAW_PERFORMANCE_AUTOLOAD') && TAW_PERFORMANCE_AUTOLOAD) {
-    Performance::register();
 }

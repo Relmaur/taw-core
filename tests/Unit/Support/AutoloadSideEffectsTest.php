@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * What happens the moment a consumer runs `require vendor/autoload.php`.
  *
- * Composer loads taw/core's `autoload.files` entries (performance.php,
+ * Composer loads taw/core's `autoload.files` entries (performance-autoload.php,
  * utilities.php) during that require — before any test can run inside this
  * PHPUnit process, whose own bootstrap already required the autoloader. So
  * each scenario runs in a FRESH `php` child process that sets up the world
@@ -26,7 +26,7 @@ final class AutoloadSideEffectsTest extends TestCase
     {
         $result = $this->runAfterAutoload('');
 
-        $this->assertSame([], $result['hooks'], 'performance.php must not register hooks at autoload time');
+        $this->assertSame([], $result['hooks'], 'loading the autoloader must not register Performance hooks');
     }
 
     public function test_the_autoload_escape_hatch_restores_load_time_registration(): void
