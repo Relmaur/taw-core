@@ -24,6 +24,9 @@ if (!defined('ABSPATH')) {
  *           is {"value": "…", "errors": [{code, at}]}.
  *           A condition (ADR-0013) sends "kind": "condition" and args {"if": {…}}: its value
  *           is {"shown": bool, "errors": [{code, path}]}.
+ *           A dynamic block setting (ADR-0016) sends "kind": "setting" and args {"expr", "setting"}
+ *           (classes, color, background, border or an attribute name): its value is
+ *           {"value": "…"|null, "dropped": null|"error"|"empty"|"not_a_color"|"palette_only"|…, "errors": […]}.
  *           Inside a TAW Loop (ADR-0014), "loops" lists the enclosing loops' attributes, outermost
  *           first: values then read each loop's first item (the item the editor edits), so
  *           `@row.*`, `@loop.*` and bindings with {"row": …} preview real values.
@@ -110,6 +113,14 @@ final class PreviewEndpoint
         $kind = $item['kind'] ?? null;
         if ($kind === 'expr') {
             return self::expression($args, $item);
+        }
+        if ($kind === 'setting') {
+            $postId = self::postId($item);
+            $setting = is_string($args['setting'] ?? null) ? $args['setting'] : '';
+            if ($postId === null || $setting === '' || !is_string($args['expr'] ?? null)) {
+                return null;
+            }
+            return BlockSettings::value($setting, $args['expr'], self::context($item, $postId));
         }
         if ($kind === 'condition') {
             $postId = self::postId($item);
