@@ -517,7 +517,7 @@ msgstr ""
 msgid "Click into the text where the value should go, then open this again."
 msgstr ""
 
-#: resources/data-panel/src/bindings/popup.tsx src/Core/Form/Form.php
+#: resources/data-panel/src/bindings/chips.tsx resources/data-panel/src/bindings/popup.tsx src/Core/Form/Form.php
 msgid "Close"
 msgstr ""
 

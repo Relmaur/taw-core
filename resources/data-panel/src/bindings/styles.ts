@@ -4,7 +4,10 @@
  * Bindings::enqueueCanvasStyles().
  */
 const CSS = `
-.taw-data-dropdown .components-popover__content{width:400px;max-width:calc(100vw - 32px);max-height:min(80vh,720px);padding:0;overflow:auto}
+.taw-data-modal.components-modal__frame{width:440px;max-width:calc(100vw - 32px);max-height:min(85vh,760px)}
+.taw-data-modal .components-modal__content{padding:0;margin:0}
+@media (max-width:599px){.taw-data-modal.components-modal__frame{margin:auto;border-radius:8px}}
+.taw-data-modal .taw-data-header{position:sticky;top:0;z-index:1;background:#fff}
 .taw-chip-popover .components-popover__content{width:400px;max-width:calc(100vw - 32px);max-height:min(80vh,720px);padding:0;overflow:auto}
 .taw-data-popup{font-size:13px;color:#1e1e1e}
 .taw-data-header{display:flex;align-items:center;gap:8px;padding:10px 8px 10px 16px;border-bottom:1px solid #e0e0e0}
