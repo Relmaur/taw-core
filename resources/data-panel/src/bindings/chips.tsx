@@ -99,6 +99,12 @@ function ChipPopover({ config, props, args }: { config: Config; props: EditProps
                 <div className="taw-data-header">
                     <Dashicon icon="database" />
                     <strong>{__('TAW value', 'taw-core')}</strong>
+                    <Button
+                        icon="no-alt"
+                        size="small"
+                        label={__('Close', 'taw-core')}
+                        onClick={() => props.onChange(afterChip(props.value))}
+                    />
                 </div>
                 <div className="taw-data-popup">
                     <ExpressionEditor value={expression} onChange={setExpression} options={options} autoFocus={false} />

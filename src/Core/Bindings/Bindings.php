@@ -45,8 +45,8 @@ final class Bindings
         . '.taw-tag[data-rich-text-format-boundary],.taw-tag:focus{background:rgba(56,88,233,.22)}'
         . '.taw-tag[data-taw-tag*=\'"if":\']{box-shadow:none;outline:1px dashed rgba(56,88,233,.8);outline-offset:-1px}'
         . '.taw-conditional{position:relative;outline:1px dashed rgba(56,88,233,.55);outline-offset:4px}'
-        . '.taw-conditional::after{content:attr(data-taw-condition);position:absolute;top:-6px;right:0;transform:translateY(-100%);z-index:2;padding:0 6px;border-radius:2px;background:#3858e9;color:#fff;font:500 10px/16px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;letter-spacing:.02em;white-space:nowrap;pointer-events:none}'
-        . '.taw-conditional.is-taw-hidden{opacity:.5}.taw-conditional.is-taw-hidden::after{background:#8a6100}'
+        . '.taw-conditional:not(.has-block-overlay)::before{content:attr(data-taw-condition);position:absolute;top:-6px;right:0;bottom:auto;left:auto;width:auto;height:auto;margin:0;box-shadow:none;outline:0;transform:translateY(-100%);z-index:2;padding:0 6px;border-radius:2px;background:#3858e9;color:#fff;font:500 10px/16px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;letter-spacing:.02em;white-space:nowrap;pointer-events:none}'
+        . '.taw-conditional.is-taw-hidden{opacity:.5}.taw-conditional.is-taw-hidden:not(.has-block-overlay)::before{background:#8a6100}'
         // The TAW Loop in the canvas (ADR-0014): setup, the editable first item, previews, "no items".
         . '.taw-loop-setup .components-placeholder__fieldset{flex-direction:column;align-items:stretch}'
         . '.taw-loop-setup__sources{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;width:100%}'

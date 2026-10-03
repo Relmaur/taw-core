@@ -519,7 +519,7 @@ msgstr "Borrar"
 msgid "Click into the text where the value should go, then open this again."
 msgstr "Haz clic en el texto donde debe ir el valor y vuelve a abrir esto."
 
-#: resources/data-panel/src/bindings/popup.tsx src/Core/Form/Form.php
+#: resources/data-panel/src/bindings/chips.tsx resources/data-panel/src/bindings/popup.tsx src/Core/Form/Form.php
 msgid "Close"
 msgstr "Cerrar"
 
