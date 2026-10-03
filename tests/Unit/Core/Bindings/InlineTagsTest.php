@@ -7,6 +7,7 @@ namespace TAW\Tests\Unit\Core\Bindings;
 use Brain\Monkey\Functions;
 use TAW\Core\Bindings\BindingContext;
 use TAW\Core\Bindings\Bindings;
+use TAW\Core\Bindings\BlockSettings;
 use TAW\Core\Bindings\BlockVisibility;
 use TAW\Core\Bindings\Expression\Evaluator;
 use TAW\Core\Bindings\InlineTags;
@@ -529,6 +530,83 @@ final class InlineTagsTest extends TestCase
 
         $this->assertSame(10, has_filter('render_block', [InlineTags::class, 'renderBlock']));
         $this->assertSame(9, has_filter('render_block', [BlockVisibility::class, 'renderBlock']), 'before tags');
+        $this->assertSame(11, has_filter('render_block', [BlockSettings::class, 'renderBlock']), 'after tags');
         $this->assertSame(10, has_filter('register_block_type_args', [InlineTags::class, 'addContext']));
+    }
+
+    public function test_link_target_rel_and_post_date_take_expressions(): void
+    {
+        $button = (object) ['name' => 'core/button', 'context' => ['postId' => 5]];
+        $date = (object) ['name' => 'core/post-date', 'context' => ['postId' => 5]];
+
+        $this->assertSame('_blank', Bindings::getValue(['expr' => '@(@book_year > 1960)'], $button, 'linkTarget'));
+        $this->assertFalse(Bindings::getValue(['expr' => '@(@book_year > 2000)'], $button, 'linkTarget'), 'false removes the attribute');
+        $this->assertFalse(Bindings::getValue(['expr' => '@book_missing'], $button, 'linkTarget'), 'empty removes it too');
+        $this->assertSame('nofollow sponsored', Bindings::getValue(['expr' => "@if(@book_year > 1960, 'NoFollow sponsored nofollow \"x\"=y', '')"], $button, 'rel'), 'rel words only');
+        $this->assertFalse(Bindings::getValue(['expr' => '@book_missing'], $button, 'rel'));
+        $this->assertSame('1965-08-01T00:00:00+00:00', Bindings::getValue(['expr' => '@book_released'], $date, 'datetime'));
+        $this->assertNull(Bindings::getValue(['expr' => 'not a date'], $date, 'datetime'), 'the saved date stays');
+    }
+
+    /**
+     * @param array<int, array{slug: string}> $theme
+     */
+    private function withPalette(array $theme = [['slug' => 'primary'], ['slug' => 'contrast2']], bool $custom = true): void
+    {
+        BlockSettings::reset();
+        Functions\when('wp_get_global_settings')->alias(static fn (array $path): mixed => $path === ['color', 'palette'] ? ['theme' => $theme, 'default' => [['slug' => 'white']]] : $custom);
+        Functions\when('_wp_to_kebab_case')->alias(static fn (string $s): string => (string) preg_replace('/(?<=[a-z])(?=\d)/', '-', $s));
+    }
+
+    public function test_block_settings_plan_cleans_every_value(): void
+    {
+        $this->withPalette();
+        $plan = BlockSettings::plan([
+            'classes'    => "card @if(@book_year > 1960, 'is-classic', 'is-new') bad\"one",
+            'color'      => 'contrast2',
+            'background' => '@book_note',
+            'border'     => '@(1 / 0)',
+            'attributes' => ['id' => 'book-@book_year', 'data-year' => '@book_year', 'title' => '@book_missing'],
+        ], new BindingContext(5));
+
+        $this->assertSame(['card', 'is-classic', 'badone'], $plan['classes']);
+        $this->assertSame(['color' => 'var(--wp--preset--color--contrast-2)'], $plan['style'], 'a palette slug, as its CSS variable');
+        $this->assertSame(['has-text-color'], $plan['markers']);
+        $this->assertSame(['id' => 'book-1965', 'data-year' => '1965'], $plan['attributes']);
+        $this->assertSame(['background' => 'not_a_color', 'border' => 'error', 'title' => 'empty'], $plan['dropped']);
+    }
+
+    public function test_block_settings_colors_follow_the_palette_and_policy(): void
+    {
+        $this->withPalette();
+        $context = new BindingContext(5);
+        $this->assertSame('#c0392b', BlockSettings::value('background', '#C0392B', $context)['value']);
+        $this->assertSame('var(--wp--preset--color--white)', BlockSettings::value('color', 'white', $context)['value'], 'default palette too');
+
+        $this->withPalette(custom: false);
+        $this->assertSame(['value' => null, 'dropped' => 'palette_only', 'errors' => []], BlockSettings::value('background', '#c0392b', $context));
+        $this->assertSame('var(--wp--preset--color--primary)', BlockSettings::value('background', 'primary', $context)['value']);
+    }
+
+    public function test_block_settings_render_skips_blocks_without_them(): void
+    {
+        $html = '<p class="x">Hi</p>';
+
+        $this->assertSame($html, BlockSettings::renderBlock($html, ['blockName' => 'core/paragraph', 'attrs' => []]));
+        $this->assertSame($html, BlockSettings::renderBlock($html, ['attrs' => ['metadata' => ['tawSettings' => ['nope' => '@x']]]]), 'nothing valid');
+        $this->assertSame('', BlockSettings::renderBlock('', ['attrs' => ['metadata' => ['tawSettings' => ['classes' => 'a']]]]), 'a hidden block stays hidden');
+        $this->assertSame($html, BlockSettings::apply($html, ['classes' => [], 'style' => [], 'markers' => [], 'attributes' => [], 'dropped' => ['color' => 'empty']], 'core/paragraph'), 'nothing to write');
+    }
+
+    public function test_previews_clean_block_settings(): void
+    {
+        $this->withPalette();
+        $item = static fn (string $setting, string $expression, int $postId = 5): array => ['key' => 'k', 'kind' => 'setting', 'args' => ['expr' => $expression, 'setting' => $setting], 'postId' => $postId];
+
+        $this->assertSame(['value' => 'is-1965 card', 'dropped' => null, 'errors' => []], PreviewEndpoint::resolve($item('classes', 'is-@book_year card')));
+        $this->assertSame(['value' => null, 'dropped' => 'not_a_color', 'errors' => []], PreviewEndpoint::resolve($item('color', 'var(--x)')));
+        $this->assertSame('1965', PreviewEndpoint::resolve($item('data-year', '@book_year'))['value']);
+        $this->assertSame('unknown_setting', PreviewEndpoint::resolve($item('onclick', 'x'))['dropped']);
+        $this->assertNull(PreviewEndpoint::resolve($item('classes', 'x', 8)), 'a post the user can\'t edit');
     }
 }

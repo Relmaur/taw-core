@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace TAW\Core\Bindings;
 
+use TAW\Core\Bindings\Expression\EvaluationError;
 use TAW\Core\Bindings\Expression\Evaluator;
 use TAW\Core\Bindings\Expression\Functions;
+use TAW\Core\Bindings\Expression\Library;
+use TAW\Core\Bindings\Expression\Value;
 use TAW\Core\Fields\Image;
 use TAW\Core\Loop\EditorData;
 use TAW\Core\Loop\RowValues;
@@ -87,6 +90,7 @@ final class Bindings
         add_action('enqueue_block_assets', [self::class, 'enqueueCanvasStyles']);
         InlineTags::register();
         BlockVisibility::register();
+        BlockSettings::register();
     }
 
     /**
@@ -214,6 +218,13 @@ final class Bindings
         }
 
         $value = Evaluator::evaluate($expression, $context)['value'];
+        // A link's target and rel (ADR-0016): false or empty removes the attribute.
+        if ($target->kind === 'target') {
+            return Value::truthy($value) ? '_blank' : false;
+        }
+        if ($target->kind === 'rel') {
+            return ($rel = self::rel($value)) === '' ? false : $rel;
+        }
         if ($value === '') {
             return null;
         }
@@ -230,8 +241,27 @@ final class Bindings
             'plain' => $value,
             'url'   => ($url = esc_url_raw($value)) === '' ? null : $url,
             'id'    => ($id = self::attachment($value)) === 0 ? null : $id,
+            'date'  => self::isoDate($value),
             default => null,
         };
+    }
+
+    /** Rel words (lowercase letters and dashes), space-separated; anything else dropped. */
+    private static function rel(string $value): string
+    {
+        $words = preg_split('/\s+/', strtolower(trim($value))) ?: [];
+
+        return implode(' ', array_unique(array_filter($words, static fn (string $word): bool => preg_match('/^[a-z]+(?:-[a-z]+)*$/', $word) === 1)));
+    }
+
+    /** A date in ISO 8601 (the site's time zone), or null to keep the saved one. */
+    private static function isoDate(string $value): ?string
+    {
+        try {
+            return wp_date('c', Library::time($value)) ?: null;
+        } catch (EvaluationError) {
+            return null;
+        }
     }
 
     /**
