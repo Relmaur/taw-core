@@ -2303,6 +2303,66 @@ An unknown edition slug 404s with `{"error": "Unknown catechism edition."}`; a k
 
 ---
 
+## Canon Law Reader Corpus
+
+A Code of Canon Law — divisions (libro → parte → sección → título → capítulo → artículo, nesting to any depth, levels skipped freely) holding numbered canons. Same storage/install/REST posture and the same two-backend split as the [Catechism Reader Corpus](#catechism-reader-corpus), edition-parameterized from day one (the 1983 Code today; the 1917 Code can be added as a second edition).
+
+**Opt-in** — call `TAW\Core\Rest\CanonLawEndpoint::enable()` in the theme's `customizations.php` before `Theme::boot()`.
+
+### Editions
+
+`TAW\Core\Corpus\CanonLaw\CanonLawEditions` is the one place valid slugs are declared — a plain developer-curated array:
+
+| Slug | Name | Installed filename |
+|---|---|---|
+| `cic-1983` | Código de Derecho Canónico (1983) | `canon-law-cic-1983.sqlite` |
+
+### Installing an edition
+
+```bash
+# Host with pdo_sqlite — copies the file into taw-private/corpus/
+php bin/taw canon-law:install cic-1983 /path/to/codigo_1983.sqlite
+
+# Host without pdo_sqlite — export on a machine that has it, install the JSON into MySQL
+php bin/taw canon-law:export /path/to/codigo_1983.sqlite /path/to/export.json
+php bin/taw canon-law:install cic-1983 /path/to/export.json
+```
+
+The source is the proofreading app's `corpus:export` file: tables `divisions` (`id`, `parent_id`, `kind`, `title`, `order`), `canons` (`id`, `division_id`, `number`, `text`), `canons_fts`, and a `meta` key/value table (`surface`, `slug`, `release_channel`, `source_revision`, `generated_at`, …). Before installing, `canon-law:install` checks the export is what it claims to be: `meta.surface` must be `canon_law` (a Bible or Catechism export is refused), and a `.sha256` sidecar next to a `.sqlite` source (`<file>.sqlite.sha256` or `<file>.sha256`, `sha256sum` format) must match. `canon-law:export` carries `meta` into the JSON so the MySQL path gets the same check. MySQL storage is one shared table-set across editions (`taw_corpus_canon_law_divisions` / `_canons` / `_meta`), reloaded per edition inside one real transaction, exactly like the Catechism installer.
+
+### Reading an edition
+
+`TAW\Core\Corpus\CanonLaw\CanonLawReaderInterface` — implemented by `CanonLawReader` (SQLite) and `MysqlCanonLawReader` (MySQL fallback):
+
+```php
+$reader = TAW\Core\Rest\CanonLawEndpoint::reader('cic-1983'); // SQLite or MySQL, filterable
+$reader->divisions('cic-1983');            // tree: id, kind, title, order, canon_count (own), canon_from/canon_to (subtree), children
+$reader->division('cic-1983', 189);        // one division's OWN canons + breadcrumb (null if it has none)
+$reader->canons('cic-1983', [1055, 1056]); // canons by number, each with division_id + breadcrumb
+$reader->searchCanons('cic-1983', 'matrimonio', 20);
+$reader->meta('cic-1983');                 // the export's provenance, e.g. release_channel
+```
+
+Canons can hang off any level, not only a leaf (Book I's cc. 1–6 sit directly on the Book), which is why each division carries its own `canon_count` next to the subtree range. Divisions with no canon anywhere under them are pruned.
+
+**Amended canons.** The source edition marks amended text inline, and the marks survive the export as plain characters: a lone `n ` before or after a paragraph sign, a leading `- ` on every canon of Book VI (replaced in 2021), the printed legend line `(n Indica que el texto corresponde a la nueva versión)`, and a trailing `[Redacción original …]:` block carrying the pre-amendment wording. Both readers pass every canon through `TAW\Core\Corpus\CanonLaw\CanonText::parse()`, so a canon is always `{number, text, amended, amendment}`: `text` is clean, `amended` is a boolean, and `amendment` is `{note, original_text}` (the bracketed heading naming the motu proprio, and the original wording, which is null when the source gives only the heading) or null. The raw text is stored unchanged in both backends; parsing happens at read time, so SQLite and MySQL can't drift apart.
+
+### Routes
+
+- `GET /wp-json/taw/v1/canon-law/editions` — every registered edition, plus `installed`, `release_channel`, `source_revision`, `generated_at` (a theme can label a `beta` export as provisional).
+- `GET /wp-json/taw/v1/canon-law/{edition}/divisions` — the division tree.
+- `GET /wp-json/taw/v1/canon-law/{edition}/divisions/{id}` — one division's own canons + breadcrumb.
+- `GET /wp-json/taw/v1/canon-law/{edition}/canons?numbers=1055,1056` — canons by number (max 50).
+- `GET /wp-json/taw/v1/canon-law/{edition}/search?q=...&limit=20` — full-text search (limit clamped 1-50).
+
+Same distinct 404s for unknown vs. not-installed editions as the Catechism routes. **Public**, rate limited: 120 requests/10 min per IP for reads, 30/10 min for search.
+
+### Chatbot tool
+
+When the endpoint is enabled and an edition is installed, `RagChatEndpoint` also offers the model `lookup_canon_law` (`TAW\Core\Rag\Tools\CanonLawLookupTool`): fetch canons by number, or search by Spanish keywords. It answers with each canon's number, location, text and amendment, so the model can cite "c. 1055 § 1". It's a dedicated tool rather than a knowledge base for two reasons: the generic SQLite ingestor embeds TEXT columns only and would drop the integer canon number, and the tool reads through the MySQL fallback, so it also works on hosts without `pdo_sqlite`.
+
+---
+
 ## Static Export & Headless CORS
 
 `export:static` only freezes what's actually static: rendered page/post HTML, Vite assets, and uploads. Forms (`admin-ajax.php?action=taw_form_*`) and search (`GET /taw/v1/search-posts`) stay dynamic by design — they keep hitting this WordPress install, over the network, exactly as before. That's the right call: there's no server at a static host to answer them otherwise.
