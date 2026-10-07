@@ -9,6 +9,7 @@ use TAW\Core\Form\SubmissionsHandler;
 use TAW\Core\Rag\Llm\LlmClient;
 use TAW\Core\Rag\Orchestrator\ChatOrchestrator;
 use TAW\Core\Rag\RagSettings;
+use TAW\Core\Rag\Tools\CanonLawLookupTool;
 use TAW\Core\Rag\Tools\SearchKnowledgeBaseTool;
 
 if (!defined('ABSPATH')) {
@@ -121,6 +122,14 @@ final class RagChatEndpoint
         $llm = new LlmClient();
         $searchTool = new SearchKnowledgeBaseTool($llm);
         $tools = [$searchTool->name() => $searchTool];
+
+        // Structured canon lookup — only when the site serves a Code and one
+        // is installed (see CanonLawLookupTool's docblock for why it isn't
+        // just another knowledge base).
+        if (CanonLawEndpoint::isEnabled() && CanonLawLookupTool::installedEdition() !== null) {
+            $canonTool = new CanonLawLookupTool();
+            $tools[$canonTool->name()] = $canonTool;
+        }
 
         $orchestrator = new ChatOrchestrator($llm, $tools, RagSettings::chatModel(), RagSettings::maxToolIterations());
         $result = $orchestrator->respond($message, $history);

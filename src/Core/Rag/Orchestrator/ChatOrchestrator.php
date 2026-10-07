@@ -27,7 +27,7 @@ if (!defined('ABSPATH')) {
  */
 final class ChatOrchestrator
 {
-    private const SYSTEM_PROMPT = "You are a helpful assistant for this website. Use the available tools to look up Bible verses, Catechism of Trent entries, or search this site's own content before answering questions that call for those authoritative sources. Answer normally for anything else.";
+    private const SYSTEM_PROMPT = "You are a helpful assistant for this website. Use the available tools to search this site's knowledge bases and content (and, when offered, to look up canons of the Code of Canon Law by number or keyword) before answering questions that call for those authoritative sources, and cite what you found. Answer normally for anything else.";
 
     /**
      * @param array<string, RagTool> $tools Keyed by tool name (must match each tool's name()).

@@ -17,6 +17,7 @@ use TAW\Core\Rag\Ingestion\PostIndexer;
 use TAW\Core\Rag\KnowledgeBase\KnowledgeBaseAdminScreen;
 use TAW\Core\Rag\RagSettings;
 use TAW\Core\Rest\BibleEndpoint;
+use TAW\Core\Rest\CanonLawEndpoint;
 use TAW\Core\Rest\CatechismEndpoint;
 use TAW\Core\Rest\Cors;
 use TAW\Core\Rest\RagChatEndpoint;
@@ -228,6 +229,17 @@ class Theme
         // CatechismEndpoint's own docblock.
         if (CatechismEndpoint::isEnabled()) {
             new CatechismEndpoint();
+        }
+
+        // ── 17. Canon Law reader corpus ─────────────────────────────────────────
+        // Opt-in only — no-op unless CanonLawEndpoint::enable() was called.
+        // GET taw/v1/canon-law/editions, taw/v1/canon-law/{edition}/divisions,
+        // …/divisions/{id}, …/canons?numbers=, and …/search over a
+        // developer-installed reference corpus (bin/taw canon-law:install —
+        // see CanonLawInstallCommand's docblock). Public, rate-limited — see
+        // CanonLawEndpoint's own docblock.
+        if (CanonLawEndpoint::isEnabled()) {
+            new CanonLawEndpoint();
         }
     }
 
