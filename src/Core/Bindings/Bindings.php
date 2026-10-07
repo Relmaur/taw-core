@@ -47,6 +47,11 @@ final class Bindings
     private const CANVAS_CSS = '.taw-tag{background:rgba(56,88,233,.1);box-shadow:inset 0 0 0 1px rgba(56,88,233,.35);border-radius:3px;padding:0 .2em;white-space:nowrap;cursor:pointer}'
         . '.taw-tag[data-rich-text-format-boundary],.taw-tag:focus{background:rgba(56,88,233,.22)}'
         . '.taw-tag[data-taw-tag*=\'"if":\']{box-shadow:none;outline:1px dashed rgba(56,88,233,.8);outline-offset:-1px}'
+        // Dynamic block settings (ADR-0016): the answered colors, over the block's saved ones, as on the site.
+        . '.taw-dynamic{outline:1px dotted rgba(56,88,233,.5);outline-offset:2px}'
+        . '.taw-dyn-color:not(.wp-block-button),.wp-block-button.taw-dyn-color .wp-block-button__link{color:var(--taw-dyn-color)!important}'
+        . '.taw-dyn-bg:not(.wp-block-button),.wp-block-button.taw-dyn-bg .wp-block-button__link{background-color:var(--taw-dyn-bg)!important}'
+        . '.taw-dyn-border:not(.wp-block-button),.wp-block-button.taw-dyn-border .wp-block-button__link{border-color:var(--taw-dyn-border)!important}'
         . '.taw-conditional{position:relative;outline:1px dashed rgba(56,88,233,.55);outline-offset:4px}'
         . '.taw-conditional:not(.has-block-overlay)::before{content:attr(data-taw-condition);position:absolute;top:-6px;right:0;bottom:auto;left:auto;width:auto;height:auto;margin:0;box-shadow:none;outline:0;transform:translateY(-100%);z-index:2;padding:0 6px;border-radius:2px;background:#3858e9;color:#fff;font:500 10px/16px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;letter-spacing:.02em;white-space:nowrap;pointer-events:none}'
         . '.taw-conditional.is-taw-hidden{opacity:.5}.taw-conditional.is-taw-hidden:not(.has-block-overlay)::before{background:#8a6100}'

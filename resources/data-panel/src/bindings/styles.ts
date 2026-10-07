@@ -73,6 +73,24 @@ const CSS = `
 .taw-expression-errors{list-style:none;margin:8px 0 0;padding:0}
 .taw-expression-errors li{display:flex;gap:6px;align-items:flex-start;margin:0 0 4px;color:#cc1818;font-size:12px}
 .taw-expression-errors .dashicon{font-size:16px;width:16px;height:16px;flex-shrink:0}
+.taw-dyn__intro,.taw-dyn__note{margin:0 0 12px;color:#757575;font-size:12px;line-height:1.5}
+.taw-dyn__note{margin:12px 0 0}
+.taw-dyn__heading{margin:16px 0 4px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:#1e1e1e}
+.taw-dyn-row{padding:8px 0;border-top:1px solid #f0f0f0}
+.taw-dyn-row:first-of-type{border-top:0}
+.taw-dyn-row__head{display:flex;align-items:center;gap:8px;min-height:24px}
+.taw-dyn-row__label{flex:1;font-size:13px;font-weight:500}
+.taw-dyn-row__expr{display:block;margin-top:4px;padding:2px 6px;background:#f6f7f7;border-radius:2px;font-size:11px;word-break:break-all}
+.taw-dyn-answer{margin-top:4px;font-size:12px}
+.taw-dyn-answer__note{color:#757575}
+.taw-dyn-answer__color{display:inline-flex;align-items:center;gap:6px}
+.taw-dyn-swatch{display:inline-block;width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}
+.taw-dyn-answer__classes{display:inline-flex;flex-wrap:wrap;gap:4px}
+.taw-dyn-row.is-open .taw-expression-editor{margin-top:6px}
+.taw-expression-editor.is-compact textarea{min-height:0}
+.taw-dyn__add{margin-top:8px}
+.taw-dyn__data{display:flex;align-items:flex-end;gap:8px;margin-top:8px}
+.taw-dyn__data .components-base-control{flex:1}
 .taw-chip-popover .taw-data-popup{padding:12px 16px 16px}
 .taw-data-expression .taw-data-note{margin:10px 0 0}
 .taw-cond__head{margin:0 0 8px;font-size:12px;line-height:28px;color:#1e1e1e}

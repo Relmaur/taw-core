@@ -14,6 +14,7 @@ import { addFilter } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
 import { CONNECTABLE_BLOCKS, type Bindings, type Config } from './logic';
 import { DataPopup } from './popup';
+import { expressionTargets } from './targets';
 
 interface EditProps {
     name: string;
@@ -73,7 +74,10 @@ export function registerToolbar(config: Config): void {
             (BlockEdit: React.ComponentType<EditProps>) =>
                 function WithTawDataButton(props: EditProps) {
                     const eligible =
-                        props.isSelected && (CONNECTABLE_BLOCKS.includes(props.name) || hasRichText(props.name));
+                        props.isSelected &&
+                        (CONNECTABLE_BLOCKS.includes(props.name) ||
+                            hasRichText(props.name) ||
+                            expressionTargets(props.name).length > 0);
                     return (
                         <>
                             <BlockEdit {...props} />

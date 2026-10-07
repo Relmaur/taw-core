@@ -27,7 +27,7 @@ class ContentDiffCommand extends Command
      *                          injects it uniformly). content:diff is a pure
      *                          file-to-file transform and never boots WordPress.
      */
-    public function __construct(string $themeDir)
+    public function __construct(string $themeDir) // @phpstan-ignore constructor.unusedParameter (bin/taw passes it to every command)
     {
         unset($themeDir);
         parent::__construct();

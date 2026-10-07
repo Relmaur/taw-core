@@ -24,7 +24,7 @@ import { connectedMetadata, planFor, withoutTawBindings, type Bindings, type Con
 import { previewExpression, previewTag } from './preview';
 import { caretIn, insertChip } from './richText';
 import { groupOptions, storedText, valueArgs, type TagArgs, type ValueOption } from './tags';
-import { expressionTargets, TEXT_ATTRIBUTE, withExpression } from './targets';
+import { expressionTargets, opensNewTab, TEXT_ATTRIBUTE, withExpression } from './targets';
 import { VisibilityEditor } from './visibility';
 import { useValueOptions } from './loop/options';
 
@@ -82,7 +82,7 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
 
     const canInline = caretIn(clientId) !== null;
     const textAttribute = TEXT_ATTRIBUTE[blockName];
-    const canBlock = textAttribute !== undefined || blockName === 'core/post-date';
+    const canBlock = textAttribute !== undefined || expressionTargets(blockName).length > 0;
     const targets = expressionTargets(blockName);
     const [targetKey, setTargetKey] = useState(() => {
         // Reopen on the part the block's expression already fills.
@@ -245,7 +245,7 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
               }
             : {
                   label:
-                      targets.length > 1 && target
+                      target && (targets.length > 1 || target.key !== 'text')
                           ? /* translators: %s: what the expression fills, e.g. "Link" */
                             sprintf(__('Use for: %s', 'taw-core'), target.label)
                           : __('Use as block text', 'taw-core'),
@@ -281,14 +281,50 @@ export function DataPopup({ config, clientId, blockName, metadata, onClose }: Po
                     ))}
                 </div>
             )}
-            <ExpressionEditor value={expression} onChange={setExpression} options={options} />
-            {mode === 'block' && target?.key === 'link' && (
+            <ExpressionEditor
+                value={expression}
+                onChange={setExpression}
+                options={options}
+                renderPreview={
+                    mode === 'block' && target?.key === 'newTab'
+                        ? (result) =>
+                              opensNewTab(result.value)
+                                  ? __('Opens in a new tab', 'taw-core')
+                                  : __('Opens in the same tab', 'taw-core')
+                        : undefined
+                }
+            />
+            {mode === 'block' && target?.key === 'newTab' && (
                 <p className="taw-data-note">
                     <Dashicon icon="info-outline" />
                     {__(
-                        'The result is used as the link. Unsafe or empty links keep the button’s own link.',
+                        "A true result opens the link in a new tab; false or empty opens it in the same tab. Try @(@book_buy_link != '').",
                         'taw-core',
                     )}
+                </p>
+            )}
+            {mode === 'block' && target?.key === 'rel' && (
+                <p className="taw-data-note">
+                    <Dashicon icon="info-outline" />
+                    {__(
+                        'Rel words, e.g. nofollow sponsored. Anything else is left out; an empty result removes the rel.',
+                        'taw-core',
+                    )}
+                </p>
+            )}
+            {mode === 'block' && target?.key === 'date' && (
+                <p className="taw-data-note">
+                    <Dashicon icon="info-outline" />
+                    {__(
+                        'The result must be a date: a date field, @post.date or 2026-10-07. Anything else keeps the block’s own date.',
+                        'taw-core',
+                    )}
+                </p>
+            )}
+            {mode === 'block' && target?.key === 'link' && (
+                <p className="taw-data-note">
+                    <Dashicon icon="info-outline" />
+                    {__('The result is used as the link. Unsafe or empty links keep the block’s own link.', 'taw-core')}
                 </p>
             )}
             {mode === 'block' && target?.as === 'image' && (

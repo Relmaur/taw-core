@@ -9,6 +9,7 @@ import { createReduxStore, dispatch, register, select, subscribe } from '@wordpr
 import { registerPlugin } from '@wordpress/plugins';
 import { registerAllowBound } from './allowBound';
 import { registerChips } from './chips';
+import { registerDynamicSettings } from './DynamicSettings';
 import { registerFunctions } from './expression';
 import { batcher, source, STORE, type Config, type PreviewItem } from './logic';
 import { connectMenu } from './menu';
@@ -76,6 +77,7 @@ if (config) {
     registerToolbar(config);
     // Whole-block conditions (ADR-0013): a sidebar panel on every block, and canvas cues.
     registerVisibility(config);
+    registerDynamicSettings(config);
     // The TAW Loop blocks' editors (ADR-0014).
     registerLoop(config);
     // Bound-only blocks from the editing policy (allowBound), when there are any.

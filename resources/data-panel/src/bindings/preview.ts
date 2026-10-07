@@ -2,12 +2,14 @@
  * Previews for chips and expressions (ADR-0012), through the same batched
  * POST taw/v1/bindings/preview as bound blocks: `kind: "tag"` gives a chip's
  * text, `kind: "expr"` an expression's value and errors, `kind: "condition"`
- * whether a condition holds for the edited post (ADR-0013).
+ * whether a condition holds for the edited post (ADR-0013), `kind: "setting"`
+ * a dynamic block setting's cleaned value (ADR-0016).
  */
 import { select } from '@wordpress/data';
 import type { ExpressionError } from './expression';
 import type { PreviewItem } from './logic';
 import type { ConditionError } from './conditions';
+import type { Dropped } from './settings';
 import { loopsFor } from './loop/chain';
 import type { TagArgs } from './tags';
 
@@ -64,7 +66,7 @@ export function context(): { postId: number; postType: string } {
  * A preview request. Inside TAW Loops (ADR-0014) it carries the enclosing
  * loops of `clientId` (default: the selected block), so values read the item.
  */
-function item(kind: 'tag' | 'expr' | 'condition', args: object, clientId?: string | null): PreviewItem {
+function item(kind: 'tag' | 'expr' | 'condition' | 'setting', args: object, clientId?: string | null): PreviewItem {
     const { postId, postType } = context();
     const loops = loopsFor(
         clientId === undefined ? select('core/block-editor')?.getSelectedBlockClientId?.() : clientId,
@@ -126,6 +128,37 @@ export async function previewCondition(
         } | null;
         if (!result || typeof result.shown !== 'boolean') return null;
         return { shown: result.shown, errors: Array.isArray(result.errors) ? (result.errors as ConditionError[]) : [] };
+    } catch {
+        return null;
+    }
+}
+
+export interface SettingAnswer {
+    /** Classes (space-separated), a color's CSS value, or an attribute's text; null when skipped. */
+    value: string | null;
+    dropped: Dropped | null;
+    errors: ExpressionError[];
+}
+
+/** A dynamic block setting's value for the edited post, as the front end will apply it; null when it can't be asked. */
+export async function previewSetting(
+    setting: string,
+    expr: string,
+    clientId?: string | null,
+): Promise<SettingAnswer | null> {
+    if (!fetchPreview) return null;
+    try {
+        const result = (await fetchPreview(item('setting', { expr, setting }, clientId))) as {
+            value?: unknown;
+            dropped?: unknown;
+            errors?: unknown;
+        } | null;
+        if (!result) return null;
+        return {
+            value: typeof result.value === 'string' ? result.value : null,
+            dropped: typeof result.dropped === 'string' ? (result.dropped as Dropped) : null,
+            errors: Array.isArray(result.errors) ? (result.errors as ExpressionError[]) : [],
+        };
     } catch {
         return null;
     }
