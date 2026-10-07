@@ -1,7 +1,8 @@
 /**
- * What an expression fills in a block (ADR-0012, ADR-0015): its text, a
- * button's link, an image (`as: "image"`: its ID, URL and alt) or an image's
- * alt text, and the bindings that do it.
+ * What an expression fills in a block (ADR-0012, ADR-0015, ADR-0016): its
+ * text, a button's link, new tab and rel, an image (`as: "image"`: its ID, URL
+ * and alt) or its alt text, caption and title, a navigation link's URL, a post
+ * date, and the bindings that do it.
  */
 import { __ } from '@wordpress/i18n';
 import type { Conditional } from './ConditionBuilder';
@@ -32,12 +33,21 @@ export function expressionTargets(blockName: string): ExpressionTarget[] {
             return [
                 { key: 'text', label: __('Button text', 'taw-core'), attributes: ['text'] },
                 { key: 'link', label: __('Link', 'taw-core'), attributes: ['url'] },
+                { key: 'newTab', label: __('Open in new tab', 'taw-core'), attributes: ['linkTarget'] },
+                { key: 'rel', label: __('Link rel', 'taw-core'), attributes: ['rel'] },
             ];
         case 'core/image':
             return [
                 { key: 'image', label: __('Image', 'taw-core'), attributes: ['id', 'url', 'alt'], as: 'image' },
                 { key: 'alt', label: __('Alt text', 'taw-core'), attributes: ['alt'] },
+                { key: 'caption', label: __('Caption', 'taw-core'), attributes: ['caption'] },
+                { key: 'title', label: __('Title', 'taw-core'), attributes: ['title'] },
             ];
+        case 'core/navigation-link':
+        case 'core/navigation-submenu':
+            return [{ key: 'link', label: __('Link', 'taw-core'), attributes: ['url'] }];
+        case 'core/post-date':
+            return [{ key: 'date', label: __('Date', 'taw-core'), attributes: ['datetime'] }];
         default:
             return TEXT_ATTRIBUTE[blockName]
                 ? [{ key: 'text', label: __('Text', 'taw-core'), attributes: [TEXT_ATTRIBUTE[blockName]] }]
@@ -79,4 +89,10 @@ export function withExpression(
             ),
         },
     };
+}
+
+/** Whether an "Open in new tab" result opens a new tab (as the server reads it: not empty, not "0"). */
+export function opensNewTab(value: string): boolean {
+    const trimmed = value.trim();
+    return trimmed !== '' && trimmed !== '0';
 }

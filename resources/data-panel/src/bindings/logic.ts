@@ -63,7 +63,7 @@ export interface BlockContext {
 export interface PreviewItem {
     key: string;
     /** Inline tags, expressions and conditions (ADR-0011/0012/0013); bound attributes send none. */
-    kind?: 'tag' | 'expr' | 'condition';
+    kind?: 'tag' | 'expr' | 'condition' | 'setting';
     args: BindingArgs;
     /** The enclosing TAW Loops, outermost first (ADR-0014). */
     loops?: unknown[];

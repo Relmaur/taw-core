@@ -1,13 +1,8 @@
 # Spanish (Mexico) translations for taw/core. Seeded from the TAW sites' own translations.
 msgid ""
 msgstr ""
-"Project-Id-Version: taw/core\n"
-"Language: es_MX\n"
-"MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
-"Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Domain: taw-core\n"
 
 #. translators: 1: block name or glob, 2: post type.
 #: src/Core/Editing/EditingAdminScreen.php
@@ -262,6 +257,22 @@ msgstr "Un precio con el símbolo de su moneda."
 msgid "A snapshot or change-set JSON file. The next screen shows exactly what would change — nothing is written yet."
 msgstr "Un archivo JSON de instantánea o de conjunto de cambios. La siguiente pantalla muestra exactamente qué cambiaría; todavía no se escribe nada."
 
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "A true result opens the link in a new tab; false or empty opens it in the same tab. Try @(@book_buy_link != '')."
+msgstr "Un resultado verdadero abre el enlace en una pestaña nueva; falso o vacío lo abre en la misma pestaña. Prueba @(@book_buy_link != '')."
+
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "ARIA description"
+msgstr "Descripción ARIA"
+
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "ARIA label"
+msgstr "Etiqueta ARIA"
+
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Add"
+msgstr "Agregar"
+
 #: src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Add Files"
 msgstr "Agregar archivos"
@@ -289,6 +300,10 @@ msgstr "Agregar una condición"
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Add a filter"
 msgstr "Agregar un filtro"
+
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Add an attribute"
+msgstr "Agregar un atributo"
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Add blocks for each item…"
@@ -374,6 +389,10 @@ msgstr "Siempre activado: ignorar la detección y usar siempre el SEO de TAW"
 msgid "An empty item to design yourself."
 msgstr "Un elemento vacío para diseñarlo tú."
 
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Anchor (id)"
+msgstr "Ancla (id)"
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Any .sqlite file uploaded here becomes searchable by the chatbot — every table and text column is chunked, embedded, and semantically searched. No particular schema is required."
 msgstr "Cualquier archivo .sqlite que subas aquí se vuelve consultable por el chatbot: cada tabla y columna de texto se divide en fragmentos, se vectoriza y se busca por significado. No se requiere ningún esquema en particular."
@@ -419,6 +438,10 @@ msgstr "Automático: detectar Yoast/RankMath/SmartCrawl y hacerse a un lado si a
 msgid "Back"
 msgstr "Atrás"
 
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Background"
+msgstr "Fondo"
+
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Block text"
 msgstr "Texto del bloque"
@@ -426,6 +449,10 @@ msgstr "Texto del bloque"
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Block text:"
 msgstr "Texto del bloque:"
+
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Border color"
+msgstr "Color del borde"
 
 #: resources/data-panel/src/bindings/targets.ts
 msgid "Button text"
@@ -439,7 +466,7 @@ msgstr "Exención"
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: resources/data-panel/src/bindings/loop/data.ts
+#: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/targets.ts
 msgid "Caption"
 msgstr "Leyenda"
 
@@ -507,9 +534,17 @@ msgstr "Elige un texto: @if(@stock > 0, 'Disponible', 'Agotado')"
 msgid "Chooses: then when the test holds, else otherwise."
 msgstr "Elige: el primero si la prueba se cumple; si no, el segundo."
 
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Choose…"
+msgstr "Elige…"
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Chunks"
 msgstr "Fragmentos"
+
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Classes"
+msgstr "Clases"
 
 #: resources/data-panel/src/controls/PickerControls.tsx src/Core/Media/MediaFolders.php
 msgid "Clear"
@@ -597,7 +632,11 @@ msgstr "Valor personalizado"
 msgid "Custom value…"
 msgstr "Valor personalizado…"
 
-#: resources/data-panel/src/bindings/tags.ts
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Data attribute (data-…)"
+msgstr "Atributo de datos (data-…)"
+
+#: resources/data-panel/src/bindings/tags.ts resources/data-panel/src/bindings/targets.ts
 msgid "Date"
 msgstr "Fecha"
 
@@ -657,6 +696,10 @@ msgstr "Mostrar los ID de carpeta"
 msgid "Division by zero."
 msgstr "División entre cero."
 
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Done"
+msgstr "Listo"
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Download snapshot"
 msgstr "Descargar instantánea"
@@ -669,7 +712,7 @@ msgstr "Arrastre para reordenar"
 msgid "Drop to upload here"
 msgstr "Suelta aquí para subir"
 
-#: resources/data-panel/src/controls/RichContent.tsx
+#: resources/data-panel/src/bindings/DynamicSettings.tsx resources/data-panel/src/controls/RichContent.tsx
 msgid "Edit"
 msgstr "Editar"
 
@@ -684,6 +727,10 @@ msgstr "Funciones del editor"
 #: src/Core/Metabox/Metabox.php
 msgid "Empty"
 msgstr "Vacío"
+
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Empty for this post: nothing changes."
+msgstr "Vacío en esta entrada: no cambia nada."
 
 #: src/Core/Auth/PagePassword.php
 msgid "Enter"
@@ -797,6 +844,10 @@ msgstr "Desde"
 msgid "Group"
 msgstr "Grupo"
 
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "HTML attributes"
+msgstr "Atributos HTML"
+
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Height"
 msgstr "Alto"
@@ -856,6 +907,10 @@ msgstr "Los íconos no están activados en este sitio (Lucide::enable())."
 #: resources/data-panel/src/controls/IconControl.tsx
 msgid "Icons couldn’t be loaded."
 msgstr "No se pudieron cargar los íconos."
+
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Ignored."
+msgstr "Se ignora."
 
 #: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/targets.ts
 msgid "Image"
@@ -952,6 +1007,10 @@ msgstr "Es el último"
 msgid "Is odd"
 msgstr "Es impar"
 
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "It has an error, so it’s skipped."
+msgstr "Tiene un error, así que se omite."
+
 #. translators: %d: item number.
 #: resources/data-panel/src/controls/Repeater.tsx
 #, php-format
@@ -1015,6 +1074,10 @@ msgstr "Excluir esta entrada"
 msgid "Link"
 msgstr "Enlace"
 
+#: resources/data-panel/src/bindings/targets.ts
+msgid "Link rel"
+msgstr "Rel del enlace"
+
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "Link text"
 msgstr "Texto del enlace"
@@ -1035,7 +1098,7 @@ msgstr "Cargar más"
 msgid "Loading items…"
 msgstr "Cargando elementos…"
 
-#: resources/data-panel/src/bindings/ExpressionEditor.tsx
+#: resources/data-panel/src/bindings/DynamicSettings.tsx resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Loading…"
 msgstr "Cargando…"
 
@@ -1164,6 +1227,10 @@ msgstr "Nombre (A–Z)"
 msgid "Name (Z–A)"
 msgstr "Nombre (Z–A)"
 
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Name after data-"
+msgstr "Nombre después de data-"
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Name and description are required."
 msgstr "El nombre y la descripción son obligatorios."
@@ -1264,6 +1331,10 @@ msgstr "Ningún valor coincide con tu búsqueda."
 msgid "None selected"
 msgstr "Nada seleccionado"
 
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Not a color, so it’s ignored. Use a palette color (accent) or a CSS color (#c0392b)."
+msgstr "No es un color, así que se ignora. Usa un color de la paleta (accent) o un color CSS (#c0392b)."
+
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Not a value this post has:"
 msgstr "No es un valor de esta entrada:"
@@ -1336,9 +1407,21 @@ msgstr "Abrir TAW Data"
 msgid "Open in a new tab"
 msgstr "Abrir en una pestaña nueva"
 
+#: resources/data-panel/src/bindings/targets.ts
+msgid "Open in new tab"
+msgstr "Abrir en una pestaña nueva"
+
 #: src/Core/Editor/VisualEditor.php
 msgid "Open the visual content editor"
 msgstr "Abrir el editor visual de contenido"
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Opens in a new tab"
+msgstr "Se abre en una pestaña nueva"
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Opens in the same tab"
+msgstr "Se abre en la misma pestaña"
 
 #: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "Options"
@@ -1494,6 +1577,10 @@ msgstr "Región"
 msgid "Registry drift"
 msgstr "Diferencias con el registro"
 
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "Rel words, e.g. nofollow sponsored. Anything else is left out; an empty result removes the rel."
+msgstr "Palabras rel, p. ej. nofollow sponsored. Todo lo demás se omite; un resultado vacío quita el rel."
+
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Related posts"
 msgstr "Entradas relacionadas"
@@ -1506,7 +1593,7 @@ msgstr "Eliminar"
 #. translators: %s: file name.
 #. translators: %s: post title.
 #. translators: %s: item title.
-#: resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx resources/data-panel/src/controls/PostSelect.tsx resources/data-panel/src/controls/Repeater.tsx
+#: resources/data-panel/src/bindings/DynamicSettings.tsx resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx resources/data-panel/src/controls/PostSelect.tsx resources/data-panel/src/controls/Repeater.tsx
 #, php-format
 msgid "Remove %s"
 msgstr "Quitar %s"
@@ -1727,6 +1814,10 @@ msgstr "Enviando…"
 msgid "Set by"
 msgstr "Definido por"
 
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Set this block’s classes, colors and HTML attributes from values, e.g. a background from the genre’s color. They apply on the site; the canvas previews them."
+msgstr "Define las clases, los colores y los atributos HTML de este bloque a partir de valores, p. ej. un fondo con el color del género. Se aplican en el sitio; el lienzo los previsualiza."
+
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Shortens to a number of characters, with “…”."
 msgstr "Acorta a un número de caracteres, con “…”."
@@ -1886,6 +1977,10 @@ msgstr "Medios TAW"
 msgid "TAW data"
 msgstr "Datos TAW"
 
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "TAW dynamic settings"
+msgstr "Ajustes dinámicos TAW"
+
 #: src/Core/Bindings/Bindings.php
 msgid "TAW field"
 msgstr "Campo TAW"
@@ -1931,6 +2026,10 @@ msgstr "Términos"
 #: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/functionDocs.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/data-panel/src/bindings/targets.ts
 msgid "Text"
 msgstr "Texto"
+
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Text color"
+msgstr "Color del texto"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Text, or @another_value"
@@ -2019,8 +2118,12 @@ msgid "The post’s terms in a taxonomy."
 msgstr "Los términos de la entrada en una taxonomía."
 
 #: resources/data-panel/src/bindings/popup.tsx
-msgid "The result is used as the link. Unsafe or empty links keep the button’s own link."
-msgstr "El resultado se usa como enlace. Si no es seguro o está vacío, el botón conserva su propio enlace."
+msgid "The result is used as the link. Unsafe or empty links keep the block’s own link."
+msgstr "El resultado se usa como enlace. Los enlaces inseguros o vacíos conservan el enlace propio del bloque."
+
+#: resources/data-panel/src/bindings/popup.tsx
+msgid "The result must be a date: a date field, @post.date or 2026-10-07. Anything else keeps the block’s own date."
+msgstr "El resultado debe ser una fecha: un campo de fecha, @post.date o 2026-10-07. Cualquier otra cosa conserva la fecha propia del bloque."
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "The result must be an image from the media library (an image field, or an image ID). Its alt text comes along."
@@ -2107,6 +2210,10 @@ msgstr "Esta fila: %s"
 msgid "This site"
 msgstr "Este sitio"
 
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "This site allows palette colors only, so it’s ignored."
+msgstr "Este sitio solo permite colores de la paleta, así que se ignora."
+
 #: resources/data-panel/src/bindings/tags.ts
 msgid "This value isn’t a date."
 msgstr "Este valor no es una fecha."
@@ -2115,7 +2222,7 @@ msgstr "Este valor no es una fecha."
 msgid "Time left until a date: “2 weeks”; empty once it’s past."
 msgstr "Tiempo que falta para una fecha: “2 semanas”; vacío cuando ya pasó."
 
-#: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
+#: resources/data-panel/src/bindings/DynamicSettings.tsx resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts resources/data-panel/src/bindings/targets.ts
 msgid "Title"
 msgstr "Título"
 
@@ -2236,6 +2343,10 @@ msgstr "Usar para: %s"
 msgid "Use it for"
 msgstr "Usarlo para"
 
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Use lowercase letters, numbers and single dashes."
+msgstr "Usa letras minúsculas, números y guiones sencillos."
+
 #: src/Core/Metabox/Metabox.php
 msgid "Use this image"
 msgstr "Usar esta imagen"
@@ -2247,6 +2358,10 @@ msgstr "Se usa en las vistas previas de Open Graph y Twitter. Si está vacía, s
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Value"
 msgstr "Valor"
+
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "Values are cleaned before they’re used: colors must be a palette color or a CSS color, and anything unsafe is left out."
+msgstr "Los valores se limpian antes de usarse: los colores deben ser de la paleta o colores CSS, y todo lo inseguro se omite."
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Visibility"
@@ -2339,6 +2454,10 @@ msgstr "Tus recursos compilados no reciben encabezados de caché: este sitio par
 #: src/Core/Auth/PagePassword.php
 msgid "Your session expired. Please try again."
 msgstr "Tu sesión expiró. Inténtalo de nuevo."
+
+#: resources/data-panel/src/bindings/DynamicSettings.tsx
+msgid "accent, #c0392b or @genre_color"
+msgstr "accent, #c0392b o @genre_color"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx src/Core/Editing/EditingAdminScreen.php
 msgid "all"

@@ -93,16 +93,36 @@ function unknownNames(names: string[], options: ValueOption[]): string[] {
     );
 }
 
+/** What a preview reports: the value and the server's errors, plus anything a custom preview adds. */
+export interface PreviewResult {
+    value: string;
+    errors: ExpressionError[];
+    [key: string]: unknown;
+}
+
 export function ExpressionEditor({
     value,
     onChange,
     options,
     autoFocus = true,
+    compact = false,
+    placeholder,
+    preview: fetchPreview = (expr: string) => previewExpression(expr),
+    renderPreview,
+    label,
 }: {
     value: string;
     onChange: (next: string) => void;
     options: ValueOption[];
     autoFocus?: boolean;
+    /** The sidebar's one-setting form: two rows and the main helpers only. */
+    compact?: boolean;
+    placeholder?: string;
+    /** Asks the server for the preview (default: the expression's text). */
+    preview?: (expr: string) => Promise<PreviewResult>;
+    /** Shows a preview result (default: its text, or "(empty for this post)"). */
+    renderPreview?: (result: PreviewResult) => React.ReactNode;
+    label?: string;
 }) {
     const ref = useRef<HTMLTextAreaElement>(null);
     const [caret, setCaret] = useState(value.length);
@@ -110,8 +130,13 @@ export function ExpressionEditor({
     // Suggestions open once the user types, not for a prefilled expression.
     const [dismissed, setDismissed] = useState(value !== '');
     // The preview and the expression it belongs to (a stale one isn't shown).
-    const [preview, setPreview] = useState<{ for: string; value: string; errors: ExpressionError[] } | null>(null);
+    const [preview, setPreview] = useState<{ for: string; result: PreviewResult } | null>(null);
     const [picking, setPicking] = useState(false);
+    // The latest preview function, without re-running the preview each render.
+    const fetchRef = useRef(fetchPreview);
+    useEffect(() => {
+        fetchRef.current = fetchPreview;
+    });
 
     const parsed = useMemo(() => parseExpression(value), [value]);
     const unknown = unknownNames(namesIn(parsed), options);
@@ -157,8 +182,8 @@ export function ExpressionEditor({
         if (value.trim() === '') return undefined;
         let current = true;
         const timer = setTimeout(() => {
-            void previewExpression(value).then((result) => {
-                if (current) setPreview({ for: value, value: result.value, errors: result.errors });
+            void fetchRef.current(value).then((result) => {
+                if (current) setPreview({ for: value, result });
             });
         }, 350);
         return () => {
@@ -217,7 +242,7 @@ export function ExpressionEditor({
     const showPreview = value.trim() !== '' && preview !== null && preview.for === value;
     // The server also reports what only evaluation finds (division by zero, text in arithmetic).
     const serverOnly = showPreview
-        ? preview.errors.filter((e) => !parsed.errors.some((p) => p.code === e.code && p.at === e.at))
+        ? preview.result.errors.filter((e) => !parsed.errors.some((p) => p.code === e.code && p.at === e.at))
         : [];
     const chars = Array.from(value);
     const problems: Problem[] = [
@@ -241,16 +266,18 @@ export function ExpressionEditor({
     ];
 
     return (
-        <div className="taw-expression-editor">
+        <div className={compact ? 'taw-expression-editor is-compact' : 'taw-expression-editor'}>
             <div className="taw-expression-field">
                 <textarea
                     ref={ref}
-                    aria-label={__('Expression', 'taw-core')}
-                    rows={3}
+                    aria-label={label ?? __('Expression', 'taw-core')}
+                    rows={compact ? 2 : 3}
                     autoFocus={autoFocus}
                     spellCheck={false}
                     value={value}
-                    placeholder={__("Published on @post.date.format('F j, Y') by @post.author", 'taw-core')}
+                    placeholder={
+                        placeholder ?? __("Published on @post.date.format('F j, Y') by @post.author", 'taw-core')
+                    }
                     onChange={(event) => {
                         onChange(event.target.value);
                         setCaret(event.target.selectionStart ?? event.target.value.length);
@@ -287,14 +314,16 @@ export function ExpressionEditor({
                 <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => typeAtCaret('@')}>
                     {__('@ value', 'taw-core')}
                 </button>
-                <button
-                    type="button"
-                    title={__('A formula, e.g. @(@price * 1.16)', 'taw-core')}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => typeAtCaret('@()', 1)}
-                >
-                    {__('@( formula )', 'taw-core')}
-                </button>
+                {!compact && (
+                    <button
+                        type="button"
+                        title={__('A formula, e.g. @(@price * 1.16)', 'taw-core')}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => typeAtCaret('@()', 1)}
+                    >
+                        {__('@( formula )', 'taw-core')}
+                    </button>
+                )}
                 <button
                     type="button"
                     title={__("Choose text: @if(@stock > 0, 'In stock', 'Sold out')", 'taw-core')}
@@ -313,7 +342,7 @@ export function ExpressionEditor({
                     {__('ƒ Functions', 'taw-core')}
                 </button>
                 {functionSuggestions('')
-                    .filter((f) => HELPER_FUNCTIONS.includes(f.fn))
+                    .filter((f) => !compact && HELPER_FUNCTIONS.includes(f.fn))
                     .map((f) => (
                         <button
                             key={f.fn}
@@ -340,10 +369,12 @@ export function ExpressionEditor({
                         <em>{__('Type @ to add a value, then . for a function.', 'taw-core')}</em>
                     ) : !showPreview ? (
                         <em>{__('Loading…', 'taw-core')}</em>
-                    ) : preview.value === '' ? (
+                    ) : renderPreview ? (
+                        renderPreview(preview.result)
+                    ) : preview.result.value === '' ? (
                         <em>{__('(empty for this post)', 'taw-core')}</em>
                     ) : (
-                        preview.value
+                        preview.result.value
                     )}
                 </span>
             </div>
