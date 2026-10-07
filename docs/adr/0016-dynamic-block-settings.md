@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-03). Plan: umbrella `docs/plans/dynamic-block-settings.md` (Phase 7d). Extends ADR-0015
+Accepted (2026-10-03); implemented in taw-core v1.74.0 (site) and v1.75.0 (editor). Plan: umbrella `docs/plans/dynamic-block-settings.md` (Phase 7d). Extends ADR-0015
 (expressions v2); follows the render-time pattern of ADR-0013 (block visibility).
 
 ## Context

@@ -53,6 +53,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.42 | Performance tweaks register only when the theme boots |
 | < v1.56 | taw-core's text has its own translations (the site's own still win) |
 | < v1.59.2 | taw-core's Spanish translation now actually loads in classic themes; tabs work by keyboard |
+| < v1.76.1 | Options-page and metabox tabs have a new look; check theme CSS that restyles `.taw-tabbed` |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -279,6 +280,51 @@ limits, pages, filter, layout), live previews of every item, and Row/Loop values
 preview route gains `POST taw/v1/loop/render` (same permissions as `bindings/preview`). No hooks change.
 `{"row": …}` and `{"loop": …}` bindings count as bound for `allowBound`. **Nothing to do.**
 
+### v1.69.1: an empty loop shows nothing
+A TAW Loop with no items and no **No items** block now renders nothing (it used to leave an empty wrapper).
+**Nothing to do.**
+
+### v1.69.2: metabox field changes reach repeaters
+The gradient-text and HubSpot form fields' change events bubble, so a repeater row holding one saves its edits
+(#84). **Nothing to do.**
+
+### v1.69.3: `Performance` is a normal class
+`src/Support/performance.php` became `src/Support/Performance.php` (PSR-4); only the `TAW_PERFORMANCE_AUTOLOAD`
+escape hatch stays file-autoloaded. Hooks are identical. **Check:** nothing, unless a theme `require`s the old
+file path directly (none of ours do).
+
+### v1.70.0 – v1.73.0: formulas and functions in expressions
+Expressions gain formulas `@( … )` and function calls `@fn( … )`: arithmetic, comparisons, `if()`, about 45
+functions (numbers and money, dates, text, lists) and a theme filter for your own, `taw_expression_functions`
+(ADR-0015; see "Expressions" in the README). Expressions also fill links and images (v1.72.0), and the
+Expression tab gains the **ƒ Functions** picker (v1.73.0). Every v1 expression reads as before. No hooks
+change. **Nothing to do.**
+
+### v1.73.1: Spanish, complete
+Every taw-core string has an es_MX translation. **Nothing to do.**
+
+### v1.73.2: the TAW data popup is a dialog
+It opens in the middle of the screen (close it with ×, Escape or a click outside), and conditional blocks no
+longer show a blue box on hover. **Nothing to do.**
+
+### v1.74.0: dynamic block settings (server side)
+A block's `metadata.tawSettings` sets its classes, colors and HTML attributes from expressions at render time
+(ADR-0016; see "Dynamic block settings" in the README). The theme's hook list gains one line (`render_block` at
+priority 11: `BlockSettings`); blocks without settings render as before. Button new-tab/rel and post-date
+bindings accept expressions. **Nothing to do.**
+
+### v1.75.0: dynamic block settings in the editor
+Every block's sidebar gains **TAW dynamic settings**, and the TAW data popup's **Use it for** gains more targets
+(new tab, rel, caption, title, navigation link, post date). No hooks change. **Nothing to do.**
+
+### v1.76.0: the Code of Canon Law corpus
+New and opt-in: `TAW\Core\Rest\CanonLawEndpoint::enable()` serves `taw/v1/canon-law/*`. It reads a Code installed with `bin/taw canon-law:install <edition> <.sqlite|.json>`, which goes to MySQL on hosts without `pdo_sqlite`. `bin/taw` gains `canon-law:install` and `canon-law:export`; themes register them in `bin/taw` (taw-theme v1.12.42). When the endpoint is enabled and an edition is installed, the chatbot gains a `lookup_canon_law` tool, and `ChatOrchestrator`'s system prompt no longer names specific corpora. No hooks change for sites that don't enable it. **Nothing to do.**
+
+### v1.76.1: tabs look like tabs
+Options-page and metabox tabs are a row of labels with the active one underlined in the admin color (they were
+bordered boxes with faded labels); on narrow screens the row scrolls sideways. Markup and keyboard behavior are
+unchanged. **Check:** a theme that restyles `.taw-tabbed .tabs` or `.tab-title` in its own admin CSS.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
@@ -287,6 +333,6 @@ These appeared since v1.22, and none is on until the site asks for it:
 - **Content:** content snapshots (`bin/taw content:export` / `content:import`).
 - **Lockdown:** editing policies (`Boot::editing()`), including `allowBound` for field-only blocks.
 - **Integrations:** Lucide icons (`Lucide::enable()`), media folders (`MediaFolders::enable()`), the
-  RAG chatbot, and the Bible and Catechism readers.
+  RAG chatbot, and the Bible, Catechism and Code of Canon Law readers.
 
 The README of the installed version (`vendor/taw/core/README.md`) documents each one.

@@ -568,6 +568,42 @@ Show a chip, a block's bound text, or a **whole block** only when rules hold (AD
   The preview endpoint takes `"kind": "condition"` → `{shown, errors}`. `tests/fixtures/conditions.json` is
   the spec.
 
+#### Dynamic block settings (v1.74.0+)
+
+Any block can take its **classes**, **colors** and **HTML attributes** from expressions (ADR-0016), stored in
+its metadata:
+
+```json
+"metadata": {"tawSettings": {
+  "classes": "@if(@book_buy_link != '', 'is-in-print', 'is-out-of-print')",
+  "background": "@if(@contains(@terms('genre'), 'Science fiction'), 'accent', 'contrast')",
+  "attributes": {"id": "@slug(@post.title)", "data-year": "@book_year"}
+}}
+```
+
+- **Keys:** `classes`, `color` (text), `background`, `border` (border color) and `attributes` (at most 10).
+- **Allowed attributes:** `id` (the anchor), `title`, `aria-label`, `aria-description` and `data-*`. Any
+  other name (`onclick`, `style`, `href`…) is refused.
+- **Each value is cleaned:**
+  - classes are split at spaces and each is cleaned like `sanitize_html_class()`;
+  - a color is a palette slug (`accent` → `var(--wp--preset--color--accent)`) or a CSS color: hex, numeric
+    `rgb()`/`hsl()`, or a named color. `var()`, `url()`, `;` and the like are dropped;
+  - when the site's editing policy turns custom colors off (`color.custom` false: `guided` and up), only
+    palette slugs apply.
+- **Errors never render.** An invalid or failed value is skipped, and an empty one changes nothing.
+- **How it's written:** `Bindings\BlockSettings` (`render_block`, priority 11) evaluates each setting in the
+  block's own context, so every TAW Loop or Query Loop item gets its own values. It writes only the block's
+  outer tag with `WP_HTML_Tag_Processor`, adding to its classes and style, and adds core's `has-text-color` /
+  `has-background` / `has-border-color` classes. A Button's colors go on its link, as core puts them.
+- **The rules live in one place:** pure `Bindings\Settings\Normalizer`; `tests/fixtures/block-settings.json`
+  is the spec (the editor's `settings.ts` passes it too). The preview endpoint takes `"kind": "setting"` with
+  `{expr, setting}` → `{value, dropped, errors}`.
+- **In the editor (v1.75.0+):** every block's sidebar has **TAW dynamic settings**, below **TAW visibility**.
+  - It has one row per setting, each with its answer for the edited post: the classes, a color swatch, the
+    attribute value, or why it's ignored.
+  - **Add an attribute** adds an anchor, title, ARIA label or description, or a `data-…` name.
+  - The canvas previews the classes and colors.
+
 #### In the editor: the TAW data popup (v1.65.0+)
 
 Select a text block (or an image, button or post date) and click the **TAW data** button (a database
@@ -585,6 +621,12 @@ icon) in its toolbar:
   editor is the value when it was inserted or refreshed; the front end is always live.
 - The footer shows what the block is bound to, with **Disconnect**. The canvas `@` stays WordPress's user
   mentions.
+- **The dialog (v1.73.2+):** it opens in the middle of the screen. Close it with **×**, Escape or a click outside.
+- **Use it for (v1.72.0+, v1.75.0+):** in **Block text** mode, choose what an expression fills:
+  - Button: text, link, **Open in new tab** (a true result opens a new tab) and **Link rel** (rel words only);
+  - Image: the image, alt text, **Caption** and **Title**;
+  - Navigation link: **Link**;
+  - Post date: **Date** (ISO 8601; a result that isn't a date keeps the block's own).
 - A group's sub-field is named `@{group}_{sub}` (e.g. `@address_city`).
 - **Conditions (v1.67.0+):**
   - the **Expression** tab and a chip's editor have **Show only when…**: the rule builder (value · comparison ·
