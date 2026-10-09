@@ -30,20 +30,163 @@ final class ChangeSet
     {
         $operations = [];
 
-        array_push($operations, ...self::diffPosts($base['posts'] ?? [], $target['posts'] ?? []));
-        array_push($operations, ...self::diffOptions($base['options'] ?? [], $target['options'] ?? []));
-        array_push($operations, ...self::diffTerms($base['terms'] ?? [], $target['terms'] ?? []));
-        array_push($operations, ...self::diffUsers($base['users'] ?? [], $target['users'] ?? []));
-        array_push($operations, ...self::diffComments($base['comments'] ?? [], $target['comments'] ?? []));
+        // A section only one side has in full (a scoped export, an opt-in
+        // section left out) yields no deletes: what's missing wasn't seen.
+        $complete = static fn (string $section): bool => self::complete($base, $section) && self::complete($target, $section);
 
-        return [
+        array_push($operations, ...self::diffPosts($base['posts'] ?? [], $target['posts'] ?? [], $complete('posts')));
+        array_push($operations, ...self::diffOptions($base['options'] ?? [], $target['options'] ?? [], $complete('options')));
+        array_push($operations, ...self::diffTerms($base['terms'] ?? [], $target['terms'] ?? [], $complete('terms')));
+        array_push($operations, ...self::diffUsers($base['users'] ?? [], $target['users'] ?? [], $complete('users')));
+        array_push($operations, ...self::diffComments($base['comments'] ?? [], $target['comments'] ?? [], $complete('comments')));
+
+        $changeSet = [
             'taw_changeset' => [
                 'schema' => (string) (($target['meta']['schema'] ?? $base['meta']['schema'] ?? Exporter::SCHEMA_VERSION)),
                 'base'   => $base['meta']['source'] ?? null,
                 'target' => $target['meta']['source'] ?? null,
             ],
-            'operations' => $operations,
         ];
+        // What the import needs to land these operations on another site
+        // (1.6): the source (URLs rewrite), `refs` (IDs map), and the media
+        // the operations reference (files sideload, attachment IDs map).
+        if (is_array($target['meta'] ?? null)) {
+            $changeSet['meta'] = $target['meta'];
+        }
+        if (is_array($target['refs'] ?? null)) {
+            $changeSet['refs'] = $target['refs'];
+        }
+        $media = self::referencedMedia(is_array($target['media'] ?? null) ? $target['media'] : [], $operations);
+        if ($media !== []) {
+            $changeSet['media'] = $media;
+        }
+        $changeSet['operations'] = $operations;
+
+        return $changeSet;
+    }
+
+    /**
+     * Whether $snapshot has $section in full: present, and not narrowed
+     * by its export scope (1.6 `meta.scope`).
+     *
+     * @param array<string, mixed> $snapshot
+     */
+    private static function complete(array $snapshot, string $section): bool
+    {
+        if (!array_key_exists($section, $snapshot)) {
+            return false;
+        }
+        $scope = is_array($snapshot['meta']['scope'] ?? null) ? $snapshot['meta']['scope'] : [];
+
+        return match ($section) {
+            'posts'   => ($scope['posts'] ?? 'all') !== 'partial',
+            'terms'   => ($scope['terms'] ?? 'all') !== 'used',
+            'options' => ($scope['options'] ?? true) !== false,
+            default   => true,
+        };
+    }
+
+    /**
+     * The media entries the operations reference: by attachment ID (in
+     * fields, option values and block attributes, `wp-image-N`), by a
+     * featured image's filename, or by URL (a file's URL, its size variants
+     * and the original of a `-scaled` upload). Pure, so `content:diff`
+     * needs no WordPress; an ID that merely looks like one carries an
+     * extra entry, which only costs a lookup.
+     *
+     * @param list<mixed>                $media
+     * @param list<array<string, mixed>> $operations
+     * @return list<array<string, mixed>>
+     */
+    public static function referencedMedia(array $media, array $operations): array
+    {
+        $ids = [];
+        $strings = [];
+        foreach ($operations as $op) {
+            if (($op['op'] ?? '') === 'delete') {
+                continue;
+            }
+            $record = is_array($op['post'] ?? null) ? $op['post'] : (is_array($op['fields'] ?? null) ? $op['fields'] : []);
+            self::scan($record, $ids, $strings, false);
+        }
+        $text = implode("\n", $strings);
+        if (preg_match_all('/"(?:id|mediaId)":(\d+)|wp-image-(\d+)|data-id=["\'](\d+)/', $text, $m)) {
+            foreach ([$m[1], $m[2], $m[3]] as $group) {
+                foreach ($group as $id) {
+                    if ($id !== '') {
+                        $ids[(int) $id] = true;
+                    }
+                }
+            }
+        }
+        if (preg_match_all('/"ids":\[([\d,]+)\]/', $text, $m)) {
+            foreach ($m[1] as $list) {
+                foreach (explode(',', $list) as $id) {
+                    $ids[(int) $id] = true;
+                }
+            }
+        }
+        $names = array_flip($strings);
+
+        $out = [];
+        foreach ($media as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $id = (int) ($entry['id'] ?? 0);
+            $filename = (string) ($entry['filename'] ?? $entry['ref'] ?? '');
+            $url = (string) ($entry['url'] ?? '');
+            if (($id > 0 && isset($ids[$id])) || ($filename !== '' && isset($names[$filename])) || self::urlIn($url, $text)) {
+                $out[] = $entry;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Collect a record's strings, and its integers under `fields` (and an
+     * option's value): the places an attachment ID is stored.
+     *
+     * @param array<int, true> $ids
+     * @param list<string>     $strings
+     */
+    private static function scan(mixed $value, array &$ids, array &$strings, bool $inFields): void
+    {
+        if (is_string($value)) {
+            $strings[] = $value;
+            if ($inFields && ctype_digit($value)) {
+                $ids[(int) $value] = true;
+            }
+            return;
+        }
+        if (is_int($value)) {
+            if ($inFields) {
+                $ids[$value] = true;
+            }
+            return;
+        }
+        if (!is_array($value)) {
+            return;
+        }
+        foreach ($value as $key => $item) {
+            self::scan($item, $ids, $strings, $inFields || $key === 'fields' || $key === 'value');
+        }
+    }
+
+    /** Whether $text links to the file at $url, a size variant of it, or its unscaled original. */
+    private static function urlIn(string $url, string $text): bool
+    {
+        if ($url === '' || !preg_match('#^(.*/[^/]+?)\.([A-Za-z0-9]{1,5})$#', $url, $m)) {
+            return $url !== '' && str_contains($text, $url);
+        }
+        $base = (string) preg_replace('#-scaled$#', '', $m[1]);
+        foreach ([$base, str_replace('/', '\\/', $base)] as $form) {
+            if (preg_match('#' . preg_quote($form, '#') . '(-scaled|-\d+x\d+)?\.' . preg_quote($m[2], '#') . '(?![\w-])#', $text)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -51,7 +194,7 @@ final class ChangeSet
      * @param mixed $target
      * @return list<array<string, mixed>>
      */
-    private static function diffPosts(mixed $base, mixed $target): array
+    private static function diffPosts(mixed $base, mixed $target, bool $deletes = true): array
     {
         $base = is_array($base) ? $base : [];
         $target = is_array($target) ? $target : [];
@@ -79,7 +222,7 @@ final class ChangeSet
             }
         }
 
-        foreach ($baseMap as $key => $record) {
+        foreach ($deletes ? $baseMap : [] as $key => $record) {
             if (!isset($targetMap[$key])) {
                 $ops[] = [
                     'op'     => 'delete',
@@ -96,7 +239,7 @@ final class ChangeSet
      * @param mixed $target
      * @return list<array<string, mixed>>
      */
-    private static function diffUsers(mixed $base, mixed $target): array
+    private static function diffUsers(mixed $base, mixed $target, bool $deletes = true): array
     {
         $keyer = static fn (array $u): string => (string) ($u['login'] ?? '');
         $baseMap = self::indexBy(is_array($base) ? $base : [], $keyer);
@@ -114,7 +257,7 @@ final class ChangeSet
                 $ops[] = ['op' => 'update', 'target' => $t, 'fields' => $record];
             }
         }
-        foreach ($baseMap as $key => $record) {
+        foreach ($deletes ? $baseMap : [] as $key => $record) {
             if ($key !== '' && !isset($targetMap[$key])) {
                 $ops[] = ['op' => 'delete', 'target' => ['kind' => 'user', 'key' => $key]];
             }
@@ -127,7 +270,7 @@ final class ChangeSet
      * @param mixed $target
      * @return list<array<string, mixed>>
      */
-    private static function diffComments(mixed $base, mixed $target): array
+    private static function diffComments(mixed $base, mixed $target, bool $deletes = true): array
     {
         $keyer = static fn (array $c): string => sha1(implode('|', [
             (string) ($c['post_ref'] ?? ''),
@@ -144,7 +287,7 @@ final class ChangeSet
                 $ops[] = ['op' => 'create', 'target' => ['kind' => 'comment', 'key' => $key], 'fields' => $record];
             }
         }
-        foreach ($baseMap as $key => $record) {
+        foreach ($deletes ? $baseMap : [] as $key => $record) {
             if (!isset($targetMap[$key])) {
                 $ops[] = ['op' => 'delete', 'target' => ['kind' => 'comment', 'key' => $key], 'fields' => $record];
             }
@@ -157,7 +300,7 @@ final class ChangeSet
      * @param mixed $target
      * @return list<array<string, mixed>>
      */
-    private static function diffOptions(mixed $base, mixed $target): array
+    private static function diffOptions(mixed $base, mixed $target, bool $deletes = true): array
     {
         $base = is_array($base) ? $base : [];
         $target = is_array($target) ? $target : [];
@@ -171,7 +314,7 @@ final class ChangeSet
             }
         }
 
-        foreach ($base as $key => $value) {
+        foreach ($deletes ? $base : [] as $key => $value) {
             if (!array_key_exists($key, $target)) {
                 $ops[] = ['op' => 'delete', 'target' => ['kind' => 'option', 'key' => $key]];
             }
@@ -185,7 +328,7 @@ final class ChangeSet
      * @param mixed $target
      * @return list<array<string, mixed>>
      */
-    private static function diffTerms(mixed $base, mixed $target): array
+    private static function diffTerms(mixed $base, mixed $target, bool $deletes = true): array
     {
         $flatten = static function (mixed $terms): array {
             $flat = [];
@@ -212,7 +355,7 @@ final class ChangeSet
             }
         }
 
-        foreach ($baseMap as $key => $entry) {
+        foreach ($deletes ? $baseMap : [] as $key => $entry) {
             if (!isset($targetMap[$key])) {
                 $ops[] = ['op' => 'delete', 'target' => ['kind' => 'term', 'type' => $entry['taxonomy'], 'slug' => $entry['row']['slug']]];
             }

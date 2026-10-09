@@ -499,6 +499,21 @@ Content Interchange, export and import (snapshot schema 1.5, fidelity Phase 5):
 production needs this release for its snapshots to carry page paths. Older snapshots still import
 (pages matched by slug, as before).
 
+### v1.85.0: scoped exports and pushes
+
+Content Interchange (snapshot schema 1.6, fidelity Phase 6):
+
+- `content:export --posts/--types/--since` (and the REST export with `types`/`since`) now leave out
+  options and keep only the terms those posts use, so importing a few posts can't overwrite the rest
+  of the site's settings. `--with-options` / `--with-terms` restore the old output.
+- `content:diff` change-sets carry the source, its references and the media they use: a push maps
+  IDs, rewrites links and downloads files. Diffing a scoped snapshot deletes nothing outside its scope.
+- An import never sets the front page (or posts page) to a page the site doesn't have.
+- A file an import downloaded is recognised on the next import even if WordPress renamed it.
+
+**Check:** scripts that pass `--posts`, `--types` or `--since` and rely on options or every term in
+the file need `--with-options` / `--with-terms`. `taw-fleet pull` exports in full and isn't affected.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

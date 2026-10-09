@@ -68,7 +68,11 @@ final class MediaResolver
             $url = (string) ($entry['url'] ?? '');
             $path = self::uploadsPath($url);
             $outcome = ['id' => $sourceId, 'filename' => $filename, 'path' => $path !== '' ? $path : $filename, 'url' => $url, 'status' => '', 'local' => 0, 'entry' => $entry];
-            $existing = ($path !== '' ? self::findByPath($path) : null) ?? self::findByFilename($filename);
+            // A file an earlier import downloaded first (it may have been
+            // renamed on the way: `photo-1.jpg`), then the path, then the name.
+            $existing = ($url !== '' ? self::findBySource($url) : null)
+                ?? ($path !== '' ? self::findByPath($path) : null)
+                ?? self::findByFilename($filename);
             if ($existing !== null) {
                 if ($sourceId > 0) {
                     $this->idMap[$sourceId] = $existing;
@@ -205,6 +209,23 @@ final class MediaResolver
         return preg_match('#/wp-content/uploads/(.+)$#', (string) strtok($url, '?#'), $m) ? $m[1] : '';
     }
 
+    /** Meta key holding the source URL of an attachment an import downloaded. */
+    public const SOURCE_META = '_taw_interchange_source';
+
+    /** The attachment an earlier import downloaded from $url. */
+    public static function findBySource(string $url): ?int
+    {
+        $matches = get_posts([
+            'post_type'      => 'attachment',
+            'post_status'    => 'inherit',
+            'posts_per_page' => 1,
+            'fields'         => 'ids',
+            'meta_query'     => [['key' => self::SOURCE_META, 'value' => $url]],
+        ]);
+
+        return isset($matches[0]) ? (int) $matches[0] : null;
+    }
+
     /** The attachment whose `_wp_attached_file` is exactly $path. */
     public static function findByPath(string $path): ?int
     {
@@ -307,6 +328,7 @@ final class MediaResolver
             return null;
         }
 
+        update_post_meta($id, self::SOURCE_META, esc_url_raw($url));
         if (!empty($entry['alt'])) {
             update_post_meta($id, '_wp_attachment_image_alt', sanitize_text_field((string) $entry['alt']));
         }

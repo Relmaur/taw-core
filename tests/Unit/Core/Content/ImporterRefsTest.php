@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Tests\Unit\Core\Content;
 
 use Brain\Monkey\Functions;
+use TAW\Core\Content\ChangeSet;
 use TAW\Core\Content\Importer;
 use TAW\Core\Metabox\Metabox;
 use TAW\Tests\TestCase;
@@ -270,5 +271,75 @@ final class ImporterRefsTest extends TestCase
         $this->assertSame('0', (string) $this->meta['5|_taw_hero_image'], 'cleared, not left pointing at an unrelated attachment 777 or 13');
         $this->assertSame('<!-- wp:image {} -->', $this->posts[5]->post_content, "the image block's id is dropped");
         $this->assertStringContainsString('gone.jpg', implode("\n", $report['warnings']));
+    }
+
+    public function test_a_front_page_this_site_lacks_is_never_written_as_zero(): void
+    {
+        $this->sitePost(5, 'page', 'home');
+        $this->options['page_on_front'] = 5;
+        $input = $this->production([]) + ['options' => ['page_on_front' => 'gone']];
+
+        $plan = (new Importer())->plan($input);
+        $this->assertSame([], $plan['records'][0]['changes']);
+        $this->assertSame(["option:page_on_front: 'gone' isn't on this site or in the import — kept as it is."], $plan['warnings']);
+
+        (new Importer())->apply($input, ['rollback' => false]);
+        $this->assertSame(5, $this->options['page_on_front']);
+    }
+
+    public function test_a_front_page_the_import_brings_is_set(): void
+    {
+        $this->sitePost(5, 'page', 'home');
+        $this->options['page_on_front'] = 5;
+        $input = $this->production([['type' => 'page', 'slug' => 'start', 'title' => 'Start']]) + ['options' => ['page_on_front' => 'start']];
+
+        $records = (new Importer())->plan($input)['records'];
+        $this->assertSame('changed', end($records)['changes']['value']['status']);
+
+        (new Importer())->apply($input, ['rollback' => false]);
+        $start = array_values(array_filter($this->posts, static fn ($p) => $p->post_name === 'start'))[0];
+        $this->assertSame($start->ID, $this->options['page_on_front']);
+    }
+
+    public function test_sticky_posts_this_site_lacks_are_left_out_without_a_change_forever(): void
+    {
+        $this->sitePost(78, 'post', 'studio-pipeline');
+        $this->options['sticky_posts'] = [78];
+        $plan = (new Importer())->plan($this->production([]) + ['options' => ['sticky_posts' => ['studio-pipeline', 'gone']]]);
+
+        $this->assertSame([], $plan['records'][0]['changes']);
+        $this->assertSame(["option:sticky_posts: 'gone' isn't on this site or in the import — left out."], $plan['warnings']);
+    }
+
+    public function test_a_change_set_maps_references_like_a_snapshot(): void
+    {
+        $this->sitePost(78, 'post', 'studio-pipeline');
+        $this->sitePost(5, 'page', 'home');
+        $base = ['meta' => ['schema' => '1.6'], 'posts' => [['type' => 'page', 'slug' => 'home', 'title' => 'Home']]];
+        $target = $this->production([['type' => 'page', 'slug' => 'home', 'title' => 'Home',
+            'fields' => ['featured_post' => 135, 'cta_url' => 'https://prod.test/contacto/']]]);
+
+        (new Importer())->apply(ChangeSet::between($base, $target), ['rollback' => false]);
+
+        $this->assertSame('78', $this->meta['5|_taw_featured_post'], "the source's 135 is this site's 78");
+        $this->assertSame('http://site.local/contacto/', $this->meta['5|_taw_cta_url']);
+    }
+
+    public function test_a_featured_image_whose_copy_was_renamed_is_found_through_the_media_map(): void
+    {
+        $this->sitePost(5, 'page', 'home');
+        $this->attachments[31] = '2026/10/photo-1.jpg';
+        $input = $this->production([['type' => 'page', 'slug' => 'home', 'title' => 'Home', 'featured_media' => 'photo.jpg']])
+            + ['media' => [['id' => 50, 'filename' => 'photo.jpg', 'url' => 'https://prod.test/wp-content/uploads/2026/10/photo-1.jpg']]];
+        Functions\when('set_post_thumbnail')->alias(function (int $post, int $att): bool {
+            $this->meta["{$post}|_thumbnail_id"] = $att;
+            return true;
+        });
+
+        $report = (new Importer())->apply($input, ['rollback' => false]);
+
+        $this->assertSame(31, $this->meta['5|_thumbnail_id']);
+        $this->assertSame([], $report['warnings']);
+        $this->assertSame([], (new Importer())->plan($input)['records'][0]['changes'] ?? [], 'and the next preview has nothing to change');
     }
 }

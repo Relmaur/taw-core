@@ -69,4 +69,23 @@ final class MediaResolverTest extends TestCase
         $this->assertSame([5615 => 16, 99 => 15], $resolver->idMap(), 'by path when the URL gives one, else the first file of that name');
         $this->assertSame('2025/01/hero.jpg', MediaResolver::uploadsPath('https://x.test/wp-content/uploads/2025/01/hero.jpg?v=2'));
     }
+
+    public function test_a_file_an_import_downloaded_matches_by_its_source_url_first(): void
+    {
+        // Downloaded earlier as 2026/10/photo-1.jpg (a name collision); 30 is an unrelated photo.jpg.
+        \Brain\Monkey\Functions\when('get_posts')->alias(static function (array $q): array {
+            $meta = $q['meta_query'][0] ?? [];
+            if (($meta['key'] ?? '') === MediaResolver::SOURCE_META) {
+                return ($meta['value'] ?? '') === 'https://src.test/wp-content/uploads/2026/10/photo.jpg' ? [31] : [];
+            }
+            return ($meta['compare'] ?? '=') === '=' ? [] : [30];
+        });
+        \Brain\Monkey\Functions\when('get_post_meta')->justReturn('2025/02/photo.jpg');
+        \Brain\Monkey\Functions\when('wp_basename')->alias(static fn (string $p): string => basename($p));
+
+        $resolver = new MediaResolver();
+        $resolver->build([['id' => 50, 'filename' => 'photo.jpg', 'url' => 'https://src.test/wp-content/uploads/2026/10/photo.jpg']], false);
+
+        $this->assertSame([50 => 31], $resolver->idMap(), 'the earlier download, not the other photo.jpg, and nothing downloaded again');
+    }
 }
