@@ -30,6 +30,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * those paths). Tier 2 is only ever reported, never written — a human
  * always reviews those diffs before they're applied, whether that's an
  * interactive agent session or a person reading a CI-opened pull request.
+ * The one exception is opt-in: the structured manifests (composer.json,
+ * package.json) also get rule-based suggestions (`merge`, ManifestMerge),
+ * and --apply-manifests writes just those additions and bumps.
  */
 class SyncCommand extends Command
 {
@@ -56,8 +59,12 @@ class SyncCommand extends Command
                      taw-theme files differ from the canonical repo?
 
                 Tier 1 changes are safe to auto-apply — pass --apply to write them.
-                Tier 2 changes are only ever reported (with a diff), never written here —
+                Tier 2 changes are reported (with a diff), never written by --apply —
                 review and apply them yourself, or via the update-theme skill.
+                composer.json and package.json also get rule-based suggestions
+                (`merge` in the JSON): keys and repositories the scaffold has and this
+                project lacks, and dependency constraints the scaffold raised. Nothing
+                is ever removed. --apply-manifests writes those suggestions only.
                 This command never touches taw/core itself — run
                 `composer update taw/core` separately if it reports being behind.
 
@@ -65,9 +72,11 @@ class SyncCommand extends Command
                   <info>php bin/taw sync</info>              human-readable report, no changes made
                   <info>php bin/taw sync --json</info>        machine-readable JSON (for CI / scripts)
                   <info>php bin/taw sync --apply</info>       also writes Tier 1 changes to disk
+                  <info>php bin/taw sync --apply-manifests</info>  also writes the composer.json/package.json suggestions
                 HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output machine-readable JSON instead of a formatted report')
-            ->addOption('apply', null, InputOption::VALUE_NONE, 'Write Tier 1 changes to disk (Tier 2 is always report-only)');
+            ->addOption('apply', null, InputOption::VALUE_NONE, 'Write Tier 1 changes to disk (Tier 2 is report-only)')
+            ->addOption('apply-manifests', null, InputOption::VALUE_NONE, 'Write the suggested composer.json/package.json additions and bumps (never removals)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -75,6 +84,7 @@ class SyncCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $asJson = (bool) $input->getOption('json');
         $apply = (bool) $input->getOption('apply');
+        $applyManifests = (bool) $input->getOption('apply-manifests');
 
         $report = [
             'taw_core' => $this->checkTawCoreVersion(),
@@ -122,10 +132,24 @@ class SyncCommand extends Command
                         $report['tier1'][] = $entry;
                     }
 
+                    $mergeRules = $manifest['manifestMerge'] ?? [];
                     foreach ($manifest['tier2'] as $entry) {
                         $changed = $this->pathDiffers($entry, $clone);
                         $entry['changed'] = $changed;
                         $entry['diff'] = $changed ? $this->diffFile($entry, $clone) : null;
+                        $rules = $mergeRules[$entry['path']] ?? null;
+                        if ($changed && is_array($rules)) {
+                            $merge = $this->planManifestMerge($entry['path'], $clone, $rules);
+                            if (is_string($merge)) {
+                                $report['errors'][] = $merge;
+                            } else {
+                                $entry['merge'] = $merge;
+                                if ($applyManifests && ($merge['add'] !== [] || $merge['bump'] !== [])) {
+                                    $this->applyManifestMerge($entry['path'], $merge);
+                                    $report['applied'][] = $entry['path'];
+                                }
+                            }
+                        }
                         $report['tier2'][] = $entry;
                     }
                 } finally {
@@ -240,7 +264,8 @@ class SyncCommand extends Command
      * @return array{
      *     tier1: array<int, array{path: string, type: string}>,
      *     tier2: array<int, array{path: string, type: string}>,
-     *     skillsReconcile?: array<string, mixed>
+     *     skillsReconcile?: array<string, mixed>,
+     *     manifestMerge?: array<string, array<string, mixed>>
      * }|null
      */
     private function loadManifest(): ?array
@@ -501,6 +526,53 @@ class SyncCommand extends Command
     }
 
     /**
+     * The rule-based suggestions for one structured manifest, or an error
+     * message when a file isn't valid JSON.
+     *
+     * @param array<string, mixed> $rules
+     * @return array<string, mixed>|string
+     */
+    private function planManifestMerge(string $path, string $cloneDir, array $rules): array|string
+    {
+        $local = $this->readJson(rtrim($this->themeDir, '/') . '/' . $path);
+        $canonical = $this->readJson(rtrim($cloneDir, '/') . '/' . $path);
+        if ($local === null || $canonical === null) {
+            return $path . ' isn\'t valid JSON (here or in the scaffold); compare it by hand.';
+        }
+
+        /** @var array{sections?: list<string>, dependencySections?: list<string>, optional?: array<string, list<string>>} $rules */
+        return ManifestMerge::plan($local, $canonical, $rules);
+    }
+
+    /**
+     * Writes a plan's additions and bumps into the project's manifest,
+     * keeping its indentation.
+     *
+     * @param array<string, mixed> $merge
+     */
+    private function applyManifestMerge(string $path, array $merge): void
+    {
+        $file = rtrim($this->themeDir, '/') . '/' . $path;
+        $original = (string) file_get_contents($file);
+        $local = $this->readJson($file) ?? [];
+        /** @var array{add: list<array<string, mixed>>, bump: list<array<string, mixed>>} $merge */
+        file_put_contents($file, ManifestMerge::encode(ManifestMerge::apply($local, $merge), $original));
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function readJson(string $file): ?array
+    {
+        if (!is_file($file)) {
+            return [];
+        }
+        $decoded = json_decode((string) file_get_contents($file), true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
      * @param array{path: string, type: string} $entry
      */
     private function diffFile(array $entry, string $cloneDir): ?string
@@ -570,6 +642,9 @@ class SyncCommand extends Command
                 if (!empty($entry['changed'])) {
                     $suffix = $applied && $key === 'tier1' ? ' (applied)' : '';
                     $io->text('- ' . $entry['path'] . $suffix);
+                    if (isset($entry['merge']) && is_array($entry['merge'])) {
+                        $this->renderMerge($io, $entry['merge']);
+                    }
                     $printedSomething = true;
                 }
             }
@@ -588,6 +663,31 @@ class SyncCommand extends Command
         if ($report['clean']) {
             $io->success('Everything is up to date.');
         }
+    }
+
+    /**
+     * The suggestions under a structured manifest's line.
+     *
+     * @param array<string, mixed> $merge
+     */
+    private function renderMerge(SymfonyStyle $io, array $merge): void
+    {
+        $lines = [];
+        foreach (['add' => 'add', 'bump' => 'raise', 'review' => 'review'] as $bucket => $verb) {
+            foreach ($merge[$bucket] ?? [] as $item) {
+                $to = isset($item['to']) ? ' → ' . json_encode($item['to'], JSON_UNESCAPED_SLASHES) : '';
+                $lines[] = '    ' . $verb . ' ' . $item['label'] . $to;
+            }
+        }
+        $features = array_unique(array_map(static fn (array $i): string => (string) $i['feature'], $merge['optional'] ?? []));
+        if ($features !== []) {
+            $lines[] = '    optional, not suggested: ' . implode(', ', $features);
+        }
+        if (($merge['add'] ?? []) === [] && ($merge['bump'] ?? []) === [] && ($merge['review'] ?? []) === []) {
+            $own = (int) ($merge['site_only'] ?? 0);
+            $lines[] = '    nothing to apply: the rest is this project\'s own (' . $own . ($own === 1 ? ' key' : ' keys') . ', kept)';
+        }
+        $io->text($lines);
     }
 
     /**

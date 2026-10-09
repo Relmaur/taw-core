@@ -13,8 +13,11 @@ to the site you're updating.
 1. **Find the installed version:** `composer show taw/core | grep versions` (or `composer.lock`).
 2. **Theme scaffold first (optional, recommended):** run the `update-theme` skill (`php bin/taw sync`).
    It syncs `functions.php`, `bin/`, CI and the framework skills, and never touches `Blocks/`, `inc/` or
-   templates. Its `composer.json`/`package.json` diffs include optional starter features (Reactiph with
-   `minimum-stability: dev`, the chatbot's `marked`/`dompurify`): skip those unless the site wants them.
+   templates. For `composer.json`/`package.json`, use its suggestions (`merge` in `sync --json`, since
+   v1.78.0) rather than the raw diff: they list only what the scaffold has and the site lacks, never a
+   removal, and `--apply-manifests` writes them. Optional starter features (Reactiph with
+   `minimum-stability: dev`, the chatbot's `marked`/`dompurify`) are listed as optional: skip those
+   unless the site wants them.
    The shared docs also mention `inc/security.php` and `Blocks/Chatbot`, which older sites may not have.
 3. **Update the package:** `composer update taw/core`. The theme's constraint (`^1.0`, or `^1.22` and
    similar on older sites) allows every later 1.x release.
@@ -40,6 +43,25 @@ saves and sends nothing. Delete any test entries you create.
 
 Nothing here changes stored data. Meta keys, option names and stored formats are the same in every 1.x
 release, so a rollback is `composer update taw/core:<old version>` (or restoring `composer.lock`).
+
+### v1.78.0: `sync` suggests composer.json/package.json changes
+
+`php bin/taw sync` now compares `composer.json` and `package.json` with the scaffold by rule instead of
+leaving a raw diff to judge (`resources/update-manifest.json` § `manifestMerge`). Each gets a `merge`
+entry in `--json`:
+- `add`: keys or repositories the scaffold has and the site lacks;
+- `bump`: dependencies whose scaffold constraint is higher;
+- `review`: other differences (a changed script, an autoload path), for a person to decide;
+- `optional`: Reactiph and chatbot lines, never suggested;
+- `site_only`: how many of the site's own keys it kept.
+
+Nothing is ever removed, and `name`, `extra` and other sections outside the rules are never read, so a
+site's own dependencies and its `extra.taw-companion` key stay. `--apply-manifests` writes `add` and
+`bump`, keeping the file's indentation; `--apply` still never writes Tier 2. Nothing changes unless you
+use the new flag.
+
+**Check:** none needed. To see it, `php bin/taw sync` lists the suggestions under `composer.json` and
+`package.json` (often "nothing to apply").
 
 ## Quick check: what applies to you
 

@@ -29,5 +29,30 @@
         "frameworkValue": "taw",
         "siteValue": "site"
     },
+    "manifestMerge": {
+        "$comment": "How sync compares the structured Tier 2 manifests (TAW\\CLI\\ManifestMerge). Only the listed sections are read; within them, keys and repositories the scaffold has and the site lacks are suggested (add), a dependency whose scaffold constraint has a higher lower bound is suggested (bump), and any other difference goes to review. Keys only the site has are its own (emailit, photoswipe, taw/hub-companion…) and are always kept: nothing is ever removed. Optional features are lines new sites get from the scaffold but existing sites only take on purpose; they are reported as optional, never suggested. Labels are dot paths, or repositories[<url>]. `php bin/taw sync --apply-manifests` writes add + bump.",
+        "composer.json": {
+            "sections": ["require", "require-dev", "autoload", "autoload-dev", "repositories", "scripts", "config", "minimum-stability", "prefer-stable"],
+            "dependencySections": ["require", "require-dev"],
+            "optional": {
+                "reactiph": [
+                    "require.reactiph/taw-bridge",
+                    "repositories[https://github.com/Relmaur/reactiph]",
+                    "repositories[https://github.com/Relmaur/reactiph-wordpress-bridge]",
+                    "repositories[https://github.com/Relmaur/reactiph-taw-bridge]",
+                    "minimum-stability",
+                    "prefer-stable"
+                ],
+                "post-create": ["scripts.post-create-project-cmd"]
+            }
+        },
+        "package.json": {
+            "sections": ["dependencies", "devDependencies", "scripts", "type"],
+            "dependencySections": ["dependencies", "devDependencies"],
+            "optional": {
+                "chatbot": ["devDependencies.marked", "devDependencies.dompurify"]
+            }
+        }
+    },
     "$never": "tests/Unit/ is deliberately never listed here, in either tier, and must never become a 'dir' entry — it holds each client project's own block tests (tests/Unit/Blocks/{Name}Test.php), content this manifest doesn't own. A 'dir' entry syncs via 'rsync -a --delete', which would silently delete every client-authored test not present in the canonical repo. Only the harness itself (tests/bootstrap.php, tests/TestCase.php, phpunit.xml) is framework-owned; individual test files are not. The same hazard for .claude/skills/ and .agents/skills/ (client sites legitimately author their own skills) is handled by 'type: skills-dir' + the skillsReconcile rules above, not by omitting them."
 }
