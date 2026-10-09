@@ -470,6 +470,12 @@ move content. What a snapshot from another site (`taw-fleet pull`, a staging cop
 so production sites need this release for their snapshots to carry `refs` (what lets `post_select`
 values move between sites). Older snapshots still import.
 
+### v1.82.1: a pull settles in one import
+
+Import side. Media is downloaded before the import decides which records already match, so a
+record that links to a file arriving in the same import is updated in that import, not the next
+one. **Check:** none.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

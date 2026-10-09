@@ -270,21 +270,24 @@ class Importer
             $report['rollback_path'] = $this->writeRollbackSnapshot();
         }
 
-        // Records the dry-run diff shows as already matching are skipped —
-        // so a clean export → import round-trip is a genuine no-op and
-        // re-running an import doesn't churn post_modified dates. Computed
-        // before the run mutates anything (it also resets $this->warnings,
-        // so it must come before the media step below).
-        $unchanged = $this->unchangedRecordKeys($input);
-        $this->warnings = [];
-
-        // Media first — the ID map is needed to rewrite references in posts/fields.
+        // Media first: the ID map rewrites references in posts and fields,
+        // and the unchanged check below must see the files this run brings
+        // (a record linking to a file not yet here would look unchanged and
+        // only settle on the next import). Sideloading writes attachments
+        // only, never the records compared.
         $media = is_array($input['media'] ?? null) ? $input['media'] : [];
         $resolver = new MediaResolver();
         $resolver->build($media, true);
         $idMap = $resolver->idMap();
         $report['media_sideloaded'] = $resolver->sideloadedCount();
-        $this->warnings = array_merge($this->warnings, $resolver->warnings());
+        $mediaWarnings = $resolver->warnings();
+
+        // Records the dry-run diff shows as already matching are skipped —
+        // so a clean export → import round-trip is a genuine no-op and
+        // re-running an import doesn't churn post_modified dates. (It also
+        // resets $this->warnings.)
+        $unchanged = $this->unchangedRecordKeys($input);
+        $this->warnings = $mediaWarnings;
         $this->refs = $this->buildRefMap($input, $idMap);
         $this->secondPass = [];
         $this->incomingPosts = [];
