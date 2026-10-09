@@ -53,14 +53,23 @@ final class ChangeSet
      */
     private static function diffPosts(mixed $base, mixed $target): array
     {
-        $keyer = static fn (array $p): string => ($p['type'] ?? '') . '|' . (($p['slug'] ?? '') !== '' ? $p['slug'] : ($p['match_key'] ?? ''));
-        $baseMap = self::indexBy(is_array($base) ? $base : [], $keyer);
-        $targetMap = self::indexBy(is_array($target) ? $target : [], $keyer);
+        $base = is_array($base) ? $base : [];
+        $target = is_array($target) ? $target : [];
+        // Hierarchical posts key on their path (1.5), when both sides have
+        // paths: a 1.4 snapshot against a 1.5 one would otherwise turn every
+        // page into a delete and a create.
+        $hasPaths = static fn (array $posts): bool => $posts === [] || array_filter($posts, static fn ($p): bool => is_array($p) && !empty($p['path'])) !== [];
+        $usePaths = $hasPaths($base) && $hasPaths($target);
+        $keyer = static fn (array $p): string => ($p['type'] ?? '') . '|' . ($usePaths && !empty($p['path'])
+            ? $p['path']
+            : (($p['slug'] ?? '') !== '' ? $p['slug'] : ($p['match_key'] ?? '')));
+        $baseMap = self::indexBy($base, $keyer);
+        $targetMap = self::indexBy($target, $keyer);
 
         $ops = [];
 
         foreach ($targetMap as $key => $record) {
-            $t = ['kind' => 'post', 'type' => $record['type'] ?? null, 'slug' => $record['slug'] ?? null, 'match_key' => $record['match_key'] ?? null];
+            $t = Importer::postTarget($record);
             if (!isset($baseMap[$key])) {
                 $ops[] = ['op' => 'create', 'target' => $t, 'post' => $record];
                 continue;
@@ -74,7 +83,7 @@ final class ChangeSet
             if (!isset($targetMap[$key])) {
                 $ops[] = [
                     'op'     => 'delete',
-                    'target' => ['kind' => 'post', 'type' => $record['type'] ?? null, 'slug' => $record['slug'] ?? null, 'match_key' => $record['match_key'] ?? null],
+                    'target' => Importer::postTarget($record),
                 ];
             }
         }

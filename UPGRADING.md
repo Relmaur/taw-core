@@ -484,6 +484,21 @@ download, files missing, and metadata changes as `media:<path>` records; and a r
 this site can't get is cleared instead of pointing at whatever attachment has that number here.
 Captions keep their markup. **Check:** none.
 
+### v1.84.0: content imports keep page and category trees
+
+Content Interchange, export and import (snapshot schema 1.5, fidelity Phase 5):
+
+- Pages are matched by their path (`about/team`), so two pages with the same slug under different
+  parents no longer overwrite each other. A page moved at the source is moved here, not duplicated.
+- Parents are set even when the source lists a child before its parent, and a parent removed at the
+  source is removed here (pages and categories).
+- Category and tag meta outside TAW fields is imported (it was exported, but never written).
+- Terms of a private taxonomy the exported posts use arrive with their names.
+
+**Check:** none on the site itself. As with v1.82.0, the **exporter** runs on the source of a pull, so
+production needs this release for its snapshots to carry page paths. Older snapshots still import
+(pages matched by slug, as before).
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

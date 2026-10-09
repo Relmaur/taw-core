@@ -94,11 +94,7 @@ class Importer
             if (!is_array($post)) {
                 continue;
             }
-            $ops[] = [
-                'op'     => 'update',
-                'target' => ['kind' => 'post', 'type' => $post['type'] ?? null, 'slug' => $post['slug'] ?? null, 'match_key' => $post['match_key'] ?? null],
-                'post'   => $post,
-            ];
+            $ops[] = ['op' => 'update', 'target' => self::postTarget($post), 'post' => $post];
         }
 
         foreach ((is_array($input['options'] ?? null) ? $input['options'] : []) as $key => $value) {
@@ -115,8 +111,28 @@ class Importer
     }
 
     /**
+     * A post record's identity: type, slug, and for a hierarchical type its
+     * path (1.5), so `about/team` and `services/team` stay two records.
+     * Slug-less drafts carry their composite `match_key`.
+     *
+     * @param array<string, mixed> $post
+     * @return array<string, mixed>
+     */
+    public static function postTarget(array $post): array
+    {
+        $target = ['kind' => 'post', 'type' => $post['type'] ?? null, 'slug' => $post['slug'] ?? null, 'match_key' => $post['match_key'] ?? null];
+        if (is_string($post['path'] ?? null) && $post['path'] !== '') {
+            $target['path'] = $post['path'];
+        }
+
+        return $target;
+    }
+
+    /**
      * Stable sort into `users → terms → posts → options → comments →
      * settings-options` — the dependency order {@see self::apply()} relies on.
+     * Within terms and posts, parents come before their children, so a
+     * child finds its parent even when the source listed it first.
      *
      * @param list<array<string, mixed>> $ops
      * @return list<array<string, mixed>>
@@ -132,14 +148,39 @@ class Importer
             return $base;
         };
 
+        // A term's depth follows its `parent` chain through the input's terms.
+        $termParents = [];
+        foreach ($ops as $op) {
+            if (($op['target']['kind'] ?? '') === 'term' && !empty($op['fields']['parent'])) {
+                $termParents[(string) ($op['target']['type'] ?? '') . ':' . (string) ($op['target']['slug'] ?? '')] = (string) $op['fields']['parent'];
+            }
+        }
+        $depth = static function (array $op) use ($termParents): int {
+            $t = is_array($op['target'] ?? null) ? $op['target'] : [];
+            if (($t['kind'] ?? '') === 'post') {
+                return substr_count((string) ($t['path'] ?? ''), '/');
+            }
+            if (($t['kind'] ?? '') !== 'term') {
+                return 0;
+            }
+            $taxonomy = (string) ($t['type'] ?? '');
+            $key = $taxonomy . ':' . (string) ($t['slug'] ?? '');
+            $seen = [];
+            while (isset($termParents[$key]) && !isset($seen[$key])) {
+                $seen[$key] = true;
+                $key = $taxonomy . ':' . $termParents[$key];
+            }
+            return count($seen);
+        };
+
         // array_multisort would drop string keys; a stable manual sort keeps insertion order within a rank.
         $indexed = [];
         foreach ($ops as $i => $op) {
-            $indexed[] = [$rank($op), $i, $op];
+            $indexed[] = [$rank($op), $depth($op), $i, $op];
         }
-        usort($indexed, static fn (array $a, array $b): int => $a[0] <=> $b[0] ?: $a[1] <=> $b[1]);
+        usort($indexed, static fn (array $a, array $b): int => $a[0] <=> $b[0] ?: $a[1] <=> $b[1] ?: $a[2] <=> $b[2]);
 
-        return array_map(static fn (array $row): array => $row[2], $indexed);
+        return array_map(static fn (array $row): array => $row[3], $indexed);
     }
 
     /**
@@ -167,6 +208,7 @@ class Importer
     {
         $this->warnings = [];
         $this->checkSchema($input);
+        $this->rememberIncoming($input);
         $media = new MediaResolver();
         $media->build(is_array($input['media'] ?? null) ? $input['media'] : [], false);
         $this->refs = $this->buildRefMap($input, $media->idMap(), $media->missingIds());
@@ -300,12 +342,7 @@ class Importer
             }
         }
         $this->secondPass = [];
-        $this->incomingPosts = [];
-        foreach (self::operationsFrom($input) as $op) {
-            if (($op['target']['kind'] ?? '') === 'post') {
-                $this->incomingPosts[(string) ($op['target']['type'] ?? '') . ':' . (string) ($op['target']['slug'] ?? '')] = true;
-            }
-        }
+        $this->rememberIncoming($input);
 
         $report['registry_drift'] = $this->registryDrift($input);
 
@@ -353,6 +390,95 @@ class Importer
     /** @var array<string, true> "type:slug" of every post in the input */
     private array $incomingPosts = [];
 
+    /** @var array<string, true> "type:path" of every hierarchical post in the input */
+    private array $incomingPaths = [];
+
+    /** @var array<string, true> "taxonomy:slug" of every term in the input */
+    private array $incomingTerms = [];
+
+    /** @var array<string, int> "type:path" => the local post an input page moved away from, see {@see self::matchMovedPosts()} */
+    private array $movedPosts = [];
+
+    /**
+     * The posts and terms the input brings, so a parent this run creates
+     * isn't reported as missing, and a page isn't matched to another
+     * record's page by its slug alone.
+     *
+     * @param array<string, mixed> $input
+     */
+    private function rememberIncoming(array $input): void
+    {
+        $this->incomingPosts = $this->incomingPaths = $this->incomingTerms = [];
+        $bySlug = [];
+        foreach (self::operationsFrom($input) as $op) {
+            $t = $op['target'];
+            $kind = (string) ($t['kind'] ?? '');
+            $type = (string) ($t['type'] ?? '');
+            if ($kind === 'post') {
+                $slug = (string) ($t['slug'] ?? '');
+                $this->incomingPosts[$type . ':' . $slug] = true;
+                if (($t['path'] ?? '') !== '') {
+                    $this->incomingPaths[$type . ':' . (string) $t['path']] = true;
+                    $bySlug[$type][$slug][(string) $t['path']] = (string) ($op['post']['title'] ?? '');
+                }
+            } elseif ($kind === 'term') {
+                $this->incomingTerms[$type . ':' . (string) ($t['slug'] ?? '')] = true;
+            }
+        }
+        $this->matchMovedPosts($bySlug);
+    }
+
+    /**
+     * Pages of the input that aren't at their path here, paired with this
+     * site's pages of the same slug that aren't at any path of the input
+     * (a page moved at the source since the last import): one of each, or
+     * else by a title only one page on each side has. Anything else stays
+     * unpaired and is created, never written over another page.
+     *
+     * @param array<string, array<string, array<string, string>>> $bySlug type => slug => path => title
+     */
+    private function matchMovedPosts(array $bySlug): void
+    {
+        $this->movedPosts = [];
+        foreach ($bySlug as $type => $slugs) {
+            if (!is_post_type_hierarchical((string) $type)) {
+                continue;
+            }
+            foreach ($slugs as $slug => $titles) {
+                $local = [];
+                foreach ($slug === '' ? [] : get_posts([
+                    'post_type'        => (string) $type,
+                    'post_name__in'    => [(string) $slug],
+                    'post_status'      => 'any',
+                    'posts_per_page'   => 50,
+                    'suppress_filters' => false,
+                    'no_found_rows'    => true,
+                ]) as $post) {
+                    $path = (string) get_page_uri($post);
+                    if (isset($titles[$path])) {
+                        unset($titles[$path]); // at its path: matched directly
+                    } elseif (!isset($this->incomingPaths[$type . ':' . $path])) {
+                        $local[] = $post;
+                    }
+                }
+                if ($titles === [] || $local === []) {
+                    continue;
+                }
+                if (count($titles) === 1 && count($local) === 1) {
+                    $this->movedPosts[$type . ':' . array_key_first($titles)] = (int) $local[0]->ID;
+                    continue;
+                }
+                foreach ($local as $post) {
+                    $same = array_keys($titles, (string) $post->post_title, true);
+                    $twins = array_filter($local, static fn (\WP_Post $p): bool => $p->post_title === $post->post_title);
+                    if (count($same) === 1 && count($twins) === 1) {
+                        $this->movedPosts[$type . ':' . $same[0]] = (int) $post->ID;
+                    }
+                }
+            }
+        }
+    }
+
     private function refs(): RefMap
     {
         return $this->refs ??= new RefMap();
@@ -386,7 +512,7 @@ class Importer
             is_array($refs['posts'] ?? null) ? $refs['posts'] : [],
             is_array($refs['terms'] ?? null) ? $refs['terms'] : [],
             is_array($refs['users'] ?? null) ? $refs['users'] : [],
-            fn (string $type, string $slug): int => (int) ($this->findPost($type, $slug)->ID ?? 0),
+            fn (string $type, string $slug, string $path = ''): int => (int) ($this->findPost($type, $slug, '', [], $path)->ID ?? 0),
             static function (string $taxonomy, string $slug): int {
                 $term = $taxonomy !== '' && $slug !== '' ? get_term_by('slug', $slug, $taxonomy) : false;
                 return $term instanceof \WP_Term ? (int) $term->term_id : 0;
@@ -586,9 +712,10 @@ class Importer
             return $kind . ':' . (string) ($t['key'] ?? '');
         }
 
-        // Slug-less drafts key on their composite match_key instead.
+        // A hierarchical post keys on its path (1.5); slug-less drafts on
+        // their composite match_key.
         $slug = (string) ($t['slug'] ?? '');
-        $identity = $slug !== '' ? $slug : (string) ($t['match_key'] ?? '');
+        $identity = ($t['path'] ?? '') !== '' ? (string) $t['path'] : ($slug !== '' ? $slug : (string) ($t['match_key'] ?? ''));
 
         return $kind . ':' . (string) ($t['type'] ?? '') . ':' . $identity;
     }
@@ -628,8 +755,12 @@ class Importer
         $matchKey = (string) ($op['target']['match_key'] ?? ($incoming['match_key'] ?? ''));
         $explicitOp = $op['op'] ?? 'update';
 
-        $existing = $this->findPost($type, $slug, $matchKey, $incoming);
+        $path = (string) ($op['target']['path'] ?? '');
+        $existing = $this->findPost($type, $slug, $matchKey, $incoming, $path);
         $identity = ['kind' => 'post', 'type' => $type, 'slug' => $slug, 'match_key' => $matchKey];
+        if ($path !== '') {
+            $identity['path'] = $path;
+        }
 
         if ($explicitOp === 'delete') {
             return $identity + ['op' => $existing ? 'would-delete' : 'skip'];
@@ -637,7 +768,7 @@ class Importer
 
         $changes = [];
 
-        foreach (['title', 'excerpt', 'content', 'status', 'menu_order', 'template', 'parent', 'comment_status', 'ping_status', 'password'] as $prop) {
+        foreach (['title', 'excerpt', 'content', 'status', 'menu_order', 'template', 'comment_status', 'ping_status', 'password'] as $prop) {
             if (!array_key_exists($prop, $incoming)) {
                 continue;
             }
@@ -652,6 +783,21 @@ class Importer
                 $changes[$prop] = ['status' => 'new', 'new' => $new];
             } elseif ((string) $old !== (string) $new) {
                 $changes[$prop] = ['status' => 'changed', 'old' => $old, 'new' => $new];
+            }
+        }
+
+        // Parent — compared by the local post it resolves to; none clears it.
+        // A parent neither here nor in the input can't be set: apply warns.
+        if (array_key_exists('parent', $incoming)) {
+            $ref = (string) ($incoming['parent'] ?? '');
+            $old = $existing ? $this->currentPostProp($existing, 'parent') : '';
+            $parent = $ref === '' ? null : $this->findParent($type, $ref);
+            $settable = $ref === '' || $parent !== null || isset($this->incomingPaths[$type . ':' . $ref]) || isset($this->incomingPosts[$type . ':' . $ref]);
+            $differs = $existing ? (int) $existing->post_parent !== (int) ($parent->ID ?? 0) : $ref !== '';
+            if ($differs && $settable) {
+                $changes['parent'] = $existing ? ['status' => 'changed', 'old' => $old, 'new' => $ref] : ['status' => 'new', 'new' => $ref];
+            } elseif (!$settable) {
+                $this->warnings[] = "{$type}:" . ($path !== '' ? $path : $slug) . ": parent '{$ref}' isn't on this site or in the import — not set.";
             }
         }
 
@@ -787,6 +933,30 @@ class Importer
             }
         }
 
+        // Parent — by slug (unique within a taxonomy); none clears it. A
+        // parent neither here nor in the input can't be set: apply warns.
+        if (array_key_exists('parent', $fields)) {
+            $ref = (string) ($fields['parent'] ?? '');
+            $old = $existing ? $this->termParentSlug($existing) : '';
+            $settable = $ref === '' || get_term_by('slug', $ref, $taxonomy) instanceof \WP_Term || isset($this->incomingTerms[$taxonomy . ':' . $ref]);
+            if ($old !== $ref && $settable) {
+                $changes['parent'] = $existing ? ['status' => 'changed', 'old' => $old, 'new' => $ref] : ['status' => 'new', 'new' => $ref];
+            } elseif (!$settable) {
+                $this->warnings[] = "term:{$taxonomy}:{$slug}: parent '{$ref}' isn't on this site or in the import — not set.";
+            }
+        }
+
+        // Term meta outside TAW fields, as the source has it (URLs mapped).
+        foreach (is_array($fields['meta'] ?? null) ? $fields['meta'] : [] as $metaKey => $value) {
+            $new = $this->termMetaValue($value);
+            $old = $existing ? get_term_meta($existing->term_id, (string) $metaKey, true) : '';
+            if (self::valueKey($old) !== self::valueKey($new)) {
+                $changes['meta.' . $metaKey] = ($existing && !self::isEmptyValue($old))
+                    ? ['status' => 'changed', 'old' => $old, 'new' => $new]
+                    : ['status' => 'new', 'new' => $new];
+            }
+        }
+
         // Term fieldsets (ADR-0008): same key rules and normalized diff as post fields.
         $registered = Metabox::fieldsFor('term', $taxonomy);
         foreach (is_array($fields['fields'] ?? null) ? $fields['fields'] : [] as $fieldKey => $newVal) {
@@ -803,6 +973,31 @@ class Importer
 
         return ['kind' => 'term', 'type' => $taxonomy, 'slug' => $slug,
                 'op' => $existing ? 'update' : 'create', 'changes' => $changes];
+    }
+
+    private function termParentSlug(\WP_Term $term): string
+    {
+        $parent = $term->parent ? get_term((int) $term->parent, $term->taxonomy) : null;
+
+        return $parent instanceof \WP_Term ? (string) $parent->slug : '';
+    }
+
+    /**
+     * A term meta value as it's stored here: unserialized (1.5 exports
+     * values unserialized; older snapshots carry the serialized string,
+     * which is decoded without objects, or kept as it came when it holds
+     * one), with the source's URLs mapped.
+     */
+    private function termMetaValue(mixed $value): mixed
+    {
+        if (is_string($value) && is_serialized($value) && !preg_match('/(?:^|[;{])[OC]:\d+:"/', $value)) {
+            $decoded = @unserialize($value, ['allowed_classes' => false]);
+            if ($decoded !== false || $value === serialize(false)) {
+                $value = $decoded;
+            }
+        }
+
+        return FieldCodec::rewriteStrings($value, $this->refs());
     }
 
     /**
@@ -897,10 +1092,11 @@ class Importer
         $slug = (string) ($op['target']['slug'] ?? '');
         $incoming = is_array($op['post'] ?? null) ? $op['post'] : [];
         $matchKey = (string) ($op['target']['match_key'] ?? ($incoming['match_key'] ?? ''));
-        $label = "{$type}:" . ($slug !== '' ? $slug : "(draft {$matchKey})");
+        $path = (string) ($op['target']['path'] ?? '');
+        $label = "{$type}:" . ($path !== '' ? $path : ($slug !== '' ? $slug : "(draft {$matchKey})"));
         $explicitOp = $op['op'] ?? 'update';
 
-        $existing = $this->findPost($type, $slug, $matchKey, $incoming);
+        $existing = $this->findPost($type, $slug, $matchKey, $incoming, $path);
 
         if ($explicitOp === 'delete') {
             if ($existing) {
@@ -960,12 +1156,15 @@ class Importer
             $postArr['post_date'] = get_date_from_gmt($date);
             $postArr['edit_date'] = true;
         }
-        if (!empty($incoming['parent'])) {
-            $parent = $this->findPost($type, (string) $incoming['parent']);
-            if ($parent) {
-                $postArr['post_parent'] = $parent->ID;
+        // Parents run before their children (see sortByDependencyOrder), so
+        // one this run creates is already here. None at the source clears it.
+        if (array_key_exists('parent', $incoming)) {
+            $ref = (string) ($incoming['parent'] ?? '');
+            $parent = $ref === '' ? null : $this->findParent($type, $ref);
+            if ($ref === '' || $parent !== null) {
+                $postArr['post_parent'] = $parent !== null ? (int) $parent->ID : 0;
             } else {
-                $this->warnings[] = "{$label}: parent '{$incoming['parent']}' not found — left unparented.";
+                $this->warnings[] = "{$label}: parent '{$ref}' not found — " . ($existing ? 'parent left as it was.' : 'left unparented.');
             }
         }
 
@@ -1150,10 +1349,15 @@ class Importer
         $args = [
             'description' => (string) ($fields['description'] ?? ($existing->description ?? '')),
         ];
-        if (!empty($fields['parent'])) {
-            $parent = get_term_by('slug', (string) $fields['parent'], $taxonomy);
-            if ($parent) {
-                $args['parent'] = $parent->term_id;
+        // Parents run before their children (see sortByDependencyOrder).
+        // None at the source clears it.
+        if (array_key_exists('parent', $fields)) {
+            $ref = (string) ($fields['parent'] ?? '');
+            $parent = $ref === '' ? false : get_term_by('slug', $ref, $taxonomy);
+            if ($ref === '' || $parent instanceof \WP_Term) {
+                $args['parent'] = $parent instanceof \WP_Term ? (int) $parent->term_id : 0;
+            } else {
+                $this->warnings[] = "{$label}: parent '{$ref}' not found — " . ($existing ? 'parent left as it was.' : 'left unparented.');
             }
         }
 
@@ -1171,6 +1375,9 @@ class Importer
         }
 
         $termId = $existing ? (int) $existing->term_id : (int) $created['term_id'];
+        foreach (is_array($fields['meta'] ?? null) ? $fields['meta'] : [] as $metaKey => $value) {
+            update_term_meta($termId, (string) $metaKey, wp_slash($this->termMetaValue($value)));
+        }
         $registered = Metabox::fieldsFor('term', $taxonomy);
         foreach (is_array($fields['fields'] ?? null) ? $fields['fields'] : [] as $fieldKey => $value) {
             $config = FieldKeys::forKey((string) $fieldKey, $registered, self::bareConfigLookup())['config'];
@@ -1480,10 +1687,40 @@ class Importer
 
     /**
      * @param array<string, mixed> $incoming The full incoming post record (for the slug-less composite match).
+     * @param string               $path     A hierarchical post's path (1.5): matched first.
      */
-    private function findPost(string $type, string $slug, string $matchKey = '', array $incoming = []): ?\WP_Post
+    private function findPost(string $type, string $slug, string $matchKey = '', array $incoming = [], string $path = ''): ?\WP_Post
     {
         if ($type === '') {
+            return null;
+        }
+
+        if ($path !== '' && is_post_type_hierarchical($type)) {
+            $found = get_page_by_path($path, 'OBJECT', $type);
+            if ($found instanceof \WP_Post) {
+                return $found;
+            }
+            // A page of the input that moved: paired up front, for the
+            // whole input at once (see matchMovedPosts()).
+            if (isset($this->incomingPaths[$type . ':' . $path])) {
+                $moved = $this->movedPosts[$type . ':' . $path] ?? 0;
+                $post = $moved > 0 ? get_post($moved) : null;
+                return $post instanceof \WP_Post && $post->post_type === $type ? $post : null;
+            }
+            // A reference outside the input (a parent, a `refs` entry, an
+            // older snapshot's slug): the one post this site has under the
+            // slug, unless it's another record of the input.
+            $candidates = $slug === '' ? [] : get_posts([
+                'post_type'        => $type,
+                'post_name__in'    => [$slug],
+                'post_status'      => 'any',
+                'posts_per_page'   => 2,
+                'suppress_filters' => false,
+                'no_found_rows'    => true,
+            ]);
+            if (count($candidates) === 1 && !isset($this->incomingPaths[$type . ':' . get_page_uri($candidates[0])])) {
+                return $candidates[0];
+            }
             return null;
         }
 
@@ -1528,6 +1765,17 @@ class Importer
         return null;
     }
 
+    /**
+     * A post's parent by its reference: the parent's path (1.5), or its
+     * slug (older snapshots, and non-hierarchical types).
+     */
+    private function findParent(string $type, string $ref): ?\WP_Post
+    {
+        $slug = ($pos = strrpos($ref, '/')) === false ? $ref : substr($ref, $pos + 1);
+
+        return $this->findPost($type, $slug, '', [], $ref);
+    }
+
     private function currentPostProp(\WP_Post $post, string $prop): mixed
     {
         return match ($prop) {
@@ -1539,7 +1787,9 @@ class Importer
             'comment_status' => $post->comment_status,
             'ping_status'    => $post->ping_status,
             'template'       => get_page_template_slug($post) ?: '',
-            'parent'         => $post->post_parent ? (get_post($post->post_parent)->post_name ?? '') : '',
+            'parent'         => $post->post_parent && ($parent = get_post($post->post_parent)) instanceof \WP_Post
+                ? (is_post_type_hierarchical((string) $post->post_type) ? (string) get_page_uri($parent) : (string) $parent->post_name)
+                : '',
             'password'       => (string) $post->post_password,
             default          => null,
         };
