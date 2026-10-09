@@ -543,6 +543,13 @@ signal the change, so the row's value only reached the saved repeater if somethi
 form changed afterwards (or the click was quick enough). **Check:** none; re-pick and save any
 repeater rows whose post selections went missing.
 
+### v1.87.2: pulls settle when a host drops large files
+
+Fix, import side. A content import now tries a media download three times before giving up (some
+hosts cut large files off mid-transfer), and its warning says why a download failed. A post whose
+comment or ping status is stored empty at the source (WordPress itself saves the site's default) no
+longer shows as changed on every pull. **Check:** none; only the site you import into needs it.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
