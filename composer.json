@@ -2,6 +2,7 @@
     "name": "taw/core",
     "description": "TAW — data layer framework for WordPress (fields, options, REST-exposed meta, content interchange), plus an optional classic-theme toolkit (block system, Vite asset pipeline)",
     "type": "library",
+    "bin": ["bin/taw"],
     "license": "GPL-2.0-or-later",
     "authors": [
         {

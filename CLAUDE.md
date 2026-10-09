@@ -4,6 +4,10 @@
 
 ## Commands
 
+The `taw` tool is `vendor/bin/taw` in a theme (v1.90.0: `TAW\CLI\Application` owns the command list,
+per theme kind; `CommandRegistry` takes outside commands). A new command goes into
+`Application::coreCommands()`, not into the scaffolds' `bin/taw` (now a hand-over shim).
+
 | Task | Command |
 |------|---------|
 | Install deps | `composer install` |

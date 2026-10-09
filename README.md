@@ -1971,6 +1971,19 @@ Before v1.81.0, `X-Forwarded-For` was trusted from any client.
 
 ## CLI
 
+The `taw` tool ships with taw/core as **`vendor/bin/taw`** (v1.90.0, `TAW\CLI\Application`): its commands
+update with `composer update taw/core`. A theme's `bin/taw` hands over to it, so `php bin/taw …` and
+`vendor/bin/taw …` are the same. A classic theme gets every command below; a block theme
+(`theme.json` + `templates/`) gets `schema:validate` and `skills:sync`. **Your own commands** go through
+`TAW\CLI\CommandRegistry`, from a file the theme's `composer.json` autoloads (never `bin/`, which the
+scaffold owns):
+
+```php
+TAW\CLI\CommandRegistry::add(fn (string $themeDir) => new App\Cli\ReportCommand($themeDir));
+```
+
+A registered command can't take a core command's name. `$TAW_THEME_DIR` points the tool at another theme.
+
 ```bash
 php bin/taw make:block HeroSection --type=meta --group=sections
 php bin/taw import:block path/to/block
