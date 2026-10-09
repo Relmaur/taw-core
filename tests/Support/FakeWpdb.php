@@ -173,6 +173,15 @@ final class FakeWpdb
             return "DELETE FROM {$m[1]}";
         }
 
+        // MySQL's upsert (`UsageMeter::record()`) → SQLite's. Without a
+        // conflict target, SQLite (3.35+) applies it to whichever unique
+        // constraint the insert hit — here the composite primary key —
+        // and a bare column name on the right-hand side reads the existing
+        // row, exactly as in MySQL.
+        if (stripos($sql, 'ON DUPLICATE KEY UPDATE') !== false) {
+            return (string) preg_replace('/\bON DUPLICATE KEY UPDATE\b/i', 'ON CONFLICT DO UPDATE SET', $sql);
+        }
+
         if (preg_match('/^SHOW TABLES LIKE \'([^\']*)\'$/i', trim($sql), $m) === 1) {
             return "SELECT name FROM sqlite_master WHERE type='table' AND name='{$m[1]}'";
         }

@@ -184,4 +184,99 @@ final class ChatOrchestratorTest extends TestCase
         $this->assertStringContainsString("couldn't reach the assistant", $result['message']);
         $this->assertSame([], $result['tool_trace']);
     }
+
+    public function test_the_default_prompt_declines_off_topic_requests(): void
+    {
+        $prompt = ChatOrchestrator::systemPrompt('');
+
+        $this->assertStringContainsString('Only help with questions related to this website', $prompt);
+        $this->assertStringNotContainsString('Answer normally for anything else', $prompt);
+    }
+
+    public function test_the_site_scope_is_appended_to_the_prompt(): void
+    {
+        $prompt = ChatOrchestrator::systemPrompt('  the parish and the Catholic faith ');
+
+        $this->assertStringEndsWith("subject matter: the parish and the Catholic faith", $prompt);
+    }
+
+    public function test_the_prompt_filter_can_replace_it_but_not_blank_it(): void
+    {
+        \Brain\Monkey\Filters\expectApplied('taw_rag_system_prompt')->once()->andReturn('Custom prompt.');
+        $this->assertSame('Custom prompt.', ChatOrchestrator::systemPrompt('x'));
+
+        \Brain\Monkey\Filters\expectApplied('taw_rag_system_prompt')->once()->andReturn('   ');
+        $this->assertStringContainsString('subject matter: x', ChatOrchestrator::systemPrompt('x'));
+    }
+
+    public function test_the_given_system_prompt_and_completion_options_reach_every_call(): void
+    {
+        $llm = $this->createMock(LlmClientInterface::class);
+        $llm->expects($this->once())
+            ->method('chatCompletion')
+            ->with(
+                $this->callback(static fn (array $messages): bool => $messages[0] === ['role' => 'system', 'content' => 'Be brief.']),
+                [],
+                'test-model',
+                ['max_tokens' => 123]
+            )
+            ->willReturn($this->finalMessage('ok'));
+
+        (new ChatOrchestrator($llm, [], 'test-model', 3, ['max_tokens' => 123], 'Be brief.'))->respond('hi');
+    }
+
+    public function test_oversized_tool_results_are_truncated_before_the_model_sees_them(): void
+    {
+        $seen = [];
+        $llm = $this->createMock(LlmClientInterface::class);
+        $llm->method('chatCompletion')->willReturnCallback(function (array $messages) use (&$seen) {
+            $seen = $messages;
+
+            return count($messages) < 4
+                ? $this->toolCallMessage('call_1', 'big_tool', [])
+                : $this->finalMessage('done');
+        });
+
+        $tool = $this->fakeTool('big_tool', static fn (): array => ['text' => str_repeat('a', 20000)]);
+        (new ChatOrchestrator($llm, ['big_tool' => $tool], 'test-model'))->respond('go');
+
+        $toolMessage = $seen[3];
+        $this->assertSame('tool', $toolMessage['role']);
+        $this->assertSame(
+            \TAW\Core\Rag\Guard\ChatLimits::TOOL_RESULT_CHARS + mb_strlen(' …[truncated]'),
+            mb_strlen($toolMessage['content'])
+        );
+    }
+
+    public function test_tool_calls_beyond_the_per_turn_cap_are_answered_but_not_run(): void
+    {
+        $calls = [];
+        for ($i = 1; $i <= 5; $i++) {
+            $calls[] = ['id' => "call_{$i}", 'type' => 'function', 'function' => ['name' => 'count_tool', 'arguments' => '{}']];
+        }
+
+        $seen = [];
+        $llm = $this->createMock(LlmClientInterface::class);
+        $llm->method('chatCompletion')->willReturnCallback(function (array $messages) use (&$seen, $calls) {
+            $seen = $messages;
+
+            return count($messages) < 3
+                ? ['role' => 'assistant', 'content' => null, 'tool_calls' => $calls]
+                : $this->finalMessage('done');
+        });
+
+        $runs = 0;
+        $tool = $this->fakeTool('count_tool', static function () use (&$runs): array {
+            $runs++;
+
+            return ['ok' => true];
+        });
+
+        (new ChatOrchestrator($llm, ['count_tool' => $tool], 'test-model'))->respond('go');
+
+        $toolReplies = array_values(array_filter($seen, static fn (array $m): bool => $m['role'] === 'tool'));
+        $this->assertSame(\TAW\Core\Rag\Guard\ChatLimits::TOOL_CALLS_PER_TURN, $runs);
+        $this->assertCount(5, $toolReplies);
+        $this->assertStringContainsString('Too many tool calls', $toolReplies[4]['content']);
+    }
 }

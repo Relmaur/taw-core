@@ -16,6 +16,7 @@ use TAW\Core\OptionsPage\OptionsPage;
 use TAW\Core\Rag\Ingestion\PostIndexer;
 use TAW\Core\Rag\KnowledgeBase\KnowledgeBaseAdminScreen;
 use TAW\Core\Rag\RagSettings;
+use TAW\Core\Rag\Usage\UsageAdminScreen;
 use TAW\Core\Rest\BibleEndpoint;
 use TAW\Core\Rest\CanonLawEndpoint;
 use TAW\Core\Rest\CatechismEndpoint;
@@ -205,6 +206,7 @@ class Theme
         if (RagSettings::isEnabled()) {
             new RagSettings();
             (new KnowledgeBaseAdminScreen())->register();
+            (new UsageAdminScreen())->register();
             new PostIndexer();
             new RagChatEndpoint();
         }

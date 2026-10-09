@@ -6,6 +6,7 @@ namespace TAW\Core\Rag\Llm;
 
 use TAW\Core\Log\Logger;
 use TAW\Core\Rag\RagSettings;
+use TAW\Core\Rag\Usage\UsageMeter;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -109,6 +110,29 @@ final class LlmClient implements LlmClientInterface
             throw new LlmClientException("LLM request to {$path} failed with status {$status}.");
         }
 
+        $this->recordUsage($path, (string) ($body['model'] ?? ''), $decoded);
+
         return $decoded;
+    }
+
+    /**
+     * Every billed call is metered here, at the one place all of them pass
+     * through, so no caller can forget to (the chat budget depends on it).
+     * A provider that omits `usage` — some self-hosted OpenAI-compatible
+     * servers do — records a request with zero tokens rather than nothing,
+     * so the request count still shows on the Usage screen.
+     *
+     * @param array<string, mixed> $response
+     */
+    private function recordUsage(string $path, string $model, array $response): void
+    {
+        $usage = is_array($response['usage'] ?? null) ? $response['usage'] : [];
+
+        UsageMeter::record(
+            $path === '/embeddings' ? UsageMeter::KIND_EMBEDDING : UsageMeter::KIND_CHAT,
+            $model,
+            (int) ($usage['prompt_tokens'] ?? 0),
+            (int) ($usage['completion_tokens'] ?? 0)
+        );
     }
 }

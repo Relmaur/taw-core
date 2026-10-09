@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\Rag\Orchestrator;
 
 use TAW\Core\Log\Logger;
+use TAW\Core\Rag\Guard\ChatLimits;
 use TAW\Core\Rag\Llm\LlmClientInterface;
 use TAW\Core\Rag\Tools\RagTool;
 
@@ -27,17 +28,46 @@ if (!defined('ABSPATH')) {
  */
 final class ChatOrchestrator
 {
-    private const SYSTEM_PROMPT = "You are a helpful assistant for this website. Use the available tools to search this site's knowledge bases and content (and, when offered, to look up canons of the Code of Canon Law by number or keyword) before answering questions that call for those authoritative sources, and cite what you found. Answer normally for anything else.";
+    /**
+     * Scoped on purpose. The previous prompt ended "Answer normally for
+     * anything else", which turned a public site widget into a free,
+     * general-purpose assistant on the site owner's API bill. Declining
+     * off-topic requests is a cost guardrail as much as a product choice.
+     */
+    private const BASE_PROMPT = "You are the assistant for this website. Use the available tools to look up this site's content and reference sources before answering questions about them, and cite what you found. Only help with questions related to this website and its subject matter. If a request is unrelated (for example homework, writing code, or general-purpose chat), politely say that you can only help with questions about this site. Reply in the language the visitor writes in, and keep answers concise.";
+
+    private readonly string $systemPrompt;
 
     /**
-     * @param array<string, RagTool> $tools Keyed by tool name (must match each tool's name()).
+     * @param array<string, RagTool> $tools             Keyed by tool name (must match each tool's name()).
+     * @param array<string, mixed>   $completionOptions Sent with every chat completion (e.g. the output-token cap).
      */
     public function __construct(
         private readonly LlmClientInterface $llm,
         private readonly array $tools,
         private readonly string $model,
         private readonly int $maxIterations = 4,
+        private readonly array $completionOptions = [],
+        ?string $systemPrompt = null,
     ) {
+        $this->systemPrompt = $systemPrompt ?? self::systemPrompt('');
+    }
+
+    /**
+     * The system prompt for a site, with its admin-written scope appended.
+     * Sites can replace it wholesale with the `taw_rag_system_prompt`
+     * filter (it receives the built prompt and the raw scope).
+     */
+    public static function systemPrompt(string $scope): string
+    {
+        $scope = trim($scope);
+        $prompt = $scope === ''
+            ? self::BASE_PROMPT
+            : self::BASE_PROMPT . "\n\nThis website's subject matter: " . $scope;
+
+        $filtered = apply_filters('taw_rag_system_prompt', $prompt, $scope);
+
+        return is_string($filtered) && trim($filtered) !== '' ? $filtered : $prompt;
     }
 
     /**
@@ -47,7 +77,7 @@ final class ChatOrchestrator
     public function respond(string $userMessage, array $history = []): array
     {
         $messages = array_merge(
-            [['role' => 'system', 'content' => self::SYSTEM_PROMPT]],
+            [['role' => 'system', 'content' => $this->systemPrompt]],
             $history,
             [['role' => 'user', 'content' => $userMessage]]
         );
@@ -72,12 +102,20 @@ final class ChatOrchestrator
                 return ['message' => (string) ($assistantMessage['content'] ?? ''), 'tool_trace' => $trace];
             }
 
-            foreach ($toolCalls as $toolCall) {
-                $result = $this->dispatchToolCall(is_array($toolCall) ? $toolCall : [], $trace);
+            foreach (array_values($toolCalls) as $index => $toolCall) {
+                // Every requested call must get a reply message (the API
+                // rejects a tool_call_id left unanswered), but only the
+                // first few actually run: a model that fans out ten
+                // searches at once would otherwise multiply the context —
+                // and the bill — of every later round.
+                $result = $index < ChatLimits::TOOL_CALLS_PER_TURN
+                    ? $this->dispatchToolCall(is_array($toolCall) ? $toolCall : [], $trace)
+                    : ['error' => 'Too many tool calls at once. Answer with the results already returned.'];
+
                 $messages[] = [
                     'role' => 'tool',
                     'tool_call_id' => (string) (is_array($toolCall) ? ($toolCall['id'] ?? '') : ''),
-                    'content' => (string) wp_json_encode($result),
+                    'content' => self::capToolResult((string) wp_json_encode($result)),
                 ];
             }
         }
@@ -106,7 +144,7 @@ final class ChatOrchestrator
     private function complete(array $messages, array $toolDefinitions, array &$trace): ?array
     {
         try {
-            return $this->llm->chatCompletion($messages, $toolDefinitions, $this->model);
+            return $this->llm->chatCompletion($messages, $toolDefinitions, $this->model, $this->completionOptions);
         } catch (\Throwable $e) {
             Logger::warning('rag.llm_request_failed', 'Chat completion request failed.', [
                 'error' => $e->getMessage(),
@@ -115,6 +153,22 @@ final class ChatOrchestrator
 
             return null;
         }
+    }
+
+    /**
+     * A tool result re-enters the context of every later model call, so a
+     * single oversized result (a long search hit, a whole chapter) is the
+     * quickest way to inflate a request's cost. The cut leaves the JSON
+     * unparseable, which the model handles fine; the marker tells it the
+     * text is partial.
+     */
+    private static function capToolResult(string $json): string
+    {
+        if (mb_strlen($json) <= ChatLimits::TOOL_RESULT_CHARS) {
+            return $json;
+        }
+
+        return mb_substr($json, 0, ChatLimits::TOOL_RESULT_CHARS) . ' …[truncated]';
     }
 
     /**

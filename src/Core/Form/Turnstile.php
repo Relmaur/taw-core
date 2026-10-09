@@ -100,13 +100,24 @@ final class Turnstile
             var pending = [];
             var loading = false;
 
-            function renderOne(el) {
+            // Options a caller may forward to Cloudflare (the chat widget
+            // uses the callbacks to collect its token, and
+            // appearance: 'interaction-only' to stay invisible unless a
+            // challenge actually needs the visitor). Anything else is
+            // dropped, so the sitekey always comes from the markup.
+            var FORWARDED = ['callback', 'error-callback', 'expired-callback', 'appearance', 'size', 'theme', 'action'];
+
+            function renderOne(item) {
+                var el = item.el;
                 if (!el || el.dataset.tawWidgetId) return; // already rendered
-                var id = window.turnstile.render(el, {
+                var options = {
                     sitekey: el.dataset.sitekey,
                     theme: el.dataset.theme || 'light',
+                };
+                FORWARDED.forEach(function (key) {
+                    if (item.options && item.options[key] !== undefined) options[key] = item.options[key];
                 });
-                el.dataset.tawWidgetId = id;
+                el.dataset.tawWidgetId = window.turnstile.render(el, options);
             }
 
             function flush() {
@@ -130,9 +141,16 @@ final class Turnstile
             }
 
             return {
-                render: function (el) {
-                    pending.push(el);
+                render: function (el, options) {
+                    pending.push({ el: el, options: options || null });
                     ensureLoaded();
+                },
+                // A token is single-use: after spending one, reset to get a
+                // fresh challenge (and token) from the same widget.
+                reset: function (el) {
+                    if (el && el.dataset.tawWidgetId && window.turnstile) {
+                        window.turnstile.reset(el.dataset.tawWidgetId);
+                    }
                 },
                 remove: function (el) {
                     if (el && el.dataset.tawWidgetId && window.turnstile) {

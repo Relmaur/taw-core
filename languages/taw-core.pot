@@ -44,6 +44,18 @@ msgid_plural "Showing %1$d of %2$d items. You’re editing the first; the others
 msgstr[0] ""
 msgstr[1] ""
 
+#. translators: 1: messages, 2: minutes
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+#, php-format
+msgid "%1$d messages or %2$d minutes, then a new human check"
+msgstr ""
+
+#. translators: 1: messages per 10 minutes, 2: messages per day
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+#, php-format
+msgid "%1$d messages per 10 minutes, %2$d per day"
+msgstr ""
+
 #. translators: 1: files chosen, 2: most allowed.
 #. translators: 1: items, 2: most allowed.
 #: resources/data-panel/src/controls/MediaControls.tsx resources/data-panel/src/controls/Repeater.tsx
@@ -91,6 +103,12 @@ msgstr[1] ""
 #: src/Core/Content/ContentAdminScreen.php
 #, php-format
 msgid "%d edited since were kept."
+msgstr ""
+
+#. translators: %d: messages per minute
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+#, php-format
+msgid "%d messages per minute"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -475,6 +493,10 @@ msgstr ""
 msgid "Bypass"
 msgstr ""
 
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Calls"
+msgstr ""
+
 #: resources/data-panel/src/rich/MiniEditor.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Cancel"
 msgstr ""
@@ -493,6 +515,14 @@ msgstr ""
 
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Change"
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Chat"
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Chat Usage"
 msgstr ""
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
@@ -633,6 +663,10 @@ msgstr ""
 msgid "Content, per post type"
 msgstr ""
 
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Cost"
+msgstr ""
+
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Current year"
 msgstr ""
@@ -659,6 +693,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/functionDocs.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Dates"
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Day"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -901,6 +939,10 @@ msgstr ""
 msgid "Highlighted"
 msgstr ""
 
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "History sent back"
+msgstr ""
+
 #: src/Core/Seo/Schema.php
 msgid "Home"
 msgstr ""
@@ -915,6 +957,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "How many words."
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Human check"
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
@@ -999,6 +1045,10 @@ msgstr ""
 msgid "Inline"
 msgstr ""
 
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Input tokens"
+msgstr ""
+
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Insert as"
 msgstr ""
@@ -1081,6 +1131,12 @@ msgstr ""
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Knowledge base deleted."
+msgstr ""
+
+#. translators: %d: number of days
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+#, php-format
+msgid "Last %d days"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -1333,6 +1389,10 @@ msgstr ""
 msgid "No items yet."
 msgstr ""
 
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "No metered calls yet."
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "No post select fields here. Add one to a fieldset first."
 msgstr ""
@@ -1397,8 +1457,16 @@ msgstr ""
 msgid "Numbers and money"
 msgstr ""
 
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Off"
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Media/MediaFolders.php
 msgid "Oldest first"
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "On"
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/data.ts
@@ -1481,6 +1549,10 @@ msgstr ""
 msgid "Otherwise show"
 msgstr ""
 
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Output tokens"
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/parts.tsx
 msgid "Page links"
 msgstr ""
@@ -1491,6 +1563,22 @@ msgstr ""
 
 #: src/Core/Auth/PagePassword.php
 msgid "Password"
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Paused"
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Per conversation"
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Per message"
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Per visitor"
 msgstr ""
 
 #: src/Core/Seo/Schema.php
@@ -1575,6 +1663,10 @@ msgstr ""
 msgid "Protected Page"
 msgstr ""
 
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Protections"
+msgstr ""
+
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Published on @post.date.format('F j, Y') by @post.author"
 msgstr ""
@@ -1585,6 +1677,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Random"
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Rate limits count messages per address. If \"Resolved\" below is not your own public IP but your host's proxy, every visitor shares one limit: add the proxy to TAW_TRUSTED_PROXIES in wp-config.php."
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
@@ -1680,6 +1776,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Replaces text."
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Resolved"
 msgstr ""
 
 #: src/Core/Editor/VisualEditor.php
@@ -1981,6 +2081,18 @@ msgstr ""
 msgid "Space between items"
 msgstr ""
 
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Spend is metered from the token counts your LLM provider reports, priced with the Budget settings. Compare it with the provider's own dashboard now and then — it is the bill of record."
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Spent this month"
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Spent today"
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Start blank"
 msgstr ""
@@ -2003,6 +2115,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Suggestions"
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "TAW Chatbot:"
 msgstr ""
 
 #: resources/data-panel/src/DataPanel.tsx src/Core/Content/ContentAdminScreen.php
@@ -2113,6 +2229,24 @@ msgstr ""
 msgid "The built-in \"This site's content\" knowledge base cannot be deleted."
 msgstr ""
 
+#. translators: 1: amount spent, 2: monthly budget
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+#, php-format
+msgid "The chat has spent %1$s of its %2$s monthly budget. It pauses on its own before going over."
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "The chat is paused (kill switch). Visitors get a \"paused\" message until it is switched back on."
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "The chat is refusing every message: its usage ledger cannot be read. See php bin/taw log:tail."
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "The chat is refusing every message: the human check is set to Turnstile, but TAW_TURNSTILE_SITE_KEY and TAW_TURNSTILE_SECRET_KEY are not defined in wp-config.php."
+msgstr ""
+
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "The day of the month."
 msgstr ""
@@ -2207,6 +2341,10 @@ msgstr ""
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "The upload failed — please try again."
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "The usage ledger could not be read, so the chat is refusing messages. See php bin/taw log:tail."
 msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
@@ -2320,6 +2458,14 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Too many values (50 at most)."
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Turnstile, but its keys are missing — chat is refusing messages"
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Turnstile, once per conversation"
 msgstr ""
 
 #: src/Core/Seo/Schema.php
@@ -2464,6 +2610,10 @@ msgstr ""
 msgid "Whole days from one date to another."
 msgstr ""
 
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Whole site"
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Width"
 msgstr ""
@@ -2478,6 +2628,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Without spaces at either end."
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Worst case per message"
 msgstr ""
 
 #: resources/data-panel/src/controls/RichContent.tsx
@@ -2508,12 +2662,16 @@ msgstr ""
 msgid "You can’t upload or choose media."
 msgstr ""
 
-#: src/Core/Content/ContentAdminScreen.php src/Core/Editing/EditingAdminScreen.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
+#: src/Core/Content/ContentAdminScreen.php src/Core/Editing/EditingAdminScreen.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php src/Core/Rag/Usage/UsageAdminScreen.php
 msgid "You do not have permission to access this page."
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "You do not have permission to import content."
+msgstr ""
+
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+msgid "Your address, as this server sees it"
 msgstr ""
 
 #: src/Support/Performance.php
@@ -2686,6 +2844,12 @@ msgstr ""
 msgid "is yes / on"
 msgstr ""
 
+#. translators: 1: turns, 2: characters per turn
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+#, php-format
+msgid "last %1$d turns, %2$d characters each"
+msgstr ""
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "locked"
 msgstr ""
@@ -2752,6 +2916,12 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "today, -30 days or 2025-01-31"
+msgstr ""
+
+#. translators: 1: max characters, 2: max answer tokens, 3: max tool rounds
+#: src/Core/Rag/Usage/UsageAdminScreen.php
+#, php-format
+msgid "up to %1$d characters in, %2$d tokens per answer, %3$d tool rounds"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php

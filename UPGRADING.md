@@ -61,6 +61,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.56 | taw-core's text has its own translations (the site's own still win) |
 | < v1.59.2 | taw-core's Spanish translation now actually loads in classic themes; tabs work by keyboard |
 | < v1.76.1 | Options-page and metabox tabs have a new look; check theme CSS that restyles `.taw-tabbed` |
+| < v1.81 | Per-IP limits stop trusting `X-Forwarded-For` (sites behind Cloudflare: set `TAW_TRUSTED_PROXIES`); an enabled chatbot needs Turnstile keys and an updated widget |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -419,6 +420,37 @@ value, so a page whose fallbacks moved into `defaults` could lose an image or a 
 `content:defaults` skipped those fields.
 
 **Check:** none.
+
+### v1.81.0: client IPs can't be spoofed; the chatbot gets a budget and a human check
+
+**Every site.** Rate limits (forms, page passwords, corpus endpoints) and the IP saved with form
+submissions now come from `REMOTE_ADDR`. `X-Forwarded-For` is read only when the request comes
+through a trusted proxy: private and loopback addresses by default, plus anything in
+`TAW_TRUSTED_PROXIES`. Before, any client could send `X-Forwarded-For` and dodge every per-IP limit.
+
+**Check:** a site behind Cloudflare or another public proxy must list it in `TAW_TRUSTED_PROXIES`
+(see README § Security / Hardening), or all visitors share one rate-limit bucket. To check: submit a
+form yourself and compare the IP saved on the submission with your own public IP (sites with the
+chatbot: **TAW Chatbot → Usage** shows it directly).
+
+**Sites that call `RagSettings::enable()`** (ADR-0017). `POST taw/v1/chat` now:
+- needs a session from `POST taw/v1/chat/session` (Turnstile) in the `X-TAW-Chat-Session` header,
+  and refuses every message (`503 not_protected`) while the human check is on and
+  `TAW_TURNSTILE_SITE_KEY`/`TAW_TURNSTILE_SECRET_KEY` are missing;
+- stops at a $1/day, $10/month budget and stricter limits (1000-character messages, 10 per 10 min and
+  60 per day per visitor, 30 per minute site-wide);
+- declines questions unrelated to the site.
+
+**Check:**
+1. Define the Turnstile keys in `wp-config.php`, or set **TAW Chatbot → Access → Human Check** to Off.
+2. Update the theme's `Blocks/Chatbot` (run Turnstile, send the session header, handle the refusal
+   `code`s). The taw-theme scaffold's widget does this.
+3. Set the budgets, prices and **Assistant Scope**, then open **TAW Chatbot → Usage** and check
+   that "Resolved" is your own IP. A site that saved the settings page before keeps its saved
+   **Max Tool-Call Iterations** (the old default was 4, the new one 3); Usage shows the value in force.
+4. Register `RagUsageCommand` in the theme's `bin/taw` (`php bin/taw sync` brings it).
+5. Ship the widget change and the taw/core bump together: the updated widget calls methods
+   (`RagSettings::humanCheck()`, `chatPaused()`, `maxMessageChars()`) that older taw/core doesn't have.
 
 ## Opt-in features you may want
 

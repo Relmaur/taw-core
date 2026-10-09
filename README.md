@@ -1949,6 +1949,24 @@ add_filter('taw_security_hide_users_endpoint', '__return_false');
 
 The classic `?author=N` → `/author/{slug}/` redirect probe is **not** handled here — it's site policy (it also kills author-archive query URLs) and overlaps with security-plugin behaviour, so it lives in `taw-theme`'s scaffold `inc/security.php`, not in the framework.
 
+### `ClientIp::get()` — the visitor's address, unspoofable (v1.81.0)
+
+Every per-IP limit (forms, page passwords, the corpus endpoints, the chatbot) and the IP stored with form submissions use `TAW\Core\Security\ClientIp::get()`, via `SubmissionsHandler::getUserIp()`. Forwarding headers are ordinary request headers any client can set, so it returns `REMOTE_ADDR` (the TCP peer). Only when that peer is a **trusted proxy** does it read `CF-Connecting-IP`, then `X-Forwarded-For` from the right (the first hop that isn't itself a trusted proxy), then `X-Real-IP`.
+
+Private and loopback ranges (`10/8`, `172.16/12`, `192.168/16`, `127/8`, `::1`, `fc00::/7`) are trusted out of the box: a request can only arrive from one through the site's own infrastructure. A public proxy such as Cloudflare must be declared, or every visitor shares one rate-limit bucket:
+
+```php
+// wp-config.php: IPs or CIDR ranges, comma-separated
+define('TAW_TRUSTED_PROXIES', '173.245.48.0/20, 103.21.244.0/22');
+
+// or in code; the filter receives the whole list, private ranges included
+add_filter('taw_trusted_proxies', fn (array $proxies): array => [...$proxies, '203.0.113.10']);
+```
+
+To check a host, open **TAW Chatbot → Usage**, or compare `ClientIp::get()` with your own public IP. "Resolved" should be your address, not the host's proxy.
+
+Before v1.81.0, `X-Forwarded-For` was trusted from any client.
+
 ---
 
 ## CLI
@@ -1977,6 +1995,7 @@ php bin/taw content:import /tmp/site.json                       # dry-run diff; 
 php bin/taw content:diff a.json b.json --out=changes.json       # two snapshots → a change-set for content:import
 php bin/taw content:reindex --post-type=post,page --batch=20    # backfill/refresh the RAG chatbot's WP-content vectors (see Sovereign Hybrid-RAG Chatbot)
 php bin/taw content:reindex-kb kb-a1b2c3d4                      # re-run ingestion for one admin-uploaded RAG knowledge base
+php bin/taw rag:usage --days=30                                 # the chatbot's metered spend vs its budgets (--uninstall drops the ledger)
 php bin/taw corpus:install /path/to/bible.sqlite bible-straubinger.sqlite   # install a reference corpus (see Bible Reader Corpus)
 php bin/taw corpus:export /path/to/bible.sqlite /path/to/bible-export.json  # portable export for a host with no pdo_sqlite
 ```
@@ -2207,7 +2226,7 @@ Uploading itself is wp-admin only, by design — there's no CLI import step; the
 
 ### Settings
 
-`Settings → TAW Chatbot` (`TAW\Core\Rag\RagSettings`): API base URL (default `https://api.openai.com/v1`), embedding/chat model names, indexed post types for the `wp-content` knowledge base (comma-separated, default `post,page`), chunk size/overlap, max tool-call iterations, and whether anonymous visitors can chat (default on). The LLM API key is **not** one of these fields — like `TAW_TURNSTILE_SECRET_KEY`, it's wp-config-constant-only: a secret doesn't belong in the options table, which an options page can [expose over REST](#rest):
+`Settings → TAW Chatbot` (`TAW\Core\Rag\RagSettings`), in four tabs. **Model & Index**: API base URL (default `https://api.openai.com/v1`), embedding/chat model names, indexed post types for the `wp-content` knowledge base (comma-separated, default `post,page`), chunk size/overlap. **Budget**, **Limits** and **Access**: the guardrails described under [`POST /wp-json/taw/v1/chat`](#post-wp-jsontawv1chat), plus whether anonymous visitors can chat (default on). The LLM API key is **not** one of these fields — like `TAW_TURNSTILE_SECRET_KEY`, it's wp-config-constant-only: a secret doesn't belong in the options table, which an options page can [expose over REST](#rest):
 
 ```php
 // wp-config.php
@@ -2228,7 +2247,24 @@ Runs an OpenAI-compatible tool-calling loop (`TAW\Core\Rag\Orchestrator\ChatOrch
 
 - **`search_knowledge_base(knowledge_base, query)`** (`TAW\Core\Rag\Tools\SearchKnowledgeBaseTool`) — semantic search over one named knowledge base. Its `knowledge_base` parameter is an enum built fresh from the current registry on every request (so a newly-uploaded knowledge base is searchable the moment ingestion finishes, no redeploy needed), and the tool's own description lists each available knowledge base's id + human description inline so the model can pick the right one without a clarifying round-trip.
 
-**Public by default** (`RagSettings::publicChatEnabled()`) — the endpoint's `permission_callback` doesn't gate anonymous requests, since WP's cookie-auth nonce check only protects logged-in callers anyway. The actual defense is unconditional rate limiting via `TAW\Core\Form\RateLimiter` (20 requests/10 min per IP), applied regardless of the public/logged-in-only setting.
+**Public by default** (`RagSettings::publicChatEnabled()`), and every message can spend money on the LLM API, so each request passes these gates (v1.81.0, ADR-0017) before anything billable runs:
+
+| Gate | Refusal | Setting / constant |
+|---|---|---|
+| Kill switch | `503 paused` | **Access → Pause the Chat**, or `define('TAW_RAG_CHAT_DISABLED', true)` |
+| Human check, once per conversation | `503 not_protected` (Turnstile keys missing), `401 session_required` | **Access → Human Check** (`turnstile` default, `off`); `TAW_TURNSTILE_SITE_KEY`/`TAW_TURNSTILE_SECRET_KEY` |
+| Per-visitor, then site-wide throttles | `429 rate_limited` + `retry_after` / `Retry-After` | **Limits**: 10 per 10 min, 60 per day per visitor; 30 per minute site-wide |
+| Budget, reserving the request's worst case | `503 budget_exhausted` | **Budget**: $1/day, $10/month, prices per 1M tokens |
+
+Every refusal is `{"code": "…", "error": "English fallback"}`, so a widget can show its own copy.
+
+**The human check.** `POST /wp-json/taw/v1/chat/session` with `{"turnstile_token": "…"}` verifies the token with Cloudflare and returns `{"token", "expires_in", "max_messages"}`, a signed session good for 30 minutes or 30 messages. Send it on each message as `X-TAW-Chat-Session`; on `401 session_required`, run Turnstile again. There are no WordPress nonces, so page caching can't serve a stale one. With the mode on and the keys missing, the chat refuses every message rather than run unprotected.
+
+**Spend.** Every successful LLM call, chat or embedding, is metered from the provider's `usage` into `{prefix}taw_rag_usage` (MySQL, so it works on hosts without `pdo_sqlite`). A message is refused when today's or this month's spend plus its worst-case cost would cross the budget. That worst case comes from the same caps that limit the message: answer length (600 tokens), message length (1000 characters), history (last 6 turns × 1500 characters), tool results (6000 characters), 3 tool calls per reply, 3 tool rounds. The site admin gets one email at 80% of the month and one when a budget pauses the chat (`taw_rag_budget_alert_recipients` filters the list). **TAW Chatbot → Usage** shows spend, the worst case per message and the active protections; so does `php bin/taw rag:usage [--days=30]`. `--uninstall` drops the table.
+
+**Scope.** The assistant answers questions about the site and declines unrelated requests (homework, code, general chat). Describe the site's subject in **Access → Assistant Scope**, or replace the prompt with the `taw_rag_system_prompt` filter (`fn (string $prompt, string $scope): string`).
+
+Outside the code: give each site its own provider key, from a provider project with a hard monthly limit. The provider's dashboard is the bill of record; the meter is an estimate from your configured prices.
 
 ---
 
