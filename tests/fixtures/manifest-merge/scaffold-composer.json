@@ -1,0 +1,66 @@
+{
+    "name": "taw/theme",
+    "description": "TAW Theme — WordPress starter theme built on taw/core",
+    "type": "project",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Site Owner",
+            "email": "owner@example.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "taw/core": "^1.0",
+        "reactiph/taw-bridge": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "TAW\\Blocks\\": "Blocks/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "TAW\\Theme\\Tests\\": "tests/"
+        }
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/Relmaur/taw-core"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/Relmaur/reactiph"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/Relmaur/reactiph-wordpress-bridge"
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/Relmaur/reactiph-taw-bridge"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "scripts": {
+        "post-create-project-cmd": [
+            "npm install --silent"
+        ],
+        "phpstan": "phpstan analyse --memory-limit=-1",
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true,
+        "platform": {
+            "php": "8.2"
+        }
+    },
+    "require-dev": {
+        "brain/monkey": "^2.6",
+        "phpstan/phpstan": "^2.2",
+        "phpunit/phpunit": "^11",
+        "szepeviktor/phpstan-wordpress": "^2.0"
+    }
+}
