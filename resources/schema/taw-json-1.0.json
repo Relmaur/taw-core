@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Relmaur/taw-core/blob/main/resources/schema/taw-json-1.0.json",
+  "title": "taw.json — a TAW site's own settings",
+  "description": "Site-owned, never synced. Mirrors TAW\\Update\\Policy (PolicyTest keeps them in sync). Every setting is optional; leave one out for its default.",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "update": {
+      "description": "What an update (bin/taw update, the framework-sync workflow, taw-fleet's Update this site) changes on its own.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "core": {
+          "description": "patch: bug-fix releases only. minor (default): every 1.x release. pinned:<version>: exactly that version.",
+          "type": "string",
+          "pattern": "^(patch|minor|pinned:v?[0-9]+\\.[0-9]+\\.[0-9]+)$",
+          "default": "minor"
+        },
+        "scaffold": {
+          "description": "auto (default): framework-owned files (Tier 1) are replaced. off: reported, not written.",
+          "enum": ["auto", "off"],
+          "default": "auto"
+        },
+        "manifests": {
+          "description": "add+bump (default): composer.json/package.json get what a new taw/core needs; nothing is removed. off: reported only.",
+          "enum": ["add+bump", "off"],
+          "default": "add+bump"
+        },
+        "docs": {
+          "description": "framework-sections (default): the framework's sections of AGENTS.md/CLAUDE.md are refreshed, the site's text kept. off: left alone.",
+          "enum": ["framework-sections", "off"],
+          "default": "framework-sections"
+        },
+        "checks": {
+          "description": "What must pass before the update is delivered.",
+          "type": "array",
+          "items": { "enum": ["lint", "phpstan", "test", "build", "smoke"] },
+          "uniqueItems": true,
+          "default": ["lint", "phpstan", "test", "build"]
+        },
+        "deliver": {
+          "description": "pr (default): a pull request for you to merge. pr+merge: merged when every check passes (merging deploys production). branch: committed on a branch, nothing pushed.",
+          "enum": ["pr", "pr+merge", "branch"],
+          "default": "pr"
+        }
+      }
+    }
+  }
+}

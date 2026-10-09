@@ -74,6 +74,7 @@ final class Application
         $everywhere = [
             new SchemaValidateCommand($themeDir),
             new SkillsSyncCommand($themeDir),
+            new PolicyCommand($themeDir),
         ];
         if (self::isBlockTheme($themeDir)) {
             return $everywhere;

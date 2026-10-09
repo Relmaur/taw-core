@@ -1984,6 +1984,38 @@ TAW\CLI\CommandRegistry::add(fn (string $themeDir) => new App\Cli\ReportCommand(
 
 A registered command can't take a core command's name. `$TAW_THEME_DIR` points the tool at another theme.
 
+### Update policy (`taw.json`, v1.91.0)
+
+A theme's `taw.json` (site-owned, never synced) says what an update changes on its own. Every setting is
+optional; the defaults are shown. Schema: `resources/schema/taw-json-1.0.json` (`TAW\Update\Policy`
+mirrors it; `PolicyTest` keeps them in sync).
+
+```json
+{
+  "$schema": "./vendor/taw/core/resources/schema/taw-json-1.0.json",
+  "update": {
+    "core": "minor",
+    "scaffold": "auto",
+    "manifests": "add+bump",
+    "docs": "framework-sections",
+    "checks": ["lint", "phpstan", "test", "build"],
+    "deliver": "pr"
+  }
+}
+```
+
+| Setting | Values |
+|---|---|
+| `core` | `patch` (1.90.x only), `minor` (every 1.x), `pinned:<version>` |
+| `scaffold` | `auto` (replace framework-owned files), `off` |
+| `manifests` | `add+bump` (what a new taw/core needs; never removals), `off` |
+| `docs` | `framework-sections` (refresh the framework's parts of AGENTS.md/CLAUDE.md), `off` |
+| `checks` | any of `lint`, `phpstan`, `test`, `build`, `smoke` (needs the site running) |
+| `deliver` | `pr` (a pull request to merge), `pr+merge` (merged when checks pass; deploys), `branch` |
+
+`php bin/taw policy` shows it in words (`--json` for tools, `--init` writes a starter file). An invalid
+file is listed with its errors, and updates refuse to run until it's fixed: never half-applied.
+
 ```bash
 php bin/taw make:block HeroSection --type=meta --group=sections
 php bin/taw import:block path/to/block

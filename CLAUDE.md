@@ -7,6 +7,9 @@
 The `taw` tool is `vendor/bin/taw` in a theme (v1.90.0: `TAW\CLI\Application` owns the command list,
 per theme kind; `CommandRegistry` takes outside commands). A new command goes into
 `Application::coreCommands()`, not into the scaffolds' `bin/taw` (now a hand-over shim).
+`TAW\Update\Policy` (v1.91.0) reads a theme's `taw.json` "update" settings (pure, pre-boot: no ABSPATH
+guard); `resources/schema/taw-json-1.0.json` mirrors it and `PolicyTest` keeps them in sync — change both
+together.
 
 | Task | Command |
 |------|---------|

@@ -597,6 +597,26 @@ TAW\CLI\CommandRegistry::add(fn (string $themeDir) => new App\Cli\ReportCommand(
 **Undo:** restore the previous `bin/taw` from git (`git checkout <commit> -- bin/taw`); taw/core keeps
 working either way.
 
+### v1.91.0: `taw.json`, the site's update policy
+
+**What changed.** A theme can now say, in its own `taw.json`, what an update changes on its own:
+taw/core's range (`patch`, `minor`, or `pinned:1.90.0`), framework files, `composer.json`/`package.json`
+additions, the framework's sections of the agent docs, which checks must pass, and how the update is
+delivered (`pr`, `pr+merge`, `branch`). `bin/taw policy` shows the effective policy in words;
+`--init` writes a starter file. Nothing acts on it yet: the coming `bin/taw update` (and taw-fleet's
+"Update this site") will.
+
+**Why.** So "update this site" can run without asking questions: the site decides once, in a file it
+owns and commits, and every updater (the dashboard, the weekly CI job, a person) follows the same rules
+(umbrella plan `docs/plans/taw-platform.md` § 5).
+
+**Check:** none. A site without `taw.json` gets the defaults: every 1.x release, framework files
+replaced, additions applied, lint + phpstan + test + build, a pull request to merge.
+
+**By hand:** `php bin/taw policy --init`, edit `taw.json` (editors that read JSON schemas complete it from
+`vendor/taw/core/resources/schema/taw-json-1.0.json`), check it with `php bin/taw policy`, commit it.
+**Undo:** delete `taw.json` (the defaults apply).
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
