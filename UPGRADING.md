@@ -19,8 +19,12 @@ to the site you're updating.
    `minimum-stability: dev`, the chatbot's `marked`/`dompurify`) are listed as optional: skip those
    unless the site wants them.
    The shared docs also mention `inc/security.php` and `Blocks/Chatbot`, which older sites may not have.
-3. **Update the package:** `composer update taw/core`. The theme's constraint (`^1.0`, or `^1.22` and
-   similar on older sites) allows every later 1.x release.
+3. **Update the package:** `composer update taw/core --with-dependencies`. The theme's constraint (`^1.0`, or
+   `^1.22` and similar on older sites) allows every later 1.x release. `--with-dependencies` (`-W`) lets
+   Composer move taw/core's own dependencies too. Without it, a release that needs a newer one (v1.77.0
+   needs `enshrined/svg-sanitize ^1.0`) changes nothing and still exits 0 with "Nothing to modify in lock
+   file". **Check the version moved** (`composer show taw/core | grep versions`); if it didn't,
+   `composer why-not taw/core <version>` says what holds it back.
 4. **Read the sections below** for every version newer than the one you came from, and do the checks
    marked **Check**.
 5. **Verify:**
@@ -43,25 +47,6 @@ saves and sends nothing. Delete any test entries you create.
 
 Nothing here changes stored data. Meta keys, option names and stored formats are the same in every 1.x
 release, so a rollback is `composer update taw/core:<old version>` (or restoring `composer.lock`).
-
-### v1.78.0: `sync` suggests composer.json/package.json changes
-
-`php bin/taw sync` now compares `composer.json` and `package.json` with the scaffold by rule instead of
-leaving a raw diff to judge (`resources/update-manifest.json` § `manifestMerge`). Each gets a `merge`
-entry in `--json`:
-- `add`: keys or repositories the scaffold has and the site lacks;
-- `bump`: dependencies whose scaffold constraint is higher;
-- `review`: other differences (a changed script, an autoload path), for a person to decide;
-- `optional`: Reactiph and chatbot lines, never suggested;
-- `site_only`: how many of the site's own keys it kept.
-
-Nothing is ever removed, and `name`, `extra` and other sections outside the rules are never read, so a
-site's own dependencies and its `extra.taw-companion` key stay. `--apply-manifests` writes `add` and
-`bump`, keeping the file's indentation; `--apply` still never writes Tier 2. Nothing changes unless you
-use the new flag.
-
-**Check:** none needed. To see it, `php bin/taw sync` lists the suggestions under `composer.json` and
-`package.json` (often "nothing to apply").
 
 ## Quick check: what applies to you
 
@@ -364,9 +349,38 @@ Also in v1.77.0: `enshrined/svg-sanitize` moves to `^1.0` (1.0.0 fixes three adv
 0.22.0, which current Composer refuses to install). Same API; SVG uploads are sanitized as before,
 with the DTD stripped first.
 
-**Check:** `php bin/taw list` doesn't show `hub:install`/`hub:enroll` (hidden),
-`php bin/taw hub:install` prints the retirement notice, and `composer audit` reports no
-advisories for svg-sanitize.
+**Check:** `composer audit` reports no advisories for svg-sanitize, and `php bin/taw list` doesn't
+show `hub:install`/`hub:enroll`. Run before the scaffold sync, the theme's old `bin/taw` still
+registers them, and `php bin/taw hub:install` prints the retirement notice. After the sync, the new
+`bin/taw` doesn't register them at all ("There are no commands defined in the hub namespace"). Both
+are a pass.
+
+### v1.78.0: `sync` suggests composer.json/package.json changes
+
+`php bin/taw sync` now compares `composer.json` and `package.json` with the scaffold by rule instead of
+leaving a raw diff to judge (`resources/update-manifest.json` § `manifestMerge`). Each gets a `merge`
+entry in `--json`:
+- `add`: keys or repositories the scaffold has and the site lacks;
+- `bump`: dependencies whose scaffold constraint is higher;
+- `review`: other differences (a changed script, an autoload path), for a person to decide;
+- `optional`: Reactiph and chatbot lines, never suggested;
+- `site_only`: how many of the site's own keys it kept.
+
+Nothing is ever removed, and `name`, `extra` and other sections outside the rules are never read, so a
+site's own dependencies and its `extra.taw-companion` key stay. `--apply-manifests` writes `add` and
+`bump`, keeping the file's indentation; `--apply` still never writes Tier 2. Nothing changes unless you
+use the new flag.
+
+**Check:** none needed. To see it, `php bin/taw sync` lists the suggestions under `composer.json` and
+`package.json` (often "nothing to apply").
+
+### v1.78.1: upgrading needs `--with-dependencies`
+
+Docs only. "How to upgrade" now says `composer update taw/core --with-dependencies`. A site coming from
+before v1.77.0 with `enshrined/svg-sanitize` 0.22.0 in its lock otherwise stays where it is without an
+error. The v1.77.0 check also covers a theme whose `bin/taw` was already synced.
+
+**Check:** none.
 
 ## Opt-in features you may want
 
