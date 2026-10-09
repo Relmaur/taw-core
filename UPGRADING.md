@@ -338,8 +338,13 @@ fleet key in `extra.taw-companion.keys`, and have your deploy copy
 `vendor/taw/hub-companion/mu-loader/taw-companion.php` to `wp-content/mu-plugins/`. Then delete the
 regular TAW Hub Companion plugin. taw-fleet reads the site (`taw-fleet live`).
 
-**Check:** `php bin/taw list` doesn't show `hub:install`/`hub:enroll` (hidden), and
-`php bin/taw hub:install` prints the retirement notice.
+Also in v1.77.0: `enshrined/svg-sanitize` moves to `^1.0` (1.0.0 fixes three advisories against
+0.22.0, which current Composer refuses to install). Same API; SVG uploads are sanitized as before,
+with the DTD stripped first.
+
+**Check:** `php bin/taw list` doesn't show `hub:install`/`hub:enroll` (hidden),
+`php bin/taw hub:install` prints the retirement notice, and `composer audit` reports no
+advisories for svg-sanitize.
 
 ## Opt-in features you may want
 
