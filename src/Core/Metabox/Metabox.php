@@ -159,6 +159,23 @@ class Metabox
     private static array $instances = [];
 
     /**
+     * Content a field shows while nothing is stored: `'defaults' =>
+     * ['field_id' => value]` in the config, keyed by field id (group
+     * sub-fields by their compound id). Only fields this metabox declares.
+     *
+     * @var array<string, mixed>
+     */
+    private array $defaults = [];
+
+    /**
+     * Post-type metaboxes declaring a default, by meta key: {@see self::get()}
+     * and the typed reads fall back through it.
+     *
+     * @var array<string, list<self>>
+     */
+    private static array $defaultIndex = [];
+
+    /**
      * @param array $config {
      *     @type string   $id       Unique metabox ID.
      *     @type string   $title    Metabox title shown in the editor.
@@ -172,6 +189,9 @@ class Metabox
      *     @type string   $icon     Optional icon shown in the metabox handle before the title.
      *                              Accepts a dashicons class (e.g. 'dashicons-admin-settings'),
      *                              a raw SVG string, or a URL to an image file.
+     *     @type array    $defaults Optional ['field_id' => value]: what a field reads, and
+     *                              shows in the editor, while nothing is stored for it.
+     *                              `content:defaults` saves them to the database.
      * }
      */
     public function __construct(array $config)
@@ -271,6 +291,78 @@ class Metabox
             // Repeater data is a single JSON blob requiring row-index-aware
             // editing — planned for a future iteration.
         }
+
+        foreach ((array) ($config['defaults'] ?? []) as $fieldKey => $value) {
+            if (self::isUnset($value) || !isset(self::$qualifiedRegistry[$this->id . '.' . $fieldKey])) {
+                continue;
+            }
+            $this->defaults[(string) $fieldKey] = $value;
+            if ($this->type !== 'nav_menu') {
+                self::$defaultIndex[$this->prefix . $fieldKey][] = $this;
+            }
+        }
+    }
+
+    /**
+     * The defaults this metabox declares, by field id.
+     *
+     * @return array<string, mixed>
+     */
+    public function defaults(): array
+    {
+        return $this->defaults;
+    }
+
+    /**
+     * A field's default in the form it's stored: structured types (repeater,
+     * files, post_select, …) as their JSON string, like a save writes them.
+     * Null when the field has none.
+     */
+    public function storedDefault(string $fieldKey): mixed
+    {
+        if (!array_key_exists($fieldKey, $this->defaults)) {
+            return null;
+        }
+        $value = $this->defaults[$fieldKey];
+        if (is_array($value)) {
+            return (string) wp_json_encode($value, JSON_UNESCAPED_UNICODE);
+        }
+
+        return $value;
+    }
+
+    /**
+     * The default for a meta key on a post, from the metabox that declares
+     * it (or, when several do, the one that applies to the post). Null when
+     * there's none.
+     */
+    public static function defaultValue(int $postId, string $metaKey): mixed
+    {
+        $boxes = self::$defaultIndex[$metaKey] ?? [];
+        if ($boxes === []) {
+            return null;
+        }
+
+        $box = $boxes[0];
+        if (count($boxes) > 1 && ($post = get_post($postId)) instanceof \WP_Post) {
+            foreach ($boxes as $candidate) {
+                if ($candidate->appliesTo($post)) {
+                    $box = $candidate;
+                    break;
+                }
+            }
+        }
+
+        return $box->storedDefault(substr($metaKey, strlen($box->prefix)));
+    }
+
+    /**
+     * Nothing stored: what `?:` treated as empty in the templates defaults
+     * replace, minus '0' (a stored value).
+     */
+    public static function isUnset(mixed $value): bool
+    {
+        return $value === '' || $value === null || $value === false || $value === [];
     }
 
     /**
@@ -350,6 +442,24 @@ class Metabox
     }
 
     /**
+     * The post types whose posts this metabox can apply to: its post-type
+     * screens, and every type with an edit screen when it has template or
+     * slug screens. {@see self::appliesTo()} settles each post.
+     *
+     * @return string[]
+     */
+    public function candidatePostTypes(): array
+    {
+        [$postTypes, $templates, $slugs] = $this->parseScreens();
+        if ($templates !== [] || $slugs !== []) {
+            $withUi = array_values(array_diff(array_map('strval', (array) get_post_types(['show_ui' => true])), ['attachment']));
+            $postTypes = array_merge($postTypes, $withUi);
+        }
+
+        return array_values(array_unique($postTypes));
+    }
+
+    /**
      * The template-file screens (e.g. 'page-about.php'): the data panel
      * re-checks these when the template changes in the editor.
      *
@@ -381,6 +491,7 @@ class Metabox
     {
         self::$fieldRegistry = [];
         self::$qualifiedRegistry = [];
+        self::$defaultIndex = [];
     }
 
     /**
@@ -2933,7 +3044,7 @@ class Metabox
                 <div class="field-and-label">
                     <label for="<?php echo esc_attr($field_id); ?>" class="field-label"><?php echo esc_html($field['label'] ?? ''); ?><?php $this->render_readonly_lock_icon($field); ?></label>
                     <?php
-                    $value = $post_id ? $this->store->get($post_id, $field_id) : '';
+                    $value = $post_id ? $this->read_value($post_id, $field_id) : '';
                     $this->render_field($field, $field_id, $value, $post_id);
                     ?>
                 </div>
@@ -3264,7 +3375,13 @@ class Metabox
      */
     private function read_value(int $object_id, string $key): mixed
     {
-        return $object_id > 0 ? $this->store->get($object_id, $key) : '';
+        $value = $object_id > 0 ? $this->store->get($object_id, $key) : '';
+        // An empty post field shows its default, so saving keeps it.
+        if (self::isUnset($value) && $this->store instanceof PostMetaStore && str_starts_with($key, $this->prefix)) {
+            return $this->storedDefault(substr($key, strlen($this->prefix))) ?? $value;
+        }
+
+        return $value;
     }
 
     /* 
@@ -3931,11 +4048,17 @@ class Metabox
      * @param int    $post_id  The post/page ID.
      * @param string $field_id Field ID (without prefix).
      * @param string $prefix   Meta key prefix. Default '_taw_'.
-     * @return mixed The raw meta value, or empty string if not set.
+     * @return mixed The raw meta value; while none is stored, the field's
+     *               default (see `defaults`), else empty string.
      */
     public static function get(int $post_id, string $field_id, string $prefix = '_taw_'): mixed
     {
-        return get_post_meta($post_id, $prefix . $field_id, true);
+        $value = get_post_meta($post_id, $prefix . $field_id, true);
+        if (self::isUnset($value) && self::$defaultIndex !== []) {
+            return self::defaultValue($post_id, $prefix . $field_id) ?? $value;
+        }
+
+        return $value;
     }
 
     /**
@@ -3992,7 +4115,7 @@ class Metabox
      */
     public static function get_bool(int $post_id, string $field_id, string $prefix = '_taw_'): bool
     {
-        return (string) get_post_meta($post_id, $prefix . $field_id, true) === '1';
+        return (string) self::get($post_id, $field_id, $prefix) === '1';
     }
 
 
@@ -4031,7 +4154,7 @@ class Metabox
      */
     public static function get_color(int $post_id, string $field_id, string $fallback = '', string $prefix = '_taw_'): string
     {
-        $color = (string) get_post_meta($post_id, $prefix . $field_id, true);
+        $color = (string) self::get($post_id, $field_id, $prefix);
         return $color !== '' ? $color : $fallback;
     }
 
@@ -4056,7 +4179,7 @@ class Metabox
      */
     public static function get_posts(int $post_id, string $field_id, string $prefix = '_taw_'): array
     {
-        $raw = get_post_meta($post_id, $prefix . $field_id, true);
+        $raw = self::get($post_id, $field_id, $prefix);
 
         if (empty($raw)) {
             return [];
@@ -4092,7 +4215,7 @@ class Metabox
      */
     public static function get_repeater(int $post_id, string $field_id, string $prefix = '_taw_'): array
     {
-        $raw = get_post_meta($post_id, $prefix . $field_id, true);
+        $raw = self::get($post_id, $field_id, $prefix);
         if (empty($raw)) return [];
 
         $rows = json_decode($raw, true);
@@ -4113,7 +4236,7 @@ class Metabox
      */
     public static function get_gradient_text(int $post_id, string $field_id, string $prefix = '_taw_'): array
     {
-        $raw = get_post_meta($post_id, $prefix . $field_id, true);
+        $raw = self::get($post_id, $field_id, $prefix);
         if (empty($raw)) return [];
 
         $segments = json_decode($raw, true);

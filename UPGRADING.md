@@ -398,6 +398,18 @@ don't import content. What an import now does differently:
 **Check:** if you keep content snapshots from before v1.79.0, they still import. A 1.3 snapshot fed to
 an older taw/core is imported best-effort (the password and the empty-taxonomy lists are ignored).
 
+### v1.80.0: field defaults, and saving them as records
+
+New and opt-in: a metabox or options page can declare `'defaults' => ['field_id' => value]`. While a
+field has nothing stored, the getters return its default and the edit screen shows it. Tools → TAW
+Data → *Defaults* (or `php bin/taw content:defaults --apply`) writes them into the empty fields, with
+an undo. Nothing changes for a site that declares no defaults.
+
+**Check:** none. To use it, move a block's `getMeta(...) ?: 'text'` fallbacks into its metabox's
+`defaults` and drop the `?:`; the page should render the same (README → Metabox System → Defaults). For
+`content:defaults`, add `$app->add(new ContentDefaultsCommand($themeDir));` to `bin/taw`, or sync it
+(`php bin/taw sync`).
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

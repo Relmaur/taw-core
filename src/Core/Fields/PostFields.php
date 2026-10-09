@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Core\Fields;
 
+use TAW\Core\Metabox\Metabox;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -39,6 +41,11 @@ final class PostFields extends MetaFields
 
     protected function read(string $key): mixed
     {
-        return get_post_meta($this->id(), $key, true);
+        $value = get_post_meta($this->id(), $key, true);
+        if (Metabox::isUnset($value)) {
+            return Metabox::defaultValue($this->id(), $key) ?? $value;
+        }
+
+        return $value;
     }
 }

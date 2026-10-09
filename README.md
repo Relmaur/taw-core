@@ -191,6 +191,28 @@ new Metabox([
 ]);
 ```
 
+### Defaults
+
+`'defaults' => ['field_id' => value]` is what a field reads while nothing is stored for it (v1.80.0+). `Metabox::get()`, `get_repeater()`, `get_bool()` and the other getters, `getMeta()` in a MetaBlock and `Taw::post()->field()` all return it, and the edit screen shows it in the field, so saving the post keeps it. Use it instead of `getMeta(...) ?: 'text'` fallbacks in `getData()`: the page renders the same, and the content can become records.
+
+```php
+new Metabox([
+    'id'       => 'taw_who',
+    'screens'  => ['page-nosotros.php'],
+    'fields'   => [['id' => 'who_heading', 'type' => 'text'], ['id' => 'who_items', 'type' => 'repeater', 'fields' => [/* … */]]],
+    'defaults' => [
+        'who_heading' => __('¿Quiénes somos?', 'taw-theme'),
+        'who_items'   => [['title' => 'Uno'], ['title' => 'Dos']], // repeaters, files, post_select: as arrays
+    ],
+]);
+```
+
+- Keys are field ids (group sub-fields by their compound id, `group_sub`). Unknown keys, and empty values, are ignored.
+- An empty stored value (`''`, or nothing) falls back to the default, as `?:` did; `'0'` is a value.
+- `OptionsPage` takes the same key; `OptionsPage::get()` falls back to it before its `$default` argument.
+- **Save them to the database:** Tools → TAW Data → *Defaults*, or `php bin/taw content:defaults` (preview) / `--apply`. Only empty fields are written, on the posts each metabox applies to (its post types, templates and slugs) and on options pages. A journal of the writes goes to `uploads/taw-private/` first; *Undo it* on the screen, or `--undo=<journal>`, reverses them and keeps any field edited since. The preview marks (`*`) a default the field's sanitizing would change (tags in a `text` or `textarea` field): saving stores the sanitized value.
+- Not yet in the block editor's data panel (ADR-0007): there the field shows empty until the defaults are saved.
+
 ### Field Types
 
 | Type | Notes |
@@ -2104,6 +2126,7 @@ php bin/taw content:import /tmp/site.json --yes             # apply (rollback sn
 php bin/taw content:import /tmp/site.json --yes --with-settings   # also apply environment settings
 php bin/taw content:import /tmp/site.json --yes --user=marco      # as this user (default: the first administrator)
 php bin/taw content:diff before.json after.json --out=changes.json
+php bin/taw content:defaults [--apply | --undo=<journal>]   # save fields' defaults as records (see Metabox → Defaults)
 ```
 
 Also, in wp-admin: **Tools → TAW Data** (Export with option checkboxes + Import-with-review), and `GET /wp-json/taw/v1/content/export` (capability `export`; content-only — no users/settings over REST).
