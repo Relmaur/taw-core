@@ -37,6 +37,15 @@ final class MediaResolver
     private int $sideloadedCount = 0;
 
     /**
+     * How each entry resolved: `matched` (an attachment here), `sideloaded`,
+     * `would-sideload` (a dry run), `missing` (not here, no URL) or `failed`
+     * (the download failed).
+     *
+     * @var list<array{id: int, filename: string, path: string, url: string, status: string, local: int, entry: array<string, mixed>}>
+     */
+    private array $outcomes = [];
+
+    /**
      * Build the ID map from a snapshot's `media[]` entries. Safe to call in
      * a dry run — pass $sideload=false to only match existing attachments
      * and record what *would* be sideloaded as a warning-style note.
@@ -56,29 +65,33 @@ final class MediaResolver
 
             // The path under uploads first (`2024/05/photo.jpg`): two files
             // can share a name in different month folders.
-            $path = self::uploadsPath((string) ($entry['url'] ?? ''));
+            $url = (string) ($entry['url'] ?? '');
+            $path = self::uploadsPath($url);
+            $outcome = ['id' => $sourceId, 'filename' => $filename, 'path' => $path !== '' ? $path : $filename, 'url' => $url, 'status' => '', 'local' => 0, 'entry' => $entry];
             $existing = ($path !== '' ? self::findByPath($path) : null) ?? self::findByFilename($filename);
             if ($existing !== null) {
                 if ($sourceId > 0) {
                     $this->idMap[$sourceId] = $existing;
                 }
+                $this->outcomes[] = ['status' => 'matched', 'local' => $existing] + $outcome;
                 continue;
             }
 
-            $url = (string) ($entry['url'] ?? '');
             if ($url === '') {
-                $this->warnings[] = "Media '{$filename}' is not on the target site and has no URL to sideload from.";
+                $this->warnings[] = "Media '{$filename}' is not on the target site and has no URL to sideload from — references to it are cleared.";
+                $this->outcomes[] = ['status' => 'missing'] + $outcome;
                 continue;
             }
 
             if (!$sideload) {
-                $this->warnings[] = "Media '{$filename}' would be sideloaded from {$url}.";
+                $this->outcomes[] = ['status' => 'would-sideload'] + $outcome;
                 continue;
             }
 
             $newId = $this->sideload($url, $entry);
             if ($newId === null) {
-                $this->warnings[] = "Failed to sideload media '{$filename}' from {$url}.";
+                $this->warnings[] = "Failed to sideload media '{$filename}' from {$url} — references to it are cleared.";
+                $this->outcomes[] = ['status' => 'failed'] + $outcome;
                 continue;
             }
 
@@ -86,6 +99,7 @@ final class MediaResolver
             if ($sourceId > 0) {
                 $this->idMap[$sourceId] = $newId;
             }
+            $this->outcomes[] = ['status' => 'sideloaded', 'local' => $newId] + $outcome;
         }
     }
 
@@ -93,6 +107,28 @@ final class MediaResolver
     public function idMap(): array
     {
         return $this->idMap;
+    }
+
+    /**
+     * @return list<array{id: int, filename: string, path: string, url: string, status: string, local: int, entry: array<string, mixed>}>
+     */
+    public function outcomes(): array
+    {
+        return $this->outcomes;
+    }
+
+    /**
+     * Source IDs of entries this site doesn't have and won't get (no URL,
+     * or the download failed): references to them are cleared.
+     *
+     * @return list<int>
+     */
+    public function missingIds(): array
+    {
+        return array_values(array_filter(array_map(
+            static fn (array $o): int => in_array($o['status'], ['missing', 'failed'], true) ? $o['id'] : 0,
+            $this->outcomes
+        )));
     }
 
     /** @return list<string> */
@@ -275,7 +311,8 @@ final class MediaResolver
             update_post_meta($id, '_wp_attachment_image_alt', sanitize_text_field((string) $entry['alt']));
         }
         if (!empty($entry['caption'])) {
-            wp_update_post(['ID' => $id, 'post_excerpt' => sanitize_text_field((string) $entry['caption'])]);
+            // A caption can carry markup (a link, emphasis): keep it as an editor would.
+            wp_update_post(['ID' => $id, 'post_excerpt' => wp_kses_post((string) $entry['caption'])]);
         }
 
         return (int) $id;

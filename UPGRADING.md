@@ -476,6 +476,14 @@ Import side. Media is downloaded before the import decides which records already
 record that links to a file arriving in the same import is updated in that import, not the next
 one. **Check:** none.
 
+### v1.83.0: content imports carry media metadata
+
+Import side (fidelity Phase 4). An image already on this site gets the source's alt text, caption,
+title and description when they differ; the dry run (and `taw-fleet pull`'s preview) lists files to
+download, files missing, and metadata changes as `media:<path>` records; and a reference to a file
+this site can't get is cleared instead of pointing at whatever attachment has that number here.
+Captions keep their markup. **Check:** none.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

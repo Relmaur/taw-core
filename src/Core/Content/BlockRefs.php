@@ -105,7 +105,7 @@ final class BlockRefs
         $swap = static function (array $m) use ($map): string {
             $local = $map->attachment((int) $m[2]);
 
-            return $m[1] . ($local ?? $m[2]) . ($m[3] ?? '');
+            return $m[1] . (is_int($local) ? $local : $m[2]) . $m[3];
         };
         $html = (string) preg_replace_callback('/(wp-image-)(\d+)()/', $swap, $html);
 

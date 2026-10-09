@@ -39,6 +39,9 @@ final class RefMap
     /** @var list<array{0: string, 1: string}> regex => replacement, media first, then the origin */
     private array $urlRules = [];
 
+    /** @var array<int, true> source attachment IDs this site doesn't have and won't get */
+    private array $missingAttachments = [];
+
     /**
      * @param array<int, int>                                          $attachments source attachment id => local id
      * @param array<int|string, array<string, mixed>>                  $postRefs    snapshot `refs.posts`
@@ -61,13 +64,27 @@ final class RefMap
         string $fromOrigin = '',
         string $toOrigin = '',
         string $fromUploads = '',
+        array $missingAttachments = [],
     ) {
         $this->urlRules = self::buildUrlRules($mediaUrls, $fromOrigin, $toOrigin, $fromUploads);
+        foreach ($missingAttachments as $missing) {
+            $this->missingAttachments[(int) $missing] = true;
+        }
     }
 
-    public function attachment(int $id): ?int
+    /**
+     * The local attachment, `false` for a file the snapshot lists that this
+     * site doesn't have and won't get (the reference is cleared, never left
+     * pointing at an unrelated attachment), or `null` for an ID the
+     * snapshot says nothing about.
+     */
+    public function attachment(int $id): int|false|null
     {
-        return $this->attachments[$id] ?? null;
+        if (isset($this->attachments[$id])) {
+            return $this->attachments[$id];
+        }
+
+        return isset($this->missingAttachments[$id]) ? false : null;
     }
 
     public function post(int $id): int|false|null
