@@ -325,6 +325,22 @@ Options-page and metabox tabs are a row of labels with the active one underlined
 bordered boxes with faded labels); on narrow screens the row scrolls sideways. Markup and keyboard behavior are
 unchanged. **Check:** a theme that restyles `.taw-tabbed .tabs` or `.tab-title` in its own admin CSS.
 
+
+### v1.77.0: `hub:install` and `hub:enroll` retired
+
+taw-hub was retired (2026-10-08). Both commands are now hidden stubs that print what replaced them
+and exit 1; nothing else changed. If your theme's `bin/taw` still registers them, it keeps working;
+`php bin/taw sync` brings the scaffold's `bin/taw`, which no longer does.
+
+What replaced them: the companion ships with the theme as an mu-plugin. Add the VCS repository
+`https://github.com/Relmaur/taw-hub-companion`, require `"taw/hub-companion": "^0.3"`, put the
+fleet key in `extra.taw-companion.keys`, and have your deploy copy
+`vendor/taw/hub-companion/mu-loader/taw-companion.php` to `wp-content/mu-plugins/`. Then delete the
+regular TAW Hub Companion plugin. taw-fleet reads the site (`taw-fleet live`).
+
+**Check:** `php bin/taw list` doesn't show `hub:install`/`hub:enroll` (hidden), and
+`php bin/taw hub:install` prints the retirement notice.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
