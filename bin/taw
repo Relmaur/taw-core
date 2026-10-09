@@ -1,0 +1,34 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * TAW CLI — `vendor/bin/taw` in every TAW theme (taw/core ≥ 1.90).
+ *
+ *   vendor/bin/taw list
+ *   vendor/bin/taw make:block Hero --type=meta
+ *
+ * The commands live in taw/core (TAW\CLI\Application) and update with
+ * `composer update taw/core`. The theme is the project that installed taw/core
+ * (the folder holding vendor/), or $TAW_THEME_DIR.
+ */
+
+declare(strict_types=1);
+
+// Composer's bin proxy (2.2+) tells us where its autoloader is; run directly
+// (php vendor/taw/core/bin/taw) we look for it.
+$autoload = $GLOBALS['_composer_autoload_path'] ?? null;
+if ($autoload === null) {
+    foreach ([dirname(__DIR__, 3) . '/autoload.php', dirname(__DIR__) . '/vendor/autoload.php'] as $candidate) {
+        if (is_file($candidate)) {
+            $autoload = $candidate;
+            break;
+        }
+    }
+}
+if ($autoload === null || !is_file($autoload)) {
+    fwrite(STDERR, "Run 'composer install' first.\n");
+    exit(1);
+}
+require $autoload;
+
+exit(TAW\CLI\Application::main(TAW\CLI\Application::themeDir(realpath($autoload) ?: $autoload, (string) getcwd())));

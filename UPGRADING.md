@@ -562,6 +562,41 @@ sentence's period is mapped. **Check:** none; a site that was pulled into before
 `hero-1.jpg`-style copy or a reference to the wrong one of two same-name files: pull again to set the
 references right, then delete the unused copy from the media library.
 
+### v1.89.0: site skills ship with taw/core
+
+taw/core now carries the site skills every TAW site gets (`resources/skills/`: `resolve-comments`,
+`perf-audit`). `bin/taw sync` installs them into `.claude/skills/` with the scaffold's skills, and the new
+`bin/taw skills:sync [--apply]` installs only these (block themes use it). **Check:** none. To install them
+by hand: `php bin/taw skills:sync --apply`, then commit `.claude/skills/`. To undo: delete the two folders
+(the next sync puts them back unless you mark a same-named skill `owner: site`).
+
+### v1.90.0: `vendor/bin/taw`, and commands of your own
+
+**What changed.** The `taw` command-line tool now ships with taw/core as `vendor/bin/taw`
+(`TAW\CLI\Application`): its command list updates with `composer update taw/core` instead of waiting for a
+scaffold release. A theme's `bin/taw` becomes a short file that hands over to it, so `php bin/taw …`
+keeps working. Commands you add yourself go through `TAW\CLI\CommandRegistry`, never into `bin/`
+(framework-owned, replaced on sync).
+
+**Why.** The theme's own `bin/taw` listed ~28 commands and was synced with `rsync --delete`: a site
+couldn't add a command, and a new command needed a scaffold release. This is the first step of making an
+update a plain `composer update` (umbrella plan `docs/plans/taw-platform.md` § 5.0).
+
+**Check:** none; nothing a site wrote changes. Run `vendor/bin/taw list` (or `php bin/taw list`): a
+classic theme lists 28 commands, a block theme `schema:validate` and `skills:sync`.
+
+**By hand** (the scaffold's sync does it for you): replace the theme's `bin/taw` with the scaffold's new
+one (taw-theme v1.12.57+ / taw-gutenberg v0.3.59+), or call taw/core directly:
+`vendor/bin/taw <command>`. To add a command of your own, put this in a file the theme's
+`composer.json` autoloads (`"autoload": {"files": ["inc/cli.php"]}`):
+
+```php
+TAW\CLI\CommandRegistry::add(fn (string $themeDir) => new App\Cli\ReportCommand($themeDir));
+```
+
+**Undo:** restore the previous `bin/taw` from git (`git checkout <commit> -- bin/taw`); taw/core keeps
+working either way.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
