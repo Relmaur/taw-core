@@ -613,7 +613,17 @@ owns and commits, and every updater (the dashboard, the weekly CI job, a person)
 **Check:** none. A site without `taw.json` gets the defaults: every 1.x release, framework files
 replaced, additions applied, lint + phpstan + test + build, a pull request to merge.
 
-**By hand:** `php bin/taw policy --init`, edit `taw.json` (editors that read JSON schemas complete it from
+**Also in v1.91.0: CI comes from taw/core.** A theme's `.github/workflows/ci.yml` and `framework-sync.yml`
+become stubs of a few lines that call taw/core's shared workflows (`theme-ci.yml`,
+`theme-framework-sync.yml` at `@v1`): the checks now update with taw/core. Each check runs only when the
+theme has what it checks (phpstan/test scripts, `Blocks/`, `taw-schema/`, a front-end check or build).
+The CI scripts move to `vendor/taw/core/resources/ci/`; until a site's taw/core has them, the shared
+workflows fall back to the theme's own `bin/ci/`. **Check:** after the sync, the next push runs CI:
+it should pass as before. **By hand:** copy the stubs from taw-theme v1.12.58+ (`smoke: true`,
+`build: false` for a classic theme) — each workflow's header lists the same checks as commands.
+**Undo:** restore the old workflow files from git.
+
+**By hand (taw.json):** `php bin/taw policy --init`, edit `taw.json` (editors that read JSON schemas complete it from
 `vendor/taw/core/resources/schema/taw-json-1.0.json`), check it with `php bin/taw policy`, commit it.
 **Undo:** delete `taw.json` (the defaults apply).
 

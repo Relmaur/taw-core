@@ -2016,6 +2016,23 @@ mirrors it; `PolicyTest` keeps them in sync).
 `php bin/taw policy` shows it in words (`--json` for tools, `--init` writes a starter file). An invalid
 file is listed with its errors, and updates refuse to run until it's fixed: never half-applied.
 
+### Theme CI (v1.91.0)
+
+A theme's CI is two short stubs calling taw/core's shared workflows, so the checks update with taw/core:
+
+```yaml
+jobs:
+  ci:
+    uses: Relmaur/taw-core/.github/workflows/theme-ci.yml@v1
+    with: { smoke: true, build: false } # classic theme; a block theme: php-versions: '["8.2", "8.4"]'
+```
+
+`theme-ci.yml` runs PHP lint, the MetaBlock `getData()` check (when there's `Blocks/`), phpstan and tests
+(when composer.json has those scripts), `schema:validate` (when there's `taw-schema/`), the front-end
+`npm run check` or `build` (input `build`), and the WordPress smoke test (input `smoke`).
+`theme-framework-sync.yml` is the weekly update: bump taw/core, apply Tier 1, run the checks, open one
+pull request. Each workflow's header lists the same steps as commands, for running them by hand.
+
 ```bash
 php bin/taw make:block HeroSection --type=meta --group=sections
 php bin/taw import:block path/to/block
