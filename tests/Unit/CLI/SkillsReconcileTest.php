@@ -88,6 +88,58 @@ final class SkillsReconcileTest extends TestCase
         );
     }
 
+    public function test_core_skills_join_the_canonical_set_and_win_a_shared_name(): void
+    {
+        $core = $this->tmp . '/core';
+        $this->writeSkill($core, 'resolve-comments', 'taw', 'from taw/core');
+        $this->writeSkill($core, 'audit-seo', 'taw', 'core copy');
+        $dirs = [
+            'resolve-comments' => $core . '/.claude/skills/resolve-comments',
+            'audit-seo' => $core . '/.claude/skills/audit-seo',
+        ];
+        $cmd = new SyncCommand($this->local);
+        $entry = ['path' => '.claude/skills/', 'type' => 'skills-dir'];
+
+        $plan = $cmd->planSkillsReconcile($entry, $this->canonical, $this->cfg, $dirs);
+        $this->assertSame(['audit-seo', 'resolve-comments'], $plan['overwrite']);
+        $this->assertSame(['legacy-export'], $plan['delete'], 'retired framework skills still go');
+
+        $cmd->applySkillsReconcile($entry, $this->canonical, $plan, $dirs);
+        $skills = $this->local . '/.claude/skills';
+        $this->assertStringContainsString('from taw/core', (string) file_get_contents($skills . '/resolve-comments/SKILL.md'));
+        $this->assertStringContainsString('core copy', (string) file_get_contents($skills . '/audit-seo/SKILL.md'), 'taw/core wins a shared name');
+    }
+
+    public function test_core_only_plan_touches_nothing_else(): void
+    {
+        $core = $this->tmp . '/core';
+        $this->writeSkill($core, 'resolve-comments', 'taw', 'from taw/core');
+        $this->writeSkill($core, 'image-crop', 'taw', 'core');
+        $dirs = [
+            'image-crop' => $core . '/.claude/skills/image-crop',
+            'resolve-comments' => $core . '/.claude/skills/resolve-comments',
+        ];
+
+        $plan = (new SyncCommand($this->local))->planSkillsReconcile(['path' => '.claude/skills/', 'type' => 'skills-dir'], null, $this->cfg, $dirs);
+
+        $this->assertSame(['resolve-comments'], $plan['overwrite']);
+        $this->assertSame(['image-crop'], $plan['clash'], "the site's own skill of that name is kept");
+        $this->assertSame([], $plan['delete'], 'without the scaffold, nothing is retired');
+        $this->assertSame([], $plan['preserve']);
+        $this->assertSame([], $plan['warn']);
+    }
+
+    public function test_taw_core_ships_its_site_skills(): void
+    {
+        $skills = SyncCommand::coreSkills();
+        $this->assertArrayHasKey('resolve-comments', $skills);
+        $this->assertArrayHasKey('perf-audit', $skills);
+        $this->assertSame([], SyncCommand::coreSkills('.agents/skills/'), 'only .claude/skills/ gets them');
+        foreach ($skills as $name => $dir) {
+            $this->assertSame('taw', (new ReflectionMethod(SyncCommand::class, 'skillOwner'))->invoke(new SyncCommand($dir), $dir, 'owner'), $name . ' is owner: taw');
+        }
+    }
+
     public function test_skill_owner_reads_the_frontmatter_marker(): void
     {
         $owner = new ReflectionMethod(SyncCommand::class, 'skillOwner');
