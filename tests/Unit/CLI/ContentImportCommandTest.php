@@ -31,6 +31,8 @@ final class ContentImportCommandTest extends TestCase
         Functions\when('get_term_by')->justReturn(false);
         Functions\when('get_post_meta')->justReturn('');
         Functions\when('get_page_by_path')->justReturn(null);
+        Functions\when('get_users')->justReturn([1]);
+        Functions\when('wp_set_current_user')->justReturn(null);
         Functions\when('get_page_template_slug')->justReturn('');
         Functions\when('get_post_thumbnail_id')->justReturn(0);
         Functions\when('wp_json_encode')->alias(static fn ($v) => json_encode($v));

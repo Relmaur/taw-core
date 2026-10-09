@@ -32,7 +32,8 @@ use TAW\Core\Metabox\Store\UserMetaStore;
  * `users → terms → posts → options (non-settings) → comments → settings`.
  * Media is sideloaded and its old→new ID map built before posts are written.
  *
- * Accepts snapshots at schema `1.0` and `1.1`.
+ * Accepts snapshots at schema `1.x`; a minor version newer than
+ * {@see Exporter::SCHEMA_VERSION} imports best-effort, with a warning.
  *
  * @phpstan-type Operation array{op?: string, target: array<string, mixed>, post?: array<string, mixed>, fields?: array<string, mixed>}
  */
@@ -197,6 +198,11 @@ class Importer
         if (!in_array($major, self::SUPPORTED_SCHEMA_MAJORS, true)) {
             $this->warnings[] = "Snapshot schema '{$schema}' is newer than this taw/core understands (supports "
                 . implode('.x / ', self::SUPPORTED_SCHEMA_MAJORS) . ".x) — importing best-effort.";
+            return;
+        }
+        if (version_compare($schema, Exporter::SCHEMA_VERSION, '>')) {
+            $this->warnings[] = "Snapshot schema '{$schema}' is newer than this taw/core's " . Exporter::SCHEMA_VERSION
+                . " — what it added is ignored. Update taw/core here to import it fully.";
         }
     }
 
@@ -210,6 +216,29 @@ class Importer
      * @return array<string, mixed>
      */
     public function apply(array $input, array $options = []): array
+    {
+        // Content is written as the site has it, like an admin's save:
+        // kses (on when the current user lacks unfiltered_html, as in a CLI
+        // run) would strip embeds, SVG and forms and turn `&` into `&amp;`.
+        $kses = function_exists('kses_remove_filters') && has_filter('content_save_pre', 'wp_filter_post_kses') !== false;
+        if ($kses) {
+            kses_remove_filters();
+        }
+        try {
+            return $this->run($input, $options);
+        } finally {
+            if ($kses) {
+                kses_init_filters();
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @param array{policy?: string, rollback?: bool, include_settings?: bool} $options
+     * @return array<string, mixed>
+     */
+    private function run(array $input, array $options): array
     {
         $this->warnings = [];
         $this->commentIdMap = [];
@@ -379,16 +408,42 @@ class Importer
 
         $changes = [];
 
-        foreach (['title', 'excerpt', 'content', 'status', 'menu_order', 'template', 'parent', 'comment_status', 'ping_status'] as $prop) {
+        foreach (['title', 'excerpt', 'content', 'status', 'menu_order', 'template', 'parent', 'comment_status', 'ping_status', 'password'] as $prop) {
             if (!array_key_exists($prop, $incoming)) {
                 continue;
             }
             $new = $incoming[$prop];
             $old = $existing ? $this->currentPostProp($existing, $prop) : null;
+            if ($prop === 'password' && !$existing && (string) $new === '') {
+                continue;
+            }
             if (!$existing) {
                 $changes[$prop] = ['status' => 'new', 'new' => $new];
             } elseif ((string) $old !== (string) $new) {
                 $changes[$prop] = ['status' => 'changed', 'old' => $old, 'new' => $new];
+            }
+        }
+
+        // Date — compared in GMT; a draft has none (0000-00-00 00:00:00).
+        $newDate = self::realDate($incoming['date'] ?? null);
+        if ($existing && $newDate !== '' && $newDate !== (string) $existing->post_date_gmt) {
+            $changes['date'] = ['status' => 'changed', 'old' => (string) $existing->post_date_gmt, 'new' => $newDate];
+        }
+
+        // Terms — per taxonomy the snapshot lists (an empty list clears it).
+        if ($existing && is_array($incoming['terms'] ?? null)) {
+            foreach ($incoming['terms'] as $taxonomy => $slugs) {
+                if (!taxonomy_exists((string) $taxonomy)) {
+                    continue;
+                }
+                $new = array_map('strval', array_values((array) $slugs));
+                sort($new);
+                $current = wp_get_object_terms($existing->ID, (string) $taxonomy, ['fields' => 'slugs']);
+                $old = is_array($current) ? array_map('strval', $current) : [];
+                sort($old);
+                if ($old !== $new) {
+                    $changes['terms.' . $taxonomy] = ['status' => 'changed', 'old' => $old, 'new' => $new];
+                }
             }
         }
 
@@ -458,6 +513,10 @@ class Importer
         $currentRaw = get_option($key, null);
         $exists = $currentRaw !== null;
 
+        if (($op['op'] ?? 'update') === 'delete') {
+            return ['kind' => 'option', 'key' => $key, 'op' => $exists ? 'would-delete' : 'skip', 'changes' => []];
+        }
+
         if ($exists && $this->optionCompareKey($key, $currentRaw) === $this->optionCompareKey($key, $incoming)) {
             return ['kind' => 'option', 'key' => $key, 'op' => 'update', 'changes' => []];
         }
@@ -480,6 +539,10 @@ class Importer
         $slug = (string) ($op['target']['slug'] ?? '');
         $existing = get_term_by('slug', $slug, $taxonomy);
         $fields = is_array($op['fields'] ?? null) ? $op['fields'] : [];
+
+        if (($op['op'] ?? 'update') === 'delete') {
+            return ['kind' => 'term', 'type' => $taxonomy, 'slug' => $slug, 'op' => $existing ? 'would-delete' : 'skip', 'changes' => []];
+        }
 
         $changes = [];
         foreach (['name', 'description'] as $prop) {
@@ -571,7 +634,7 @@ class Importer
     {
         $fields = is_array($op['fields'] ?? null) ? $op['fields'] : [];
         $key = (string) ($op['target']['key'] ?? '');
-        $postId = $this->resolveAnyPostId((string) ($fields['post_ref'] ?? ''));
+        $postId = $this->resolveCommentPostId($fields);
 
         if ($postId === 0) {
             return ['kind' => 'comment', 'key' => $key, 'op' => 'skip',
@@ -579,6 +642,9 @@ class Importer
         }
 
         $exists = $this->findExistingComment($postId, $fields) > 0;
+        if (($op['op'] ?? 'update') === 'delete') {
+            return ['kind' => 'comment', 'key' => $key, 'op' => $exists ? 'would-delete' : 'skip', 'changes' => []];
+        }
 
         return ['kind' => 'comment', 'key' => $key,
                 'op' => $exists ? 'update' : 'create',
@@ -635,6 +701,9 @@ class Importer
                 $postArr[$prop] = (string) $incoming[$prop];
             }
         }
+        if (array_key_exists('password', $incoming)) {
+            $postArr['post_password'] = (string) $incoming['password'];
+        }
 
         // Author — resolve the portable {login,email} ref to a local user;
         // fall back to the importing user with a warning when it's absent.
@@ -652,8 +721,13 @@ class Importer
             }
         }
 
-        if (!empty($incoming['date'])) {
-            $postArr['post_date_gmt'] = (string) $incoming['date'];
+        // Both columns: wp_update_post keeps the old post_date otherwise, and
+        // the local and GMT dates drift apart.
+        $date = self::realDate($incoming['date'] ?? null);
+        if ($date !== '') {
+            $postArr['post_date_gmt'] = $date;
+            $postArr['post_date'] = get_date_from_gmt($date);
+            $postArr['edit_date'] = true;
         }
         if (!empty($incoming['parent'])) {
             $parent = $this->findPost($type, (string) $incoming['parent']);
@@ -666,17 +740,20 @@ class Importer
 
         if ($existing) {
             $postArr['ID'] = $existing->ID;
-            $postId = (int) wp_update_post(wp_slash($postArr), true);
+            $result = wp_update_post(wp_slash($postArr), true);
             $bucket = 'updated';
         } else {
-            $postId = (int) wp_insert_post(wp_slash($postArr), true);
+            $result = wp_insert_post(wp_slash($postArr), true);
             $bucket = 'created';
         }
 
-        if ($postId <= 0) {
-            $this->warnings[] = "{$label}: write failed.";
+        // A WP_Error cast to int is 1: never write fields onto post 1.
+        if (is_wp_error($result)) {
+            $this->warnings[] = "{$label}: write failed: " . $result->get_error_message();
             return ['bucket' => 'skipped', 'label' => $label];
         }
+        $postId = (int) $result;
+        $this->claimSlug($postId, $slug, $label);
 
         if (array_key_exists('template', $incoming)) {
             $tpl = (string) ($incoming['template'] ?? '');
@@ -701,6 +778,10 @@ class Importer
             // Format 1.2 keys (ADR-0008): a bare id is a `_taw_` field, a full
             // meta key is a field with another prefix; 1.0/1.1 keys are bare ids.
             $config = FieldKeys::forKey((string) $fieldId, $registered, self::bareConfigLookup())['config'];
+            if (!empty($config['unregistered'])) {
+                $this->writeUnregistered('update_post_meta', $postId, $config, $value, "{$postType} field '{$fieldId}'");
+                continue;
+            }
             $value = FieldCodec::rewriteAttachmentIds($config, $value, $idMap);
             Metabox::writeMeta($postId, $config, $value);
         }
@@ -847,6 +928,10 @@ class Importer
         $registered = Metabox::fieldsFor('term', $taxonomy);
         foreach (is_array($fields['fields'] ?? null) ? $fields['fields'] : [] as $fieldKey => $value) {
             $config = FieldKeys::forKey((string) $fieldKey, $registered, self::bareConfigLookup())['config'];
+            if (!empty($config['unregistered'])) {
+                $this->writeUnregistered('update_term_meta', $termId, $config, $value, "{$taxonomy} term field '{$fieldKey}'");
+                continue;
+            }
             Metabox::writeTo(new TermMetaStore(), $termId, $config, FieldCodec::rewriteAttachmentIds($config, $value, $idMap));
         }
 
@@ -894,8 +979,14 @@ class Importer
             'user_login'   => $login,
             'user_email'   => $email,
             'display_name' => (string) ($fields['display_name'] ?? $login),
-            'role'         => $roles[0] ?? '',
         ];
+        // No role this site defines: an existing user keeps theirs (an empty
+        // role would strip it); a new one gets the site's default role.
+        if ($roles !== []) {
+            $userData['role'] = $roles[0];
+        } elseif ($existingId === 0) {
+            $userData['role'] = (string) get_option('default_role', 'subscriber');
+        }
 
         if ($existingId > 0) {
             $userData['ID'] = $existingId;
@@ -930,6 +1021,10 @@ class Importer
         $registered = Metabox::fieldsFor('user');
         foreach (is_array($fields['fields'] ?? null) ? $fields['fields'] : [] as $fieldKey => $value) {
             $config = FieldKeys::forKey((string) $fieldKey, $registered, self::bareConfigLookup())['config'];
+            if (!empty($config['unregistered'])) {
+                $this->writeUnregistered('update_user_meta', $userId, $config, $value, "user field '{$fieldKey}'");
+                continue;
+            }
             Metabox::writeTo(new UserMetaStore(), $userId, $config, FieldCodec::rewriteAttachmentIds($config, $value, $idMap));
         }
 
@@ -953,18 +1048,27 @@ class Importer
         $sourceRef = (string) ($fields['ref'] ?? ($op['target']['key'] ?? ''));
         $postRef = (string) ($fields['post_ref'] ?? '');
         $label = "comment:{$postRef}";
+        $explicitOp = $op['op'] ?? 'update';
 
-        if (($op['op'] ?? 'update') === 'skip' || $policy === 'skip') {
+        if ($explicitOp === 'skip' || $policy === 'skip') {
             return ['bucket' => 'skipped', 'label' => $label];
         }
 
-        $postId = $this->resolveAnyPostId($postRef);
+        $postId = $this->resolveCommentPostId($fields);
         if ($postId === 0) {
             $this->warnings[] = "{$label}: target post not matched — comment skipped.";
             return ['bucket' => 'skipped', 'label' => $label];
         }
 
         $existing = $this->findExistingComment($postId, $fields);
+        if ($explicitOp === 'delete') {
+            if ($existing > 0) {
+                wp_delete_comment($existing, true);
+                $this->touchedCommentPosts[$postId] = true;
+                return ['bucket' => 'deleted', 'label' => $label];
+            }
+            return ['bucket' => 'skipped', 'label' => $label];
+        }
         if ($existing > 0) {
             if ($sourceRef !== '') {
                 $this->commentIdMap[$sourceRef] = $existing;
@@ -979,6 +1083,7 @@ class Importer
             'comment_author_url'   => (string) ($fields['author_url'] ?? ''),
             'comment_content'      => (string) ($fields['content'] ?? ''),
             'comment_date_gmt'     => (string) ($fields['date_gmt'] ?? ''),
+            'comment_date'         => ($fields['date_gmt'] ?? '') !== '' ? get_date_from_gmt((string) $fields['date_gmt']) : current_time('mysql'),
             'comment_approved'     => (string) ($fields['approved'] ?? '1'),
             'comment_type'         => (string) ($fields['type'] ?? 'comment'),
         ]);
@@ -1004,15 +1109,26 @@ class Importer
      */
     private function findExistingComment(int $postId, array $fields): int
     {
-        $matches = get_comments([
-            'post_id'      => $postId,
-            'author_email' => (string) ($fields['author_email'] ?? ''),
-            'date_query'   => [['column' => 'comment_date_gmt', 'after' => '-1 second', 'before' => '+1 second', 'inclusive' => true]],
-            'number'       => 50,
-            'status'       => 'all',
-        ]);
         $wanted = (string) ($fields['content'] ?? '');
         $wantedDate = (string) ($fields['date_gmt'] ?? '');
+        $query = [
+            'post_id'      => $postId,
+            'author_email' => (string) ($fields['author_email'] ?? ''),
+            'number'       => 50,
+            'status'       => 'all',
+        ];
+        // Around the comment's own date (a relative '-1 second' would mean
+        // "now", and nothing would ever match).
+        $at = $wantedDate !== '' ? strtotime($wantedDate . ' UTC') : false;
+        if ($at !== false) {
+            $query['date_query'] = [[
+                'column'    => 'comment_date_gmt',
+                'after'     => gmdate('Y-m-d H:i:s', $at - 1),
+                'before'    => gmdate('Y-m-d H:i:s', $at + 1),
+                'inclusive' => true,
+            ]];
+        }
+        $matches = get_comments($query);
         foreach ($matches as $c) {
             if ((string) $c->comment_content === $wanted
                 && ($wantedDate === '' || (string) $c->comment_date_gmt === $wantedDate)) {
@@ -1035,15 +1151,85 @@ class Importer
         if ($slug === '') {
             return 0;
         }
+        $types = array_values(array_diff(get_post_types(['public' => true]), ['attachment']));
         $found = get_posts([
             'post_name__in'    => [$slug],
-            'post_type'        => 'any',
+            'post_type'        => $types !== [] ? $types : 'any',
             'post_status'      => 'any',
             'posts_per_page'   => 1,
             'no_found_rows'    => true,
             'suppress_filters' => false,
         ]);
         return ($found[0] ?? null) instanceof \WP_Post ? (int) $found[0]->ID : 0;
+    }
+
+    /**
+     * The local post a comment belongs to: by `(post_type, post_ref)` when
+     * the snapshot says the type (1.3+), else by slug across public types.
+     *
+     * @param array<string, mixed> $fields
+     */
+    private function resolveCommentPostId(array $fields): int
+    {
+        $slug = (string) ($fields['post_ref'] ?? '');
+        $type = (string) ($fields['post_type'] ?? '');
+        if ($type !== '' && $slug !== '') {
+            $post = $this->findPost($type, $slug);
+            return $post ? (int) $post->ID : 0;
+        }
+        return $this->resolveAnyPostId($slug);
+    }
+
+    /**
+     * Give the post the slug the snapshot says. Media is sideloaded first,
+     * and an attachment titled like a page takes its slug ("about"), so the
+     * page would become "about-2" and a new copy would appear on every run.
+     * The attachment gets another slug instead.
+     */
+    private function claimSlug(int $postId, string $slug, string $label): void
+    {
+        $current = (string) get_post_field('post_name', $postId);
+        if ($slug === '' || $current === '' || $current === $slug) {
+            return;
+        }
+        $holder = get_posts([
+            'post_type'        => 'attachment',
+            'post_status'      => 'inherit',
+            'post_name__in'    => [$slug],
+            'posts_per_page'   => 1,
+            'fields'           => 'ids',
+            'suppress_filters' => false,
+            'no_found_rows'    => true,
+        ]);
+        if ($holder === []) {
+            $this->warnings[] = "{$label}: saved as '{$current}' (the slug is taken).";
+            return;
+        }
+        wp_update_post(['ID' => (int) $holder[0], 'post_name' => $slug . '-media']);
+        wp_update_post(['ID' => $postId, 'post_name' => $slug]);
+    }
+
+    /**
+     * A field this site doesn't register: written as the snapshot has it
+     * (the exporter kept it raw), never through a guessed field type that
+     * would mangle it.
+     *
+     * @param callable(int, string, mixed): mixed $update update_{post,term,user}_meta
+     * @param array<string, mixed>                $config
+     */
+    private function writeUnregistered(callable $update, int $id, array $config, mixed $value, string $what): void
+    {
+        $update($id, (string) $config['meta_key'], wp_slash($value));
+        $this->warnings[] = "{$what} isn't registered on this site — written as-is.";
+    }
+
+    /**
+     * A real date, or '' for an empty or zero one (drafts have no GMT date).
+     */
+    private static function realDate(mixed $date): string
+    {
+        $date = is_string($date) ? trim($date) : '';
+        return ($date === '' || str_starts_with($date, '0000-00-00')) ? '' : $date;
     }
 
     /**
@@ -1076,7 +1262,7 @@ class Importer
             return null;
         }
         $title = (string) ($incoming['title'] ?? '');
-        $dateGmt = (string) ($incoming['date'] ?? '');
+        $dateGmt = self::realDate($incoming['date'] ?? null);
         foreach (get_posts([
             'post_type'        => $type,
             'post_status'      => ['draft', 'pending', 'auto-draft'],
@@ -1085,8 +1271,11 @@ class Importer
             'suppress_filters' => false,
             'no_found_rows'    => true,
         ]) as $candidate) {
-            $candidateKey = sha1($type . '|' . $candidate->post_title . '|' . $candidate->post_date_gmt);
-            if ($candidateKey === $matchKey || ($title !== '' && $dateGmt !== '' && $candidate->post_title === $title && $candidate->post_date_gmt === $dateGmt)) {
+            // 1.3 keys a draft by its local date (drafts have no GMT date);
+            // older snapshots used the empty GMT date.
+            $keys = [Exporter::draftKey($type, (string) $candidate->post_title, (string) $candidate->post_date),
+                     sha1($type . '|' . $candidate->post_title . '|' . $candidate->post_date_gmt)];
+            if (in_array($matchKey, $keys, true) || ($title !== '' && $dateGmt !== '' && $candidate->post_title === $title && $candidate->post_date_gmt === $dateGmt)) {
                 return $candidate;
             }
         }
@@ -1105,6 +1294,7 @@ class Importer
             'ping_status'    => $post->ping_status,
             'template'       => get_page_template_slug($post) ?: '',
             'parent'         => $post->post_parent ? (get_post($post->post_parent)->post_name ?? '') : '',
+            'password'       => (string) $post->post_password,
             default          => null,
         };
     }
@@ -1221,7 +1411,9 @@ class Importer
         if ($config !== null) {
             return Metabox::sanitizeForStorage($config, $value);
         }
-        return wp_json_encode($value);
+        // Not a registered TAW option: store it as the source had it (an
+        // array option stays an array, not a JSON string).
+        return $value;
     }
 
     /**
