@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TAW\Core\Form;
 
+use TAW\Core\Security\ClientIp;
+
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -510,18 +512,13 @@ class SubmissionsHandler
      * Helpers
      * =================================================================== */
 
+    /**
+     * Kept as the long-standing entry point for every caller; the
+     * header-trust rules live in {@see ClientIp}.
+     */
     public static function getUserIp(): string
     {
-        $ip = $_SERVER['HTTP_X_FORWARDED_FOR']
-            ?? $_SERVER['HTTP_X_REAL_IP']
-            ?? $_SERVER['REMOTE_ADDR']
-            ?? '0.0.0.0';
-
-        if (str_contains($ip, ',')) {
-            $ip = trim(explode(',', $ip)[0]);
-        }
-
-        return sanitize_text_field($ip);
+        return ClientIp::get();
     }
 
     private static function getUserAgent(): string

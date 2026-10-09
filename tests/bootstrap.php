@@ -189,6 +189,20 @@ if (!class_exists('WP_REST_Request')) {
             $this->params[$key] = $value;
         }
 
+        /** @var array<string, string> */
+        private array $headers = [];
+
+        /** Same key canonicalization as WordPress: lowercase, dashes → underscores. */
+        public function set_header(string $key, string $value): void
+        {
+            $this->headers[strtolower(str_replace('-', '_', $key))] = $value;
+        }
+
+        public function get_header(string $key): ?string
+        {
+            return $this->headers[strtolower(str_replace('-', '_', $key))] ?? null;
+        }
+
         public function offsetExists(mixed $offset): bool
         {
             return isset($this->params[$offset]);
@@ -222,6 +236,19 @@ if (!class_exists('WP_REST_Response')) {
         public function get_data(): mixed
         {
             return $this->data;
+        }
+
+        /** @var array<string, string> */
+        public array $headers = [];
+
+        public function header(string $key, string $value): void
+        {
+            $this->headers[$key] = $value;
+        }
+
+        public function get_status(): int
+        {
+            return $this->status;
         }
     }
 }

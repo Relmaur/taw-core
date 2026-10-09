@@ -7,6 +7,9 @@ namespace TAW\Tests\Unit\Core\Rag\Llm;
 use Brain\Monkey\Functions;
 use TAW\Core\Rag\Llm\LlmClient;
 use TAW\Core\Rag\Llm\LlmClientException;
+use TAW\Core\Rag\Usage\UsageMeter;
+use TAW\Core\Rag\Usage\UsageSchema;
+use TAW\Tests\Support\FakeWpdb;
 use TAW\Tests\TestCase;
 
 final class LlmClientTest extends TestCase
@@ -80,5 +83,38 @@ final class LlmClientTest extends TestCase
         $message = (new LlmClient())->chatCompletion([['role' => 'user', 'content' => 'hi']], [], 'test-model');
 
         $this->assertSame('Hello!', $message['content']);
+    }
+
+    public function test_every_successful_call_is_metered_by_kind_and_model(): void
+    {
+        $wpdb = new FakeWpdb();
+        $GLOBALS['wpdb'] = $wpdb;
+        UsageMeter::resetForTests();
+        Functions\when('update_option')->justReturn(true);
+        Functions\when('get_transient')->justReturn(false);
+        Functions\when('set_transient')->justReturn(true);
+        Functions\when('delete_transient')->justReturn(true);
+        Functions\when('current_time')->justReturn('2026-10-09');
+
+        Functions\when('is_wp_error')->justReturn(false);
+        Functions\when('wp_remote_retrieve_response_code')->justReturn(200);
+        Functions\when('wp_remote_post')->justReturn(['response' => ['code' => 200]]);
+        Functions\when('wp_remote_retrieve_body')->justReturn(json_encode([
+            'choices' => [['message' => ['role' => 'assistant', 'content' => 'Hi']]],
+            'usage' => ['prompt_tokens' => 1200, 'completion_tokens' => 80],
+        ]));
+
+        (new LlmClient())->chatCompletion([['role' => 'user', 'content' => 'hi']], [], 'gpt-4o-mini');
+
+        $row = $wpdb->get_row('SELECT * FROM ' . UsageSchema::table());
+        unset($GLOBALS['wpdb']);
+
+        $this->assertNotNull($row);
+        $this->assertSame('chat', $row['kind']);
+        $this->assertSame('gpt-4o-mini', $row['model']);
+        $this->assertSame(1200, (int) $row['prompt_tokens']);
+        $this->assertSame(80, (int) $row['completion_tokens']);
+        // Default prices: 1200 × 0.15 + 80 × 0.60 = 228 micro-dollars.
+        $this->assertSame(228, (int) $row['cost_micros']);
     }
 }

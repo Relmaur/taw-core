@@ -50,6 +50,17 @@ final class TurnstileEnqueueScriptTest extends TestCase
         $this->assertStringContainsString('remove:', $output);
     }
 
+    public function test_the_helper_forwards_callbacks_and_can_reset(): void
+    {
+        $output = $this->captureOutput();
+
+        $this->assertStringContainsString('reset:', $output);
+        $this->assertStringContainsString("'callback'", $output);
+        $this->assertStringContainsString("'appearance'", $output);
+        // The site key always comes from the markup, never from a caller.
+        $this->assertStringNotContainsString("'sitekey', 'callback'", $output);
+    }
+
     public function test_script_url_uses_explicit_render_mode(): void
     {
         $output = $this->captureOutput();
