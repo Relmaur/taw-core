@@ -59,6 +59,8 @@ final class ExporterTest extends TestCase
         Functions\when('get_object_taxonomies')->justReturn([]);
         Functions\when('get_page_template_slug')->justReturn('');
         Functions\when('is_post_type_hierarchical')->alias(static fn (string $t): bool => $t === 'page');
+        Functions\when('get_theme_mod')->alias(static fn (string $k, $d = false) => $d);
+        Functions\when('wp_get_nav_menus')->justReturn([]);
         Functions\when('get_page_uri')->alias(static fn ($p): string => is_object($p) ? (string) $p->post_name : '');
         Functions\when('maybe_unserialize')->alias(static fn ($v) => is_string($v) && ($u = @unserialize($v)) !== false ? $u : $v);
 
@@ -123,7 +125,7 @@ final class ExporterTest extends TestCase
     {
         $snapshot = (new Exporter())->snapshot();
 
-        $this->assertSame('1.6', $snapshot['meta']['schema']);
+        $this->assertSame('1.7', $snapshot['meta']['schema']);
         $this->assertSame('https://example.test', $snapshot['meta']['source']['url']);
 
         $post = $snapshot['posts'][0];
@@ -193,6 +195,96 @@ final class ExporterTest extends TestCase
         $this->assertSame(['posts' => 'partial', 'terms' => 'all', 'options' => true], $asked['meta']['scope']);
 
         $this->assertSame(['posts' => 'all', 'terms' => 'all', 'options' => true], (new Exporter())->snapshot()['meta']['scope']);
+    }
+
+    public function test_site_icon_logo_menus_and_their_locations(): void
+    {
+        global $wpdb;
+        $wpdb = new class {
+            public string $options = 'wp_options';
+            /** @return list<string> */
+            public function get_col(string $query): array
+            {
+                return str_contains($query, 'managed') ? ['9'] : [];
+            }
+        };
+        Functions\when('get_option')->alias(static fn (string $name, $default = false) => $name === 'site_icon' ? '93' : $default);
+        Functions\when('get_theme_mod')->alias(static fn (string $k, $d = false) => match ($k) {
+            'custom_logo' => 17,
+            'nav_menu_locations' => ['primary' => 2, 'footer' => 9],
+            default => $d,
+        });
+        $menu = static fn (int $id, string $slug): \WP_Term => new \WP_Term(['term_id' => $id, 'taxonomy' => 'nav_menu', 'slug' => $slug, 'name' => ucfirst($slug)]);
+        Functions\when('wp_get_nav_menus')->justReturn([$menu(2, 'primary-menu'), $menu(9, 'code-menu')]);
+        Functions\when('get_term')->alias(static fn ($id) => match ((int) $id) {
+            2 => $menu(2, 'primary-menu'),
+            9 => $menu(9, 'code-menu'),
+            33 => new \WP_Term(['term_id' => 33, 'taxonomy' => 'category', 'slug' => 'news']),
+            default => null,
+        });
+        $item = static fn (int $id, string $type, string $object, int $objectId, int $parent = 0, string $url = ''): object => (object) [
+            'ID' => $id, 'type' => $type, 'object' => $object, 'object_id' => $objectId, 'menu_item_parent' => $parent,
+            'url' => $url, 'target' => '', 'attr_title' => '', 'classes' => [''], 'xfn' => '',
+        ];
+        Functions\when('wp_get_nav_menu_items')->alias(static fn ($menuId) => (int) $menuId === 2 ? [
+            $item(100, 'post_type', 'page', 42),
+            $item(101, 'taxonomy', 'category', 33, 100),
+            $item(102, 'custom', 'custom', 0, 0, 'https://example.test/contacto/'),
+        ] : [$item(200, 'custom', 'custom', 0)]);
+        Functions\when('get_post_field')->alias(static fn (string $f, int $id) => $f === 'post_title' && $id === 102 ? 'Contact' : '');
+        Functions\when('get_post')->alias(static fn ($id) => match ((int) $id) {
+            42 => new \WP_Post(['ID' => 42, 'post_type' => 'page', 'post_name' => 'front', 'post_parent' => 0]),
+            93, 17 => new \WP_Post(['ID' => (int) $id, 'post_type' => 'attachment', 'post_mime_type' => 'image/png', 'post_title' => '', 'post_content' => '', 'post_excerpt' => '']),
+            default => null,
+        });
+
+        $snapshot = (new Exporter())->snapshot();
+
+        $this->assertSame(93, $snapshot['options']['site_icon']);
+        $this->assertSame(['custom_logo' => 17, 'nav_menu_locations' => ['primary' => 'primary-menu']], $snapshot['theme_mods'], "the code-owned menu's location is left out");
+        $this->assertSame(['primary-menu'], array_column($snapshot['menus'], 'slug'), 'a menu the theme builds in code is left out');
+        $items = $snapshot['menus'][0]['items'];
+        $this->assertSame(['type' => 'page', 'slug' => 'front', 'path' => 'front'], $items[0]['link']);
+        $this->assertSame(['taxonomy' => 'category', 'slug' => 'news'], $items[1]['link']);
+        $this->assertSame('1', $items[1]['parent'], 'its parent by position');
+        $this->assertSame(['https://example.test/contacto/', 'Contact'], [$items[2]['url'], $items[2]['title']]);
+        $this->assertContains(93, array_column($snapshot['media'], 'id'), 'the icon travels as media');
+        $this->assertContains(17, array_column($snapshot['media'], 'id'), 'and the logo');
+    }
+
+    public function test_footnotes_and_asked_for_meta_prefixes_travel_raw(): void
+    {
+        Functions\when('get_post_meta')->alias(static function ($id, $key = '', $single = false) {
+            if ($id === 10 && $key === '') {
+                return ['footnotes' => ['[{"id":"f1","content":"See https://example.test/a"}]'], '_wds_title' => ['SEO title'],
+                    '_wds_meta' => [serialize(['a' => 1])], '_breakdance_hide' => ['1'], '_taw_hero' => ['77']];
+            }
+            return $single ? '' : [];
+        });
+
+        $plain = (new Exporter())->snapshot()['posts'][0];
+        $this->assertSame(['footnotes' => '[{"id":"f1","content":"See https://example.test/a"}]'], $plain['meta']);
+
+        $asked = (new Exporter())->snapshot(['meta_prefixes' => ['_wds_']]);
+        $this->assertSame(['_wds_meta', '_wds_title', 'footnotes'], array_keys($asked['posts'][0]['meta']));
+        $this->assertSame(['a' => 1], $asked['posts'][0]['meta']['_wds_meta'], 'unserialized');
+        $this->assertSame(['_wds_'], $asked['meta']['scope']['meta_prefixes']);
+    }
+
+    public function test_reusable_blocks_and_block_navigation_are_exported_when_registered(): void
+    {
+        Functions\when('post_type_exists')->alias(static fn (string $t): bool => in_array($t, ['page', 'post', 'wp_block', 'wp_navigation'], true));
+        $types = null;
+        Functions\when('get_posts')->alias(static function (array $q) use (&$types): array {
+            $types ??= $q['post_type'] ?? null;
+            return [];
+        });
+
+        (new Exporter())->snapshot();
+
+        $this->assertContains('wp_block', $types);
+        $this->assertContains('wp_navigation', $types);
+        $this->assertNotContains('wp_template', $types);
     }
 
     public function test_fields_with_another_prefix_are_keyed_by_meta_key(): void

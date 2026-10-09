@@ -2152,7 +2152,12 @@ Also, in wp-admin: **Tools → TAW Data** (Export with option checkboxes + Impor
 
 ### The snapshot
 
-`TAW\Core\Content\Exporter::snapshot($scope)` — a plain array, `json_encode`-ready. Schema: [`resources/schema/content-interchange-1.6.json`](resources/schema/content-interchange-1.6.json) (`schema` is `"1.6"`; the importer also accepts `"1.0"`–`"1.5"`, and warns when a file's minor version is newer than its own).
+`TAW\Core\Content\Exporter::snapshot($scope)` — a plain array, `json_encode`-ready. Schema: [`resources/schema/content-interchange-1.7.json`](resources/schema/content-interchange-1.7.json) (`schema` is `"1.7"`; the importer also accepts `"1.0"`–`"1.6"`, and warns when a file's minor version is newer than its own).
+
+**1.7** draws the boundary of what a site's state includes:
+- **Carried:** the site icon (`site_icon`) and logo (`theme_mods.custom_logo`), mapped through the media match. `theme_mods.nav_menu_locations` (location → menu slug). `menus`: classic menus built in wp-admin, with each item linking by natural key (a page by type and path, a term by taxonomy and slug, custom links URL-mapped) and keyed by position. A menu is compared, and rebuilt when it differs, as a whole. Reusable blocks (`wp_block`) and block navigation menus (`wp_navigation`) as posts, with `core/block` / `core/navigation` `ref` attributes mapped. Core's `footnotes` post meta in a post's `meta`.
+- **Opt-in:** other plugins' post meta (SEO plugins and the like) only with `--meta=<prefix>[,…]` (e.g. `--meta=_wds_` for SmartCrawl), written as stored.
+- **Not carried, by design:** templates, template parts and global styles (code-owned in TAW themes), widgets, and menus a theme builds in code (term IDs stored in `taw_managed_menu_*` options) — and those menus' locations.
 
 **1.6** adds `meta.scope` (`posts: all|partial`, `terms: all|used`, `options: true|false`). A **scoped export** (`--posts`, `--types`, `--since`, or REST `types`/`since`) carries only the terms its posts use (and their parents) and no `options` section, so importing "just these posts" never overwrites unrelated options or terms; `--with-options` / `--with-terms` (REST `include_options` / `include_terms`) bring them back. A **change-set** (`content:diff`) carries the target's `meta` (its source origin), `refs`, and the `media` entries its operations reference, so a push maps IDs, rewrites URLs and downloads files like a snapshot import; it emits no deletes for a section either side has partially.
 
@@ -2176,7 +2181,7 @@ Also, in wp-admin: **Tools → TAW Data** (Export with option checkboxes + Impor
 
 **Never exported:** revisions, transients, non-allowlisted core/plugin options, `nav_menu`/`nav_menu_item` (code-owned in TAW themes). Drafts are excluded unless `--include-drafts`.
 
-Scope options: `--types=`, `--since=`, `--posts=` (IDs or slugs; any of the three makes the export scoped: no options, only the terms its posts use — `--with-options`, `--with-terms` add them), `--no-media`, `--all-media`, `--include-drafts`, `--with-users`, `--with-user-passwords`, `--with-comments`, `--with-settings`, `--migrate` (= `--with-users --with-settings --all-media --include-drafts`).
+Scope options: `--meta=<prefix>[,…]` (also carry post meta with these key prefixes), `--types=`, `--since=`, `--posts=` (IDs or slugs; any of the three makes the export scoped: no options, only the terms its posts use — `--with-options`, `--with-terms` add them), `--no-media`, `--all-media`, `--include-drafts`, `--with-users`, `--with-user-passwords`, `--with-comments`, `--with-settings`, `--migrate` (= `--with-users --with-settings --all-media --include-drafts`).
 
 ### Import — dry-run mandatory, rollback automatic
 

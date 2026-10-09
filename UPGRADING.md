@@ -525,6 +525,17 @@ failed. If the rollback snapshot or the journal can't be written, nothing is imp
 **Check:** none. Scripts reading `content:import --json` get new `failed`, `journal` and `error` keys;
 without `--json`, the command now exits non-zero when a record failed.
 
+### v1.87.0: content moves carry the site icon, logo and menus
+
+Content Interchange, export and import (snapshot schema 1.7, fidelity Phase 8). A pull, push or
+`--migrate` now also carries the site icon and logo, the classic menus built in wp-admin and which
+location each sits in, reusable blocks and block navigation menus, and footnotes. Menus a theme builds
+in code (stored in `taw_managed_menu_*` options) are left alone. Other plugins' post meta (an SEO
+plugin's titles, say) is carried only when asked: `content:export --meta=_wds_`.
+
+**Check:** none on the site itself. As with v1.84.0, the **exporter** runs on the source of a pull, so
+production needs this release for its snapshots to carry these.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

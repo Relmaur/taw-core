@@ -185,4 +185,20 @@ final class RefMapTest extends TestCase
         $this->assertSame(['sizeSlug' => 'large'], $out[0]['attrs']);
         $this->assertSame('<img class="wp-image-503">', BlockRefs::rewriteHtml('<img class="wp-image-503">', $map), 'the class is left; the attribute is what WordPress reads');
     }
+
+    public function test_navigation_and_reusable_block_refs_map_to_this_sites_posts(): void
+    {
+        $changed = false;
+        $out = BlockRefs::rewriteBlocks([
+            ['blockName' => 'core/navigation', 'attrs' => ['ref' => 135, 'overlayMenu' => 'never'], 'innerBlocks' => []],
+            ['blockName' => 'core/block', 'attrs' => ['ref' => 140], 'innerBlocks' => []],
+        ], $this->map(), $changed);
+
+        $this->assertSame(['ref' => 78, 'overlayMenu' => 'never'], $out[0]['attrs']);
+        $this->assertSame([], $out[1]['attrs'], 'a reusable block this site lacks is unlinked, not pointed at another post');
+        $this->assertSame([135, 140], BlockRefs::collectBlocks([
+            ['blockName' => 'core/navigation', 'attrs' => ['ref' => 135], 'innerBlocks' => []],
+            ['blockName' => 'core/block', 'attrs' => ['ref' => 140], 'innerBlocks' => []],
+        ])['posts'], 'and the export collects both for refs');
+    }
 }

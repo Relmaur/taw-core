@@ -103,4 +103,20 @@ final class ChangeSetScopeTest extends TestCase
 
         $this->assertSame(['option', 'post'], $deleted);
     }
+
+    public function test_menus_and_theme_mods_diff_as_records(): void
+    {
+        $menu = static fn (string $label): array => ['slug' => 'primary-menu', 'name' => 'Primary', 'items' => [['key' => '1', 'type' => 'custom', 'url' => 'https://x.test/', 'title' => $label]]];
+        $a = ['meta' => ['schema' => '1.7'], 'posts' => [], 'menus' => [$menu('Home'), ['slug' => 'old', 'name' => 'Old', 'items' => []]], 'theme_mods' => ['custom_logo' => 17, 'nav_menu_locations' => ['primary' => 'primary-menu']]];
+        $b = ['meta' => ['schema' => '1.7'], 'posts' => [], 'menus' => [$menu('Start')], 'theme_mods' => ['custom_logo' => 18, 'nav_menu_locations' => ['primary' => 'primary-menu']]];
+
+        $ops = array_map(static fn (array $op): string => $op['op'] . ' ' . $op['target']['kind'] . ':' . $op['target']['key'], ChangeSet::between($a, $b)['operations']);
+
+        $this->assertSame(['update menu:primary-menu', 'delete menu:old', 'update theme_mod:custom_logo'], $ops);
+
+        $scoped = $b;
+        $scoped['meta']['scope'] = ['posts' => 'partial', 'terms' => 'used', 'options' => false];
+        unset($scoped['menus'], $scoped['theme_mods']);
+        $this->assertSame([], ChangeSet::between($a, $scoped)['operations'], 'a scoped export carries no menus, and deletes none');
+    }
 }

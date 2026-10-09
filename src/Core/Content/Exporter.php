@@ -26,11 +26,11 @@ use TAW\Core\OptionsPage\OptionsPage;
  *
  * Schema: see `resources/schema/content-interchange-1.4.json`.
  *
- * @phpstan-type Scope array{types?: list<string>, since?: string, posts?: list<int|string>, include_media?: bool, all_media?: bool, include_drafts?: bool, include_users?: bool, include_user_passwords?: bool, include_comments?: bool, include_settings?: bool, include_options?: bool, include_terms?: bool}
+ * @phpstan-type Scope array{types?: list<string>, since?: string, posts?: list<int|string>, include_media?: bool, all_media?: bool, include_drafts?: bool, include_users?: bool, include_user_passwords?: bool, include_comments?: bool, include_settings?: bool, include_options?: bool, include_terms?: bool, meta_prefixes?: list<string>}
  */
 class Exporter
 {
-    public const SCHEMA_VERSION = '1.6';
+    public const SCHEMA_VERSION = '1.7';
 
     /**
      * Core (non-`_taw_`) options included in every export. `page_on_front`
@@ -42,7 +42,20 @@ class Exporter
         'show_on_front',
         'page_on_front',
         'page_for_posts',
+        'site_icon',
     ];
+
+    /** Options in an allowlist whose value is an attachment ID (mapped through the media match on import). */
+    public const ATTACHMENT_ID_OPTIONS = ['site_icon'];
+
+    /** Theme mods carried in `theme_mods` (1.7): the logo, and which menu sits in each location. */
+    public const THEME_MOD_ALLOWLIST = ['custom_logo', 'nav_menu_locations'];
+
+    /** Post meta outside TAW fields that core keeps content in (1.7): footnote blocks' text. */
+    public const POST_META_ALLOWLIST = ['footnotes'];
+
+    /** Post types WordPress doesn't make public but that hold content (1.7). */
+    public const BLOCK_CONTENT_TYPES = ['wp_block', 'wp_navigation'];
 
     /**
      * A *second*, opt-in allowlist for environment-ish settings a full
@@ -81,11 +94,9 @@ class Exporter
         'customize_changeset',
         'oembed_cache',
         'user_request',
-        'wp_block',
         'wp_template',
         'wp_template_part',
         'wp_global_styles',
-        'wp_navigation',
         'taw_submission',
     ];
 
@@ -100,6 +111,9 @@ class Exporter
 
     /** @var array<int, true> post IDs referenced by ID (post_select, block attributes) */
     private array $referencedPosts = [];
+
+    /** @var list<string> post meta key prefixes to carry (`--meta`) */
+    private array $metaPrefixes = [];
 
     /** @var array<string, true> taxonomies of the exported post types */
     private array $postTaxonomies = [];
@@ -134,6 +148,7 @@ class Exporter
         $this->urlAttachments = [];
         $this->postTaxonomies = [];
         $this->usedTerms = [];
+        $this->metaPrefixes = array_values(array_filter(array_map('strval', $scope['meta_prefixes'] ?? []), static fn (string $p): bool => $p !== '' && $p !== '_taw_'));
         $uploads = function_exists('wp_upload_dir') ? wp_upload_dir(null, false) : [];
         $uploadsUrl = (string) ($uploads['baseurl'] ?? '');
         $this->uploadsUrl = (string) preg_replace('#^https?:#', '', $uploadsUrl);
@@ -169,11 +184,15 @@ class Exporter
                     'posts'   => $scoped ? 'partial' : 'all',
                     'terms'   => $includeTerms ? 'all' : 'used',
                     'options' => $includeOptions,
-                ],
+                ] + ($this->metaPrefixes !== [] ? ['meta_prefixes' => $this->metaPrefixes] : []),
             ],
         ];
         if ($options !== null) {
             $snapshot['options'] = $options;
+            // Site-level, like options (1.7): the logo and menu locations,
+            // and the menus built in wp-admin.
+            $snapshot['theme_mods'] = $this->exportThemeMods();
+            $snapshot['menus'] = $this->exportMenus();
         }
         $snapshot['terms'] = $terms;
         $snapshot['posts'] = $posts;
@@ -274,7 +293,9 @@ class Exporter
             // human-curated content by definition — auto-include it even
             // when `public => false` (e.g. a Mass-schedule CPT), so sites
             // stop needing a manual `taw_content_export_post_types` filter.
-            Metabox::postTypesWithMetabox()
+            Metabox::postTypesWithMetabox(),
+            // Reusable blocks and block navigation menus (1.7).
+            array_values(array_filter(self::BLOCK_CONTENT_TYPES, static fn (string $t): bool => post_type_exists($t)))
         )));
 
         $all = array_values(array_filter($all, fn (string $t): bool => !in_array($t, self::NEVER_EXPORT_POST_TYPES, true)));
@@ -345,6 +366,25 @@ class Exporter
             $this->collectContent($text);
         }
 
+        // Post meta outside TAW fields (1.7): core's footnotes, and the
+        // prefixes asked for (`--meta=_wds_`), as stored (unserialized).
+        $rawMeta = [];
+        foreach ($meta as $key => $rawValues) {
+            if (!is_string($key) || str_starts_with($key, '_taw_') || in_array($key, $keyedBy, true)) {
+                continue;
+            }
+            $wanted = in_array($key, self::POST_META_ALLOWLIST, true);
+            foreach ($this->metaPrefixes as $prefix) {
+                $wanted = $wanted || str_starts_with($key, $prefix);
+            }
+            if (!$wanted) {
+                continue;
+            }
+            $rawMeta[$key] = maybe_unserialize(is_array($rawValues) ? ($rawValues[0] ?? '') : $rawValues);
+            $this->collectValue(['type' => 'text', 'unregistered' => true], $rawMeta[$key]);
+        }
+        ksort($rawMeta);
+
         $thumbId = (int) get_post_thumbnail_id($post) ?: 0;
         $featured = null;
         if ($thumbId > 0) {
@@ -386,6 +426,9 @@ class Exporter
             'featured_media' => $featured,
             'fields'         => $fields,
         ];
+        if ($rawMeta !== []) {
+            $record['meta'] = $rawMeta;
+        }
 
         // A slug-less post (draft / auto-draft) needs a stable composite key
         // so the importer doesn't recreate it on every run.
@@ -628,6 +671,15 @@ class Exporter
         foreach ($allowlist as $name) {
             $name = (string) $name;
 
+            if (in_array($name, self::ATTACHMENT_ID_OPTIONS, true)) {
+                $id = (int) get_option($name);
+                $out[$name] = $id;
+                if ($id > 0) {
+                    $this->referencedAttachments[$id] = true;
+                }
+                continue;
+            }
+
             if (in_array($name, self::POST_SLUG_OPTIONS, true)) {
                 $id = (int) get_option($name);
                 $out[$name] = $id > 0 ? (get_post($id)->post_name ?? null) : null;
@@ -647,6 +699,115 @@ class Exporter
         }
 
         return $out;
+    }
+
+    /**
+     * The allowlisted theme mods of the active theme (1.7): `custom_logo`
+     * (an attachment ID) and `nav_menu_locations` (location => menu slug;
+     * menus the theme manages in code are left out, as in `menus`).
+     *
+     * @return array<string, mixed>
+     */
+    private function exportThemeMods(): array
+    {
+        $out = [];
+        $logo = (int) get_theme_mod('custom_logo', 0);
+        $out['custom_logo'] = $logo;
+        if ($logo > 0) {
+            $this->referencedAttachments[$logo] = true;
+        }
+        $managed = $this->managedMenuIds();
+        $locations = [];
+        foreach ((array) get_theme_mod('nav_menu_locations', []) as $location => $menuId) {
+            $menu = (int) $menuId > 0 && !isset($managed[(int) $menuId]) ? get_term((int) $menuId, 'nav_menu') : null;
+            if ($menu instanceof \WP_Term) {
+                $locations[(string) $location] = (string) $menu->slug;
+            }
+        }
+        ksort($locations);
+        $out['nav_menu_locations'] = $locations;
+
+        return $out;
+    }
+
+    /**
+     * Classic menus built in wp-admin (1.7), each `{slug, name, items}`;
+     * an item names what it links to by natural key (a page by type and
+     * path, a term by taxonomy and slug) and its parent by the source
+     * item's key. Menus a theme builds in code (tracked in
+     * `taw_managed_menu_*` options) are left out: the code owns them.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function exportMenus(): array
+    {
+        $managed = $this->managedMenuIds();
+        $out = [];
+        foreach (wp_get_nav_menus() as $menu) {
+            if (isset($managed[(int) $menu->term_id])) {
+                continue;
+            }
+            $items = [];
+            // Items are keyed by position, not by their IDs: a rebuilt menu
+            // (new IDs, same items) exports the same.
+            $menuItems = array_values(array_filter((array) wp_get_nav_menu_items($menu->term_id, ['post_status' => 'publish']), 'is_object'));
+            $position = [];
+            foreach ($menuItems as $i => $item) {
+                $position[(int) $item->ID] = (string) ($i + 1);
+            }
+            foreach ($menuItems as $i => $item) {
+                $row = [
+                    'key'         => (string) ($i + 1),
+                    'parent'      => $position[(int) $item->menu_item_parent] ?? null,
+                    'title'       => (string) get_post_field('post_title', (int) $item->ID),
+                    'type'        => (string) $item->type,
+                    'object'      => (string) $item->object,
+                    'target'      => (string) $item->target,
+                    'attr_title'  => (string) $item->attr_title,
+                    'description' => (string) get_post_field('post_content', (int) $item->ID),
+                    'classes'     => array_values(array_filter(array_map('strval', (array) $item->classes))),
+                    'xfn'         => (string) $item->xfn,
+                ];
+                if ($item->type === 'post_type') {
+                    $linked = get_post((int) $item->object_id);
+                    if (!$linked instanceof \WP_Post) {
+                        continue;
+                    }
+                    $row['link'] = ['type' => (string) $linked->post_type, 'slug' => (string) $linked->post_name]
+                        + (is_post_type_hierarchical((string) $linked->post_type) ? ['path' => (string) get_page_uri($linked)] : []);
+                } elseif ($item->type === 'taxonomy') {
+                    $linked = get_term((int) $item->object_id);
+                    if (!$linked instanceof \WP_Term) {
+                        continue;
+                    }
+                    $row['link'] = ['taxonomy' => (string) $linked->taxonomy, 'slug' => (string) $linked->slug];
+                } elseif ($item->type === 'custom') {
+                    $row['url'] = (string) $item->url;
+                }
+                $items[] = $row;
+            }
+            $out[] = ['slug' => (string) $menu->slug, 'name' => (string) $menu->name, 'items' => $items];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Menus a theme builds in code: the term IDs stored in `taw_managed_menu_*` options.
+     *
+     * @return array<int, true>
+     */
+    private function managedMenuIds(): array
+    {
+        global $wpdb;
+        $ids = [];
+        foreach ((array) $wpdb->get_col("SELECT option_value FROM {$wpdb->options} WHERE option_name LIKE 'taw\\_managed\\_menu\\_%'") as $id) {
+            if ((int) $id > 0) {
+                $ids[(int) $id] = true;
+            }
+        }
+
+        return $ids;
     }
 
     private function decodeUnknownOption(mixed $raw): mixed
