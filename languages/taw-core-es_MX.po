@@ -820,6 +820,11 @@ msgstr "Exportar"
 msgid "Expression"
 msgstr "Expresión"
 
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Failed: %s"
+msgstr "Falló: %s"
+
 #: src/Core/Seo/SeoMeta.php
 msgid "Falls back to the post title when empty. Also used as the <title> tag itself, not just social previews."
 msgstr "Si está vacío, se usa el título de la entrada. También se usa como la etiqueta <title>, no solo en las vistas previas de redes sociales."
@@ -999,8 +1004,19 @@ msgid "Import"
 msgstr "Importar"
 
 #: src/Core/Content/ContentAdminScreen.php
+msgid "Import applied in part."
+msgstr "Importación aplicada en parte."
+
+#: src/Core/Content/ContentAdminScreen.php
 msgid "Import applied."
 msgstr "Importación aplicada."
+
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Import undone: %d change reversed."
+msgid_plural "Import undone: %d changes reversed."
+msgstr[0] "Importación deshecha: se revirtió %d cambio."
+msgstr[1] "Importación deshecha: se revirtieron %d cambios."
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Include"
@@ -1433,6 +1449,10 @@ msgstr "Nada"
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Nothing found."
 msgstr "No se encontró nada."
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Nothing was imported."
+msgstr "No se importó nada."
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Now"
@@ -2209,6 +2229,10 @@ msgid "That file is not valid JSON."
 msgstr "Ese archivo no es un JSON válido."
 
 #: src/Core/Content/ContentAdminScreen.php
+msgid "That import couldn't be found (or was undone already), so nothing was undone."
+msgstr "No se encontró esa importación (o ya se deshizo), así que no se deshizo nada."
+
+#: src/Core/Content/ContentAdminScreen.php
 msgid "That save couldn't be found, so nothing was undone."
 msgstr "No se encontró ese guardado, así que no se deshizo nada."
 
@@ -2502,6 +2526,10 @@ msgid "Undo it"
 msgstr "Deshacerlo"
 
 #: src/Core/Content/ContentAdminScreen.php
+msgid "Undo this import"
+msgstr "Deshacer esta importación"
+
+#: src/Core/Content/ContentAdminScreen.php
 #, php-format
 msgid "Undone: %d fields emptied again."
 msgstr "Deshecho: %d campos vaciados de nuevo."
@@ -2570,6 +2598,10 @@ msgstr "Valor"
 #: resources/data-panel/src/bindings/DynamicSettings.tsx
 msgid "Values are cleaned before they’re used: colors must be a palette color or a CSS color, and anything unsafe is left out."
 msgstr "Los valores se limpian antes de usarse: los colores deben ser de la paleta o colores CSS, y todo lo inseguro se omite."
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Values edited since are kept."
+msgstr "Los valores editados desde entonces se conservan."
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Visibility"

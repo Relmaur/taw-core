@@ -823,6 +823,11 @@ msgstr ""
 msgid "Expression"
 msgstr ""
 
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Failed: %s"
+msgstr ""
+
 #: src/Core/Seo/SeoMeta.php
 msgid "Falls back to the post title when empty. Also used as the <title> tag itself, not just social previews."
 msgstr ""
@@ -1002,8 +1007,19 @@ msgid "Import"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
+msgid "Import applied in part."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
 msgid "Import applied."
 msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Import undone: %d change reversed."
+msgid_plural "Import undone: %d changes reversed."
+msgstr[0] ""
+msgstr[1] ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Include"
@@ -1435,6 +1451,10 @@ msgstr ""
 
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Nothing found."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Nothing was imported."
 msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
@@ -2212,6 +2232,10 @@ msgid "That file is not valid JSON."
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
+msgid "That import couldn't be found (or was undone already), so nothing was undone."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
 msgid "That save couldn't be found, so nothing was undone."
 msgstr ""
 
@@ -2505,6 +2529,10 @@ msgid "Undo it"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
+msgid "Undo this import"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
 #, php-format
 msgid "Undone: %d fields emptied again."
 msgstr ""
@@ -2572,6 +2600,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/DynamicSettings.tsx
 msgid "Values are cleaned before they’re used: colors must be a palette color or a CSS color, and anything unsafe is left out."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Values edited since are kept."
 msgstr ""
 
 #: resources/data-panel/src/bindings/popup.tsx

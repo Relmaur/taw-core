@@ -307,14 +307,53 @@ class Importer
         $schemaWarnings = $this->warnings;
 
         $report = [
-            'created' => [], 'updated' => [], 'skipped' => [], 'deleted' => [],
-            'media_sideloaded' => 0, 'warnings' => [], 'rollback_path' => null,
+            'created' => [], 'updated' => [], 'skipped' => [], 'deleted' => [], 'failed' => [],
+            'media_sideloaded' => 0, 'warnings' => [], 'rollback_path' => null, 'journal' => null, 'error' => null,
         ];
 
-        if (($options['rollback'] ?? true) !== false) {
-            $report['rollback_path'] = $this->writeRollbackSnapshot();
+        // A safety net first, or nothing: the full rollback snapshot, and
+        // the journal `content:import --undo` reverses.
+        if (($options['rollback'] ?? true) === false) {
+            $this->applyAll($input, $policy, $includeSettings, $report);
+            $report['warnings'] = array_merge($schemaWarnings, $report['warnings']);
+            return $report;
+        }
+        $report['rollback_path'] = $this->writeRollbackSnapshot();
+        $journalPath = $report['rollback_path'] !== null ? $this->openJournal() : null;
+        if ($journalPath === null) {
+            $report['error'] = "Couldn't write the rollback snapshot or the import journal in uploads/taw-private, so nothing was imported.";
+            $report['warnings'] = $schemaWarnings;
+            return $report;
         }
 
+        $journal = new ImportJournal(new WpRecords());
+        $unwatch = WpRecords::watch($journal);
+        try {
+            $this->applyAll($input, $policy, $includeSettings, $report);
+        } catch (\Throwable $e) {
+            $report['error'] = 'The import stopped: ' . $e->getMessage() . ' — undo what it did with content:import --undo.';
+            $report['warnings'] = $this->warnings;
+        } finally {
+            $unwatch();
+            $report['journal'] = $this->writeJournal($journalPath, $journal->entries(), $input);
+            if ($report['journal'] === null) {
+                $report['warnings'][] = "Couldn't save the import journal ({$journalPath}); the rollback snapshot is the way back.";
+            }
+        }
+        $report['warnings'] = array_merge($schemaWarnings, $report['warnings']);
+
+        return $report;
+    }
+
+    /**
+     * Everything the import writes, into $report. A record that fails is
+     * listed under `failed` and the rest carry on.
+     *
+     * @param array<string, mixed> $input
+     * @param array<string, mixed> $report
+     */
+    private function applyAll(array $input, string $policy, bool $includeSettings, array &$report): void
+    {
         // Media first: the ID map rewrites references in posts and fields,
         // and the unchanged check below must see the files this run brings
         // (a record linking to a file not yet here would look unchanged and
@@ -366,27 +405,33 @@ class Importer
                 continue;
             }
 
-            $result = match ($kind) {
-                'post'    => $this->applyPost($op, $policy, $idMap),
-                'option'  => $this->applyOption($op, $policy),
-                'term'    => $this->applyTerm($op, $policy, $idMap),
-                'user'    => $this->applyUser($op, $policy, $idMap),
-                'comment' => $this->applyComment($op, $policy),
-                default   => ['bucket' => 'skipped', 'label' => "unknown:{$kind}"],
-            };
+            try {
+                $result = match ($kind) {
+                    'post'    => $this->applyPost($op, $policy, $idMap),
+                    'option'  => $this->applyOption($op, $policy),
+                    'term'    => $this->applyTerm($op, $policy, $idMap),
+                    'user'    => $this->applyUser($op, $policy, $idMap),
+                    'comment' => $this->applyComment($op, $policy),
+                    default   => ['bucket' => 'skipped', 'label' => "unknown:{$kind}"],
+                };
+            } catch (\Throwable $e) {
+                $result = ['bucket' => 'failed', 'label' => $this->recordKey($op) . ': ' . $e->getMessage()];
+            }
             $report[$result['bucket']][] = $result['label'];
         }
 
         // Second pass — references to posts this run created after the post
-        // that points at them.
-        $this->rewriteSecondPass();
+        // that points at them; then comment threading + counts, once every
+        // comment exists.
+        foreach (['second pass' => fn () => $this->rewriteSecondPass(), 'comment threading' => fn () => $this->finalizeComments()] as $step => $run) {
+            try {
+                $run();
+            } catch (\Throwable $e) {
+                $report['failed'][] = "{$step}: " . $e->getMessage();
+            }
+        }
 
-        // Second pass — comment threading + counts, once every comment exists.
-        $this->finalizeComments();
-
-        $report['warnings'] = array_merge($schemaWarnings, $this->warnings);
-
-        return $report;
+        $report['warnings'] = $this->warnings;
     }
 
     /** @var array<string, int> media filename in the input => the local attachment it matched or became */
@@ -2001,19 +2046,31 @@ class Importer
         return RegistryFingerprint::drift($recorded, RegistryFingerprint::current());
     }
 
-    private function writeRollbackSnapshot(): string
+    /** The private folder for rollback snapshots and journals ('' when it can't be made). */
+    private static function privateDir(): string
     {
         $uploads = wp_upload_dir();
-        $dir = trailingslashit($uploads['basedir']) . 'taw-private';
+        $dir = trailingslashit((string) $uploads['basedir']) . 'taw-private';
 
-        if (!is_dir($dir)) {
-            wp_mkdir_p($dir);
+        if (!is_dir($dir) && !wp_mkdir_p($dir)) {
+            return '';
         }
         foreach (['.htaccess' => "Require all denied\nDeny from all\n", 'index.php' => "<?php\n// Silence is golden.\n"] as $guard => $body) {
             $path = $dir . '/' . $guard;
             if (!file_exists($path)) {
                 file_put_contents($path, $body);
             }
+        }
+
+        return $dir;
+    }
+
+    /** The rollback snapshot's path, or null when it couldn't be written. */
+    private function writeRollbackSnapshot(): ?string
+    {
+        $dir = self::privateDir();
+        if ($dir === '') {
+            return null;
         }
 
         // Maximal scope — an undo of a `--migrate` import has to be able to
@@ -2027,12 +2084,105 @@ class Importer
             'include_drafts'   => true,
         ];
 
+        $json = wp_json_encode((new Exporter())->snapshot($rollbackScope), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         $path = $dir . '/rollback-' . gmdate('Ymd-His') . '.json';
-        file_put_contents(
-            $path,
-            (string) wp_json_encode((new Exporter())->snapshot($rollbackScope), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
-        );
 
-        return $path;
+        return is_string($json) && @file_put_contents($path, $json) !== false ? $path : null;
+    }
+
+    /** A new journal file (proving the folder is writable), or null. */
+    private function openJournal(): ?string
+    {
+        $dir = self::privateDir();
+        if ($dir === '') {
+            return null;
+        }
+        $path = $dir . '/' . self::JOURNAL_PREFIX . gmdate('Ymd-His') . '.json';
+        for ($n = 2; file_exists($path); $n++) {
+            $path = $dir . '/' . self::JOURNAL_PREFIX . gmdate('Ymd-His') . "-{$n}.json";
+        }
+
+        return @file_put_contents($path, '{"entries":[]}') !== false ? $path : null;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $entries
+     * @param array<string, mixed>       $input
+     */
+    private function writeJournal(string $path, array $entries, array $input): ?string
+    {
+        $json = wp_json_encode([
+            'taw_import_journal' => 1,
+            'created_at'         => gmdate('c'),
+            'source'             => $input['meta']['source']['url'] ?? ($input['taw_changeset']['target']['url'] ?? null),
+            'entries'            => $entries,
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        return is_string($json) && @file_put_contents($path, $json) !== false ? $path : null;
+    }
+
+    public const JOURNAL_PREFIX = 'import-';
+
+    /**
+     * The newest import journal not yet undone, as `{path, entries, created_at, source}`.
+     *
+     * @return array{path: string, entries: list<array<string, mixed>>, created_at: string, source: ?string}|null
+     */
+    public static function latestJournal(): ?array
+    {
+        $dir = self::privateDir();
+        $files = $dir === '' ? [] : (glob($dir . '/' . self::JOURNAL_PREFIX . '*.json') ?: []);
+        rsort($files);
+
+        return $files === [] ? null : self::readJournal($files[0]);
+    }
+
+    /**
+     * @return array{path: string, entries: list<array<string, mixed>>, created_at: string, source: ?string}|null
+     */
+    public static function readJournal(string $journal): ?array
+    {
+        $dir = realpath(self::privateDir());
+        $candidate = str_contains($journal, '/') ? $journal : self::privateDir() . '/' . $journal;
+        $real = realpath($candidate);
+        if ($dir === false || $real === false || dirname($real) !== $dir || !str_starts_with(basename($real), self::JOURNAL_PREFIX)) {
+            return null;
+        }
+        $data = json_decode((string) file_get_contents($real), true);
+        if (!is_array($data) || !is_array($data['entries'] ?? null)) {
+            return null;
+        }
+
+        return ['path' => $real, 'entries' => array_values($data['entries']), 'created_at' => (string) ($data['created_at'] ?? ''), 'source' => $data['source'] ?? null];
+    }
+
+    /**
+     * Reverse an import from its journal (the newest when none is named).
+     * Values edited since are kept; the journal is renamed `undone-…`.
+     *
+     * @return array{restored: int, deleted: int, recreated: int, kept: list<string>, journal: ?string, error: ?string}
+     */
+    public function undo(string $journal = ''): array
+    {
+        $found = $journal === '' ? self::latestJournal() : self::readJournal($journal);
+        if ($found === null) {
+            return ['restored' => 0, 'deleted' => 0, 'recreated' => 0, 'kept' => [], 'journal' => null,
+                'error' => $journal === '' ? 'No import to undo.' : "That isn't an import journal in uploads/taw-private: {$journal}"];
+        }
+
+        $kses = function_exists('kses_remove_filters') && has_filter('content_save_pre', 'wp_filter_post_kses') !== false;
+        if ($kses) {
+            kses_remove_filters();
+        }
+        try {
+            $result = ImportJournal::undo($found['entries'], new WpRecords());
+        } finally {
+            if ($kses) {
+                kses_init_filters();
+            }
+        }
+        rename($found['path'], dirname($found['path']) . '/undone-' . basename($found['path']));
+
+        return $result + ['journal' => $found['path'], 'error' => null];
     }
 }
