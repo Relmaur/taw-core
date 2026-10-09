@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "kind": "post_type",
+  "key": "fid_book",
+  "labels": { "singular": "Book", "plural": "Books" },
+  "args": { "public": true, "has_archive": true, "supports": ["title", "editor", "thumbnail", "excerpt", "page-attributes"] }
+}

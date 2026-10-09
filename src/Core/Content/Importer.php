@@ -55,6 +55,9 @@ class Importer
     /** @var list<array{op: array<string, mixed>, id: int, label: string}> posts to rewrite again once the run's posts exist */
     private array $secondPass = [];
 
+    /** @var list<array{op: array<string, mixed>, id: int, label: string}> terms whose fields point at a post this run creates later */
+    private array $termSecondPass = [];
+
     /**
      * Normalize either input shape into a flat operations list.
      *
@@ -395,6 +398,7 @@ class Importer
             }
         }
         $this->secondPass = [];
+        $this->termSecondPass = [];
         $this->rememberIncoming($input);
 
         $report['registry_drift'] = $this->registryDrift($input);
@@ -758,6 +762,17 @@ class Importer
             }
         }
         $this->secondPass = [];
+
+        foreach ($this->termSecondPass as ['op' => $op, 'id' => $termId, 'label' => $label]) {
+            $this->refs()->takeUnresolved();
+            $fields = is_array($op['fields'] ?? null) ? $op['fields'] : [];
+            $this->writeTermFields($termId, (string) ($op['target']['type'] ?? ''), is_array($fields['fields'] ?? null) ? $fields['fields'] : []);
+            $unresolved = $this->refs()->takeUnresolved();
+            if ($unresolved !== []) {
+                $this->warnings[] = "{$label}: references " . implode(', ', $unresolved) . " — not on this site, dropped.";
+            }
+        }
+        $this->termSecondPass = [];
     }
 
     /** @var array<string, int> source comment ref => new comment ID */
@@ -856,6 +871,7 @@ class Importer
         }
 
         $changes = [];
+        $this->refs()->takeUnresolved();
 
         foreach (['title', 'excerpt', 'content', 'status', 'menu_order', 'template', 'comment_status', 'ping_status', 'password'] as $prop) {
             if (!array_key_exists($prop, $incoming)) {
@@ -977,11 +993,30 @@ class Importer
                 ? ['status' => 'changed', 'old' => $oldDecoded, 'new' => $newDecoded]
                 : ['status' => 'new', 'new' => $newDecoded];
         }
+        if ($existing && ($pending = $this->pendingRefs()) !== []) {
+            $changes['links'] = ['status' => 'changed', 'old' => null, 'new' => $pending];
+        }
 
         return $identity + [
             'op' => $existing ? 'update' : 'create',
             'changes' => $changes,
         ];
+    }
+
+    /**
+     * References met since the last takeUnresolved() to posts this import
+     * creates. Planned before those posts exist, they compare as empty: the
+     * record would read as unchanged and be skipped, and the link would only
+     * arrive on the next import. Listed, the record is written and its
+     * second pass links them.
+     *
+     * @return list<string>
+     */
+    private function pendingRefs(): array
+    {
+        $unresolved = array_values(array_unique($this->refs()->takeUnresolved()));
+
+        return array_values(array_filter($unresolved, fn (string $ref): bool => isset($this->incomingPosts[$ref])));
     }
 
     /**
@@ -997,6 +1032,12 @@ class Importer
 
         if (($op['op'] ?? 'update') === 'delete') {
             return ['kind' => 'option', 'key' => $key, 'op' => $exists ? 'would-delete' : 'skip', 'changes' => []];
+        }
+
+        // `false` is what get_option() returns for an option the source
+        // never set (older exporters wrote it): nothing to create here.
+        if (!$exists && $incoming === false) {
+            return ['kind' => 'option', 'key' => $key, 'op' => 'update', 'changes' => []];
         }
 
         // A page this site lacks (and the import doesn't bring) is never
@@ -1075,6 +1116,7 @@ class Importer
         }
 
         // Term fieldsets (ADR-0008): same key rules and normalized diff as post fields.
+        $this->refs()->takeUnresolved();
         $registered = Metabox::fieldsFor('term', $taxonomy);
         foreach (is_array($fields['fields'] ?? null) ? $fields['fields'] : [] as $fieldKey => $newVal) {
             $target = FieldKeys::forKey((string) $fieldKey, $registered, self::bareConfigLookup());
@@ -1086,6 +1128,9 @@ class Importer
             $changes['fields.' . $fieldKey] = ($existing && !self::isEmptyValue($oldDecoded))
                 ? ['status' => 'changed', 'old' => $oldDecoded, 'new' => $newDecoded]
                 : ['status' => 'new', 'new' => $newDecoded];
+        }
+        if ($existing && ($pending = $this->pendingRefs()) !== []) {
+            $changes['links'] = ['status' => 'changed', 'old' => null, 'new' => $pending];
         }
 
         return ['kind' => 'term', 'type' => $taxonomy, 'slug' => $slug,
@@ -1824,8 +1869,26 @@ class Importer
         foreach (is_array($fields['meta'] ?? null) ? $fields['meta'] : [] as $metaKey => $value) {
             update_term_meta($termId, (string) $metaKey, wp_slash($this->termMetaValue($value)));
         }
+        $this->refs()->takeUnresolved();
+        $this->writeTermFields($termId, $taxonomy, is_array($fields['fields'] ?? null) ? $fields['fields'] : []);
+
+        // Terms run before posts: a field pointing at a page this run
+        // creates resolves on the second pass, like a post's.
+        $unresolved = $this->refs()->takeUnresolved();
+        if (array_intersect_key(array_flip($unresolved), $this->incomingPosts) !== []) {
+            $this->termSecondPass[] = ['op' => $op, 'id' => $termId, 'label' => $label];
+        } elseif ($unresolved !== []) {
+            $this->warnings[] = "{$label}: references " . implode(', ', $unresolved) . " — not on this site, dropped.";
+        }
+
+        return ['bucket' => $bucket, 'label' => $label];
+    }
+
+    /** @param array<string, mixed> $fields field key => value, as exported */
+    private function writeTermFields(int $termId, string $taxonomy, array $fields): void
+    {
         $registered = Metabox::fieldsFor('term', $taxonomy);
-        foreach (is_array($fields['fields'] ?? null) ? $fields['fields'] : [] as $fieldKey => $value) {
+        foreach ($fields as $fieldKey => $value) {
             $config = FieldKeys::forKey((string) $fieldKey, $registered, self::bareConfigLookup())['config'];
             if (!empty($config['unregistered'])) {
                 $this->writeUnregistered('update_term_meta', $termId, $config, $value, "{$taxonomy} term field '{$fieldKey}'");
@@ -1833,8 +1896,6 @@ class Importer
             }
             Metabox::writeTo(new TermMetaStore(), $termId, $config, FieldCodec::rewriteRefs($config, FieldCodec::decode($config, $value), $this->refs()));
         }
-
-        return ['bucket' => $bucket, 'label' => $label];
     }
 
     /**
@@ -2363,11 +2424,11 @@ class Importer
             return 'att:' . (int) $value;
         }
         if (in_array($key, self::POST_ID_OPTIONS, true)) {
-            return 'pid:' . $this->resolveLocalPostId($value);
+            return 'pid:' . $this->postRefCompareKey($value);
         }
 
         if (in_array($key, self::POST_ID_LIST_OPTIONS, true)) {
-            $ids = array_values(array_filter(array_map(fn ($ref): int => $this->resolveLocalPostId($ref), is_array($value) ? $value : [])));
+            $ids = array_values(array_filter(array_map(fn ($ref): string => $this->postRefCompareKey($ref), is_array($value) ? $value : []), static fn (string $k): bool => $k !== '0'));
             sort($ids);
             return 'pids:' . implode(',', $ids);
         }
@@ -2376,6 +2437,26 @@ class Importer
         $decoded = $config !== null ? FieldCodec::decode($config, $value) : $value;
 
         return self::valueKey($decoded);
+    }
+
+    /**
+     * A post reference as {@see self::optionCompareKey()} compares it: the
+     * local ID, or, for a post this import brings but that isn't here yet,
+     * `incoming:<slug>` (resolving it to 0 read as "unchanged" when the site
+     * had no front page, and the import never set one).
+     */
+    private function postRefCompareKey(mixed $ref): string
+    {
+        $id = $this->resolveLocalPostId($ref);
+        if ($id > 0) {
+            return (string) $id;
+        }
+        $ref = is_scalar($ref) ? (string) $ref : '';
+        if ($ref !== '' && $ref !== '0' && (isset($this->incomingPosts["page:{$ref}"]) || isset($this->incomingPosts["post:{$ref}"]))) {
+            return "incoming:{$ref}";
+        }
+
+        return '0';
     }
 
     private function encodeOptionForStorage(string $key, mixed $value): mixed

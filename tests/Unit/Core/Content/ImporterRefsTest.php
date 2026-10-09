@@ -191,6 +191,20 @@ final class ImporterRefsTest extends TestCase
         $this->assertStringNotContainsString('dropped', implode("\n", $report['warnings']));
     }
 
+    public function test_a_page_already_here_is_linked_to_a_post_the_import_creates(): void
+    {
+        $this->sitePost(5, 'page', 'home');
+
+        (new Importer())->apply($this->production([
+            ['type' => 'page', 'slug' => 'home', 'title' => 'Home', 'fields' => ['featured_post' => 150]],
+            ['type' => 'post', 'slug' => 'later', 'title' => 'Later'],
+        ]), ['rollback' => false]);
+
+        $later = array_values(array_filter($this->posts, static fn ($p) => $p->post_name === 'later'))[0];
+        $this->assertSame((string) $later->ID, $this->meta['5|_taw_featured_post'] ?? null,
+            "planned before 'later' existed, the link read as empty = unchanged, and the page was skipped");
+    }
+
     public function test_a_reference_this_site_lacks_is_dropped_with_a_warning(): void
     {
         $this->sitePost(5, 'page', 'home');
@@ -311,6 +325,27 @@ final class ImporterRefsTest extends TestCase
         (new Importer())->apply($input, ['rollback' => false]);
         $start = array_values(array_filter($this->posts, static fn ($p) => $p->post_name === 'start'))[0];
         $this->assertSame($start->ID, $this->options['page_on_front']);
+    }
+
+    public function test_a_site_without_a_front_page_gets_the_one_the_import_brings(): void
+    {
+        $this->options['page_on_front'] = '0';
+        $this->options['sticky_posts'] = [];
+        $input = $this->production([['type' => 'page', 'slug' => 'start', 'title' => 'Start'], ['type' => 'post', 'slug' => 'pinned', 'title' => 'Pinned']])
+            + ['options' => ['page_on_front' => 'start', 'sticky_posts' => ['pinned']]];
+
+        (new Importer())->apply($input, ['rollback' => false, 'include_settings' => true]); // sticky_posts is a setting
+
+        $ids = array_column(array_map(static fn ($p) => ['slug' => $p->post_name, 'id' => $p->ID], $this->posts), 'id', 'slug');
+        $this->assertSame($ids['start'], $this->options['page_on_front'], "'start' resolved to 0 before it existed, which read as unchanged");
+        $this->assertSame([$ids['pinned']], $this->options['sticky_posts']);
+    }
+
+    public function test_an_option_the_source_never_set_is_not_created(): void
+    {
+        $plan = (new Importer())->plan($this->production([]) + ['options' => ['WPLANG' => false]]);
+
+        $this->assertSame([], $plan['records'][0]['changes'], 'get_option() returned false at the source: nothing to write');
     }
 
     public function test_sticky_posts_this_site_lacks_are_left_out_without_a_change_forever(): void

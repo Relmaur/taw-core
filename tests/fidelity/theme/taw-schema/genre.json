@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "kind": "taxonomy",
+  "key": "fid_genre",
+  "for": ["fid_book", "post"],
+  "labels": { "singular": "Genre", "plural": "Genres" },
+  "args": { "hierarchical": true }
+}

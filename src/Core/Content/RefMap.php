@@ -193,7 +193,7 @@ final class RefMap
      * Each media URL as a pattern that also matches its size variants
      * (`-300x200`) and the original of a `-scaled` upload, in plain and
      * JSON-escaped (`\/`) form; then the origin, as http or https, not as a
-     * prefix of a longer host, and not for files in the source's uploads
+     * prefix of a longer host (a sentence's closing `.` is no host), and not for files in the source's uploads
      * folder: a file this site has is mapped by its media rule above, and
      * one it doesn't have keeps loading from the source.
      *
@@ -233,8 +233,8 @@ final class RefMap
         if ($host !== '' && $toOrigin !== '' && preg_replace('#^https?://#', '', $toOrigin) !== $host) {
             $uploads = (string) preg_replace('#^https?://' . preg_quote($host, '#') . '#', '', rtrim($fromUploads, '/'));
             $uploads = $uploads !== '' && str_starts_with($uploads, '/') ? $uploads : '/wp-content/uploads';
-            $rules[] = ['#https?://' . preg_quote($host, '#') . '(?![\w.-])(?!' . preg_quote($uploads . '/', '#') . ')#', self::escapeReplacement($toOrigin)];
-            $rules[] = ['#https?:\\\\/\\\\/' . preg_quote(str_replace('/', '\/', $host), '#') . '(?![\w.-])(?!' . preg_quote(str_replace('/', '\/', $uploads . '/'), '#') . ')#', self::escapeReplacement(str_replace('/', '\/', $toOrigin))];
+            $rules[] = ['#https?://' . preg_quote($host, '#') . '(?![\w-]|\.[\w-])(?!' . preg_quote($uploads . '/', '#') . ')#', self::escapeReplacement($toOrigin)];
+            $rules[] = ['#https?:\\\\/\\\\/' . preg_quote(str_replace('/', '\/', $host), '#') . '(?![\w-]|\.[\w-])(?!' . preg_quote(str_replace('/', '\/', $uploads . '/'), '#') . ')#', self::escapeReplacement(str_replace('/', '\/', $toOrigin))];
         }
 
         return $rules;

@@ -335,6 +335,28 @@ final class ImporterHierarchyTest extends TestCase
         $this->assertSame([], $this->changes($input));
     }
 
+    public function test_a_term_field_can_point_at_a_page_the_same_import_creates(): void
+    {
+        Functions\when('absint')->alias(static fn ($v): int => abs((int) $v));
+        Functions\when('sanitize_text_field')->returnArg(1);
+        new Metabox(['id' => 'genre', 'title' => 'Genre', 'screens' => ['term:category'], 'fields' => [
+            ['id' => 'landing', 'type' => 'post_select', 'post_type' => 'page'],
+        ]]);
+        $this->terms[50] = $this->term(50, 'category', 'news');
+        $input = [
+            'meta'  => ['schema' => '1.5', 'source' => ['url' => 'https://prod.test']],
+            'refs'  => ['posts' => ['135' => ['type' => 'page', 'slug' => 'start', 'path' => 'start']]],
+            'terms' => ['category' => [['slug' => 'news', 'name' => 'News', 'description' => '', 'parent' => null, 'fields' => ['landing' => 135]]]],
+            'posts' => [$this->rec('start')],
+        ];
+
+        (new Importer())->apply($input, ['rollback' => false]);
+
+        $start = $this->find('start');
+        $this->assertNotNull($start);
+        $this->assertSame((string) $start->ID, $this->termMeta['50|_taw_landing'], 'terms run before posts: written again once the page exists');
+    }
+
     public function test_change_sets_key_pages_by_path(): void
     {
         $base = ['meta' => ['schema' => '1.5'], 'posts' => [['title' => 'A'] + $this->rec('about/team', 'about'), $this->rec('services/team', 'services')]];

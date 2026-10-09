@@ -78,3 +78,70 @@ jobs:
         run: |
           git status --porcelain -- assets/data-panel
           test -z "$(git status --porcelain -- assets/data-panel)" || { echo "assets/data-panel is stale: run npm run build in resources/data-panel and commit it."; exit 1; }
+
+  # Content interchange fidelity: a real two-site round trip (tests/fidelity/run.sh).
+  # Site A is seeded with everything an import has to carry by natural key, exported,
+  # and imported into site B (its IDs offset); a second import must report 0 changes,
+  # every value must point at the same record on both sites, B's export must import
+  # back into A without a change, and undo must restore B.
+  fidelity:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=6
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer:v2
+          extensions: mysqli, gd
+          coverage: none
+
+      # setup-php's wp-cli download 404s (releases ship wp-cli-<version>.phar), so
+      # install the pinned release phar and check it against its published sha512.
+      - name: Install WP-CLI
+        env:
+          WP_CLI_VERSION: "2.12.0"
+        run: |
+          base="https://github.com/wp-cli/wp-cli/releases/download/v${WP_CLI_VERSION}/wp-cli-${WP_CLI_VERSION}.phar"
+          curl -fsSL -o /tmp/wp-cli.phar "$base"
+          echo "$(curl -fsSL "${base}.sha512" | cut -d' ' -f1)  /tmp/wp-cli.phar" | sha512sum -c -
+          sudo install -m 0755 /tmp/wp-cli.phar /usr/local/bin/wp
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Download WordPress once (both sites copy it)
+        run: wp core download --path="$RUNNER_TEMP/wordpress"
+
+      - name: Round trip
+        env:
+          FID_WORK: ${{ runner.temp }}/fidelity
+          FID_DB_HOST: 127.0.0.1
+          FID_DB_PASS: root
+          FID_WP_CORE: ${{ runner.temp }}/wordpress
+        run: tests/fidelity/run.sh
+
+      - name: Keep the snapshots and key dumps
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fidelity
+          path: |
+            ${{ runner.temp }}/fidelity/*.json
+            ${{ runner.temp }}/fidelity/*.txt
+            ${{ runner.temp }}/fidelity/*.log

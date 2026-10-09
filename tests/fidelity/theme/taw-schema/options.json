@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "kind": "options_page",
+  "key": "fid_options",
+  "title": "Fidelity options",
+  "fields": [
+    { "id": "o_text", "type": "text", "label": "Text" },
+    { "id": "o_image", "type": "image", "label": "Image" },
+    { "id": "o_page", "type": "post_select", "label": "Page", "post_type": "page" },
+    { "id": "o_rows", "type": "repeater", "label": "Rows", "fields": [
+      { "id": "label", "type": "text", "label": "Label" },
+      { "id": "target", "type": "post_select", "label": "Target", "post_type": "page,post" }
+    ] }
+  ]
+}

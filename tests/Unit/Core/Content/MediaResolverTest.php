@@ -106,4 +106,18 @@ final class MediaResolverTest extends TestCase
         $this->assertSame('cURL error 56: unexpected eof', $failed->get_error_message(), 'the reason reaches the warning');
         $this->assertSame(2, $calls);
     }
+
+    public function test_the_filename_fallback_never_takes_another_files_download_or_a_matched_one(): void
+    {
+        // 30: downloaded earlier from the other hero.jpg; 31: already matched in this run; 32: a plain upload.
+        \Brain\Monkey\Functions\when('get_posts')->justReturn([30, 31, 32]);
+        \Brain\Monkey\Functions\when('get_post_meta')->alias(static fn (int $id, string $key): string => match (true) {
+            $key === MediaResolver::SOURCE_META => $id === 30 ? 'https://src.test/wp-content/uploads/2025/01/hero.jpg' : '',
+            default => '2026/10/hero.jpg',
+        });
+        \Brain\Monkey\Functions\when('wp_basename')->alias(static fn (string $p): string => basename($p));
+
+        $this->assertSame(32, MediaResolver::findByFilename('hero.jpg', [31], 'https://src.test/wp-content/uploads/2024/05/hero.jpg'));
+        $this->assertSame(30, MediaResolver::findByFilename('hero.jpg'), 'without a URL or taken list: the first of that name, as before');
+    }
 }
