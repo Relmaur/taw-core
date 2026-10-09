@@ -21,6 +21,8 @@ final class ImporterTest extends TestCase
         parent::setUp();
         \TAW\Core\Metabox\Metabox::resetRegistryForTests();
         Functions\when('post_type_exists')->alias(static fn (string $t): bool => in_array($t, ['page', 'post', 'book'], true));
+        Functions\when('get_post_types')->justReturn(['post' => 'post', 'page' => 'page', 'attachment' => 'attachment']);
+        Functions\when('get_post_field')->justReturn('');
     }
 
     protected function tearDown(): void

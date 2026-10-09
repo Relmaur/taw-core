@@ -2102,6 +2102,7 @@ php bin/taw content:export --migrate --output=/tmp/site.json # + users, settings
 php bin/taw content:import /tmp/site.json                   # dry-run: field-level diff, writes nothing
 php bin/taw content:import /tmp/site.json --yes             # apply (rollback snapshot written first)
 php bin/taw content:import /tmp/site.json --yes --with-settings   # also apply environment settings
+php bin/taw content:import /tmp/site.json --yes --user=marco      # as this user (default: the first administrator)
 php bin/taw content:diff before.json after.json --out=changes.json
 ```
 
@@ -2109,7 +2110,9 @@ Also, in wp-admin: **Tools → TAW Data** (Export with option checkboxes + Impor
 
 ### The snapshot
 
-`TAW\Core\Content\Exporter::snapshot($scope)` — a plain array, `json_encode`-ready. Schema: [`resources/schema/content-interchange-1.2.json`](resources/schema/content-interchange-1.2.json) (`schema` is `"1.2"`; the importer also accepts `"1.0"` and `"1.1"`).
+`TAW\Core\Content\Exporter::snapshot($scope)` — a plain array, `json_encode`-ready. Schema: [`resources/schema/content-interchange-1.3.json`](resources/schema/content-interchange-1.3.json) (`schema` is `"1.3"`; the importer also accepts `"1.0"`–`"1.2"`, and warns when a file's minor version is newer than its own).
+
+**1.3** adds a post's `password`, a comment's `post_type` (so its post is matched within that type), keeps a post's empty taxonomies as `[]` (so the importer clears terms removed at the source), and keys a slug-less draft by its local date.
 
 **Field keys (1.2):** a post's `fields` are keyed by the bare field id for `_taw_` fields (`"hero_heading"`), exactly as in 1.0 and 1.1, and by the full meta key for fields with any other prefix (`"_book_author"`). Each value is decoded with the config of the field registered for that post type (`Metabox::fieldsFor()`). Before 1.2, fields with another prefix were left out.
 
@@ -2118,7 +2121,7 @@ Also, in wp-admin: **Tools → TAW Data** (Export with option checkboxes + Impor
 | `meta` | `schema`, `generated_at`, `source` (url, `taw/core` version, theme), and a `registry_fingerprint` (block IDs + a `field_id → type` map) so the importer can warn on drift |
 | `options` | every `_taw_*` option (repeater/files **decoded to arrays**), plus an allowlisted core set — `blogname`, `blogdescription`, `show_on_front`, `page_on_front`/`page_for_posts` **resolved to slugs**. Filter: `taw_content_export_core_options`. With `--with-settings`, also a **second** allowlist of environment settings (`permalink_structure`, `timezone_string`, `sticky_posts` → slugs, …). Filter: `taw_content_export_settings_options` |
 | `terms` | per public taxonomy (except `nav_menu`): `{slug, name, description, parent (by slug), meta}`, plus `fields` (decoded, keyed like post fields) when the taxonomy has term fieldsets (v1.53.0+) |
-| `posts` | `page`/`post`, every **public** CPT, **and** every CPT with a `Metabox` attached (so `public => false` content CPTs export without a manual filter) — except `taw_submission` and framework-internal types. Filter: `taw_content_export_post_types` (runs last). Per post: `type, slug, status, title, excerpt, content, menu_order, date, author ({login,email}), comment_status, ping_status, parent (by slug), template, terms, featured_media (filename), fields`. A slug-less draft also carries a composite `match_key` |
+| `posts` | `page`/`post`, every **public** CPT, **and** every CPT with a `Metabox` attached (so `public => false` content CPTs export without a manual filter) — except `taw_submission` and framework-internal types. Filter: `taw_content_export_post_types` (runs last). Per post: `type, slug, status, title, excerpt, content, menu_order, date, author ({login,email}), comment_status, ping_status, password, parent (by slug), template, terms (every taxonomy, `[]` when empty), featured_media (filename), fields`. A slug-less draft also carries a composite `match_key` |
 | `users` | opt-in (`--with-users`): `{login, email, display_name, roles[], meta{first_name,last_name,description,nickname,locale}, user_registered}`, plus `fields` when a fieldset targets users (v1.54.0+). Password hashes only with the second flag `--with-user-passwords` |
 | `comments` | opt-in (`--with-comments`): comments on exported posts, with `parent_ref` threading |
 | `media` | every referenced attachment: `{id, ref (filename), filename, url, title, description, alt, caption, mime}`. `--all-media` also carries unreferenced attachments |
@@ -2136,7 +2139,10 @@ Scope options: `--types=`, `--since=`, `--posts=` (IDs or slugs), `--no-media`, 
 - **Portable transforms are reversed on import** — `page_on_front`/`page_for_posts` and `sticky_posts` (slugs), `post.parent` (slug), `featured_media` (filename), `author` (`{login,email}`) all resolve back to a local ID before the diff and the write. A clean **export → import of the same site is a verified no-op** (`--migrate` export then `import --yes` → 0 created / 0 updated / 0 deleted): `plan()` reports zero changes and `apply()` skips every record the dry-run shows unchanged.
 - **`Importer::plan()`** produces the field-level diff (`unchanged` / `changed old→new` / `new` / `would-delete`) and writes nothing. `""` ↔ missing ↔ `null` ↔ `[]`, `"1"` ↔ `true`, `"[…]"` ↔ the decoded array all compare equal. `content:import` without `--yes` stops here.
 - **Apply** writes a full **maximal-scope** `Exporter` snapshot to `wp-content/uploads/taw-private/` (an `.htaccess`-denied dir) first, then: posts via `wp_insert_post`/`wp_update_post`; **meta via `Metabox::writeMeta()`**; options via `update_option`; terms via `wp_insert_term`/`wp_update_term`; users via `wp_insert_user`/`wp_update_user` (roles sanitised against the target's defined roles); comments via `wp_insert_comment`. Per-record conflict policy `update` / `create` / `skip`. **Environment settings are also import-gated** — skipped unless `--with-settings` / the admin checkbox.
-- **Report:** created / updated / skipped / deleted / media sideloaded / warnings (registry drift, unresolved author/parent, undefined role, missing media) / rollback path.
+- **Writes content as an admin save does:** `apply()` lifts kses for the run (an iframe, SVG or form survives, and `&` stays `&`), and `content:import` runs as a user (`--user`, default the first administrator), so fields saved as code keep their markup and new posts get an author.
+- **The dry run compares** a post's title, excerpt, content, status, menu order, template, parent, comment and ping status, password, date (GMT), terms per taxonomy, author, featured image and fields; an option, term or comment `delete` shows as `would-delete`.
+- **Safe failures:** a post write that fails is reported and nothing else is written for it. A field or option no fieldset or options page registers is written as the snapshot has it (an array stays an array). A user whose roles this site doesn't define keeps the role they have. A page whose slug a sideloaded attachment took gets it back.
+- **Report:** created / updated / skipped / deleted / media sideloaded / warnings (registry drift, unresolved author/parent, undefined role, missing media, unregistered fields) / rollback path.
 
 ### REST-registered field meta
 

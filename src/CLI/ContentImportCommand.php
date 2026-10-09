@@ -50,6 +50,7 @@ class ContentImportCommand extends Command
             ->addOption('yes', null, InputOption::VALUE_NONE, 'Apply the changes (otherwise the command only previews them)')
             ->addOption('policy', null, InputOption::VALUE_REQUIRED, 'Conflict policy for records that already exist: update | create | skip', 'update')
             ->addOption('with-settings', null, InputOption::VALUE_NONE, 'Also apply environment-settings options (permalink_structure, timezone, sticky_posts, …) — skipped by default')
+            ->addOption('user', null, InputOption::VALUE_REQUIRED, 'Import as this user (login, email or ID); default: the first administrator')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the plan/report as JSON');
     }
 
@@ -86,6 +87,18 @@ class ContentImportCommand extends Command
         }
         WpLoader::autoConfigureLocalSocket($this->themeDir);
         require $wpLoad;
+
+        // Import as a user, like an admin's save: with none, WordPress
+        // filters content through kses and fields saved as code lose their
+        // markup, and new posts get no author.
+        $user = $this->importUser((string) $input->getOption('user'));
+        if ($user === null) {
+            $io->error("No such user: '" . $input->getOption('user') . "'.");
+            return Command::FAILURE;
+        }
+        if ($user > 0) {
+            wp_set_current_user($user);
+        }
 
         $importer = new Importer();
         $plan = $importer->plan($data);
@@ -166,5 +179,20 @@ class ContentImportCommand extends Command
         foreach ($plan['warnings'] ?? [] as $warning) {
             $io->warning((string) $warning);
         }
+    }
+
+    /**
+     * The user to import as: the one asked for (null when there's no such
+     * user), else the first administrator (0 when the site has none).
+     */
+    private function importUser(string $wanted): ?int
+    {
+        if ($wanted !== '') {
+            $user = ctype_digit($wanted) ? get_user_by('id', (int) $wanted) : (get_user_by('login', $wanted) ?: get_user_by('email', $wanted));
+            return $user ? (int) $user->ID : null;
+        }
+        $admins = get_users(['role' => 'administrator', 'number' => 1, 'orderby' => 'ID', 'order' => 'ASC', 'fields' => 'ID']);
+
+        return isset($admins[0]) ? (int) $admins[0] : 0;
     }
 }

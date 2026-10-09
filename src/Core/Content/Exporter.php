@@ -24,13 +24,13 @@ use TAW\Core\OptionsPage\OptionsPage;
  * transients, non-allowlisted core/plugin options, and
  * `nav_menu` / `nav_menu_item` (code-owned in TAW themes).
  *
- * Schema: see `resources/schema/content-interchange-1.2.json`.
+ * Schema: see `resources/schema/content-interchange-1.3.json`.
  *
  * @phpstan-type Scope array{types?: list<string>, since?: string, posts?: list<int|string>, include_media?: bool, all_media?: bool, include_drafts?: bool, include_users?: bool, include_user_passwords?: bool, include_comments?: bool, include_settings?: bool}
  */
 class Exporter
 {
-    public const SCHEMA_VERSION = '1.2';
+    public const SCHEMA_VERSION = '1.3';
 
     /**
      * Core (non-`_taw_`) options included in every export. `page_on_front`
@@ -184,7 +184,8 @@ class Exporter
         ];
 
         if (!empty($scope['since'])) {
-            $args['date_query'] = [['after' => (string) $scope['since'], 'inclusive' => true]];
+            // Modified, not published: an old post edited yesterday is a change.
+            $args['date_query'] = [['column' => 'post_modified_gmt', 'after' => (string) $scope['since'], 'inclusive' => true]];
         }
 
         if (!empty($scope['posts'])) {
@@ -313,6 +314,7 @@ class Exporter
             'author'         => $this->authorRef((int) $post->post_author),
             'comment_status' => (string) $post->comment_status,
             'ping_status'    => (string) $post->ping_status,
+            'password'       => (string) $post->post_password,
             'parent'         => $post->post_parent ? (get_post($post->post_parent)->post_name ?? null) : null,
             'template'       => get_page_template_slug($post) ?: null,
             'terms'          => $this->postTerms($post),
@@ -323,10 +325,20 @@ class Exporter
         // A slug-less post (draft / auto-draft) needs a stable composite key
         // so the importer doesn't recreate it on every run.
         if ((string) $post->post_name === '') {
-            $record['match_key'] = sha1($post->post_type . '|' . $post->post_title . '|' . $post->post_date_gmt);
+            $record['match_key'] = self::draftKey((string) $post->post_type, (string) $post->post_title, (string) $post->post_date);
         }
 
         return $record;
+    }
+
+    /**
+     * The composite key of a slug-less draft: type, title and its *local*
+     * date (a draft has no GMT date, so two drafts with the same title
+     * would share a key).
+     */
+    public static function draftKey(string $type, string $title, string $localDate): string
+    {
+        return sha1($type . '|' . $title . '|' . $localDate);
     }
 
     /**
@@ -356,9 +368,10 @@ class Exporter
                 continue;
             }
             $terms = wp_get_object_terms($post->ID, $taxonomy, ['fields' => 'slugs']);
-            if (is_wp_error($terms) || $terms === []) {
+            if (is_wp_error($terms)) {
                 continue;
             }
+            // An empty list is kept, so the importer clears what was removed.
             $out[$taxonomy] = array_values(array_map('strval', $terms));
         }
         return $out;
@@ -665,6 +678,7 @@ class Exporter
             $out[] = [
                 'ref'          => (string) $comment->comment_ID,
                 'post_ref'     => $postRef,
+                'post_type'    => $this->exportedPosts[$postId]['type'] ?? '',
                 'author_name'  => (string) $comment->comment_author,
                 'author_email' => (string) $comment->comment_author_email,
                 'author_url'   => (string) $comment->comment_author_url,

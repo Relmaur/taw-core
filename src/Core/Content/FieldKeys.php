@@ -105,7 +105,9 @@ final class FieldKeys
         $config = $bareConfig($fieldId);
 
         if (!is_array($config) || ($config['prefix'] ?? self::DEFAULT_PREFIX) !== self::DEFAULT_PREFIX) {
-            $config = ['type' => 'text', 'id' => $fieldId];
+            // Nothing registers it here: the importer writes it as-is rather
+            // than through a guessed type (text would wipe an array).
+            $config = ['type' => 'text', 'id' => $fieldId, 'unregistered' => true];
         }
 
         return array_merge($config, [

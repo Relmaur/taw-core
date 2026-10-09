@@ -119,7 +119,7 @@ final class ExporterTest extends TestCase
     {
         $snapshot = (new Exporter())->snapshot();
 
-        $this->assertSame('1.2', $snapshot['meta']['schema']);
+        $this->assertSame('1.3', $snapshot['meta']['schema']);
         $this->assertSame('https://example.test', $snapshot['meta']['source']['url']);
 
         $post = $snapshot['posts'][0];
@@ -318,13 +318,14 @@ final class ExporterTest extends TestCase
         $draft = new \WP_Post([
             'ID' => 30, 'post_type' => 'post', 'post_name' => '', 'post_status' => 'draft',
             'post_title' => 'Untitled note', 'post_excerpt' => '', 'post_content' => '', 'post_parent' => 0,
-            'menu_order' => 0, 'post_date_gmt' => '2026-02-02 12:00:00',
+            'menu_order' => 0, 'post_date' => '2026-02-02 06:00:00', 'post_date_gmt' => '0000-00-00 00:00:00',
         ]);
         Functions\when('get_posts')->justReturn([$draft]);
 
         $post = (new Exporter())->snapshot(['include_drafts' => true, 'include_media' => false])['posts'][0];
 
         $this->assertSame('', $post['slug']);
-        $this->assertSame(sha1('post|Untitled note|2026-02-02 12:00:00'), $post['match_key']);
+        // Keyed by the local date: a draft has no GMT date.
+        $this->assertSame(sha1('post|Untitled note|2026-02-02 06:00:00'), $post['match_key']);
     }
 }

@@ -382,6 +382,22 @@ error. The v1.77.0 check also covers a theme whose `bin/taw` was already synced.
 
 **Check:** none.
 
+### v1.79.0: content imports keep what they're given
+
+Content Interchange fixes, import side, plus snapshot schema 1.3. Nothing changes for sites that
+don't import content. What an import now does differently:
+
+- Content keeps embeds, SVG and forms, and `&` stays `&`. `content:import` runs as the first
+  administrator (`--user` picks another).
+- Comments aren't duplicated on every import, and keep their dates.
+- Password-protected posts stay protected. Date-only and term-only changes travel, and terms removed
+  at the source are removed.
+- A failed post write no longer writes its fields onto post 1. A user keeps their role when the source's
+  role doesn't exist here. Unregistered fields and array options arrive as they left.
+
+**Check:** if you keep content snapshots from before v1.79.0, they still import. A 1.3 snapshot fed to
+an older taw/core is imported best-effort (the password and the empty-taxonomy lists are ignored).
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
