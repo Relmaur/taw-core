@@ -19,7 +19,11 @@ if (!defined('ABSPATH')) {
  *     conflict-policy selector. There is no one-click apply, and every
  *     apply writes a rollback snapshot first.
  *
- * Export needs the core `export` capability; import needs
+ *   - Defaults: lists every empty field that has a `defaults` value and
+ *     saves them with one button ({@see Defaults}); the last save can be
+ *     undone.
+ *
+ * Export needs the core `export` capability; import and defaults need
  * `taw_import_content`, granted by a `user_has_cap` filter to anyone with
  * `manage_options` (override via `taw_import_content_cap`).
  */
@@ -34,6 +38,8 @@ final class ContentAdminScreen
         add_action('admin_post_taw_content_export', [$this, 'handleExport']);
         add_action('admin_post_taw_content_import_preview', [$this, 'handleImportPreview']);
         add_action('admin_post_taw_content_import_apply', [$this, 'handleImportApply']);
+        add_action('admin_post_taw_content_defaults_apply', [$this, 'handleDefaultsApply']);
+        add_action('admin_post_taw_content_defaults_undo', [$this, 'handleDefaultsUndo']);
         add_filter('user_has_cap', [$this, 'grantImportCap'], 10, 1);
     }
 
@@ -129,8 +135,70 @@ final class ContentAdminScreen
             <?php else: ?>
                 <?php $this->renderReviewTable($pending); ?>
             <?php endif; ?>
+
+            <?php if (current_user_can(self::IMPORT_CAP)): ?>
+                <hr>
+                <?php $this->renderDefaults(); ?>
+            <?php endif; ?>
         </div>
         <?php
+    }
+
+    private function renderDefaults(): void
+    {
+        $defaults = new Defaults();
+        $plan = $defaults->plan();
+        $last = $defaults->latestJournal();
+        ?>
+        <h2 id="taw-defaults"><?php esc_html_e('Defaults', 'taw-core'); ?></h2>
+        <p class="description">
+            <?php esc_html_e('Content the theme shows from its code while a field is empty. Saving writes it into those empty fields, so it can be edited here and travels with exports. Fields that have a value are never touched.', 'taw-core'); ?>
+        </p>
+
+        <?php if ($plan['records'] === []): ?>
+            <p><?php esc_html_e('Every field with a default already has a value.', 'taw-core'); ?></p>
+        <?php else: ?>
+            <p><?php printf(esc_html__('%1$d empty fields on %2$d posts and %3$d options would be saved.', 'taw-core'), count($plan['records']), (int) $plan['posts'], (int) $plan['options']); ?></p>
+            <details>
+                <summary><?php esc_html_e('Show the fields', 'taw-core'); ?></summary>
+                <table class="widefat striped" style="margin-top:.5em">
+                    <thead><tr>
+                        <th><?php esc_html_e('Where', 'taw-core'); ?></th>
+                        <th><?php esc_html_e('Field', 'taw-core'); ?></th>
+                        <th><?php esc_html_e('Value', 'taw-core'); ?></th>
+                    </tr></thead>
+                    <tbody>
+                    <?php foreach ($plan['records'] as $record): ?>
+                        <tr>
+                            <td><code><?php echo esc_html($record['label']); ?></code></td>
+                            <td><?php echo esc_html($record['field']); ?><?php echo $record['altered'] ? ' <strong title="' . esc_attr__('Saving changes this value', 'taw-core') . '">*</strong>' : ''; ?></td>
+                            <td><?php echo esc_html($this->truncate(wp_strip_all_tags((string) (is_scalar($record['value']) ? $record['value'] : wp_json_encode($record['value']))))); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </details>
+            <?php foreach ($plan['warnings'] as $warning): ?>
+                <div class="notice notice-warning inline"><p><?php echo esc_html($warning); ?></p></div>
+            <?php endforeach; ?>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-top:1em">
+                <?php wp_nonce_field('taw_content_defaults_apply'); ?>
+                <input type="hidden" name="action" value="taw_content_defaults_apply">
+                <?php submit_button(sprintf(__('Save %d defaults to the database', 'taw-core'), count($plan['records'])), 'primary', 'submit', false); ?>
+            </form>
+        <?php endif; ?>
+
+        <?php if ($last !== null): ?>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-top:1em">
+                <?php wp_nonce_field('taw_content_defaults_undo'); ?>
+                <input type="hidden" name="action" value="taw_content_defaults_undo">
+                <input type="hidden" name="journal" value="<?php echo esc_attr(basename($last['path'])); ?>">
+                <p>
+                    <?php printf(esc_html__('Last saved %1$s UTC: %2$d fields.', 'taw-core'), esc_html($last['created_gmt']), (int) $last['entries']); ?>
+                    <?php submit_button(__('Undo it', 'taw-core'), 'secondary small', 'submit', false); ?>
+                </p>
+            </form>
+        <?php endif;
     }
 
     /* -----------------------------------------------------------------
@@ -210,6 +278,34 @@ final class ContentAdminScreen
 
         set_transient('taw_content_import_report_' . get_current_user_id(), $report, 300);
         $this->redirectBack(['imported' => 1]);
+    }
+
+    public function handleDefaultsApply(): void
+    {
+        if (!current_user_can(self::IMPORT_CAP)) {
+            wp_die(esc_html__('Unauthorized', 'taw-core'));
+        }
+        check_admin_referer('taw_content_defaults_apply');
+
+        $report = (new Defaults())->apply();
+        if ($report['error'] !== null) {
+            $this->redirectBack(['taw_error' => 'defaults_journal']);
+        }
+        $this->redirectBack(['defaults_saved' => $report['written']]);
+    }
+
+    public function handleDefaultsUndo(): void
+    {
+        if (!current_user_can(self::IMPORT_CAP)) {
+            wp_die(esc_html__('Unauthorized', 'taw-core'));
+        }
+        check_admin_referer('taw_content_defaults_undo');
+
+        $result = (new Defaults())->undo(sanitize_file_name(wp_unslash((string) ($_POST['journal'] ?? ''))));
+        if ($result['error'] !== null) {
+            $this->redirectBack(['taw_error' => 'defaults_undo']);
+        }
+        $this->redirectBack(['defaults_restored' => $result['restored'], 'defaults_kept' => $result['kept']]);
     }
 
     /* -----------------------------------------------------------------
@@ -308,10 +404,21 @@ final class ContentAdminScreen
             'no_file'  => __('No file was uploaded.', 'taw-core'),
             'bad_json' => __('That file is not valid JSON.', 'taw-core'),
             'expired'  => __('The pending import expired — please upload the file again.', 'taw-core'),
+            'defaults_journal' => __("The journal couldn't be written to uploads/taw-private, so no defaults were saved.", 'taw-core'),
+            'defaults_undo'    => __("That save couldn't be found, so nothing was undone.", 'taw-core'),
         ];
         $err = sanitize_key((string) ($_GET['taw_error'] ?? ''));
         if (isset($errors[$err])) {
             echo '<div class="notice notice-error"><p>' . esc_html($errors[$err]) . '</p></div>';
+        }
+
+        if (isset($_GET['defaults_saved'])) {
+            echo '<div class="notice notice-success"><p>' . esc_html(sprintf(__('Saved %d defaults to the database.', 'taw-core'), absint($_GET['defaults_saved']))) . '</p></div>';
+        }
+        if (isset($_GET['defaults_restored'])) {
+            $kept = absint($_GET['defaults_kept'] ?? 0);
+            echo '<div class="notice notice-success"><p>' . esc_html(sprintf(__('Undone: %d fields emptied again.', 'taw-core'), absint($_GET['defaults_restored'])))
+                . ($kept > 0 ? ' ' . esc_html(sprintf(__('%d edited since were kept.', 'taw-core'), $kept)) : '') . '</p></div>';
         }
 
         if (!empty($_GET['imported'])) {

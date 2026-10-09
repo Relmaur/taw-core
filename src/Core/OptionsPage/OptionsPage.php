@@ -82,6 +82,15 @@ class OptionsPage
      */
     private static array $groupRegistry = [];
 
+    /**
+     * What an option reads, and its field shows, while nothing is stored:
+     * `'defaults' => ['field_id' => value]` on the page config, kept by
+     * full option name. `content:defaults` saves them.
+     *
+     * @var array<string, mixed>
+     */
+    private static array $defaults = [];
+
     public function __construct(array $config)
     {
         $this->id         = $config['id'];
@@ -112,6 +121,12 @@ class OptionsPage
             }
         }
 
+        foreach ((array) ($config['defaults'] ?? []) as $fieldKey => $value) {
+            if (!Metabox::isUnset($value) && isset(self::$fieldRegistry[$this->prefix . $fieldKey])) {
+                self::$defaults[$this->prefix . $fieldKey] = $value;
+            }
+        }
+
         add_action('admin_menu', [$this, 'register_page']);
         add_action('admin_init', [$this, 'register_settings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
@@ -130,6 +145,54 @@ class OptionsPage
     public static function getFieldRegistry(): array
     {
         return self::$fieldRegistry;
+    }
+
+    /**
+     * Every declared default, by full option name.
+     *
+     * @return array<string, mixed>
+     */
+    public static function defaults(): array
+    {
+        return self::$defaults;
+    }
+
+    /**
+     * An option's default in its stored form (structured values as JSON),
+     * or null when it has none.
+     */
+    public static function defaultOf(string $optionName): mixed
+    {
+        if (!array_key_exists($optionName, self::$defaults)) {
+            return null;
+        }
+        $value = self::$defaults[$optionName];
+
+        return is_array($value) ? (string) wp_json_encode($value, JSON_UNESCAPED_UNICODE) : $value;
+    }
+
+    /** @internal Tests only. */
+    public static function resetForTests(): void
+    {
+        self::$fieldRegistry = [];
+        self::$groupRegistry = [];
+        self::$defaults = [];
+    }
+
+    /**
+     * An option's value as its field shows it: the stored value, else the
+     * page's default, else the field's own `default`.
+     *
+     * @param array<string, mixed> $field
+     */
+    private static function current(string $optionName, array $field): mixed
+    {
+        $value = get_option($optionName, $field['default'] ?? '');
+        if (Metabox::isUnset($value)) {
+            return self::defaultOf($optionName) ?? $value;
+        }
+
+        return $value;
     }
 
     /**
@@ -366,7 +429,7 @@ class OptionsPage
     {
         $values = [];
         foreach ($this->get_all_fields() as $field) {
-            $values[$field['id']] = FieldCodec::decode($field, get_option($this->prefix . $field['id'], $field['default'] ?? ''));
+            $values[$field['id']] = FieldCodec::decode($field, self::current($this->prefix . $field['id'], $field));
         }
 
         return $values;
@@ -419,7 +482,7 @@ class OptionsPage
         $values = [];
         foreach ($this->get_all_fields() as $field) {
             $option_name = $this->prefix . $field['id'];
-            $values[$option_name] = get_option($option_name, $field['default'] ?? '');
+            $values[$option_name] = self::current($option_name, $field);
         }
         return $values;
     }
@@ -522,7 +585,7 @@ class OptionsPage
     {
         foreach ($fields as $field) {
             $field_id      = $this->prefix . $field['id'];
-            $value         = get_option($field_id, $field['default'] ?? '');
+            $value         = self::current($field_id, $field);
             $label         = $field['label'] ?? '';
             $desc          = $field['description'] ?? '';
             $has_conditions = !empty($field['conditions']);
@@ -909,7 +972,7 @@ class OptionsPage
         ?><div class="fields-container"><?php
         foreach ($group_fields as $field) {
             $field_id = $field_id_prefix . '_' . $field['id'];
-            $value    = get_option($field_id, $field['default'] ?? '');
+            $value    = self::current($field_id, $field);
         ?>
             <div class="field" style="--span: <?php echo esc_attr($field['width'] ?? '100'); ?>;">
                 <div class="field-and-label">
@@ -1212,7 +1275,12 @@ class OptionsPage
      */
     public static function get(string $field_id, string $prefix = '_taw_', mixed $default = ''): mixed
     {
-        return get_option($prefix . $field_id, $default);
+        $value = get_option($prefix . $field_id, null);
+        if (Metabox::isUnset($value) && ($fallback = self::defaultOf($prefix . $field_id)) !== null) {
+            return $fallback;
+        }
+
+        return $value ?? $default;
     }
 
     /**

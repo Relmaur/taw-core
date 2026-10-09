@@ -28,6 +28,11 @@ msgstr "“%s” en themeBlocks no coincide con ningún bloque registrado."
 msgid "#%d (not published)"
 msgstr "#%d (no publicado)"
 
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "%1$d empty fields on %2$d posts and %3$d options would be saved."
+msgstr "Se guardarían %1$d campos vacíos en %2$d entradas y %3$d opciones."
+
 #. translators: 1: items shown, 2: all items
 #: resources/data-panel/src/bindings/loop/parts.tsx
 #, php-format
@@ -79,6 +84,11 @@ msgid "%d block"
 msgid_plural "%d blocks"
 msgstr[0] "%d bloque"
 msgstr[1] "%d bloques"
+
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "%d edited since were kept."
+msgstr "Se conservaron %d editados desde entonces."
 
 #: src/Core/Content/ContentAdminScreen.php
 #, php-format
@@ -612,6 +622,10 @@ msgstr "Conectar a campo TAW"
 msgid "Connect to TAW field…"
 msgstr "Conectar a campo TAW…"
 
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Content the theme shows from its code while a field is empty. Saving writes it into those empty fields, so it can be edited here and travels with exports. Fields that have a value are never touched."
+msgstr "Contenido que el tema muestra desde su código mientras un campo está vacío. Al guardarlo se escribe en esos campos vacíos, para que pueda editarse aquí y viaje con las exportaciones. Los campos que ya tienen un valor nunca se tocan."
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Content, per post type"
 msgstr "Contenido, por tipo de contenido"
@@ -643,6 +657,10 @@ msgstr "Fecha"
 #: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/functionDocs.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Dates"
 msgstr "Fechas"
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Defaults"
+msgstr "Valores predeterminados"
 
 #: src/Core/Media/MediaFolders.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Delete"
@@ -736,6 +754,10 @@ msgstr "Vacío en esta entrada: no cambia nada."
 msgid "Enter"
 msgstr "Entrar"
 
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Every field with a default already has a value."
+msgstr "Todos los campos con un valor predeterminado ya tienen un valor."
+
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Excerpt"
 msgstr "Extracto"
@@ -772,7 +794,7 @@ msgstr "Si está vacío, se usa el título del sitio."
 msgid "Feeds the \"sameAs\" entity signal — link every profile that represents this same organization/brand (LinkedIn, Instagram, etc.)."
 msgstr "Alimenta la señal de entidad “sameAs”: enlaza cada perfil que represente a esta misma organización o marca (LinkedIn, Instagram, etc.)."
 
-#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Field"
 msgstr "Campo"
 
@@ -1057,6 +1079,11 @@ msgstr "Bases de conocimiento"
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Knowledge base deleted."
 msgstr "Base de conocimiento eliminada."
+
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Last saved %1$s UTC: %2$d fields."
+msgstr "Último guardado %1$s UTC: %2$d campos."
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Layout"
@@ -1731,6 +1758,20 @@ msgstr "Mismo autor que esta entrada"
 msgid "Save"
 msgstr "Guardar"
 
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Save %d defaults to the database"
+msgstr "Guardar %d valores predeterminados en la base de datos"
+
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Saved %d defaults to the database."
+msgstr "Se guardaron %d valores predeterminados en la base de datos."
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Saving changes this value"
+msgstr "Guardarlo cambia este valor"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Search"
 msgstr "Búsqueda"
@@ -1846,6 +1887,10 @@ msgstr "Mostrar solo cuando…"
 #: resources/data-panel/src/bindings/loop/parts.tsx
 msgid "Show page numbers"
 msgstr "Mostrar números de página"
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Show the fields"
+msgstr "Mostrar los campos"
 
 #: resources/data-panel/src/bindings/visibility.tsx
 msgid "Show this block only when values match, e.g. a Buy button only when the buy link is set."
@@ -2047,6 +2092,10 @@ msgstr "Ese archivo no es una base de datos SQLite válida."
 msgid "That file is not valid JSON."
 msgstr "Ese archivo no es un JSON válido."
 
+#: src/Core/Content/ContentAdminScreen.php
+msgid "That save couldn't be found, so nothing was undone."
+msgstr "No se encontró ese guardado, así que no se deshizo nada."
+
 #. translators: %s: post type.
 #: src/Core/Editing/EditingAdminScreen.php
 #, php-format
@@ -2088,6 +2137,10 @@ msgstr "Las primeras palabras, con “…”."
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "The images of a files or image field, e.g. a gallery."
 msgstr "Las imágenes de un campo de archivos o imagen, p. ej. una galería."
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "The journal couldn't be written to uploads/taw-private, so no defaults were saved."
+msgstr "No se pudo escribir el registro en uploads/taw-private, así que no se guardó ningún valor predeterminado."
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "The largest number."
@@ -2298,6 +2351,15 @@ msgstr "No autorizado"
 msgid "Unclosed parenthesis or quote."
 msgstr "Paréntesis o comilla sin cerrar."
 
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Undo it"
+msgstr "Deshacerlo"
+
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Undone: %d fields emptied again."
+msgstr "Deshecho: %d campos vaciados de nuevo."
+
 #: src/Core/Media/MediaFolders.php
 msgid "Unfiled"
 msgstr "Sin carpeta"
@@ -2355,7 +2417,7 @@ msgstr "Usar esta imagen"
 msgid "Used for Open Graph/Twitter card previews. Falls back to the featured image when empty."
 msgstr "Se usa en las vistas previas de Open Graph y Twitter. Si está vacía, se usa la imagen destacada."
 
-#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Value"
 msgstr "Valor"
 
@@ -2378,6 +2440,10 @@ msgstr "No pudimos verificar que eres humano. Inténtalo de nuevo."
 #: src/Core/Content/ContentAdminScreen.php
 msgid "When a record already exists:"
 msgstr "Cuando un registro ya existe:"
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Where"
+msgstr "Dónde"
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Whether a list has a value (any case)."

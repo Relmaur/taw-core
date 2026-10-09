@@ -31,6 +31,11 @@ msgstr ""
 msgid "#%d (not published)"
 msgstr ""
 
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "%1$d empty fields on %2$d posts and %3$d options would be saved."
+msgstr ""
+
 #. translators: 1: items shown, 2: all items
 #: resources/data-panel/src/bindings/loop/parts.tsx
 #, php-format
@@ -82,6 +87,11 @@ msgid "%d block"
 msgid_plural "%d blocks"
 msgstr[0] ""
 msgstr[1] ""
+
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "%d edited since were kept."
+msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
 #, php-format
@@ -615,6 +625,10 @@ msgstr ""
 msgid "Connect to TAW field…"
 msgstr ""
 
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Content the theme shows from its code while a field is empty. Saving writes it into those empty fields, so it can be edited here and travels with exports. Fields that have a value are never touched."
+msgstr ""
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Content, per post type"
 msgstr ""
@@ -645,6 +659,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/conditions.ts resources/data-panel/src/bindings/functionDocs.ts resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Dates"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Defaults"
 msgstr ""
 
 #: src/Core/Media/MediaFolders.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
@@ -739,6 +757,10 @@ msgstr ""
 msgid "Enter"
 msgstr ""
 
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Every field with a default already has a value."
+msgstr ""
+
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Excerpt"
 msgstr ""
@@ -775,7 +797,7 @@ msgstr ""
 msgid "Feeds the \"sameAs\" entity signal — link every profile that represents this same organization/brand (LinkedIn, Instagram, etc.)."
 msgstr ""
 
-#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Field"
 msgstr ""
 
@@ -1059,6 +1081,11 @@ msgstr ""
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Knowledge base deleted."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Last saved %1$s UTC: %2$d fields."
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
@@ -1734,6 +1761,20 @@ msgstr ""
 msgid "Save"
 msgstr ""
 
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Save %d defaults to the database"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Saved %d defaults to the database."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Saving changes this value"
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Search"
 msgstr ""
@@ -1848,6 +1889,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/loop/parts.tsx
 msgid "Show page numbers"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Show the fields"
 msgstr ""
 
 #: resources/data-panel/src/bindings/visibility.tsx
@@ -2050,6 +2095,10 @@ msgstr ""
 msgid "That file is not valid JSON."
 msgstr ""
 
+#: src/Core/Content/ContentAdminScreen.php
+msgid "That save couldn't be found, so nothing was undone."
+msgstr ""
+
 #. translators: %s: post type.
 #: src/Core/Editing/EditingAdminScreen.php
 #, php-format
@@ -2090,6 +2139,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "The images of a files or image field, e.g. a gallery."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "The journal couldn't be written to uploads/taw-private, so no defaults were saved."
 msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
@@ -2301,6 +2354,15 @@ msgstr ""
 msgid "Unclosed parenthesis or quote."
 msgstr ""
 
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Undo it"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Undone: %d fields emptied again."
+msgstr ""
+
 #: src/Core/Media/MediaFolders.php
 msgid "Unfiled"
 msgstr ""
@@ -2358,7 +2420,7 @@ msgstr ""
 msgid "Used for Open Graph/Twitter card previews. Falls back to the featured image when empty."
 msgstr ""
 
-#: resources/data-panel/src/bindings/ConditionBuilder.tsx
+#: resources/data-panel/src/bindings/ConditionBuilder.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Value"
 msgstr ""
 
@@ -2380,6 +2442,10 @@ msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "When a record already exists:"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Where"
 msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
