@@ -285,9 +285,23 @@ final class Policy
         return $means[$value] ?? $value;
     }
 
-    /** A starter taw.json: every setting at its default, with the schema link. */
+    /**
+     * A starter taw.json: every setting at its default, with the schema link.
+     * Written the way the scaffolds' Prettier formats JSON (4-space indent,
+     * short lists on one line), so a theme whose CI runs `prettier --check`
+     * accepts it.
+     */
     public static function starter(): string
     {
-        return (string) json_encode(['$schema' => './' . self::SCHEMA, 'update' => self::defaults()], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
+        $lines = ['{', '    "$schema": ' . json_encode('./' . self::SCHEMA, JSON_UNESCAPED_SLASHES) . ',', '    "update": {'];
+        $settings = self::defaults();
+        $last = array_key_last($settings);
+        foreach ($settings as $key => $value) {
+            $lines[] = '        ' . json_encode($key) . ': ' . json_encode($value, JSON_UNESCAPED_SLASHES) . ($key === $last ? '' : ',');
+        }
+        $lines[] = '    }';
+        $lines[] = '}';
+
+        return str_replace('","', '", "', implode("\n", $lines)) . "\n";
     }
 }
