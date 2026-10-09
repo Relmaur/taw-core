@@ -514,6 +514,17 @@ Content Interchange (snapshot schema 1.6, fidelity Phase 6):
 **Check:** scripts that pass `--posts`, `--types` or `--since` and rely on options or every term in
 the file need `--with-options` / `--with-terms`. `taw-fleet pull` exports in full and isn't affected.
 
+### v1.86.0: content imports can be undone
+
+Import side (fidelity Phase 7). Every applied import now writes a journal next to its rollback snapshot
+in `uploads/taw-private/`, and `content:import --undo --yes` (or *Undo this import* in Tools → TAW Data)
+reverses it: values it changed go back, what it created is deleted, what it deleted is recreated, and
+anything edited by hand since is kept. A record that fails no longer stops the import; it's listed as
+failed. If the rollback snapshot or the journal can't be written, nothing is imported.
+
+**Check:** none. Scripts reading `content:import --json` get new `failed`, `journal` and `error` keys;
+without `--json`, the command now exits non-zero when a record failed.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

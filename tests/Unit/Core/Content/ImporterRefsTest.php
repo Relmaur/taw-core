@@ -342,4 +342,41 @@ final class ImporterRefsTest extends TestCase
         $this->assertSame([], $report['warnings']);
         $this->assertSame([], (new Importer())->plan($input)['records'][0]['changes'] ?? [], 'and the next preview has nothing to change');
     }
+
+    public function test_a_record_that_fails_is_reported_and_the_rest_carry_on(): void
+    {
+        Functions\when('wp_insert_post')->alias(function (array $a): int {
+            if ($a['post_name'] === 'broken') {
+                throw new \RuntimeException('database went away');
+            }
+            $id = $this->nextId++;
+            $this->posts[$id] = new \WP_Post(['ID' => $id, 'post_type' => $a['post_type'], 'post_name' => $a['post_name'], 'post_title' => $a['post_title'] ?? '',
+                'post_content' => '', 'post_excerpt' => '', 'post_status' => 'publish']);
+            return $id;
+        });
+
+        $report = (new Importer())->apply($this->production([
+            ['type' => 'page', 'slug' => 'broken', 'title' => 'Broken'],
+            ['type' => 'page', 'slug' => 'fine', 'title' => 'Fine'],
+        ]), ['rollback' => false]);
+
+        $this->assertSame(['post:page:broken: database went away'], $report['failed']);
+        $this->assertSame(['page:fine'], $report['created']);
+    }
+
+    public function test_nothing_is_imported_without_a_rollback_snapshot(): void
+    {
+        Functions\when('wp_upload_dir')->justReturn(['basedir' => '/nonexistent/uploads']);
+        Functions\when('trailingslashit')->alias(static fn (string $p): string => rtrim($p, '/') . '/');
+        Functions\when('wp_mkdir_p')->justReturn(false);
+        Functions\when('wp_insert_post')->alias(static function (): int {
+            throw new \LogicException('nothing may be written');
+        });
+
+        $report = (new Importer())->apply($this->production([['type' => 'page', 'slug' => 'new', 'title' => 'New']]));
+
+        $this->assertStringContainsString("Couldn't write the rollback snapshot or the import journal", (string) $report['error']);
+        $this->assertSame([], $report['created']);
+        $this->assertNull($report['journal']);
+    }
 }

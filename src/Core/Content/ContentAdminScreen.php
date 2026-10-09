@@ -40,6 +40,7 @@ final class ContentAdminScreen
         add_action('admin_post_taw_content_import_apply', [$this, 'handleImportApply']);
         add_action('admin_post_taw_content_defaults_apply', [$this, 'handleDefaultsApply']);
         add_action('admin_post_taw_content_defaults_undo', [$this, 'handleDefaultsUndo']);
+        add_action('admin_post_taw_content_import_undo', [$this, 'handleImportUndo']);
         add_filter('user_has_cap', [$this, 'grantImportCap'], 10, 1);
     }
 
@@ -294,6 +295,20 @@ final class ContentAdminScreen
         $this->redirectBack(['defaults_saved' => $report['written']]);
     }
 
+    public function handleImportUndo(): void
+    {
+        if (!current_user_can(self::IMPORT_CAP)) {
+            wp_die(esc_html__('Unauthorized', 'taw-core'));
+        }
+        check_admin_referer('taw_content_import_undo');
+
+        $result = (new Importer())->undo(sanitize_file_name(wp_unslash((string) ($_POST['journal'] ?? ''))));
+        if ($result['error'] !== null) {
+            $this->redirectBack(['taw_error' => 'import_undo']);
+        }
+        $this->redirectBack(['import_undone' => $result['restored'] + $result['deleted'] + $result['recreated'], 'import_kept' => count($result['kept'])]);
+    }
+
     public function handleDefaultsUndo(): void
     {
         if (!current_user_can(self::IMPORT_CAP)) {
@@ -406,6 +421,7 @@ final class ContentAdminScreen
             'expired'  => __('The pending import expired — please upload the file again.', 'taw-core'),
             'defaults_journal' => __("The journal couldn't be written to uploads/taw-private, so no defaults were saved.", 'taw-core'),
             'defaults_undo'    => __("That save couldn't be found, so nothing was undone.", 'taw-core'),
+            'import_undo'      => __("That import couldn't be found (or was undone already), so nothing was undone.", 'taw-core'),
         ];
         $err = sanitize_key((string) ($_GET['taw_error'] ?? ''));
         if (isset($errors[$err])) {
@@ -421,11 +437,26 @@ final class ContentAdminScreen
                 . ($kept > 0 ? ' ' . esc_html(sprintf(__('%d edited since were kept.', 'taw-core'), $kept)) : '') . '</p></div>';
         }
 
+        if (isset($_GET['import_undone'])) {
+            $kept = absint($_GET['import_kept'] ?? 0);
+            echo '<div class="notice notice-success"><p>' . esc_html(sprintf(_n('Import undone: %d change reversed.', 'Import undone: %d changes reversed.', absint($_GET['import_undone']), 'taw-core'), absint($_GET['import_undone'])))
+                . ($kept > 0 ? ' ' . esc_html(sprintf(__('%d edited since were kept.', 'taw-core'), $kept)) : '') . '</p></div>';
+        }
+
         if (!empty($_GET['imported'])) {
             $report = get_transient('taw_content_import_report_' . get_current_user_id());
             delete_transient('taw_content_import_report_' . get_current_user_id());
             if (is_array($report)) {
-                echo '<div class="notice notice-success"><p><strong>' . esc_html__('Import applied.', 'taw-core') . '</strong></p><ul style="list-style:disc;margin-left:20px">';
+                $ok = empty($report['error']) && empty($report['failed']);
+                echo '<div class="notice ' . ($ok ? 'notice-success' : 'notice-warning') . '"><p><strong>'
+                    . esc_html($ok ? __('Import applied.', 'taw-core') : (empty($report['rollback_path']) ? __('Nothing was imported.', 'taw-core') : __('Import applied in part.', 'taw-core')))
+                    . '</strong></p><ul style="list-style:disc;margin-left:20px">';
+                if (!empty($report['error'])) {
+                    echo '<li style="color:#b32d2e">' . esc_html((string) $report['error']) . '</li>';
+                }
+                foreach ((array) ($report['failed'] ?? []) as $failure) {
+                    echo '<li style="color:#b32d2e">' . esc_html(sprintf(__('Failed: %s', 'taw-core'), (string) $failure)) . '</li>';
+                }
                 foreach (['created', 'updated', 'skipped', 'deleted'] as $bucket) {
                     echo '<li>' . esc_html(ucfirst($bucket) . ': ' . count((array) ($report[$bucket] ?? []))) . '</li>';
                 }
@@ -436,7 +467,16 @@ final class ContentAdminScreen
                 foreach ((array) ($report['warnings'] ?? []) as $w) {
                     echo '<li style="color:#b32d2e">' . esc_html((string) $w) . '</li>';
                 }
-                echo '</ul></div>';
+                echo '</ul>';
+                if (!empty($report['journal'])) {
+                    echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="margin:0 0 10px">';
+                    wp_nonce_field('taw_content_import_undo');
+                    echo '<input type="hidden" name="action" value="taw_content_import_undo">';
+                    echo '<input type="hidden" name="journal" value="' . esc_attr(basename((string) $report['journal'])) . '">';
+                    submit_button(__('Undo this import', 'taw-core'), 'secondary small', 'submit', false);
+                    echo ' <span class="description">' . esc_html__('Values edited since are kept.', 'taw-core') . '</span></form>';
+                }
+                echo '</div>';
             }
         }
     }
