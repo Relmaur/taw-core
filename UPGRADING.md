@@ -410,6 +410,16 @@ an undo. Nothing changes for a site that declares no defaults.
 `content:defaults`, add `$app->add(new ContentDefaultsCommand($themeDir));` to `bin/taw`, or sync it
 (`php bin/taw sync`).
 
+### v1.80.1: field defaults treat `'0'` and `'[]'` as empty
+
+Only for sites using v1.80.0's `defaults`. A field now falls back to its default for every value a
+`?:` fallback treated as empty, including `'0'` (an image field saved blank) and `'[]'` (a repeater
+saved with no rows); a checkbox's `'0'` still counts as unchecked. In v1.80.0 those kept the empty
+value, so a page whose fallbacks moved into `defaults` could lose an image or a list, and
+`content:defaults` skipped those fields.
+
+**Check:** none.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

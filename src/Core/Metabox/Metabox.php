@@ -293,7 +293,8 @@ class Metabox
         }
 
         foreach ((array) ($config['defaults'] ?? []) as $fieldKey => $value) {
-            if (self::isUnset($value) || !isset(self::$qualifiedRegistry[$this->id . '.' . $fieldKey])) {
+            $fieldConfig = self::$qualifiedRegistry[$this->id . '.' . $fieldKey] ?? null;
+            if ($fieldConfig === null || self::isUnset($value, $fieldConfig)) {
                 continue;
             }
             $this->defaults[(string) $fieldKey] = $value;
@@ -338,31 +339,69 @@ class Metabox
      */
     public static function defaultValue(int $postId, string $metaKey): mixed
     {
+        $box = self::defaultBox($postId, $metaKey);
+
+        return $box?->storedDefault(substr($metaKey, strlen($box->prefix)));
+    }
+
+    /**
+     * $value, or the meta key's default when $value is empty for its field
+     * ({@see self::isUnset()}). What the getters and typed reads return.
+     */
+    public static function withDefault(int $postId, string $metaKey, mixed $value): mixed
+    {
+        $box = self::defaultBox($postId, $metaKey);
+        if ($box === null) {
+            return $value;
+        }
+        $fieldKey = substr($metaKey, strlen($box->prefix));
+
+        return self::isUnset($value, self::$qualifiedRegistry[$box->id . '.' . $fieldKey] ?? null)
+            ? $box->storedDefault($fieldKey)
+            : $value;
+    }
+
+    /**
+     * The metabox whose default a meta key uses on a post: the one that
+     * declares it, or, when several do, the one that applies to the post.
+     */
+    private static function defaultBox(int $postId, string $metaKey): ?self
+    {
         $boxes = self::$defaultIndex[$metaKey] ?? [];
         if ($boxes === []) {
             return null;
         }
 
-        $box = $boxes[0];
         if (count($boxes) > 1 && ($post = get_post($postId)) instanceof \WP_Post) {
             foreach ($boxes as $candidate) {
                 if ($candidate->appliesTo($post)) {
-                    $box = $candidate;
-                    break;
+                    return $candidate;
                 }
             }
         }
 
-        return $box->storedDefault(substr($metaKey, strlen($box->prefix)));
+        return $boxes[0];
     }
 
     /**
-     * Nothing stored: what `?:` treated as empty in the templates defaults
-     * replace, minus '0' (a stored value).
+     * Empty, as a theme's `getMeta() ?: 'text'` fallback saw it, so moving
+     * fallbacks into `defaults` renders the same: '', '0', 0, null, false,
+     * [], and an empty JSON list or object (a repeater saved with no rows
+     * stores '[]'; an image field saved blank stores '0'). A checkbox's '0'
+     * is a value: unchecked is a choice.
+     *
+     * @param array<string, mixed>|null $config The field's config, when known.
      */
-    public static function isUnset(mixed $value): bool
+    public static function isUnset(mixed $value, ?array $config = null): bool
     {
-        return $value === '' || $value === null || $value === false || $value === [];
+        if ($value === '' || $value === null || $value === false || $value === []) {
+            return true;
+        }
+        if ($value === '0' || $value === 0 || $value === 0.0) {
+            return ($config['type'] ?? '') !== 'checkbox';
+        }
+
+        return is_string($value) && in_array(trim($value), ['[]', '{}', 'null'], true);
     }
 
     /**
@@ -3377,8 +3416,11 @@ class Metabox
     {
         $value = $object_id > 0 ? $this->store->get($object_id, $key) : '';
         // An empty post field shows its default, so saving keeps it.
-        if (self::isUnset($value) && $this->store instanceof PostMetaStore && str_starts_with($key, $this->prefix)) {
-            return $this->storedDefault(substr($key, strlen($this->prefix))) ?? $value;
+        if ($this->store instanceof PostMetaStore && str_starts_with($key, $this->prefix)) {
+            $fieldKey = substr($key, strlen($this->prefix));
+            if (self::isUnset($value, self::$qualifiedRegistry[$this->id . '.' . $fieldKey] ?? null)) {
+                return $this->storedDefault($fieldKey) ?? $value;
+            }
         }
 
         return $value;
@@ -4054,11 +4096,8 @@ class Metabox
     public static function get(int $post_id, string $field_id, string $prefix = '_taw_'): mixed
     {
         $value = get_post_meta($post_id, $prefix . $field_id, true);
-        if (self::isUnset($value) && self::$defaultIndex !== []) {
-            return self::defaultValue($post_id, $prefix . $field_id) ?? $value;
-        }
 
-        return $value;
+        return self::$defaultIndex !== [] ? self::withDefault($post_id, $prefix . $field_id, $value) : $value;
     }
 
     /**

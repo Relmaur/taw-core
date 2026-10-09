@@ -161,4 +161,20 @@ final class WpLoader
 
         return $path;
     }
+
+    /**
+     * The user a CLI write runs as, like an admin's save: $wanted (an ID,
+     * login or email), else the first administrator (0 when there is none).
+     * Null when $wanted matches nobody. Call after WordPress is loaded.
+     */
+    public static function cliUser(string $wanted): ?int
+    {
+        if ($wanted !== '') {
+            $user = ctype_digit($wanted) ? get_user_by('id', (int) $wanted) : (get_user_by('login', $wanted) ?: get_user_by('email', $wanted));
+            return $user ? (int) $user->ID : null;
+        }
+        $admins = get_users(['role' => 'administrator', 'number' => 1, 'orderby' => 'ID', 'order' => 'ASC', 'fields' => 'ID']);
+
+        return isset($admins[0]) ? (int) $admins[0] : 0;
+    }
 }

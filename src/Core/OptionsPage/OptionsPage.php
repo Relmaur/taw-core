@@ -122,7 +122,8 @@ class OptionsPage
         }
 
         foreach ((array) ($config['defaults'] ?? []) as $fieldKey => $value) {
-            if (!Metabox::isUnset($value) && isset(self::$fieldRegistry[$this->prefix . $fieldKey])) {
+            $fieldConfig = self::$fieldRegistry[$this->prefix . $fieldKey] ?? null;
+            if ($fieldConfig !== null && !Metabox::isUnset($value, $fieldConfig)) {
                 self::$defaults[$this->prefix . $fieldKey] = $value;
             }
         }
@@ -188,7 +189,7 @@ class OptionsPage
     private static function current(string $optionName, array $field): mixed
     {
         $value = get_option($optionName, $field['default'] ?? '');
-        if (Metabox::isUnset($value)) {
+        if (Metabox::isUnset($value, $field)) {
             return self::defaultOf($optionName) ?? $value;
         }
 
@@ -1276,7 +1277,7 @@ class OptionsPage
     public static function get(string $field_id, string $prefix = '_taw_', mixed $default = ''): mixed
     {
         $value = get_option($prefix . $field_id, null);
-        if (Metabox::isUnset($value) && ($fallback = self::defaultOf($prefix . $field_id)) !== null) {
+        if (($fallback = self::defaultOf($prefix . $field_id)) !== null && Metabox::isUnset($value, self::$fieldRegistry[$prefix . $field_id] ?? null)) {
             return $fallback;
         }
 
