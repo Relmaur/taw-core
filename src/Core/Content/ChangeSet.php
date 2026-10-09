@@ -39,6 +39,8 @@ final class ChangeSet
         array_push($operations, ...self::diffTerms($base['terms'] ?? [], $target['terms'] ?? [], $complete('terms')));
         array_push($operations, ...self::diffUsers($base['users'] ?? [], $target['users'] ?? [], $complete('users')));
         array_push($operations, ...self::diffComments($base['comments'] ?? [], $target['comments'] ?? [], $complete('comments')));
+        array_push($operations, ...self::diffMenus($base['menus'] ?? [], $target['menus'] ?? [], $complete('menus')));
+        array_push($operations, ...self::diffKeyed('theme_mod', $base['theme_mods'] ?? [], $target['theme_mods'] ?? []));
 
         $changeSet = [
             'taw_changeset' => [
@@ -81,7 +83,7 @@ final class ChangeSet
         return match ($section) {
             'posts'   => ($scope['posts'] ?? 'all') !== 'partial',
             'terms'   => ($scope['terms'] ?? 'all') !== 'used',
-            'options' => ($scope['options'] ?? true) !== false,
+            'options', 'menus', 'theme_mods' => ($scope['options'] ?? true) !== false,
             default   => true,
         };
     }
@@ -290,6 +292,54 @@ final class ChangeSet
         foreach ($deletes ? $baseMap : [] as $key => $record) {
             if (!isset($targetMap[$key])) {
                 $ops[] = ['op' => 'delete', 'target' => ['kind' => 'comment', 'key' => $key], 'fields' => $record];
+            }
+        }
+        return $ops;
+    }
+
+    /**
+     * Menus by slug (1.7); a menu is one record, its items included.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function diffMenus(mixed $base, mixed $target, bool $deletes = true): array
+    {
+        $keyer = static fn (array $m): string => (string) ($m['slug'] ?? '');
+        $baseMap = self::indexBy(is_array($base) ? $base : [], $keyer);
+        $targetMap = self::indexBy(is_array($target) ? $target : [], $keyer);
+        $ops = [];
+        foreach ($targetMap as $key => $record) {
+            if ($key === '') {
+                continue;
+            }
+            $t = ['kind' => 'menu', 'key' => $key];
+            if (!isset($baseMap[$key])) {
+                $ops[] = ['op' => 'create', 'target' => $t, 'fields' => $record];
+            } elseif (self::normalize($baseMap[$key]) !== self::normalize($record)) {
+                $ops[] = ['op' => 'update', 'target' => $t, 'fields' => $record];
+            }
+        }
+        foreach ($deletes ? $baseMap : [] as $key => $record) {
+            if ($key !== '' && !isset($targetMap[$key])) {
+                $ops[] = ['op' => 'delete', 'target' => ['kind' => 'menu', 'key' => $key]];
+            }
+        }
+        return $ops;
+    }
+
+    /**
+     * A `key => value` section (theme mods, 1.7) as operations of $kind;
+     * a key the target lacks isn't deleted (a theme mod is reset, not removed).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function diffKeyed(string $kind, mixed $base, mixed $target): array
+    {
+        $base = is_array($base) ? $base : [];
+        $ops = [];
+        foreach (is_array($target) ? $target : [] as $key => $value) {
+            if (!array_key_exists($key, $base) || self::normalize($base[$key]) !== self::normalize($value)) {
+                $ops[] = ['op' => 'update', 'target' => ['kind' => $kind, 'key' => (string) $key], 'fields' => ['value' => $value]];
             }
         }
         return $ops;

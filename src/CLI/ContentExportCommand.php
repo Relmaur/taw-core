@@ -58,6 +58,7 @@ class ContentExportCommand extends Command
             ->addOption('with-comments', null, InputOption::VALUE_NONE, 'Export comments on the exported posts')
             ->addOption('with-settings', null, InputOption::VALUE_NONE, 'Export the environment-settings option allowlist')
             ->addOption('with-options', null, InputOption::VALUE_NONE, 'With --posts/--types/--since: also export options (left out by default)')
+            ->addOption('meta', null, InputOption::VALUE_REQUIRED, "Also carry post meta whose keys start with these prefixes (comma-separated, e.g. _wds_ for SmartCrawl); left out by default")
             ->addOption('with-terms', null, InputOption::VALUE_NONE, 'With --posts/--types/--since: export every term, not only those the posts use')
             ->addOption('migrate', null, InputOption::VALUE_NONE, '= --with-users --with-settings --all-media --include-drafts');
     }
@@ -97,6 +98,9 @@ class ContentExportCommand extends Command
         }
         if ($migrate || $input->getOption('with-terms')) {
             $scope['include_terms'] = true;
+        }
+        if (is_string($input->getOption('meta')) && $input->getOption('meta') !== '') {
+            $scope['meta_prefixes'] = array_values(array_filter(array_map('trim', explode(',', (string) $input->getOption('meta')))));
         }
         if (is_string($input->getOption('types')) && $input->getOption('types') !== '') {
             $scope['types'] = array_values(array_filter(array_map('trim', explode(',', (string) $input->getOption('types')))));

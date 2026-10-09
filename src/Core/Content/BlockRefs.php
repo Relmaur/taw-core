@@ -151,6 +151,9 @@ final class BlockRefs
             if ($kind !== '') {
                 self::one($attrs, 'id', $kind, $refs, $map);
             }
+        } elseif ($name === 'core/navigation' || $name === 'core/block') {
+            // A block navigation menu (`wp_navigation`) or a reusable block (`wp_block`), 1.7.
+            self::one($attrs, 'ref', 'posts', $refs, $map);
         } elseif ($name === 'core/page-list') {
             self::one($attrs, 'rootPageID', 'posts', $refs, $map);
         } elseif ($name === 'core/latest-posts') {

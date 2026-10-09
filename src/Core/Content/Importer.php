@@ -44,7 +44,7 @@ class Importer
     public const SUPPORTED_SCHEMA_MAJORS = ['1'];
 
     /** Relative apply order for each target kind (lower runs first). */
-    private const KIND_ORDER = ['user' => 0, 'term' => 1, 'post' => 2, 'option' => 3, 'comment' => 4];
+    private const KIND_ORDER = ['user' => 0, 'term' => 1, 'post' => 2, 'menu' => 3, 'option' => 4, 'theme_mod' => 5, 'comment' => 6];
 
     /** @var list<string> */
     private array $warnings = [];
@@ -101,6 +101,16 @@ class Importer
             $ops[] = ['op' => 'update', 'target' => ['kind' => 'option', 'key' => (string) $key], 'fields' => ['value' => $value]];
         }
 
+        // Menus and theme mods (1.7): after posts and terms, which menu items link to.
+        foreach ((is_array($input['menus'] ?? null) ? $input['menus'] : []) as $menu) {
+            if (is_array($menu) && ($menu['slug'] ?? '') !== '') {
+                $ops[] = ['op' => 'update', 'target' => ['kind' => 'menu', 'key' => (string) $menu['slug']], 'fields' => $menu];
+            }
+        }
+        foreach ((is_array($input['theme_mods'] ?? null) ? $input['theme_mods'] : []) as $key => $value) {
+            $ops[] = ['op' => 'update', 'target' => ['kind' => 'theme_mod', 'key' => (string) $key], 'fields' => ['value' => $value]];
+        }
+
         foreach ((is_array($input['comments'] ?? null) ? $input['comments'] : []) as $comment) {
             if (is_array($comment) && isset($comment['post_ref'])) {
                 $ops[] = ['op' => 'update', 'target' => ['kind' => 'comment', 'key' => self::commentKey($comment)], 'fields' => $comment];
@@ -143,7 +153,7 @@ class Importer
             $kind = is_array($op['target'] ?? null) ? (string) ($op['target']['kind'] ?? '') : '';
             $base = self::KIND_ORDER[$kind] ?? 9;
             if ($kind === 'option' && in_array((string) ($op['target']['key'] ?? ''), Exporter::SETTINGS_OPTION_ALLOWLIST, true)) {
-                return 5; // settings options run last of all
+                return 7; // settings options run last of all
             }
             return $base;
         };
@@ -221,6 +231,8 @@ class Importer
             $kind = $op['target']['kind'] ?? '';
             $records[] = match ($kind) {
                 'post'    => $this->planPost($op),
+                'menu'    => $this->planMenu($op),
+                'theme_mod' => $this->planThemeMod($op),
                 'option'  => $this->planOption($op),
                 'term'    => $this->planTerm($op),
                 'user'    => $this->planUser($op),
@@ -408,6 +420,8 @@ class Importer
             try {
                 $result = match ($kind) {
                     'post'    => $this->applyPost($op, $policy, $idMap),
+                    'menu'    => $this->applyMenu($op, $policy),
+                    'theme_mod' => $this->applyThemeMod($op, $policy),
                     'option'  => $this->applyOption($op, $policy),
                     'term'    => $this->applyTerm($op, $policy, $idMap),
                     'user'    => $this->applyUser($op, $policy, $idMap),
@@ -706,6 +720,9 @@ class Importer
      */
     private function rewriteOption(string $key, mixed $value): mixed
     {
+        if (in_array($key, Exporter::ATTACHMENT_ID_OPTIONS, true)) {
+            return $this->localAttachment($value);
+        }
         if (!str_starts_with($key, '_taw_')) {
             return $value;
         }
@@ -780,7 +797,7 @@ class Importer
         $t = is_array($opOrRecord['target'] ?? null) ? $opOrRecord['target'] : $opOrRecord;
         $kind = (string) ($t['kind'] ?? '');
 
-        if (in_array($kind, ['option', 'user', 'comment', 'media'], true)) {
+        if (in_array($kind, ['option', 'user', 'comment', 'media', 'menu', 'theme_mod'], true)) {
             return $kind . ':' . (string) ($t['key'] ?? '');
         }
 
@@ -922,6 +939,17 @@ class Importer
             }
         }
 
+        // Post meta outside TAW fields (1.7): footnotes, `--meta` prefixes.
+        foreach (is_array($incoming['meta'] ?? null) ? $incoming['meta'] : [] as $metaKey => $value) {
+            $new = FieldCodec::rewriteStrings($value, $this->refs());
+            $old = $existing ? get_post_meta($existing->ID, (string) $metaKey, true) : '';
+            if (self::valueKey($old) !== self::valueKey($new)) {
+                $changes['meta.' . $metaKey] = ($existing && !self::isEmptyValue($old))
+                    ? ['status' => 'changed', 'old' => $old, 'new' => $new]
+                    : ['status' => 'new', 'new' => $new];
+            }
+        }
+
         $registered = Metabox::fieldsFor('post', $type);
         foreach (is_array($incoming['fields'] ?? null) ? $incoming['fields'] : [] as $fieldId => $newVal) {
             $target = FieldKeys::forKey((string) $fieldId, $registered, self::bareConfigLookup());
@@ -1058,6 +1086,322 @@ class Importer
 
         return ['kind' => 'term', 'type' => $taxonomy, 'slug' => $slug,
                 'op' => $existing ? 'update' : 'create', 'changes' => $changes];
+    }
+
+    /**
+     * A source attachment ID (`site_icon`, `custom_logo`) as this site's:
+     * through the media match; 0 when the file isn't here and won't be.
+     */
+    private function localAttachment(mixed $value): int
+    {
+        $id = (int) $value;
+        if ($id <= 0) {
+            return 0;
+        }
+        $local = $this->refs()->attachment($id);
+
+        return is_int($local) ? $local : ($local === false ? 0 : $id);
+    }
+
+    /* -----------------------------------------------------------------
+     * Menus and theme mods (1.7)
+     * ----------------------------------------------------------------- */
+
+    /**
+     * A menu's items as compared: in order, each what it links to (a local
+     * ID, or a URL), its label and options, and its parent's position.
+     * `null` for an item whose target isn't here.
+     *
+     * @param list<array<string, mixed>> $items incoming items
+     * @return list<array<string, mixed>|null>
+     */
+    private function incomingMenuItems(array $items): array
+    {
+        $position = [];
+        foreach ($items as $i => $item) {
+            $position[(string) ($item['key'] ?? '')] = $i;
+        }
+        $out = [];
+        foreach ($items as $item) {
+            $type = (string) ($item['type'] ?? 'custom');
+            $link = is_array($item['link'] ?? null) ? $item['link'] : [];
+            $target = match ($type) {
+                'post_type' => (int) ($this->findPost((string) ($link['type'] ?? ''), (string) ($link['slug'] ?? ''), '', [], (string) ($link['path'] ?? ''))->ID ?? 0),
+                'taxonomy'  => ($t = get_term_by('slug', (string) ($link['slug'] ?? ''), (string) ($link['taxonomy'] ?? ''))) instanceof \WP_Term ? (int) $t->term_id : 0,
+                'custom'    => $this->refs()->urls((string) ($item['url'] ?? '')),
+                default     => (string) ($item['object'] ?? ''),
+            };
+            $parent = $item['parent'] ?? null;
+            $out[] = in_array($target, [0, ''], true) && $type !== 'custom' ? null : [
+                'type' => $type, 'object' => (string) ($item['object'] ?? ''), 'target' => $target,
+                'title' => (string) ($item['title'] ?? ''), 'parent' => $parent !== null && isset($position[(string) $parent]) ? $position[(string) $parent] : -1,
+                'link_target' => (string) ($item['target'] ?? ''), 'attr_title' => (string) ($item['attr_title'] ?? ''),
+                'description' => (string) ($item['description'] ?? ''), 'classes' => array_values(array_map('strval', (array) ($item['classes'] ?? []))),
+                'xfn' => (string) ($item['xfn'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * This site's menu items, in the same shape.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function localMenuItems(int $menuId): array
+    {
+        $items = array_values(array_filter((array) wp_get_nav_menu_items($menuId, ['post_status' => 'publish']), 'is_object'));
+        $position = [];
+        foreach ($items as $i => $item) {
+            $position[(int) $item->ID] = $i;
+        }
+        $out = [];
+        foreach ($items as $item) {
+            $out[] = [
+                'type' => (string) $item->type, 'object' => (string) $item->object,
+                'target' => match ((string) $item->type) {
+                    'post_type', 'taxonomy' => (int) $item->object_id,
+                    'custom' => (string) $item->url,
+                    default => (string) $item->object,
+                },
+                'title' => (string) get_post_field('post_title', (int) $item->ID),
+                'parent' => (int) $item->menu_item_parent > 0 && isset($position[(int) $item->menu_item_parent]) ? $position[(int) $item->menu_item_parent] : -1,
+                'link_target' => (string) $item->target, 'attr_title' => (string) $item->attr_title,
+                'description' => (string) get_post_field('post_content', (int) $item->ID),
+                'classes' => array_values(array_filter(array_map('strval', (array) $item->classes))), 'xfn' => (string) $item->xfn,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $op
+     * @return array<string, mixed>
+     */
+    private function planMenu(array $op): array
+    {
+        $slug = (string) ($op['target']['key'] ?? '');
+        $fields = is_array($op['fields'] ?? null) ? $op['fields'] : [];
+        $menu = wp_get_nav_menu_object($slug);
+        $identity = ['kind' => 'menu', 'key' => $slug];
+        if (($op['op'] ?? 'update') === 'delete') {
+            return $identity + ['op' => $menu ? 'would-delete' : 'skip', 'changes' => []];
+        }
+        $incoming = $this->incomingMenuItems(is_array($fields['items'] ?? null) ? $fields['items'] : []);
+        $kept = self::keptMenuItems($incoming);
+        $dropped = count($incoming) - count($kept);
+        if ($dropped > 0) {
+            $this->warnings[] = "menu:{$slug}: {$dropped} item(s) link to pages or terms that aren't on this site or in the import — left out.";
+        }
+        if (!$menu instanceof \WP_Term) {
+            return $identity + ['op' => 'create', 'changes' => ['items' => ['status' => 'new', 'new' => count($kept) . ' items']]];
+        }
+        $changes = [];
+        if ((string) ($fields['name'] ?? $menu->name) !== (string) $menu->name) {
+            $changes['name'] = ['status' => 'changed', 'old' => $menu->name, 'new' => $fields['name']];
+        }
+        $local = $this->localMenuItems((int) $menu->term_id);
+        if (self::valueKey($local) !== self::valueKey($kept)) {
+            $changes['items'] = ['status' => 'changed', 'old' => count($local) . ' items', 'new' => count($kept) . ' items'];
+        }
+
+        return $identity + ['op' => 'update', 'changes' => $changes];
+    }
+
+    /**
+     * The items that land (targets found), with each parent re-pointed at
+     * its position among them (an item under a left-out one sits at the top).
+     *
+     * @param list<array<string, mixed>|null> $resolved
+     * @return list<array<string, mixed>>
+     */
+    private static function keptMenuItems(array $resolved): array
+    {
+        $newIndex = [];
+        $n = 0;
+        foreach ($resolved as $i => $item) {
+            if ($item !== null) {
+                $newIndex[$i] = $n++;
+            }
+        }
+        $out = [];
+        foreach ($resolved as $item) {
+            if ($item !== null) {
+                $item['parent'] = $newIndex[$item['parent']] ?? -1;
+                $out[] = $item;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Create the menu, or rebuild its items when they differ (a menu is
+     * compared and written as a whole, like the editor saves it).
+     *
+     * @param array<string, mixed> $op
+     * @return array{bucket: string, label: string}
+     */
+    private function applyMenu(array $op, string $policy): array
+    {
+        $slug = (string) ($op['target']['key'] ?? '');
+        $label = "menu:{$slug}";
+        $fields = is_array($op['fields'] ?? null) ? $op['fields'] : [];
+        $menu = wp_get_nav_menu_object($slug);
+
+        if (($op['op'] ?? 'update') === 'delete') {
+            if ($menu instanceof \WP_Term) {
+                wp_delete_nav_menu((int) $menu->term_id);
+                return ['bucket' => 'deleted', 'label' => $label];
+            }
+            return ['bucket' => 'skipped', 'label' => $label];
+        }
+        if ($policy === 'skip' || ($menu instanceof \WP_Term && $policy === 'create')) {
+            return ['bucket' => 'skipped', 'label' => $label];
+        }
+
+        $name = (string) ($fields['name'] ?? $slug);
+        if ($menu instanceof \WP_Term) {
+            $menuId = (int) $menu->term_id;
+            if ($name !== (string) $menu->name) {
+                wp_update_term($menuId, 'nav_menu', ['name' => $name]);
+            }
+            $bucket = 'updated';
+        } else {
+            $made = wp_create_nav_menu($name);
+            if (is_wp_error($made)) {
+                $this->warnings[] = "{$label}: " . $made->get_error_message();
+                return ['bucket' => 'skipped', 'label' => $label];
+            }
+            $menuId = (int) $made;
+            wp_update_term($menuId, 'nav_menu', ['slug' => $slug]);
+            $bucket = 'created';
+        }
+
+        $items = array_values(is_array($fields['items'] ?? null) ? $fields['items'] : []);
+        $resolved = $this->incomingMenuItems($items);
+        if ($bucket === 'updated' && self::valueKey($this->localMenuItems($menuId)) === self::valueKey(self::keptMenuItems($resolved))) {
+            return ['bucket' => $bucket, 'label' => $label]; // only the name changed
+        }
+
+        foreach ((array) wp_get_nav_menu_items($menuId, ['post_status' => 'any']) as $old) {
+            if (is_object($old)) {
+                wp_delete_post((int) $old->ID, true);
+            }
+        }
+        $made = [];
+        foreach ($items as $i => $item) {
+            $r = $resolved[$i];
+            if ($r === null) {
+                continue;
+            }
+            $parent = $item['parent'] ?? null;
+            $args = [
+                'menu-item-type'        => $r['type'],
+                'menu-item-object'      => $r['object'],
+                'menu-item-title'       => $r['title'],
+                'menu-item-parent-id'   => $parent !== null ? ($made[(string) $parent] ?? 0) : 0,
+                'menu-item-position'    => $i + 1,
+                'menu-item-target'      => $r['link_target'],
+                'menu-item-attr-title'  => $r['attr_title'],
+                'menu-item-description' => $r['description'],
+                'menu-item-classes'     => implode(' ', $r['classes']),
+                'menu-item-xfn'         => $r['xfn'],
+                'menu-item-status'      => 'publish',
+            ];
+            if (is_int($r['target'])) {
+                $args['menu-item-object-id'] = $r['target'];
+            } elseif ($r['type'] === 'custom') {
+                $args['menu-item-url'] = $r['target'];
+            }
+            $id = wp_update_nav_menu_item($menuId, 0, wp_slash($args));
+            if (!is_wp_error($id)) {
+                $made[(string) ($item['key'] ?? '')] = (int) $id;
+            }
+        }
+
+        return ['bucket' => $bucket, 'label' => $label];
+    }
+
+    /**
+     * A theme mod's value as this site stores it: the logo through the
+     * media match, menu locations by menu slug (to local menus).
+     */
+    private function localThemeMod(string $key, mixed $value): mixed
+    {
+        if ($key === 'custom_logo') {
+            return $this->localAttachment($value);
+        }
+        if ($key === 'nav_menu_locations') {
+            $out = [];
+            foreach (is_array($value) ? $value : [] as $location => $slug) {
+                $menu = wp_get_nav_menu_object((string) $slug);
+                if ($menu instanceof \WP_Term) {
+                    $out[(string) $location] = (int) $menu->term_id;
+                }
+            }
+            ksort($out);
+            return $out;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param array<string, mixed> $op
+     * @return array<string, mixed>
+     */
+    private function planThemeMod(array $op): array
+    {
+        $key = (string) ($op['target']['key'] ?? '');
+        $value = $op['fields']['value'] ?? null;
+        $identity = ['kind' => 'theme_mod', 'key' => $key];
+        if (!in_array($key, Exporter::THEME_MOD_ALLOWLIST, true)) {
+            return $identity + ['op' => 'skip', 'changes' => []];
+        }
+
+        if ($key === 'nav_menu_locations') {
+            // By slug: a menu this import creates has no local ID yet.
+            $current = [];
+            foreach ((array) get_theme_mod($key, []) as $location => $id) {
+                $menu = (int) $id > 0 ? wp_get_nav_menu_object((int) $id) : false;
+                if ($menu instanceof \WP_Term && isset($value[$location])) {
+                    $current[(string) $location] = (string) $menu->slug;
+                }
+            }
+            $new = is_array($value) ? array_map('strval', $value) : [];
+            ksort($current);
+            ksort($new);
+            return $identity + ['op' => 'update', 'changes' => $current === $new ? [] : ['value' => ['status' => 'changed', 'old' => $current, 'new' => $new]]];
+        }
+
+        $old = (int) get_theme_mod($key, 0);
+        $new = $this->localThemeMod($key, $value);
+
+        return $identity + ['op' => 'update', 'changes' => $old === $new ? [] : ['value' => ['status' => $old > 0 ? 'changed' : 'new', 'old' => $old, 'new' => $new]]];
+    }
+
+    /**
+     * @param array<string, mixed> $op
+     * @return array{bucket: string, label: string}
+     */
+    private function applyThemeMod(array $op, string $policy): array
+    {
+        $key = (string) ($op['target']['key'] ?? '');
+        $label = "theme_mod:{$key}";
+        if (!in_array($key, Exporter::THEME_MOD_ALLOWLIST, true) || $policy === 'skip' || ($op['op'] ?? 'update') !== 'update') {
+            return ['bucket' => 'skipped', 'label' => $label];
+        }
+        $value = $this->localThemeMod($key, $op['fields']['value'] ?? null);
+        if ($key === 'nav_menu_locations' && is_array($value)) {
+            // Only the locations the source assigns; others stay as they are.
+            $value = $value + array_diff_key((array) get_theme_mod($key, []), (array) ($op['fields']['value'] ?? []));
+        }
+        set_theme_mod($key, $value);
+
+        return ['bucket' => 'updated', 'label' => $label];
     }
 
     private function termParentSlug(\WP_Term $term): string
@@ -1219,6 +1563,11 @@ class Importer
 
         // Author — resolve the portable {login,email} ref to a local user;
         // fall back to the importing user with a warning when it's absent.
+        // A post with no author at the source (WordPress's own, like a
+        // navigation menu) is created with none.
+        if (!$existing && array_key_exists('author', $incoming) && $incoming['author'] === null) {
+            $postArr['post_author'] = 0;
+        }
         if (array_key_exists('author', $incoming) && $incoming['author'] !== null) {
             $authorId = $this->resolveLocalUserId($incoming['author']);
             if ($authorId > 0) {
@@ -1276,6 +1625,9 @@ class Importer
         }
 
         $this->writePostFields($postId, $type, is_array($incoming['fields'] ?? null) ? $incoming['fields'] : [], $idMap);
+        foreach (is_array($incoming['meta'] ?? null) ? $incoming['meta'] : [] as $metaKey => $value) {
+            update_post_meta($postId, (string) $metaKey, wp_slash(FieldCodec::rewriteStrings($value, $this->refs())));
+        }
         $this->writePostTerms($postId, is_array($incoming['terms'] ?? null) ? $incoming['terms'] : []);
         if (array_key_exists('featured_media', $incoming) && empty($incoming['featured_media'])) {
             // No featured image at the source: remove this site's.
@@ -2003,6 +2355,9 @@ class Importer
 
     private function optionCompareKey(string $key, mixed $value): string
     {
+        if (in_array($key, Exporter::ATTACHMENT_ID_OPTIONS, true)) {
+            return 'att:' . (int) $value;
+        }
         if (in_array($key, self::POST_ID_OPTIONS, true)) {
             return 'pid:' . $this->resolveLocalPostId($value);
         }
