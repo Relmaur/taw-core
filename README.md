@@ -2202,6 +2202,9 @@ Scope options: `--meta=<prefix>[,…]` (also carry post meta with these key pref
 - **Safe failures:** a post write that fails is reported and nothing else is written for it. A field or option no fieldset or options page registers is written as the snapshot has it (an array stays an array). A user whose roles this site doesn't define keeps the role they have. A page whose slug a sideloaded attachment took gets it back.
 - **Failures and undo (v1.86.0):** the rollback snapshot and an **import journal** (`uploads/taw-private/import-*.json`) are written before anything else; if either can't be written, nothing is imported (`error`). A record whose write throws is listed under `failed` and the rest carry on. The journal records, per record the import touched (posts and attachments, terms, options, users, comments, with their meta), only the values it changed (before and after), what it created and what it deleted — captured from WordPress's own hooks while the import runs (`Content\WpRecords::watch()`), so files it downloads, slugs it reclaims and comment threading are in it too. **`content:import --undo`** previews undoing the last import (or `--undo=<journal>`), `--yes` does it: a value goes back only while it still equals what the import left (an edit made since is kept, and listed), created records are deleted (files too) unless edited since, deleted ones are recreated; the journal is renamed `undone-…`. Tools → TAW Data shows the same as an *Undo this import* button on the import report. With `--json`, the exit code says only whether anything was imported; read `failed`, `error` and `journal`.
 - **Report:** created / updated / skipped / deleted / failed / media sideloaded / journal / warnings (registry drift, unresolved author/parent, undefined role, missing media, unregistered fields) / rollback path.
+- **Links to what the import creates (v1.88.0):** a record already here whose only change is a link to a post this import creates shows `links` in the dry run and is written, then linked on the run's second pass (terms too, though they're imported before posts); so is a front page, posts page or sticky post the import brings. Before, the link arrived only on the next import.
+- **Downloaded files keep their place (v1.88.0):** a file goes into the source's month folder (`2024/05/hero.jpg` stays there, so a second `hero.jpg` from 2025/01 stays a second file), a `-scaled` file is downloaded as its original (WordPress makes the same scaled copy), and the filename fallback never takes a file downloaded from another URL. A download is tried three times (v1.87.2).
+- **Fidelity suite:** `composer run fidelity` (CI job `fidelity`) runs a real two-site round trip: see [Fidelity suite](#fidelity-suite).
 
 ### REST-registered field meta
 
@@ -2546,6 +2549,21 @@ Dump::log($value);
 | `emailit/emailit-php` _(optional, suggested)_ | Powers `EmailConfig::useEmailit()` (see § "Email") — only needed on sites that opt into it |
 
 **Alpine.js** (every admin-side interactive widget: Metabox fields, Options Page, the Icon picker, Media Folders) is vendored at `assets/vendor/alpine.min.js` (pinned version, currently 3.15.12) and enqueued via `TAW\Support\Alpine::enqueue()` — not loaded from a CDN. `taw/core` is installed on arbitrary client sites, some offline or behind restrictive CSPs, so a CDN dependency for a required admin script isn't safe to assume.
+
+## Fidelity suite
+
+```bash
+composer run fidelity   # tests/fidelity/run.sh — also runs in CI (job `fidelity`)
+```
+
+A real round trip between two WordPress sites, for [Content Interchange](#content-interchange). Site A gets the fixture theme (`tests/fidelity/theme/`: every field type, a term fieldset, an options page, a post type with a hierarchical taxonomy, menu locations) and `seed.php`: pages three levels deep, two pages named `team`, two `hero.jpg` in different month folders, a `-scaled` upload, blocks holding attachment, post, term and reusable-block IDs, IDs inside groups and nested repeater rows, a wp-admin menu, block navigation, footnotes, the site icon and logo, a second author and a draft. Site B has its IDs offset by 5000 and some of A's records already there, older (`seed-b.php`). A is exported (`--migrate`) and imported into B, and the suite checks that:
+
+1. a second import reports 0 changes;
+2. every value in B points at the record it did in A: `keys.php` writes each site's state with every ID as the record it points to, straight from the database (not through the Exporter), and the two files must be equal;
+3. B's export, imported back into A, changes nothing;
+4. undo returns B to its state before the import.
+
+Needs WP-CLI, PHP with `mysqli` and `gd`, and a MySQL server; set `FID_DB_HOST` (e.g. `localhost:/tmp/mysql.sock`), `FID_DB_USER`/`FID_DB_PASS`, and optionally `FID_WP_CORE` (a WordPress directory to copy instead of downloading) and `FID_WORK`. On a failure the snapshots and key dumps stay in `FID_WORK`. A new kind of content the interchange carries belongs in `seed.php`, so the suite guards it.
 
 ## Static Analysis
 
