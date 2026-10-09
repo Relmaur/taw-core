@@ -49,6 +49,12 @@ class Importer
     /** @var list<string> */
     private array $warnings = [];
 
+    /** How the input's references map to this site's (see {@see self::buildRefMap()}). */
+    private ?RefMap $refs = null;
+
+    /** @var list<array{op: array<string, mixed>, id: int, label: string}> posts to rewrite again once the run's posts exist */
+    private array $secondPass = [];
+
     /**
      * Normalize either input shape into a flat operations list.
      *
@@ -161,6 +167,9 @@ class Importer
     {
         $this->warnings = [];
         $this->checkSchema($input);
+        $media = new MediaResolver();
+        $media->build(is_array($input['media'] ?? null) ? $input['media'] : [], false);
+        $this->refs = $this->buildRefMap($input, $media->idMap());
 
         $records = [];
         foreach (self::operationsFrom($input) as $op) {
@@ -276,6 +285,14 @@ class Importer
         $idMap = $resolver->idMap();
         $report['media_sideloaded'] = $resolver->sideloadedCount();
         $this->warnings = array_merge($this->warnings, $resolver->warnings());
+        $this->refs = $this->buildRefMap($input, $idMap);
+        $this->secondPass = [];
+        $this->incomingPosts = [];
+        foreach (self::operationsFrom($input) as $op) {
+            if (($op['target']['kind'] ?? '') === 'post') {
+                $this->incomingPosts[(string) ($op['target']['type'] ?? '') . ':' . (string) ($op['target']['slug'] ?? '')] = true;
+            }
+        }
 
         $report['registry_drift'] = $this->registryDrift($input);
 
@@ -308,12 +325,108 @@ class Importer
             $report[$result['bucket']][] = $result['label'];
         }
 
+        // Second pass — references to posts this run created after the post
+        // that points at them.
+        $this->rewriteSecondPass();
+
         // Second pass — comment threading + counts, once every comment exists.
         $this->finalizeComments();
 
         $report['warnings'] = array_merge($schemaWarnings, $this->warnings);
 
         return $report;
+    }
+
+    /** @var array<string, true> "type:slug" of every post in the input */
+    private array $incomingPosts = [];
+
+    private function refs(): RefMap
+    {
+        return $this->refs ??= new RefMap();
+    }
+
+    /**
+     * The input's references mapped to this site's: attachments by the
+     * media match, posts/terms/users by their natural keys in `refs` (1.4),
+     * and URLs — each media file's source URL to its local one, then the
+     * source origin to this site's.
+     *
+     * @param array<string, mixed> $input
+     * @param array<int, int>      $idMap source attachment id => local id
+     */
+    private function buildRefMap(array $input, array $idMap): RefMap
+    {
+        $refs = is_array($input['refs'] ?? null) ? $input['refs'] : [];
+        $sourceUrl = (string) ($input['meta']['source']['url'] ?? '');
+        $mediaUrls = [];
+        foreach (is_array($input['media'] ?? null) ? $input['media'] : [] as $entry) {
+            $local = $idMap[(int) ($entry['id'] ?? 0)] ?? 0;
+            $from = (string) ($entry['url'] ?? '');
+            if ($local > 0 && $from !== '' && is_string($to = wp_get_attachment_url($local))) {
+                $mediaUrls[] = ['from' => $from, 'to' => $to];
+            }
+        }
+
+        return new RefMap(
+            $idMap,
+            is_array($refs['posts'] ?? null) ? $refs['posts'] : [],
+            is_array($refs['terms'] ?? null) ? $refs['terms'] : [],
+            is_array($refs['users'] ?? null) ? $refs['users'] : [],
+            fn (string $type, string $slug): int => (int) ($this->findPost($type, $slug)->ID ?? 0),
+            static function (string $taxonomy, string $slug): int {
+                $term = $taxonomy !== '' && $slug !== '' ? get_term_by('slug', $slug, $taxonomy) : false;
+                return $term instanceof \WP_Term ? (int) $term->term_id : 0;
+            },
+            fn (array $ref): int => $this->resolveLocalUserId($ref),
+            $mediaUrls,
+            $sourceUrl,
+            $sourceUrl !== '' ? (string) home_url() : '',
+            (string) ($input['meta']['source']['uploads_url'] ?? ''),
+        );
+    }
+
+    /**
+     * A TAW option's incoming value with its references mapped (registered
+     * options by their field type; others' strings for URLs). Core options
+     * pass through.
+     */
+    private function rewriteOption(string $key, mixed $value): mixed
+    {
+        if (!str_starts_with($key, '_taw_')) {
+            return $value;
+        }
+        $config = \TAW\Core\OptionsPage\OptionsPage::getFieldRegistry()[$key] ?? null;
+
+        return $config !== null
+            ? FieldCodec::rewriteRefs($config, FieldCodec::decode($config, $value), $this->refs())
+            : FieldCodec::rewriteStrings($value, $this->refs());
+    }
+
+    /**
+     * Rewrite the content and fields of posts that referenced a post this
+     * run created after them, now that every post exists.
+     */
+    private function rewriteSecondPass(): void
+    {
+        foreach ($this->secondPass as ['op' => $op, 'id' => $postId, 'label' => $label]) {
+            $incoming = is_array($op['post'] ?? null) ? $op['post'] : [];
+            $this->refs()->takeUnresolved();
+            $result = wp_update_post(wp_slash([
+                'ID'           => $postId,
+                'post_content' => BlockRefs::rewrite((string) ($incoming['content'] ?? ''), $this->refs()),
+                'post_excerpt' => BlockRefs::rewrite((string) ($incoming['excerpt'] ?? ''), $this->refs()),
+            ]), true);
+            if (is_wp_error($result)) {
+                $this->warnings[] = "{$label}: second pass failed: " . $result->get_error_message();
+                continue;
+            }
+            $this->writePostFields($postId, (string) ($op['target']['type'] ?? ''), is_array($incoming['fields'] ?? null) ? $incoming['fields'] : [], []);
+            $unresolved = $this->refs()->takeUnresolved();
+            if ($unresolved !== []) {
+                $this->warnings[] = "{$label}: references " . implode(', ', $unresolved) . " — not on this site, dropped.";
+            }
+        }
+        $this->secondPass = [];
     }
 
     /** @var array<string, int> source comment ref => new comment ID */
@@ -412,7 +525,9 @@ class Importer
             if (!array_key_exists($prop, $incoming)) {
                 continue;
             }
-            $new = $incoming[$prop];
+            $new = in_array($prop, ['content', 'excerpt'], true)
+                ? BlockRefs::rewrite((string) $incoming[$prop], $this->refs())
+                : $incoming[$prop];
             $old = $existing ? $this->currentPostProp($existing, $prop) : null;
             if ($prop === 'password' && !$existing && (string) $new === '') {
                 continue;
@@ -485,7 +600,7 @@ class Importer
                 $config,
                 $existing ? get_post_meta($existing->ID, $target['meta_key'], true) : ''
             );
-            $newDecoded = FieldCodec::decode($config, $newVal);
+            $newDecoded = FieldCodec::decode($config, FieldCodec::rewriteRefs($config, FieldCodec::decode($config, $newVal), $this->refs()));
 
             if (self::valueKey($oldDecoded) === self::valueKey($newDecoded)) {
                 continue;
@@ -509,7 +624,7 @@ class Importer
     private function planOption(array $op): array
     {
         $key = (string) ($op['target']['key'] ?? '');
-        $incoming = $op['fields']['value'] ?? null;
+        $incoming = $this->rewriteOption($key, $op['fields']['value'] ?? null);
         $currentRaw = get_option($key, null);
         $exists = $currentRaw !== null;
 
@@ -561,7 +676,7 @@ class Importer
         foreach (is_array($fields['fields'] ?? null) ? $fields['fields'] : [] as $fieldKey => $newVal) {
             $target = FieldKeys::forKey((string) $fieldKey, $registered, self::bareConfigLookup());
             $oldDecoded = FieldCodec::decode($target['config'], $existing ? get_term_meta($existing->term_id, $target['meta_key'], true) : '');
-            $newDecoded = FieldCodec::decode($target['config'], $newVal);
+            $newDecoded = FieldCodec::decode($target['config'], FieldCodec::rewriteRefs($target['config'], FieldCodec::decode($target['config'], $newVal), $this->refs()));
             if (self::valueKey($oldDecoded) === self::valueKey($newDecoded)) {
                 continue;
             }
@@ -614,7 +729,7 @@ class Importer
             foreach (is_array($fields['fields'] ?? null) ? $fields['fields'] : [] as $fieldKey => $newVal) {
                 $target = FieldKeys::forKey((string) $fieldKey, $registered, self::bareConfigLookup());
                 $oldDecoded = FieldCodec::decode($target['config'], get_user_meta($existing, $target['meta_key'], true));
-                $newDecoded = FieldCodec::decode($target['config'], $newVal);
+                $newDecoded = FieldCodec::decode($target['config'], FieldCodec::rewriteRefs($target['config'], FieldCodec::decode($target['config'], $newVal), $this->refs()));
                 if (self::valueKey($oldDecoded) !== self::valueKey($newDecoded)) {
                     $changes['fields.' . $fieldKey] = self::isEmptyValue($oldDecoded)
                         ? ['status' => 'new', 'new' => $newDecoded]
@@ -691,8 +806,8 @@ class Importer
             'post_name'    => $slug,
             'post_title'   => (string) ($incoming['title'] ?? $slug),
             'post_status'  => (string) ($incoming['status'] ?? 'publish'),
-            'post_excerpt' => (string) ($incoming['excerpt'] ?? ''),
-            'post_content' => MediaResolver::rewriteContent((string) ($incoming['content'] ?? ''), $idMap),
+            'post_excerpt' => BlockRefs::rewrite((string) ($incoming['excerpt'] ?? ''), $this->refs()),
+            'post_content' => BlockRefs::rewrite((string) ($incoming['content'] ?? ''), $this->refs()),
             'menu_order'   => (int) ($incoming['menu_order'] ?? 0),
         ];
 
@@ -762,7 +877,22 @@ class Importer
 
         $this->writePostFields($postId, $type, is_array($incoming['fields'] ?? null) ? $incoming['fields'] : [], $idMap);
         $this->writePostTerms($postId, is_array($incoming['terms'] ?? null) ? $incoming['terms'] : []);
-        $this->assignFeaturedMedia($postId, $incoming['featured_media'] ?? null, $idMap);
+        if (array_key_exists('featured_media', $incoming) && empty($incoming['featured_media'])) {
+            // No featured image at the source: remove this site's.
+            if ((int) get_post_thumbnail_id($postId) > 0) {
+                delete_post_thumbnail($postId);
+            }
+        } else {
+            $this->assignFeaturedMedia($postId, $incoming['featured_media'] ?? null, $idMap);
+        }
+
+        // A reference to a post this run creates later resolves on a second pass.
+        $unresolved = $this->refs()->takeUnresolved();
+        if (array_intersect_key(array_flip($unresolved), $this->incomingPosts) !== []) {
+            $this->secondPass[] = ['op' => $op, 'id' => $postId, 'label' => $label];
+        } elseif ($unresolved !== []) {
+            $this->warnings[] = "{$label}: references " . implode(', ', $unresolved) . " — not on this site, dropped.";
+        }
 
         return ['bucket' => $bucket, 'label' => $label];
     }
@@ -782,7 +912,7 @@ class Importer
                 $this->writeUnregistered('update_post_meta', $postId, $config, $value, "{$postType} field '{$fieldId}'");
                 continue;
             }
-            $value = FieldCodec::rewriteAttachmentIds($config, $value, $idMap);
+            $value = FieldCodec::rewriteRefs($config, FieldCodec::decode($config, $value), $this->refs());
             Metabox::writeMeta($postId, $config, $value);
         }
     }
@@ -862,7 +992,7 @@ class Importer
                 is_array($value) ? $value : []
             )));
         } else {
-            $stored = $this->encodeOptionForStorage($key, $value);
+            $stored = $this->encodeOptionForStorage($key, $this->rewriteOption($key, $value));
         }
 
         update_option($key, $stored);
@@ -932,7 +1062,7 @@ class Importer
                 $this->writeUnregistered('update_term_meta', $termId, $config, $value, "{$taxonomy} term field '{$fieldKey}'");
                 continue;
             }
-            Metabox::writeTo(new TermMetaStore(), $termId, $config, FieldCodec::rewriteAttachmentIds($config, $value, $idMap));
+            Metabox::writeTo(new TermMetaStore(), $termId, $config, FieldCodec::rewriteRefs($config, FieldCodec::decode($config, $value), $this->refs()));
         }
 
         return ['bucket' => $bucket, 'label' => $label];
@@ -1025,7 +1155,7 @@ class Importer
                 $this->writeUnregistered('update_user_meta', $userId, $config, $value, "user field '{$fieldKey}'");
                 continue;
             }
-            Metabox::writeTo(new UserMetaStore(), $userId, $config, FieldCodec::rewriteAttachmentIds($config, $value, $idMap));
+            Metabox::writeTo(new UserMetaStore(), $userId, $config, FieldCodec::rewriteRefs($config, FieldCodec::decode($config, $value), $this->refs()));
         }
 
         // Portable password hash — WP would re-hash a plain value, so write it raw.
@@ -1219,8 +1349,8 @@ class Importer
      */
     private function writeUnregistered(callable $update, int $id, array $config, mixed $value, string $what): void
     {
-        $update($id, (string) $config['meta_key'], wp_slash($value));
-        $this->warnings[] = "{$what} isn't registered on this site — written as-is.";
+        $update($id, (string) $config['meta_key'], wp_slash(FieldCodec::rewriteStrings($value, $this->refs())));
+        $this->warnings[] = "{$what} isn't registered on this site — written as it came (URLs mapped).";
     }
 
     /**

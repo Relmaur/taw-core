@@ -209,6 +209,135 @@ final class FieldCodec
     }
 
     /**
+     * Every post ID a decoded field value references (`post_select`, also
+     * inside repeaters) — for the exporter's `refs.posts`.
+     *
+     * @param array<string, mixed> $fieldConfig
+     * @return list<int>
+     */
+    public static function referencedPostIds(array $fieldConfig, mixed $decoded): array
+    {
+        $type = $fieldConfig['type'] ?? 'text';
+
+        if ($type === 'post_select') {
+            return self::intList(is_array($decoded) ? $decoded : [$decoded]);
+        }
+
+        if ($type === 'repeater' && is_array($decoded)) {
+            $subFields = self::indexById($fieldConfig['fields'] ?? []);
+            $ids = [];
+            foreach ($decoded as $row) {
+                foreach (is_array($row) ? $row : [] as $key => $val) {
+                    if (isset($subFields[$key])) {
+                        $ids = array_merge($ids, self::referencedPostIds($subFields[$key], $val));
+                    }
+                }
+            }
+            return array_values(array_unique($ids));
+        }
+
+        return [];
+    }
+
+    /**
+     * Every string inside a decoded value (text, URLs, rich text, repeater
+     * cells, link URLs) — for the exporter's scan of uploads URLs.
+     *
+     * @return list<string>
+     */
+    public static function strings(mixed $decoded): array
+    {
+        if (is_string($decoded)) {
+            return $decoded === '' ? [] : [$decoded];
+        }
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $out = [];
+        foreach ($decoded as $value) {
+            $out = array_merge($out, self::strings($value));
+        }
+
+        return $out;
+    }
+
+    /**
+     * A decoded field value with its references mapped to this site's:
+     * attachments (`image`, `files`), posts (`post_select`; a post the
+     * snapshot names but this site lacks is dropped), rich text through
+     * {@see BlockRefs::rewrite()}, and the URLs in every string.
+     *
+     * @param array<string, mixed> $fieldConfig
+     */
+    public static function rewriteRefs(array $fieldConfig, mixed $decoded, RefMap $map): mixed
+    {
+        $type = $fieldConfig['type'] ?? 'text';
+
+        if (!empty($fieldConfig['unregistered'])) {
+            return self::rewriteStrings($decoded, $map);
+        }
+
+        return match ($type) {
+            'image'       => is_numeric($decoded) && (int) $decoded > 0 ? ($map->attachment((int) $decoded) ?? $decoded) : $decoded,
+            'files'       => is_array($decoded) ? RefMap::mapIds(self::intList($decoded), static fn (int $id) => $map->attachment($id)) : $decoded,
+            'post_select' => self::rewritePostSelect($decoded, $map),
+            'repeater'    => self::rewriteRows($fieldConfig, $decoded, $map),
+            'wysiwyg'     => is_string($decoded) ? BlockRefs::rewrite($decoded, $map) : $decoded,
+            'checkbox', 'number', 'range' => $decoded,
+            default       => self::rewriteStrings($decoded, $map),
+        };
+    }
+
+    private static function rewritePostSelect(mixed $decoded, RefMap $map): mixed
+    {
+        if (is_array($decoded)) {
+            return RefMap::mapIds(self::intList($decoded), static fn (int $id) => $map->post($id));
+        }
+        if (!is_numeric($decoded) || (int) $decoded <= 0) {
+            return $decoded;
+        }
+        $local = $map->post((int) $decoded);
+
+        return $local === false ? null : ($local ?? $decoded);
+    }
+
+    /**
+     * @param array<string, mixed> $fieldConfig
+     */
+    private static function rewriteRows(array $fieldConfig, mixed $decoded, RefMap $map): mixed
+    {
+        if (!is_array($decoded)) {
+            return $decoded;
+        }
+        $subFields = self::indexById($fieldConfig['fields'] ?? []);
+
+        return array_map(static function ($row) use ($subFields, $map) {
+            if (!is_array($row)) {
+                return $row;
+            }
+            foreach ($row as $key => $val) {
+                $row[$key] = isset($subFields[$key])
+                    ? self::rewriteRefs($subFields[$key], $val, $map)
+                    : self::rewriteStrings($val, $map);
+            }
+            return $row;
+        }, $decoded);
+    }
+
+    /** Every string in $value with its URLs mapped. */
+    public static function rewriteStrings(mixed $value, RefMap $map): mixed
+    {
+        if (is_string($value)) {
+            return $map->urls($value);
+        }
+        if (is_array($value)) {
+            return array_map(static fn ($v) => self::rewriteStrings($v, $map), $value);
+        }
+
+        return $value;
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $fields
      * @return array<string, array<string, mixed>>
      */

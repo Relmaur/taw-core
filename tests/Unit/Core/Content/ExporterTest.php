@@ -32,6 +32,7 @@ final class ExporterTest extends TestCase
         };
 
         Functions\when('home_url')->justReturn('https://example.test');
+        Functions\when('wp_upload_dir')->justReturn(['baseurl' => 'https://example.test/wp-content/uploads']);
         Functions\when('get_stylesheet')->justReturn('taw-theme');
         Functions\when('apply_filters')->alias(static fn (string $h, $value = null) => $value);
         Functions\when('is_wp_error')->justReturn(false);
@@ -119,7 +120,7 @@ final class ExporterTest extends TestCase
     {
         $snapshot = (new Exporter())->snapshot();
 
-        $this->assertSame('1.3', $snapshot['meta']['schema']);
+        $this->assertSame('1.4', $snapshot['meta']['schema']);
         $this->assertSame('https://example.test', $snapshot['meta']['source']['url']);
 
         $post = $snapshot['posts'][0];
@@ -211,6 +212,41 @@ final class ExporterTest extends TestCase
         $this->assertSame('hero.jpg', $media[0]['ref']);
         $this->assertSame('Hero alt', $media[0]['alt']);
         $this->assertSame('image/jpeg', $media[0]['mime']);
+    }
+
+    public function test_references_travel_by_natural_key(): void
+    {
+        new \TAW\Core\Metabox\Metabox(['id' => 'taw_refs', 'title' => 'Refs', 'screens' => 'page', 'fields' => [
+            ['id' => 'featured', 'type' => 'post_select'],
+            ['id' => 'guide', 'type' => 'url'],
+        ]]);
+        $content = '<!-- wp:image {"id":88} --><figure><img class="wp-image-88" src="https://example.test/wp-content/uploads/2026/01/photo-300x200.jpg"></figure><!-- /wp:image -->';
+        Functions\when('get_posts')->justReturn([new \WP_Post([
+            'ID' => 10, 'post_type' => 'page', 'post_name' => 'home', 'post_status' => 'publish', 'post_title' => 'Home',
+            'post_excerpt' => '', 'post_content' => $content, 'post_parent' => 0, 'menu_order' => 0, 'post_date_gmt' => '2026-01-01 00:00:00',
+        ])]);
+        Functions\when('get_post_meta')->alias(static function ($id, $key = '', $single = false) {
+            if ($id === 10 && $key === '') {
+                return ['_taw_featured' => ['135'], '_taw_guide' => ['https://example.test/wp-content/uploads/2024/09/guide.pdf']];
+            }
+            return $key === '_wp_attached_file' ? "2026/01/file-{$id}.jpg" : ($single ? '' : []);
+        });
+        Functions\when('parse_blocks')->justReturn([['blockName' => 'core/image', 'attrs' => ['id' => 88], 'innerBlocks' => []]]);
+        Functions\when('attachment_url_to_postid')->alias(static fn (string $url): int => str_ends_with($url, '/2024/09/guide.pdf') ? 89 : 0);
+        Functions\when('is_post_type_hierarchical')->justReturn(false);
+        Functions\when('get_post')->alias(static fn ($id) => match ((int) $id) {
+            88, 89 => new \WP_Post(['ID' => (int) $id, 'post_type' => 'attachment', 'post_mime_type' => 'image/jpeg', 'post_excerpt' => '']),
+            135    => new \WP_Post(['ID' => 135, 'post_type' => 'post', 'post_name' => 'studio-pipeline']),
+            default => null,
+        });
+
+        $snapshot = (new Exporter())->snapshot();
+
+        $this->assertSame('https://example.test/wp-content/uploads', $snapshot['meta']['source']['uploads_url']);
+        $this->assertSame([135 => ['type' => 'post', 'slug' => 'studio-pipeline', 'path' => 'studio-pipeline']], $snapshot['refs']['posts']);
+        $ids = array_column($snapshot['media'], 'id');
+        sort($ids);
+        $this->assertSame([88, 89], $ids, 'the image block and the PDF the url field links to');
     }
 
     public function test_no_media_scope_omits_the_section(): void
