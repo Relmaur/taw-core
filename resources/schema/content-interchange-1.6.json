@@ -1,0 +1,596 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://taw.mlizardo.com/schema/content-interchange-1.6.json",
+  "title": "TAW Content Interchange 1.6",
+  "description": "Portable snapshot / change-set format produced by TAW\\Core\\Content\\Exporter and consumed by TAW\\Core\\Content\\Importer (php bin/taw content:export | content:import | content:diff). 1.1 adds optional users / comments sections and per-post author / comment_status / ping_status for whole-site state migration. 1.2 keys post fields with another meta prefix than _taw_ by their full meta key (_taw_ fields keep their bare id, as in 1.0 and 1.1). Importer accepts 1.0, 1.1 and 1.2. 1.3 adds post password, comment post_type, empty taxonomies as [], and drafts keyed by local date. 1.4 adds `refs` (natural keys of every post, term and user referenced by ID, so the importer maps IDs to its own) and meta.source.uploads_url; media also covers attachments referenced in block attributes, wp-image-N classes and uploads URLs. 1.5 keys hierarchical posts by `path` (the parents' slugs and its own, as in a page URL), names a hierarchical post's parent by its path, exports term meta values unserialized, and exports the terms of every taxonomy the exported post types use. 1.6 adds meta.scope (which sections a scoped export left partial: posts, terms 'used', options false — options are then left out); a scoped export (--posts/--types/--since) carries only the terms its posts use (and their parents) and no options unless asked; a change-set carries the target's meta, refs and the media its operations reference, and has no deletes for a section either side has partially.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/snapshot"
+    },
+    {
+      "$ref": "#/$defs/changeset"
+    }
+  ],
+  "$defs": {
+    "snapshot": {
+      "type": "object",
+      "required": [
+        "meta",
+        "terms",
+        "posts"
+      ],
+      "properties": {
+        "meta": {
+          "type": "object",
+          "required": [
+            "schema",
+            "generated_at",
+            "source"
+          ],
+          "properties": {
+            "schema": {
+              "enum": [
+                "1.0",
+                "1.1",
+                "1.2",
+                "1.3",
+                "1.4",
+                "1.5",
+                "1.6"
+              ]
+            },
+            "generated_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "source": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "taw_core_version": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "theme": {
+                  "type": "string"
+                },
+                "uploads_url": {
+                  "type": "string",
+                  "description": "The source's uploads URL (wp_upload_dir baseurl)."
+                }
+              }
+            },
+            "registry_fingerprint": {
+              "type": "object",
+              "description": "The block/field registry at export time, so the importer can warn on drift.",
+              "properties": {
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "options": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "scope": {
+              "type": "object",
+              "description": "1.6: what this export left partial. A change-set emits no deletes for a partial section.",
+              "properties": {
+                "posts": {
+                  "enum": [
+                    "all",
+                    "partial"
+                  ],
+                  "description": "partial = --posts/--types/--since"
+                },
+                "terms": {
+                  "enum": [
+                    "all",
+                    "used"
+                  ],
+                  "description": "used = only the terms the exported posts use, and their parents"
+                },
+                "options": {
+                  "type": "boolean",
+                  "description": "false = the options section is left out"
+                }
+              }
+            }
+          }
+        },
+        "options": {
+          "type": "object",
+          "description": "Every _taw_* option (repeater/files decoded to arrays) plus an allowlisted core set, plus the environment-settings allowlist when exported with --with-settings. page_on_front / page_for_posts resolve to slugs; sticky_posts resolves to a list of slugs.",
+          "additionalProperties": true
+        },
+        "terms": {
+          "type": "object",
+          "description": "Keyed by taxonomy. nav_menu is excluded.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/term"
+            }
+          }
+        },
+        "posts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/post"
+          }
+        },
+        "users": {
+          "type": "array",
+          "description": "Present only when exported with --with-users. Matched on import by login then email.",
+          "items": {
+            "$ref": "#/$defs/user"
+          }
+        },
+        "comments": {
+          "type": "array",
+          "description": "Present only when exported with --with-comments. Threading is rebuilt from parent_ref.",
+          "items": {
+            "$ref": "#/$defs/comment"
+          }
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/media"
+          }
+        },
+        "refs": {
+          "type": "object",
+          "description": "Natural keys of every post, term and user the snapshot references by numeric ID (post_select values, block attributes), keyed by the source ID.",
+          "properties": {
+            "posts": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "slug"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "terms": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "required": [
+                  "taxonomy",
+                  "slug"
+                ],
+                "properties": {
+                  "taxonomy": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "users": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "required": [
+                  "login"
+                ],
+                "properties": {
+                  "login": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "changeset": {
+      "type": "object",
+      "required": [
+        "taw_changeset",
+        "operations"
+      ],
+      "properties": {
+        "taw_changeset": {
+          "type": "object",
+          "required": [
+            "schema"
+          ],
+          "properties": {
+            "schema": {
+              "enum": [
+                "1.0",
+                "1.1",
+                "1.2"
+              ]
+            },
+            "base": {},
+            "target": {}
+          }
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/operation"
+          }
+        },
+        "meta": {
+          "$ref": "#/$defs/snapshot/properties/meta",
+          "description": "1.6: the target snapshot's meta (its source origin rewrites URLs on import)"
+        },
+        "refs": {
+          "$ref": "#/$defs/snapshot/properties/refs",
+          "description": "1.6: the target snapshot's refs"
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/media"
+          },
+          "description": "1.6: the target's media entries the operations reference"
+        }
+      }
+    },
+    "operation": {
+      "type": "object",
+      "required": [
+        "target"
+      ],
+      "properties": {
+        "op": {
+          "enum": [
+            "create",
+            "update",
+            "delete",
+            "skip"
+          ]
+        },
+        "target": {
+          "type": "object",
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "post",
+                "option",
+                "term",
+                "user",
+                "comment"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "description": "post type, or taxonomy for kind=term"
+            },
+            "slug": {
+              "type": "string"
+            },
+            "match_key": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "composite key for a slug-less draft post"
+            },
+            "key": {
+              "type": "string",
+              "description": "option name (kind=option), user login (kind=user), or content hash (kind=comment)"
+            }
+          }
+        },
+        "post": {
+          "$ref": "#/$defs/post"
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "post": {
+      "type": "object",
+      "required": [
+        "type",
+        "slug"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string",
+          "description": "hierarchical types only (1.5): the parents' slugs and its own, joined by '/' (get_page_uri). The record's identity on import; the slug is the fallback."
+        },
+        "match_key": {
+          "type": "string",
+          "description": "present only for slug-less posts: sha1(type|title|post_date) — the local date, as drafts have no GMT date (1.3; 1.0–1.2 used date_gmt)"
+        },
+        "status": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "excerpt": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "menu_order": {
+          "type": "integer"
+        },
+        "date": {
+          "type": "string"
+        },
+        "author": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "portable author ref; resolved on import by login then email",
+          "properties": {
+            "login": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            }
+          }
+        },
+        "comment_status": {
+          "type": "string"
+        },
+        "ping_status": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string",
+          "description": "post_password (1.3); empty when the post isn't protected"
+        },
+        "parent": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "parent post: its path for a hierarchical type (1.5), its slug otherwise and in older snapshots; null clears it"
+        },
+        "template": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "terms": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "featured_media": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "attachment filename"
+        },
+        "fields": {
+          "type": "object",
+          "description": "field key => value, decoded by the field's registered type. The key is the bare field id for _taw_ fields and the full meta key for any other prefix (1.2).",
+          "additionalProperties": true
+        }
+      }
+    },
+    "term": {
+      "type": "object",
+      "required": [
+        "slug",
+        "name"
+      ],
+      "properties": {
+        "slug": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "parent": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "parent term slug; null clears it (1.5)"
+        },
+        "meta": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "term meta outside TAW fields (keys not starting with _), values unserialized (1.5; older snapshots carry serialized strings)"
+        }
+      }
+    },
+    "user": {
+      "type": "object",
+      "required": [
+        "login",
+        "email"
+      ],
+      "properties": {
+        "login": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "meta": {
+          "type": "object",
+          "properties": {
+            "first_name": {
+              "type": "string"
+            },
+            "last_name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "nickname": {
+              "type": "string"
+            },
+            "locale": {
+              "type": "string"
+            }
+          }
+        },
+        "user_registered": {
+          "type": "string"
+        },
+        "password_hash": {
+          "type": "string",
+          "description": "present only with --with-user-passwords; a portable phpass/bcrypt hash"
+        }
+      }
+    },
+    "comment": {
+      "type": "object",
+      "required": [
+        "post_ref",
+        "content"
+      ],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "description": "source-site comment ID — an in-file id for threading"
+        },
+        "post_ref": {
+          "type": "string",
+          "description": "slug of the post the comment belongs to"
+        },
+        "post_type": {
+          "type": "string",
+          "description": "the post's type (1.3), so the slug is matched within it"
+        },
+        "author_name": {
+          "type": "string"
+        },
+        "author_email": {
+          "type": "string"
+        },
+        "author_url": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "date_gmt": {
+          "type": "string"
+        },
+        "approved": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "parent_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "ref of the parent comment, for threading"
+        }
+      }
+    },
+    "media": {
+      "type": "object",
+      "required": [
+        "ref",
+        "filename"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "source-site attachment ID, used only to build the old->new ID map"
+        },
+        "ref": {
+          "type": "string",
+          "description": "filename — the stable match key"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "alt": {
+          "type": "string"
+        },
+        "caption": {
+          "type": "string"
+        },
+        "mime": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

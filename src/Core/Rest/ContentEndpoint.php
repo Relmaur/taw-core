@@ -56,6 +56,16 @@ final class ContentEndpoint
                     'default'  => false,
                     'type'     => 'boolean',
                 ],
+                // With `types`/`since`, options and unrelated terms are left
+                // out unless asked (the export is scoped).
+                'include_options' => [
+                    'required' => false,
+                    'type'     => 'boolean',
+                ],
+                'include_terms' => [
+                    'required' => false,
+                    'type'     => 'boolean',
+                ],
             ],
         ]);
     }
@@ -82,6 +92,11 @@ final class ContentEndpoint
         $since = (string) $request->get_param('since');
         if ($since !== '') {
             $scope['since'] = $since;
+        }
+        foreach (['include_options', 'include_terms'] as $flag) {
+            if ($request->get_param($flag) !== null) {
+                $scope[$flag] = (bool) $request->get_param($flag);
+            }
         }
 
         $exporter = new Exporter();

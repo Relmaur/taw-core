@@ -26,11 +26,11 @@ use TAW\Core\OptionsPage\OptionsPage;
  *
  * Schema: see `resources/schema/content-interchange-1.4.json`.
  *
- * @phpstan-type Scope array{types?: list<string>, since?: string, posts?: list<int|string>, include_media?: bool, all_media?: bool, include_drafts?: bool, include_users?: bool, include_user_passwords?: bool, include_comments?: bool, include_settings?: bool}
+ * @phpstan-type Scope array{types?: list<string>, since?: string, posts?: list<int|string>, include_media?: bool, all_media?: bool, include_drafts?: bool, include_users?: bool, include_user_passwords?: bool, include_comments?: bool, include_settings?: bool, include_options?: bool, include_terms?: bool}
  */
 class Exporter
 {
-    public const SCHEMA_VERSION = '1.5';
+    public const SCHEMA_VERSION = '1.6';
 
     /**
      * Core (non-`_taw_`) options included in every export. `page_on_front`
@@ -104,6 +104,9 @@ class Exporter
     /** @var array<string, true> taxonomies of the exported post types */
     private array $postTaxonomies = [];
 
+    /** @var array<string, array<string, true>> taxonomy => slug => true, the terms the exported posts use */
+    private array $usedTerms = [];
+
     /** @var array<int, true> term IDs referenced by ID (block attributes) */
     private array $referencedTerms = [];
 
@@ -130,15 +133,23 @@ class Exporter
         $this->referencedUsers = [];
         $this->urlAttachments = [];
         $this->postTaxonomies = [];
+        $this->usedTerms = [];
         $uploads = function_exists('wp_upload_dir') ? wp_upload_dir(null, false) : [];
         $uploadsUrl = (string) ($uploads['baseurl'] ?? '');
         $this->uploadsUrl = (string) preg_replace('#^https?:#', '', $uploadsUrl);
 
         $includeMedia = $scope['include_media'] ?? true;
 
+        // A scoped export (some posts) carries what those posts need: the
+        // terms they use (and their parents), no options. Importing "just
+        // these posts" then never overwrites unrelated options or terms.
+        $scoped = !empty($scope['types']) || !empty($scope['since']) || !empty($scope['posts']);
+        $includeOptions = $scope['include_options'] ?? (!$scoped || !empty($scope['include_settings']));
+        $includeTerms = $scope['include_terms'] ?? !$scoped;
+
         $posts = $this->exportPosts($scope);
-        $terms = $this->exportTerms();
-        $options = $this->exportOptions($scope);
+        $terms = $this->exportTerms(!$includeTerms);
+        $options = $includeOptions ? $this->exportOptions($scope) : null;
 
         $snapshot = [
             'meta' => [
@@ -153,11 +164,19 @@ class Exporter
                     'uploads_url'      => $uploadsUrl,
                 ],
                 'registry_fingerprint' => RegistryFingerprint::current(),
+                // What's partial (1.6): a change-set deletes nothing it can't see.
+                'scope'                => [
+                    'posts'   => $scoped ? 'partial' : 'all',
+                    'terms'   => $includeTerms ? 'all' : 'used',
+                    'options' => $includeOptions,
+                ],
             ],
-            'options' => $options,
-            'terms'   => $terms,
-            'posts'   => $posts,
         ];
+        if ($options !== null) {
+            $snapshot['options'] = $options;
+        }
+        $snapshot['terms'] = $terms;
+        $snapshot['posts'] = $posts;
 
         if (!empty($scope['include_users'])) {
             $snapshot['users'] = $this->exportUsers(!empty($scope['include_user_passwords']));
@@ -418,6 +437,9 @@ class Exporter
                 continue;
             }
             $this->postTaxonomies[(string) $taxonomy] = true;
+            foreach ($terms as $slug) {
+                $this->usedTerms[(string) $taxonomy][(string) $slug] = true;
+            }
             // An empty list is kept, so the importer clears what was removed.
             $out[$taxonomy] = array_values(array_map('strval', $terms));
         }
@@ -431,7 +453,7 @@ class Exporter
     /**
      * @return array<string, list<array<string, mixed>>>
      */
-    private function exportTerms(): array
+    private function exportTerms(bool $usedOnly = false): array
     {
         $out = [];
         // Public taxonomies, and every one the exported posts use: a post's
@@ -449,6 +471,12 @@ class Exporter
             $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => false]);
             if (is_wp_error($terms) || $terms === []) {
                 continue;
+            }
+            if ($usedOnly) {
+                $terms = $this->usedTermsOf((string) $taxonomy, $terms);
+                if ($terms === []) {
+                    continue;
+                }
             }
 
             // Term fieldsets (ADR-0008): a taxonomy with TAW fields gets a
@@ -473,6 +501,34 @@ class Exporter
             $out[$taxonomy] = $rows;
         }
         return $out;
+    }
+
+    /**
+     * The terms the exported posts use (assigned, or referenced by ID in
+     * blocks), and their parents up to the root, in the order given.
+     *
+     * @param array<int|string, mixed> $terms get_terms() of one taxonomy
+     * @return list<\WP_Term>
+     */
+    private function usedTermsOf(string $taxonomy, array $terms): array
+    {
+        $byId = [];
+        foreach ($terms as $term) {
+            if ($term instanceof \WP_Term) {
+                $byId[(int) $term->term_id] = $term;
+            }
+        }
+        $keep = [];
+        foreach ($byId as $id => $term) {
+            if (!isset($this->usedTerms[$taxonomy][(string) $term->slug]) && !isset($this->referencedTerms[$id])) {
+                continue;
+            }
+            for ($at = $id; $at > 0 && isset($byId[$at]) && !isset($keep[$at]); $at = (int) $byId[$at]->parent) {
+                $keep[$at] = true;
+            }
+        }
+
+        return array_values(array_filter($byId, static fn (\WP_Term $t): bool => isset($keep[(int) $t->term_id])));
     }
 
     /**

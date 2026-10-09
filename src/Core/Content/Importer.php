@@ -211,6 +211,7 @@ class Importer
         $this->rememberIncoming($input);
         $media = new MediaResolver();
         $media->build(is_array($input['media'] ?? null) ? $input['media'] : [], false);
+        $this->featuredIds = self::featuredIds($input, $media->idMap());
         $this->refs = $this->buildRefMap($input, $media->idMap(), $media->missingIds());
 
         // Media first, as apply runs it: files to download, files missing,
@@ -333,6 +334,7 @@ class Importer
         $unchanged = $this->unchangedRecordKeys($input);
         $this->warnings = $mediaWarnings;
         $this->refs = $this->buildRefMap($input, $idMap, $resolver->missingIds());
+        $this->featuredIds = self::featuredIds($input, $idMap);
         if ($policy === 'update') {
             foreach ($this->planMedia($resolver->outcomes()) as $record) {
                 if (($record['op'] ?? '') === 'update' && !empty($record['changes'])) {
@@ -385,6 +387,31 @@ class Importer
         $report['warnings'] = array_merge($schemaWarnings, $this->warnings);
 
         return $report;
+    }
+
+    /** @var array<string, int> media filename in the input => the local attachment it matched or became */
+    private array $featuredIds = [];
+
+    /**
+     * Featured images are referenced by filename: through the media entries
+     * to the local attachment (a downloaded copy may have another name).
+     *
+     * @param array<string, mixed> $input
+     * @param array<int, int>      $idMap
+     * @return array<string, int>
+     */
+    private static function featuredIds(array $input, array $idMap): array
+    {
+        $out = [];
+        foreach (is_array($input['media'] ?? null) ? $input['media'] : [] as $entry) {
+            $local = is_array($entry) ? ($idMap[(int) ($entry['id'] ?? 0)] ?? 0) : 0;
+            $name = is_array($entry) ? (string) ($entry['filename'] ?? $entry['ref'] ?? '') : '';
+            if ($local > 0 && $name !== '') {
+                $out[$name] = $local;
+            }
+        }
+
+        return $out;
     }
 
     /** @var array<string, true> "type:slug" of every post in the input */
@@ -842,7 +869,8 @@ class Importer
             $newRef = $incoming['featured_media'];
             $currentThumb = $existing ? (int) get_post_thumbnail_id($existing) : 0;
             $currentRef = $currentThumb > 0 ? MediaResolver::attachmentFilename($currentThumb) : null;
-            if ((string) $currentRef !== (string) $newRef) {
+            $newLocal = is_string($newRef) ? ($this->featuredIds[$newRef] ?? 0) : 0;
+            if ($newLocal > 0 ? $newLocal !== $currentThumb : (string) $currentRef !== (string) $newRef) {
                 $changes['featured_media'] = ($existing && $currentRef !== null)
                     ? ['status' => 'changed', 'old' => $currentRef, 'new' => $newRef]
                     : ['status' => 'new', 'new' => $newRef];
@@ -892,6 +920,18 @@ class Importer
 
         if (($op['op'] ?? 'update') === 'delete') {
             return ['kind' => 'option', 'key' => $key, 'op' => $exists ? 'would-delete' : 'skip', 'changes' => []];
+        }
+
+        // A page this site lacks (and the import doesn't bring) is never
+        // written as 0: the front page would turn into the posts list.
+        $missing = $this->unresolvedPostRefs($key, $incoming, true);
+        if ($missing !== []) {
+            $single = in_array($key, self::POST_ID_OPTIONS, true);
+            $this->warnings[] = "option:{$key}: '" . implode("', '", $missing) . "' isn't on this site or in the import — "
+                . ($single ? 'kept as it is.' : 'left out.');
+            if ($single) {
+                return ['kind' => 'option', 'key' => $key, 'op' => 'update', 'changes' => []];
+            }
         }
 
         if ($exists && $this->optionCompareKey($key, $currentRaw) === $this->optionCompareKey($key, $incoming)) {
@@ -1268,7 +1308,7 @@ class Importer
             set_post_thumbnail($postId, $id);
             return;
         }
-        $found = MediaResolver::findByFilename((string) $ref);
+        $found = ($this->featuredIds[(string) $ref] ?? 0) ?: MediaResolver::findByFilename((string) $ref);
         if ($found !== null) {
             set_post_thumbnail($postId, $found);
         } else {
@@ -1301,6 +1341,11 @@ class Importer
         // sticky_posts is the list variant.
         if (in_array($key, self::POST_ID_OPTIONS, true)) {
             $stored = $this->resolveLocalPostId($value);
+            $missing = $this->unresolvedPostRefs($key, $value);
+            if ($stored === 0 && $missing !== []) {
+                $this->warnings[] = "option:{$key}: '{$missing[0]}' not found — kept as it is.";
+                return ['bucket' => 'skipped', 'label' => "option:{$key}"];
+            }
         } elseif (in_array($key, self::POST_ID_LIST_OPTIONS, true)) {
             $stored = array_values(array_filter(array_map(
                 fn ($ref): int => $this->resolveLocalPostId($ref),
@@ -1880,6 +1925,37 @@ class Importer
      * slug that point at the same post compare equal); TAW options decode
      * through their registered field type; everything else compares raw.
      */
+    /**
+     * The post references of a post-ID option (`page_on_front`,
+     * `sticky_posts`…) that don't resolve on this site; with $orIncoming,
+     * those the import brings count as resolved (posts run before options).
+     *
+     * @return list<string>
+     */
+    private function unresolvedPostRefs(string $key, mixed $value, bool $orIncoming = false): array
+    {
+        if (in_array($key, self::POST_ID_OPTIONS, true)) {
+            $refs = [$value];
+        } elseif (in_array($key, self::POST_ID_LIST_OPTIONS, true)) {
+            $refs = is_array($value) ? $value : [];
+        } else {
+            return [];
+        }
+        $missing = [];
+        foreach ($refs as $ref) {
+            if ($ref === null || $ref === '' || $ref === 0 || $ref === '0' || !is_scalar($ref) || $this->resolveLocalPostId($ref) > 0) {
+                continue;
+            }
+            $ref = (string) $ref;
+            if ($orIncoming && (isset($this->incomingPosts["page:{$ref}"]) || isset($this->incomingPosts["post:{$ref}"]))) {
+                continue;
+            }
+            $missing[] = $ref;
+        }
+
+        return $missing;
+    }
+
     private function optionCompareKey(string $key, mixed $value): string
     {
         if (in_array($key, self::POST_ID_OPTIONS, true)) {
@@ -1887,7 +1963,7 @@ class Importer
         }
 
         if (in_array($key, self::POST_ID_LIST_OPTIONS, true)) {
-            $ids = array_map(fn ($ref): int => $this->resolveLocalPostId($ref), is_array($value) ? $value : []);
+            $ids = array_values(array_filter(array_map(fn ($ref): int => $this->resolveLocalPostId($ref), is_array($value) ? $value : [])));
             sort($ids);
             return 'pids:' . implode(',', $ids);
         }

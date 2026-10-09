@@ -123,7 +123,7 @@ final class ExporterTest extends TestCase
     {
         $snapshot = (new Exporter())->snapshot();
 
-        $this->assertSame('1.5', $snapshot['meta']['schema']);
+        $this->assertSame('1.6', $snapshot['meta']['schema']);
         $this->assertSame('https://example.test', $snapshot['meta']['source']['url']);
 
         $post = $snapshot['posts'][0];
@@ -168,6 +168,31 @@ final class ExporterTest extends TestCase
 
         $this->assertSame(['category', 'internal_tag'], array_keys($terms), "a private taxonomy the posts use is exported too");
         $this->assertSame(['color' => '#c00', 'links' => ['x', 'y']], $terms['category'][0]['meta']);
+    }
+
+    public function test_a_scoped_export_carries_the_terms_its_posts_use_and_no_options(): void
+    {
+        Functions\when('get_taxonomies')->justReturn(['category' => 'category']);
+        Functions\when('get_object_taxonomies')->justReturn(['category']);
+        Functions\when('wp_get_object_terms')->justReturn(['child']);
+        Functions\when('get_term_meta')->justReturn([]);
+        Functions\when('get_term')->justReturn(null);
+        $term = static fn (int $id, string $slug, int $parent): \WP_Term => new \WP_Term(['term_id' => $id, 'taxonomy' => 'category',
+            'slug' => $slug, 'name' => ucfirst($slug), 'description' => '', 'parent' => $parent]);
+        Functions\when('get_terms')->justReturn([$term(1, 'root', 0), $term(2, 'parent', 1), $term(3, 'child', 2), $term(4, 'other', 0)]);
+
+        $scoped = (new Exporter())->snapshot(['posts' => [10]]);
+
+        $this->assertArrayNotHasKey('options', $scoped);
+        $this->assertSame(['root', 'parent', 'child'], array_column($scoped['terms']['category'], 'slug'), 'the used term and its parents');
+        $this->assertSame(['posts' => 'partial', 'terms' => 'used', 'options' => false], $scoped['meta']['scope']);
+
+        $asked = (new Exporter())->snapshot(['posts' => [10], 'include_options' => true, 'include_terms' => true]);
+        $this->assertSame('Example', $asked['options']['blogname']);
+        $this->assertCount(4, $asked['terms']['category']);
+        $this->assertSame(['posts' => 'partial', 'terms' => 'all', 'options' => true], $asked['meta']['scope']);
+
+        $this->assertSame(['posts' => 'all', 'terms' => 'all', 'options' => true], (new Exporter())->snapshot()['meta']['scope']);
     }
 
     public function test_fields_with_another_prefix_are_keyed_by_meta_key(): void

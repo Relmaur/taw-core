@@ -57,6 +57,8 @@ class ContentExportCommand extends Command
             ->addOption('with-user-passwords', null, InputOption::VALUE_NONE, 'Include portable password hashes in users[] (implies --with-users)')
             ->addOption('with-comments', null, InputOption::VALUE_NONE, 'Export comments on the exported posts')
             ->addOption('with-settings', null, InputOption::VALUE_NONE, 'Export the environment-settings option allowlist')
+            ->addOption('with-options', null, InputOption::VALUE_NONE, 'With --posts/--types/--since: also export options (left out by default)')
+            ->addOption('with-terms', null, InputOption::VALUE_NONE, 'With --posts/--types/--since: export every term, not only those the posts use')
             ->addOption('migrate', null, InputOption::VALUE_NONE, '= --with-users --with-settings --all-media --include-drafts');
     }
 
@@ -89,6 +91,13 @@ class ContentExportCommand extends Command
             'include_comments'       => (bool) $input->getOption('with-comments'),
             'include_settings'       => $migrate || (bool) $input->getOption('with-settings'),
         ];
+        // A scoped export leaves out options and unrelated terms unless asked.
+        if ($migrate || $input->getOption('with-options')) {
+            $scope['include_options'] = true;
+        }
+        if ($migrate || $input->getOption('with-terms')) {
+            $scope['include_terms'] = true;
+        }
         if (is_string($input->getOption('types')) && $input->getOption('types') !== '') {
             $scope['types'] = array_values(array_filter(array_map('trim', explode(',', (string) $input->getOption('types')))));
         }
@@ -117,7 +126,7 @@ class ContentExportCommand extends Command
         $io->definitionList(
             ['Schema' => Exporter::SCHEMA_VERSION],
             ['Posts' => (string) count($snapshot['posts'])],
-            ['Options' => (string) count($snapshot['options'])],
+            ['Options' => isset($snapshot['options']) ? (string) count($snapshot['options']) : 'left out (scoped export; --with-options adds them)'],
             ['Terms' => (string) array_sum(array_map('count', $snapshot['terms']))],
             ['Media' => (string) count($snapshot['media'] ?? [])],
             ['Users' => (string) count($snapshot['users'] ?? [])],
