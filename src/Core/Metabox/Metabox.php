@@ -1688,14 +1688,17 @@ class Metabox
 
                             // --- Sync hidden input ---
 
+                            // `change` so a repeater row re-serializes (as the image and
+                            // files pickers do): without it a pick inside a row only
+                            // reached the repeater's JSON if something else fired later.
                             function updateValue() {
                                 if (!multiple) {
-                                    $input.val(selection.length ? selection[0].id : '');
+                                    $input.val(selection.length ? selection[0].id : '').trigger('change');
                                 } else {
                                     var ids = selection.map(function(p) {
                                         return p.id;
                                     });
-                                    $input.val(JSON.stringify(ids));
+                                    $input.val(JSON.stringify(ids)).trigger('change');
                                 }
                             }
                         });

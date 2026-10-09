@@ -536,6 +536,13 @@ plugin's titles, say) is carried only when asked: `content:export --meta=_wds_`.
 **Check:** none on the site itself. As with v1.84.0, the **exporter** runs on the source of a pull, so
 production needs this release for its snapshots to carry these.
 
+### v1.87.1: a post picked inside a repeater row is saved
+
+Fix. A `post_select` sub-field in a repeater row could lose the editor's pick: the picker didn't
+signal the change, so the row's value only reached the saved repeater if something else in the
+form changed afterwards (or the click was quick enough). **Check:** none; re-pick and save any
+repeater rows whose post selections went missing.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
