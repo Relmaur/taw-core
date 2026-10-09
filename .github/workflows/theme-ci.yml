@@ -1,0 +1,186 @@
+name: TAW theme CI (shared)
+
+# Called by every TAW theme's .github/workflows/ci.yml, a few-line stub:
+#
+#   jobs:
+#     ci:
+#       uses: Relmaur/taw-core/.github/workflows/theme-ci.yml@v1
+#       with: { smoke: true }
+#
+# The checks live here, so they update for every site with a taw/core
+# release instead of being copied into each theme (umbrella plan
+# docs/plans/taw-platform.md § 5.0). Each check runs only when the theme has
+# what it checks: phpstan/test when composer.json has those scripts, the
+# getData() check when there's a Blocks/ folder, schema:validate when there's
+# taw-schema/, the front-end check or build when package.json has one.
+#
+# By hand, the same checks are (from the theme folder):
+#   php -l on every theme file · php vendor/taw/core/resources/ci/check-getdata-signature.php .
+#   composer run phpstan · composer run test · vendor/bin/taw schema:validate
+#   npm run check (or npm run build) · the smoke test: see the smoke job below
+
+on:
+  workflow_call:
+    inputs:
+      php-versions:
+        description: JSON list of PHP versions to check, e.g. '["8.2", "8.4"]'
+        type: string
+        default: '["8.2"]'
+      build:
+        description: Run the front-end check/build (npm) when package.json has one
+        type: boolean
+        default: true
+      smoke:
+        description: Boot WordPress with the theme and render every block and form (classic themes)
+        type: boolean
+        default: false
+
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ${{ fromJSON(inputs.php-versions) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --no-check-all --no-check-publish
+
+      # taw/core installs from GitHub (VCS), not Packagist: authenticated API
+      # calls avoid the 60/hour unauthenticated cap shared runners hit.
+      - name: Authenticate Composer with GitHub
+        run: composer config -g github-oauth.github.com "${{ github.token }}"
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: PHP lint (every theme file)
+        run: |
+          find . -name "*.php" -not -path "./vendor/*" -not -path "./node_modules/*" -print0 \
+            | xargs -0 -n1 -P4 php -l
+
+      - name: MetaBlock getData() signature
+        if: hashFiles('Blocks/**/*.php') != ''
+        run: |
+          script=vendor/taw/core/resources/ci/check-getdata-signature.php
+          [ -f "$script" ] || script=bin/ci/check-getdata-signature.php # taw/core < 1.91
+          php "$script" "$PWD"
+
+      - name: Static analysis
+        run: |
+          if composer run-script --list 2>/dev/null | grep -qE '^\s+phpstan(\s|$)'; then composer run phpstan
+          else echo "No phpstan script in composer.json: skipped."; fi
+
+      - name: Unit tests
+        run: |
+          if composer run-script --list 2>/dev/null | grep -qE '^\s+test(\s|$)'; then composer run test
+          else echo "No test script in composer.json: skipped."; fi
+
+      - name: Validate taw-schema/*.json
+        if: hashFiles('taw-schema/*.json') != ''
+        run: |
+          tool=vendor/bin/taw; [ -x "$tool" ] || tool="php bin/taw" # taw/core < 1.90
+          $tool schema:validate
+
+  frontend:
+    if: inputs.build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip without package.json
+        id: has
+        run: |
+          if [ -f package.json ] && [ -f package-lock.json ]; then echo "npm=true" >> "$GITHUB_OUTPUT"
+          else echo "npm=false" >> "$GITHUB_OUTPUT"; echo "No package.json/package-lock.json: skipped."; fi
+
+      - uses: shivammathur/setup-php@v2
+        if: steps.has.outputs.npm == 'true'
+        with:
+          php-version: "8.2"
+          tools: composer:v2
+          coverage: none
+
+      # vite.config.js imports taw/core's shared Vite plugins from vendor/.
+      - name: Install PHP dependencies (for vendor/taw/core)
+        if: steps.has.outputs.npm == 'true'
+        run: |
+          composer config -g github-oauth.github.com "${{ github.token }}"
+          composer install --no-interaction --prefer-dist --no-progress --no-dev
+
+      - uses: actions/setup-node@v4
+        if: steps.has.outputs.npm == 'true'
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Front-end check or build
+        if: steps.has.outputs.npm == 'true'
+        run: |
+          npm ci --no-audit --no-fund
+          if npm run | grep -qE '^\s+check$'; then npm run check
+          elif npm run | grep -qE '^\s+build$'; then npm run build
+          else echo "No check or build script: skipped."; fi
+
+  smoke:
+    if: inputs.smoke
+    runs-on: ubuntu-latest
+    # A real (if minimal) WordPress + MySQL: boots WordPress with this theme
+    # active, creates one page, and renders every registered block and form
+    # against it — the runtime errors no static check sees.
+    steps:
+      - uses: actions/checkout@v4
+
+      # The runner's own MySQL 8 (root/root): no image pull, no Docker Hub limit.
+      - name: Start MySQL
+        run: |
+          sudo systemctl start mysql.service
+          mysqladmin --user=root --password=root --host=127.0.0.1 --silent --wait=30 ping
+          mysql --user=root --password=root --host=127.0.0.1 -e "CREATE DATABASE IF NOT EXISTS wordpress_smoke_test"
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer:v2
+          extensions: mysqli
+          coverage: none
+
+      # setup-php's wp-cli download 404s (releases ship wp-cli-<version>.phar):
+      # install the pinned release phar, checked against its published sha512.
+      - name: Install WP-CLI
+        env:
+          WP_CLI_VERSION: "2.12.0"
+        run: |
+          base="https://github.com/wp-cli/wp-cli/releases/download/v${WP_CLI_VERSION}/wp-cli-${WP_CLI_VERSION}.phar"
+          curl -fsSL -o /tmp/wp-cli.phar "$base"
+          echo "$(curl -fsSL "${base}.sha512" | cut -d' ' -f1)  /tmp/wp-cli.phar" | sha512sum -c -
+          sudo install -m 0755 /tmp/wp-cli.phar /usr/local/bin/wp
+
+      - name: Install dependencies
+        run: |
+          composer config -g github-oauth.github.com "${{ github.token }}"
+          composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Install WordPress with this theme
+        run: |
+          wp core download --path=/tmp/wordpress
+          wp config create --path=/tmp/wordpress --dbname=wordpress_smoke_test --dbuser=root --dbpass=root --dbhost=127.0.0.1
+          wp core install --path=/tmp/wordpress --url=http://localhost:8080 --title="CI Smoke Test" \
+            --admin_user=admin --admin_password=admin --admin_email=admin@example.com
+          rsync -a --exclude=.git "$GITHUB_WORKSPACE/" /tmp/wordpress/wp-content/themes/ci-theme/
+          wp theme activate ci-theme --path=/tmp/wordpress
+
+      - name: Render every block and form
+        run: |
+          theme=/tmp/wordpress/wp-content/themes/ci-theme
+          script=$theme/vendor/taw/core/resources/ci/smoke-test.php
+          [ -f "$script" ] || script=$theme/bin/ci/smoke-test.php # taw/core < 1.91
+          POST_ID=$(wp post create --path=/tmp/wordpress --post_type=page --post_title="Smoke Test" --post_status=publish --porcelain)
+          php "$script" /tmp/wordpress/wp-load.php "$POST_ID"
