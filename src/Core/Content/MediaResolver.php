@@ -13,8 +13,9 @@ namespace TAW\Core\Content;
 /**
  * Resolves the `media[]` section of a snapshot against the target site.
  *
- * Matching is by **filename**, never by numeric ID (IDs are meaningless
- * across environments). For each media entry: find an existing attachment
+ * Matching is by the file's **path under uploads** (`2024/05/photo.jpg`),
+ * then its **filename**, never by numeric ID (IDs are meaningless across
+ * environments). For each media entry: find an existing attachment
  * with that filename; if there is none and the entry carries a URL,
  * sideload it. The result is an `old id => new id` map the importer uses
  * to rewrite every attachment reference — in `post_content`
@@ -53,7 +54,10 @@ final class MediaResolver
                 continue;
             }
 
-            $existing = self::findByFilename($filename);
+            // The path under uploads first (`2024/05/photo.jpg`): two files
+            // can share a name in different month folders.
+            $path = self::uploadsPath((string) ($entry['url'] ?? ''));
+            $existing = ($path !== '' ? self::findByPath($path) : null) ?? self::findByFilename($filename);
             if ($existing !== null) {
                 if ($sourceId > 0) {
                     $this->idMap[$sourceId] = $existing;
@@ -103,6 +107,10 @@ final class MediaResolver
     }
 
     /**
+     * Superseded by {@see BlockRefs::rewrite()}, which the importer uses: this
+     * regex rewrites every block's `"id":N`, not only the attributes that
+     * hold attachment IDs. Kept for callers outside the importer.
+     *
      * Rewrite attachment IDs inside post_content — Gutenberg image blocks
      * (`wp-image-<id>` on the <img>, `"id":<id>` in the block comment) and
      * gallery blocks (`"ids":[...]`).
@@ -153,6 +161,26 @@ final class MediaResolver
         }
         $url = wp_get_attachment_url($attachmentId);
         return is_string($url) && $url !== '' ? wp_basename($url) : (string) $attachmentId;
+    }
+
+    /** A media URL's path under the uploads folder, or '' when it isn't there. */
+    public static function uploadsPath(string $url): string
+    {
+        return preg_match('#/wp-content/uploads/(.+)$#', (string) strtok($url, '?#'), $m) ? $m[1] : '';
+    }
+
+    /** The attachment whose `_wp_attached_file` is exactly $path. */
+    public static function findByPath(string $path): ?int
+    {
+        $matches = get_posts([
+            'post_type'      => 'attachment',
+            'post_status'    => 'inherit',
+            'posts_per_page' => 1,
+            'fields'         => 'ids',
+            'meta_query'     => [['key' => '_wp_attached_file', 'value' => $path]],
+        ]);
+
+        return isset($matches[0]) ? (int) $matches[0] : null;
     }
 
     /**

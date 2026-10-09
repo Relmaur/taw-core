@@ -24,13 +24,13 @@ use TAW\Core\OptionsPage\OptionsPage;
  * transients, non-allowlisted core/plugin options, and
  * `nav_menu` / `nav_menu_item` (code-owned in TAW themes).
  *
- * Schema: see `resources/schema/content-interchange-1.3.json`.
+ * Schema: see `resources/schema/content-interchange-1.4.json`.
  *
  * @phpstan-type Scope array{types?: list<string>, since?: string, posts?: list<int|string>, include_media?: bool, all_media?: bool, include_drafts?: bool, include_users?: bool, include_user_passwords?: bool, include_comments?: bool, include_settings?: bool}
  */
 class Exporter
 {
-    public const SCHEMA_VERSION = '1.3';
+    public const SCHEMA_VERSION = '1.4';
 
     /**
      * Core (non-`_taw_`) options included in every export. `page_on_front`
@@ -98,6 +98,21 @@ class Exporter
     /** @var array<int, array{type: string, slug: string}> post ID => natural key of every exported post */
     private array $exportedPosts = [];
 
+    /** @var array<int, true> post IDs referenced by ID (post_select, block attributes) */
+    private array $referencedPosts = [];
+
+    /** @var array<int, true> term IDs referenced by ID (block attributes) */
+    private array $referencedTerms = [];
+
+    /** @var array<int, true> user IDs referenced by ID (block attributes) */
+    private array $referencedUsers = [];
+
+    /** The uploads URL, without a scheme (`//host/wp-content/uploads`); '' = unknown. */
+    private string $uploadsUrl = '';
+
+    /** @var array<string, int> uploads URL => attachment ID (0 = none) */
+    private array $urlAttachments = [];
+
     /**
      * @param Scope $scope
      * @return array<string, mixed>
@@ -107,6 +122,13 @@ class Exporter
         $this->warnings = [];
         $this->referencedAttachments = [];
         $this->exportedPosts = [];
+        $this->referencedPosts = [];
+        $this->referencedTerms = [];
+        $this->referencedUsers = [];
+        $this->urlAttachments = [];
+        $uploads = function_exists('wp_upload_dir') ? wp_upload_dir(null, false) : [];
+        $uploadsUrl = (string) ($uploads['baseurl'] ?? '');
+        $this->uploadsUrl = (string) preg_replace('#^https?:#', '', $uploadsUrl);
 
         $includeMedia = $scope['include_media'] ?? true;
 
@@ -124,6 +146,7 @@ class Exporter
                         ? InstalledVersions::getPrettyVersion('taw/core')
                         : null,
                     'theme'            => get_stylesheet(),
+                    'uploads_url'      => $uploadsUrl,
                 ],
                 'registry_fingerprint' => RegistryFingerprint::current(),
             ],
@@ -143,6 +166,10 @@ class Exporter
         if ($includeMedia) {
             $snapshot['media'] = $this->exportMedia(!empty($scope['all_media']));
         }
+
+        // Natural keys of everything referenced by ID, so the importer maps
+        // IDs to its own (1.4). Built last: users and options add to it.
+        $snapshot['refs'] = $this->exportRefs();
 
         return $snapshot;
     }
@@ -288,9 +315,11 @@ class Exporter
             $decoded = FieldCodec::decode($config, $raw);
             $fields[$fieldKey] = $decoded;
 
-            foreach (FieldCodec::referencedAttachmentIds($config, $decoded) as $attId) {
-                $this->referencedAttachments[$attId] = true;
-            }
+            $this->collectValue($config, $decoded);
+        }
+
+        foreach ([(string) $post->post_content, (string) $post->post_excerpt] as $text) {
+            $this->collectContent($text);
         }
 
         $thumbId = (int) get_post_thumbnail_id($post) ?: 0;
@@ -451,9 +480,7 @@ class Exporter
             $decoded = FieldCodec::decode($config, is_array($values) ? ($values[0] ?? '') : $values);
             $fields[FieldKeys::keyOf($config)] = $decoded;
 
-            foreach (FieldCodec::referencedAttachmentIds($config, $decoded) as $attId) {
-                $this->referencedAttachments[$attId] = true;
-            }
+            $this->collectValue($config, $decoded);
         }
 
         return $fields;
@@ -503,6 +530,7 @@ class Exporter
             $raw = get_option($name);
             $config = $optionRegistry[$name] ?? null;
             $out[$name] = $config !== null ? FieldCodec::decode($config, $raw) : $this->decodeUnknownOption($raw);
+            $this->collectValue($config ?? ['type' => 'text', 'unregistered' => true], $out[$name]);
         }
 
         /** @var list<string> $allowlist */
@@ -547,6 +575,124 @@ class Exporter
             }
         }
         return $raw;
+    }
+
+    /* -----------------------------------------------------------------
+     * References (1.4)
+     * ----------------------------------------------------------------- */
+
+    /**
+     * What a field value references: attachments, posts, and files linked
+     * by URL in the uploads folder.
+     *
+     * @param array<string, mixed> $config
+     */
+    private function collectValue(array $config, mixed $decoded): void
+    {
+        foreach (FieldCodec::referencedAttachmentIds($config, $decoded) as $attId) {
+            $this->referencedAttachments[$attId] = true;
+        }
+        foreach (FieldCodec::referencedPostIds($config, $decoded) as $postId) {
+            $this->referencedPosts[$postId] = true;
+        }
+        foreach (FieldCodec::strings($decoded) as $text) {
+            $this->collectContent($text);
+        }
+    }
+
+    /** What content references: block attributes, `wp-image-N`, uploads URLs. */
+    private function collectContent(string $text): void
+    {
+        if ($text === '') {
+            return;
+        }
+        $refs = BlockRefs::collect($text);
+        foreach ($refs['attachments'] as $id) {
+            $this->referencedAttachments[$id] = true;
+        }
+        foreach ($refs['posts'] as $id) {
+            $this->referencedPosts[$id] = true;
+        }
+        foreach ($refs['terms'] as $id) {
+            $this->referencedTerms[$id] = true;
+        }
+        foreach ($refs['users'] as $id) {
+            $this->referencedUsers[$id] = true;
+        }
+        foreach ($this->uploadsAttachments($text) as $attId) {
+            $this->referencedAttachments[$attId] = true;
+        }
+    }
+
+    /**
+     * Attachments whose files $text links to in the uploads folder (a PDF
+     * in a link field, an image URL in a text field, a size variant).
+     *
+     * @return list<int>
+     */
+    private function uploadsAttachments(string $text): array
+    {
+        if ($this->uploadsUrl === '' || !str_contains($text, $this->uploadsUrl) || !function_exists('attachment_url_to_postid')) {
+            return [];
+        }
+        preg_match_all('#(?:https?:)?' . preg_quote($this->uploadsUrl, '#') . '/[^\s"\'<>()\\\\]+#', $text, $m);
+        $ids = [];
+        foreach (array_unique($m[0]) as $url) {
+            $url = 'https:' . (string) preg_replace('#^(?:https?:)?#', '', $url);
+            if (!isset($this->urlAttachments[$url])) {
+                $id = 0;
+                $original = (string) preg_replace('#-\d+x\d+(\.[A-Za-z0-9]+)$#', '$1', $url);
+                $scaled = (string) preg_replace('#(\.[A-Za-z0-9]+)$#', '-scaled$1', $original);
+                foreach (array_unique([$url, $original, $scaled]) as $candidate) {
+                    $id = attachment_url_to_postid($candidate) ?: attachment_url_to_postid(str_replace('https:', 'http:', $candidate));
+                    if ($id > 0) {
+                        break;
+                    }
+                }
+                $this->urlAttachments[$url] = (int) $id;
+            }
+            if ($this->urlAttachments[$url] > 0) {
+                $ids[] = $this->urlAttachments[$url];
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * The natural keys of every post, term and user referenced by ID.
+     *
+     * @return array{posts: array<int, array<string, string>>, terms: array<int, array<string, string>>, users: array<int, array<string, string>>}
+     */
+    private function exportRefs(): array
+    {
+        $refs = ['posts' => [], 'terms' => [], 'users' => []];
+        foreach (array_keys($this->referencedPosts) as $id) {
+            $post = get_post((int) $id);
+            if (!$post instanceof \WP_Post || $post->post_name === '') {
+                $this->warnings[] = "Referenced post {$id} no longer exists (or has no slug).";
+                continue;
+            }
+            $refs['posts'][(int) $id] = [
+                'type' => (string) $post->post_type,
+                'slug' => (string) $post->post_name,
+                'path' => is_post_type_hierarchical((string) $post->post_type) ? (string) get_page_uri($post) : (string) $post->post_name,
+            ];
+        }
+        foreach (array_keys($this->referencedTerms) as $id) {
+            $term = get_term((int) $id);
+            if ($term instanceof \WP_Term) {
+                $refs['terms'][(int) $id] = ['taxonomy' => (string) $term->taxonomy, 'slug' => (string) $term->slug];
+            }
+        }
+        foreach (array_keys($this->referencedUsers) as $id) {
+            $user = get_userdata((int) $id);
+            if ($user) {
+                $refs['users'][(int) $id] = ['login' => (string) $user->user_login, 'email' => (string) $user->user_email];
+            }
+        }
+
+        return $refs;
     }
 
     /* -----------------------------------------------------------------

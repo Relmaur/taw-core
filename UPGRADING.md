@@ -452,6 +452,24 @@ chatbot: **TAW Chatbot → Usage** shows it directly).
 5. Ship the widget change and the taw/core bump together: the updated widget calls methods
    (`RagSettings::humanCheck()`, `chatPaused()`, `maxMessageChars()`) that older taw/core doesn't have.
 
+### v1.82.0: content imports map references and URLs
+
+Content Interchange, export and import (snapshot schema 1.4). Nothing changes for sites that don't
+move content. What a snapshot from another site (`taw-fleet pull`, a staging copy) now does:
+
+- Post references (`post_select`, query loops, navigation links) point at this site's posts, found
+  by slug, instead of keeping the source's IDs. Attachment and term IDs in blocks are mapped too, and
+  only in the block attributes that hold them.
+- Links to the source site become links to this site; image URLs become this site's copies. Files
+  this site doesn't have (yet) keep loading from the source.
+- Media is matched by its path under uploads before its filename, so two images with the same name
+  in different month folders no longer swap.
+- Importing the same snapshot twice reports nothing to change the second time.
+
+**Check:** none on the site itself. The **exporter** runs on the site that's the source of a pull,
+so production sites need this release for their snapshots to carry `refs` (what lets `post_select`
+values move between sites). Older snapshots still import.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

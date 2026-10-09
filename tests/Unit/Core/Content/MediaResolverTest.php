@@ -46,4 +46,27 @@ final class MediaResolverTest extends TestCase
         $content = '<img class="wp-image-9"/>';
         $this->assertSame($content, MediaResolver::rewriteContent($content, []));
     }
+
+    public function test_media_matches_its_uploads_path_before_its_filename(): void
+    {
+        // Two attachments named hero.jpg: 15 in 2024/05, 16 in 2025/01.
+        \Brain\Monkey\Functions\when('get_posts')->alias(static function (array $q): array {
+            $meta = $q['meta_query'][0] ?? [];
+            if (($meta['compare'] ?? '=') === '=') {
+                return ($meta['value'] ?? '') === '2025/01/hero.jpg' ? [16] : [];
+            }
+            return [15, 16];
+        });
+        \Brain\Monkey\Functions\when('get_post_meta')->alias(static fn (int $id): string => $id === 15 ? '2024/05/hero.jpg' : '2025/01/hero.jpg');
+        \Brain\Monkey\Functions\when('wp_basename')->alias(static fn (string $p): string => basename($p));
+
+        $resolver = new MediaResolver();
+        $resolver->build([
+            ['id' => 5615, 'filename' => 'hero.jpg', 'url' => 'https://prod.test/wp-content/uploads/2025/01/hero.jpg'],
+            ['id' => 99, 'filename' => 'hero.jpg'],
+        ], false);
+
+        $this->assertSame([5615 => 16, 99 => 15], $resolver->idMap(), 'by path when the URL gives one, else the first file of that name');
+        $this->assertSame('2025/01/hero.jpg', MediaResolver::uploadsPath('https://x.test/wp-content/uploads/2025/01/hero.jpg?v=2'));
+    }
 }
