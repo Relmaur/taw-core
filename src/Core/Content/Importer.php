@@ -865,6 +865,10 @@ class Importer
                 ? BlockRefs::rewrite((string) $incoming[$prop], $this->refs())
                 : $incoming[$prop];
             $old = $existing ? $this->currentPostProp($existing, $prop) : null;
+            if (in_array($prop, ['comment_status', 'ping_status'], true) && (string) $new === '') {
+                // WordPress never stores an empty status: it saves the default.
+                $new = get_default_comment_status($type, $prop === 'ping_status' ? 'pingback' : 'comment');
+            }
             if ($prop === 'password' && !$existing && (string) $new === '') {
                 continue;
             }

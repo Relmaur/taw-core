@@ -150,6 +150,18 @@ final class ImporterRefsTest extends TestCase
         $this->assertSame([], $plan['records'][0]['changes'], "prod's 135 is this site's 78, and its URLs are this site's");
     }
 
+    public function test_an_empty_discussion_status_reads_as_the_default_wordpress_stores(): void
+    {
+        $this->sitePost(5, 'post', 'news');
+        Functions\when('get_default_comment_status')->justReturn('closed');
+
+        $plan = (new Importer())->plan($this->production([[
+            'type' => 'post', 'slug' => 'news', 'title' => 'News', 'content' => '', 'ping_status' => '', 'comment_status' => '',
+        ]]));
+
+        $this->assertSame([], $plan['records'][0]['changes'], "WordPress saves '' as the default, so a pull would never settle");
+    }
+
     public function test_the_import_maps_ids_and_urls(): void
     {
         $this->sitePost(78, 'post', 'studio-pipeline');

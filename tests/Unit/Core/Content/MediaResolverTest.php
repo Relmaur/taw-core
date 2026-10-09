@@ -88,4 +88,22 @@ final class MediaResolverTest extends TestCase
 
         $this->assertSame([50 => 31], $resolver->idMap(), 'the earlier download, not the other photo.jpg, and nothing downloaded again');
     }
+
+    public function test_a_dropped_download_is_tried_again(): void
+    {
+        $calls = 0;
+        \Brain\Monkey\Functions\when('download_url')->alias(static function () use (&$calls) {
+            return ++$calls < 3 ? new \WP_Error('http_request_failed', 'cURL error 56: unexpected eof') : '/tmp/song.mp3';
+        });
+        \Brain\Monkey\Functions\when('is_wp_error')->alias(static fn ($v): bool => $v instanceof \WP_Error);
+
+        $this->assertSame('/tmp/song.mp3', MediaResolver::download('https://src.test/song.mp3'));
+        $this->assertSame(3, $calls);
+
+        $calls = 0;
+        $failed = MediaResolver::download('https://src.test/song.mp3', 2);
+        $this->assertInstanceOf(\WP_Error::class, $failed);
+        $this->assertSame('cURL error 56: unexpected eof', $failed->get_error_message(), 'the reason reaches the warning');
+        $this->assertSame(2, $calls);
+    }
 }

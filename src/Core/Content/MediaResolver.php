@@ -28,6 +28,9 @@ namespace TAW\Core\Content;
  */
 final class MediaResolver
 {
+    /** Tries per download before the file counts as failed. */
+    public const DOWNLOAD_ATTEMPTS = 3;
+
     /** @var array<int, int> old (source) attachment id => new (target) attachment id */
     private array $idMap = [];
 
@@ -92,9 +95,10 @@ final class MediaResolver
                 continue;
             }
 
-            $newId = $this->sideload($url, $entry);
+            $error = '';
+            $newId = $this->sideload($url, $entry, $error);
             if ($newId === null) {
-                $this->warnings[] = "Failed to sideload media '{$filename}' from {$url} — references to it are cleared.";
+                $this->warnings[] = "Failed to sideload media '{$filename}' from {$url} ({$error}) — references to it are cleared.";
                 $this->outcomes[] = ['status' => 'failed'] + $outcome;
                 continue;
             }
@@ -291,18 +295,40 @@ final class MediaResolver
     }
 
     /**
+     * Download a remote file to a temporary path, trying again when the
+     * transfer fails: some hosts drop large files mid-way (cURL 56), and a
+     * dropped file clears every reference to it.
+     *
+     * @return string|\WP_Error the temporary path, or the last attempt's error
+     */
+    public static function download(string $url, int $attempts = self::DOWNLOAD_ATTEMPTS): string|\WP_Error
+    {
+        $tmp = new \WP_Error('http_request_failed', 'not attempted');
+        for ($i = 0; $i < max(1, $attempts); $i++) {
+            $tmp = download_url($url);
+            if (!is_wp_error($tmp)) {
+                return $tmp;
+            }
+        }
+
+        return $tmp;
+    }
+
+    /**
      * Sideload a remote file into the media library.
      *
      * @param array<string, mixed> $entry
+     * @param string               $error why it failed, when it did
      */
-    private function sideload(string $url, array $entry): ?int
+    private function sideload(string $url, array $entry, string &$error = ''): ?int
     {
         require_once ABSPATH . 'wp-admin/includes/media.php';
         require_once ABSPATH . 'wp-admin/includes/file.php';
         require_once ABSPATH . 'wp-admin/includes/image.php';
 
-        $tmp = download_url($url);
+        $tmp = self::download($url);
         if (is_wp_error($tmp)) {
+            $error = $tmp->get_error_message();
             return null;
         }
 
@@ -322,6 +348,7 @@ final class MediaResolver
         $id = media_handle_sideload($fileArray, 0, null, $postData);
 
         if (is_wp_error($id)) {
+            $error = $id->get_error_message();
             if (file_exists($tmp)) {
                 wp_delete_file($tmp);
             }
