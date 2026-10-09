@@ -62,11 +62,31 @@ final class MetaboxDefaultsTest extends TestCase
         $this->assertSame('Welcome', Metabox::get(5, 'hero_heading'));
         $this->meta['5_taw_hero_heading'] = 'Mine';
         $this->assertSame('Mine', Metabox::get(5, 'hero_heading'));
-        $this->meta['5_taw_hero_count'] = '0';
-        $this->assertSame('0', Metabox::get(5, 'hero_count'), "'0' is a stored value");
+        $this->meta['5_taw_hero_count'] = '7';
+        $this->assertSame('7', Metabox::get(5, 'hero_count'));
 
         $this->assertSame(['hero_heading', 'hero_items', 'hero_count'], array_keys($box->defaults()), 'only declared fields, and an empty default is none');
         $this->assertSame('', Metabox::get(5, 'not_a_field'));
+    }
+
+    public function test_empty_means_what_a_fallback_saw(): void
+    {
+        new Metabox(['id' => 'taw_team', 'title' => 'Team', 'screens' => ['page'], 'fields' => [
+            ['id' => 'photo', 'type' => 'image'],
+            ['id' => 'members', 'type' => 'repeater', 'fields' => [['id' => 'name', 'type' => 'text']]],
+            ['id' => 'count', 'type' => 'number'],
+            ['id' => 'show', 'type' => 'checkbox'],
+        ], 'defaults' => ['photo' => 5510, 'members' => [['name' => 'Ana']], 'count' => '3', 'show' => '1']]);
+        $this->meta['5_taw_photo'] = '0';       // an image field saved blank
+        $this->meta['5_taw_members'] = '[]';    // a repeater saved with no rows
+        $this->meta['5_taw_count'] = '0';
+        $this->meta['5_taw_show'] = '0';        // unchecked
+
+        $this->assertSame(5510, Metabox::get(5, 'photo'));
+        $this->assertSame([['name' => 'Ana']], Metabox::get_repeater(5, 'members'));
+        $this->assertSame('3', Metabox::get(5, 'count'), 'as `?:` did');
+        $this->assertSame('0', Metabox::get(5, 'show'), "a checkbox's '0' is a choice");
+        $this->assertFalse(Metabox::get_bool(5, 'show'));
     }
 
     public function test_structured_defaults_read_like_stored_json(): void

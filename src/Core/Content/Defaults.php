@@ -53,7 +53,7 @@ final class Defaults
                     }
                     $metaKey = Metabox::metaKeyOf($config);
                     $id = 'post:' . $post->ID . ':' . $metaKey;
-                    if (isset($records[$id]) || !Metabox::isUnset(get_post_meta($post->ID, $metaKey, true))) {
+                    if (isset($records[$id]) || !Metabox::isUnset(get_post_meta($post->ID, $metaKey, true), $config)) {
                         continue;
                     }
 
@@ -65,7 +65,7 @@ final class Defaults
         $options = OptionsPage::getFieldRegistry();
         foreach (OptionsPage::defaults() as $optionName => $default) {
             $config = $options[$optionName] ?? null;
-            if ($config === null || !Metabox::isUnset(get_option($optionName, ''))) {
+            if ($config === null || !Metabox::isUnset(get_option($optionName, ''), $config)) {
                 continue;
             }
             $records['option:' . $optionName] = $this->record('option', 0, (string) ($config['option_page_title'] ?? 'Options'), (string) ($config['option_page'] ?? ''), (string) ($config['id'] ?? $optionName), $optionName, $config, $default, OptionsPage::defaultOf($optionName));

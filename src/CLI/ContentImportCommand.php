@@ -91,7 +91,7 @@ class ContentImportCommand extends Command
         // Import as a user, like an admin's save: with none, WordPress
         // filters content through kses and fields saved as code lose their
         // markup, and new posts get no author.
-        $user = $this->importUser((string) $input->getOption('user'));
+        $user = WpLoader::cliUser((string) $input->getOption('user'));
         if ($user === null) {
             $io->error("No such user: '" . $input->getOption('user') . "'.");
             return Command::FAILURE;
@@ -179,20 +179,5 @@ class ContentImportCommand extends Command
         foreach ($plan['warnings'] ?? [] as $warning) {
             $io->warning((string) $warning);
         }
-    }
-
-    /**
-     * The user to import as: the one asked for (null when there's no such
-     * user), else the first administrator (0 when the site has none).
-     */
-    private function importUser(string $wanted): ?int
-    {
-        if ($wanted !== '') {
-            $user = ctype_digit($wanted) ? get_user_by('id', (int) $wanted) : (get_user_by('login', $wanted) ?: get_user_by('email', $wanted));
-            return $user ? (int) $user->ID : null;
-        }
-        $admins = get_users(['role' => 'administrator', 'number' => 1, 'orderby' => 'ID', 'order' => 'ASC', 'fields' => 'ID']);
-
-        return isset($admins[0]) ? (int) $admins[0] : 0;
     }
 }

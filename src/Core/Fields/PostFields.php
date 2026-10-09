@@ -41,11 +41,6 @@ final class PostFields extends MetaFields
 
     protected function read(string $key): mixed
     {
-        $value = get_post_meta($this->id(), $key, true);
-        if (Metabox::isUnset($value)) {
-            return Metabox::defaultValue($this->id(), $key) ?? $value;
-        }
-
-        return $value;
+        return Metabox::withDefault($this->id(), $key, get_post_meta($this->id(), $key, true));
     }
 }

@@ -39,6 +39,7 @@ class ContentDefaultsCommand extends Command
                 HELP)
             ->addOption('apply', null, InputOption::VALUE_NONE, 'Write the defaults (otherwise only preview)')
             ->addOption('undo', null, InputOption::VALUE_REQUIRED, 'Reverse a journal from uploads/taw-private (fields edited since are kept)')
+            ->addOption('user', null, InputOption::VALUE_REQUIRED, 'Write as this user (login, email or ID); default: the first administrator')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the plan/report as JSON');
     }
 
@@ -57,6 +58,17 @@ class ContentDefaultsCommand extends Command
         }
         WpLoader::autoConfigureLocalSocket($this->themeDir);
         require $wpLoad;
+
+        // Write as an admin's save would: fields that keep markup for users
+        // allowed unfiltered HTML (`sanitize => code`) are sanitized per user.
+        $user = WpLoader::cliUser((string) $input->getOption('user'));
+        if ($user === null) {
+            $io->error("No such user: '" . $input->getOption('user') . "'.");
+            return Command::FAILURE;
+        }
+        if ($user > 0) {
+            wp_set_current_user($user);
+        }
 
         $defaults = new Defaults();
 

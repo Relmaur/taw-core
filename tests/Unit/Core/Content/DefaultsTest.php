@@ -80,6 +80,7 @@ final class DefaultsTest extends TestCase
         new OptionsPage(['id' => 'taw_footer', 'title' => 'Footer', 'fields' => [['id' => 'phone', 'type' => 'text']], 'defaults' => ['phone' => '555-0100']]);
 
         $this->meta['1|_taw_intro_heading'] = 'Already mine';
+        $this->meta['2|_taw_intro_items'] = '[]'; // saved with no rows: still empty
     }
 
     protected function tearDown(): void

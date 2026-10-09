@@ -208,7 +208,7 @@ new Metabox([
 ```
 
 - Keys are field ids (group sub-fields by their compound id, `group_sub`). Unknown keys, and empty values, are ignored.
-- An empty stored value (`''`, or nothing) falls back to the default, as `?:` did; `'0'` is a value.
+- A field falls back to its default when its stored value is empty as `?:` saw it: nothing, `''`, `'0'`, or an empty JSON list or object (a repeater saved with no rows stores `'[]'`, an image field saved blank `'0'`). A checkbox's `'0'` is a value: unchecked is a choice.
 - `OptionsPage` takes the same key; `OptionsPage::get()` falls back to it before its `$default` argument.
 - **Save them to the database:** Tools → TAW Data → *Defaults*, or `php bin/taw content:defaults` (preview) / `--apply`. Only empty fields are written, on the posts each metabox applies to (its post types, templates and slugs) and on options pages. A journal of the writes goes to `uploads/taw-private/` first; *Undo it* on the screen, or `--undo=<journal>`, reverses them and keeps any field edited since. The preview marks (`*`) a default the field's sanitizing would change (tags in a `text` or `textarea` field): saving stores the sanitized value.
 - Not yet in the block editor's data panel (ADR-0007): there the field shows empty until the defaults are saved.
