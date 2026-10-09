@@ -108,12 +108,13 @@ class SyncCommand extends Command
 
                     foreach ($manifest['tier1'] as $entry) {
                         if ($entry['type'] === 'skills-dir') {
-                            $plan = $this->planSkillsReconcile($entry, $clone, $skillsCfg);
+                            $core = self::coreSkills($entry['path']);
+                            $plan = $this->planSkillsReconcile($entry, $clone, $skillsCfg, $core);
                             $entry['reconcile'] = $plan;
                             $entry['changed'] = $plan['overwrite'] !== [] || $plan['delete'] !== [];
 
                             if ($entry['changed'] && $apply) {
-                                $this->applySkillsReconcile($entry, $clone, $plan);
+                                $this->applySkillsReconcile($entry, $clone, $plan, $core);
                                 $report['applied'][] = $entry['path'];
                             }
 
@@ -268,7 +269,7 @@ class SyncCommand extends Command
      *     manifestMerge?: array<string, array<string, mixed>>
      * }|null
      */
-    private function loadManifest(): ?array
+    public function loadManifest(): ?array
     {
         $path = dirname(__DIR__, 2) . '/resources/update-manifest.json';
 
@@ -369,7 +370,7 @@ class SyncCommand extends Command
      * @param array<string, mixed> $manifest
      * @return array{ownerKey: string, frameworkValue: string, siteValue: string}
      */
-    private function skillsReconcileConfig(array $manifest): array
+    public function skillsReconcileConfig(array $manifest): array
     {
         $cfg = is_array($manifest['skillsReconcile'] ?? null) ? $manifest['skillsReconcile'] : [];
 
@@ -397,23 +398,71 @@ class SyncCommand extends Command
      *   - present only in client, `owner: taw`  → delete (retired framework skill)
      *   - present only in client, no `owner:`   → preserve, but warn (human call)
      *
+     * The site skills taw/core itself ships (`resources/skills/<name>/`, the
+     * one source for classic and block themes alike), by name → folder. Only
+     * `.claude/skills/` gets them.
+     *
+     * @return array<string, string>
+     */
+    public static function coreSkills(string $path = '.claude/skills/'): array
+    {
+        if (rtrim($path, '/') !== '.claude/skills') {
+            return [];
+        }
+        $root = dirname(__DIR__, 2) . '/resources/skills';
+        $skills = [];
+        foreach (is_dir($root) ? (scandir($root) ?: []) : [] as $name) {
+            if ($name[0] !== '.' && is_file($root . '/' . $name . '/SKILL.md')) {
+                $skills[$name] = $root . '/' . $name;
+            }
+        }
+        ksort($skills);
+
+        return $skills;
+    }
+
+    /**
+     * Every canonical skill for one skills-dir entry, by name → folder: the
+     * scaffold clone's, then taw/core's own (which win on a shared name).
+     *
+     * @param array<string, string> $core
+     * @return array<string, string>
+     */
+    private function canonicalSkillDirs(array $entry, ?string $cloneDir, array $core): array
+    {
+        $dirs = [];
+        if ($cloneDir !== null) {
+            $canonical = rtrim($cloneDir, '/') . '/' . $entry['path'];
+            foreach ($this->immediateSubdirs($canonical) as $name) {
+                $dirs[$name] = rtrim($canonical, '/') . '/' . $name;
+            }
+        }
+
+        return array_merge($dirs, $core);
+    }
+
+    /**
+     * $cloneDir null = taw/core's skills only (`skills:sync`): skills it
+     * doesn't ship are left alone, never deleted, preserved or warned about.
+     *
      * @param array{path: string, type: string} $entry
      * @param array{ownerKey: string, frameworkValue: string, siteValue: string} $cfg
+     * @param array<string, string> $core taw/core's skills (coreSkills())
      * @return array{overwrite: list<string>, delete: list<string>, preserve: list<string>, warn: list<string>, clash: list<string>}
      */
-    private function planSkillsReconcile(array $entry, string $cloneDir, array $cfg): array
+    public function planSkillsReconcile(array $entry, ?string $cloneDir, array $cfg, array $core = []): array
     {
         $local = rtrim($this->themeDir, '/') . '/' . $entry['path'];
-        $canonical = rtrim($cloneDir, '/') . '/' . $entry['path'];
 
-        $canonicalSkills = $this->immediateSubdirs($canonical);
-        $localSkills = $this->immediateSubdirs($local);
+        $canonicalDirs = $this->canonicalSkillDirs($entry, $cloneDir, $core);
+        $canonicalSkills = array_keys($canonicalDirs);
+        $localSkills = $cloneDir === null ? [] : $this->immediateSubdirs($local);
 
         $plan = ['overwrite' => [], 'delete' => [], 'preserve' => [], 'warn' => [], 'clash' => []];
 
         foreach ($canonicalSkills as $name) {
             $localSkill = $local . '/' . $name;
-            $canonicalSkill = $canonical . '/' . $name;
+            $canonicalSkill = $canonicalDirs[$name];
 
             if (is_dir($localSkill) && $this->skillOwner($localSkill, $cfg['ownerKey']) === $cfg['siteValue']) {
                 $plan['clash'][] = $name;
@@ -453,21 +502,24 @@ class SyncCommand extends Command
     /**
      * @param array{path: string, type: string} $entry
      * @param array{overwrite: list<string>, delete: list<string>, preserve: list<string>, warn: list<string>, clash: list<string>} $plan
+     * @param array<string, string> $core taw/core's skills (coreSkills())
      */
-    private function applySkillsReconcile(array $entry, string $cloneDir, array $plan): void
+    public function applySkillsReconcile(array $entry, ?string $cloneDir, array $plan, array $core = []): void
     {
         $local = rtrim($this->themeDir, '/') . '/' . $entry['path'];
-        $canonical = rtrim($cloneDir, '/') . '/' . $entry['path'];
+        $canonicalDirs = $this->canonicalSkillDirs($entry, $cloneDir, $core);
 
         @mkdir($local, 0755, true);
 
         foreach ($plan['overwrite'] as $name) {
-            $src = rtrim($canonical . '/' . $name, '/') . '/';
+            $src = rtrim($canonicalDirs[$name], '/') . '/';
             $dest = rtrim($local . '/' . $name, '/') . '/';
             @mkdir($dest, 0755, true);
             // `--delete` is safe *within* one skill folder — a skill dir is
-            // wholly framework-owned; only its parent is shared.
-            exec('rsync -a --delete ' . escapeshellarg($src) . ' ' . escapeshellarg($dest));
+            // wholly framework-owned; only its parent is shared. `--checksum`:
+            // an edit that keeps a file's size within the same second would
+            // otherwise pass rsync's size+time check and be skipped.
+            exec('rsync -a --checksum --delete ' . escapeshellarg($src) . ' ' . escapeshellarg($dest));
         }
 
         foreach ($plan['delete'] as $name) {
