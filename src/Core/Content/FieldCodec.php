@@ -278,7 +278,7 @@ final class FieldCodec
         }
 
         return match ($type) {
-            'image'       => is_numeric($decoded) && (int) $decoded > 0 ? ($map->attachment((int) $decoded) ?? $decoded) : $decoded,
+            'image'       => self::rewriteImage($decoded, $map),
             'files'       => is_array($decoded) ? RefMap::mapIds(self::intList($decoded), static fn (int $id) => $map->attachment($id)) : $decoded,
             'post_select' => self::rewritePostSelect($decoded, $map),
             'repeater'    => self::rewriteRows($fieldConfig, $decoded, $map),
@@ -286,6 +286,16 @@ final class FieldCodec
             'checkbox', 'number', 'range' => $decoded,
             default       => self::rewriteStrings($decoded, $map),
         };
+    }
+
+    private static function rewriteImage(mixed $decoded, RefMap $map): mixed
+    {
+        if (!is_numeric($decoded) || (int) $decoded <= 0) {
+            return $decoded;
+        }
+        $local = $map->attachment((int) $decoded);
+
+        return $local === false ? 0 : ($local ?? $decoded);
     }
 
     private static function rewritePostSelect(mixed $decoded, RefMap $map): mixed

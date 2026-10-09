@@ -170,4 +170,19 @@ final class RefMapTest extends TestCase
         $this->assertSame([135], FieldCodec::referencedPostIds($repeater, [['post' => 135]]));
         $this->assertSame(['a', 'b'], FieldCodec::strings(['x' => 'a', 'y' => [1, 'b', '']]));
     }
+
+    public function test_a_listed_file_this_site_cant_get_is_cleared(): void
+    {
+        $map = new RefMap([501 => 9001], [], [], [], null, null, null, [], '', '', '', [503]);
+
+        $this->assertFalse($map->attachment(503));
+        $this->assertNull($map->attachment(999), 'not in the snapshot: left alone');
+        $this->assertSame(0, FieldCodec::rewriteRefs(['type' => 'image'], 503, $map));
+        $this->assertSame([9001], FieldCodec::rewriteRefs(['type' => 'files'], [501, 503], $map));
+
+        $changed = false;
+        $out = BlockRefs::rewriteBlocks([['blockName' => 'core/image', 'attrs' => ['id' => 503, 'sizeSlug' => 'large'], 'innerBlocks' => []]], $map, $changed);
+        $this->assertSame(['sizeSlug' => 'large'], $out[0]['attrs']);
+        $this->assertSame('<img class="wp-image-503">', BlockRefs::rewriteHtml('<img class="wp-image-503">', $map), 'the class is left; the attribute is what WordPress reads');
+    }
 }

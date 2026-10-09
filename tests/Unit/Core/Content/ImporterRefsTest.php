@@ -30,6 +30,9 @@ final class ImporterRefsTest extends TestCase
     /** @var list<int> */
     private array $thumbnailsRemoved = [];
 
+    /** @var array<int, string> this site's attachments: id => path under uploads */
+    private array $attachments = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -59,7 +62,16 @@ final class ImporterRefsTest extends TestCase
             return true;
         });
         Functions\when('get_post')->alias(fn ($id) => $this->posts[(int) $id] ?? null);
+        Functions\when('wp_basename')->alias(static fn (string $p): string => basename($p));
+        Functions\when('wp_kses_post')->returnArg(1);
+        Functions\when('wp_get_attachment_url')->alias(fn (int $id): string => 'http://site.local/wp-content/uploads/' . ($this->attachments[$id] ?? ''));
         Functions\when('get_posts')->alias(function (array $q): array {
+            if (($q['post_type'] ?? '') === 'attachment') {
+                $want = (string) ($q['meta_query'][0]['value'] ?? '');
+                $exact = ($q['meta_query'][0]['compare'] ?? '=') === '=';
+                return array_keys(array_filter($this->attachments, static fn (string $file): bool => $exact
+                    ? $file === $want : str_contains('/' . $file, $want)));
+            }
             $slugs = $q['post_name__in'] ?? null;
             return array_values(array_filter($this->posts, static fn (\WP_Post $p): bool => is_array($slugs)
                 && in_array($p->post_name, $slugs, true) && in_array($p->post_type, (array) ($q['post_type'] ?? []), true)));
@@ -202,5 +214,61 @@ final class ImporterRefsTest extends TestCase
 
         $this->assertSame('http://site.local/aviso/', $this->options['_taw_footer_link']);
         $this->assertSame('https://prod.test is my site', $this->options['blogname'], 'core options pass through');
+    }
+
+    /** An attachment of this fake site, with its metadata. */
+    private function siteAttachment(int $id, string $path, string $alt = '', string $caption = ''): void
+    {
+        $this->attachments[$id] = $path;
+        $this->meta["{$id}|_wp_attached_file"] = $path;
+        $this->meta["{$id}|_wp_attachment_image_alt"] = $alt;
+        $this->posts[$id] = new \WP_Post(['ID' => $id, 'post_type' => 'attachment', 'post_name' => basename($path), 'post_title' => basename($path),
+            'post_excerpt' => $caption, 'post_content' => '', 'post_status' => 'inherit']);
+    }
+
+    public function test_the_plan_lists_media_to_download_missing_and_changed(): void
+    {
+        $this->siteAttachment(900, '2024/05/hero.jpg', 'Old alt');
+        $plan = (new Importer())->plan([
+            'meta'  => ['schema' => '1.4', 'source' => ['url' => 'https://prod.test']],
+            'media' => [
+                ['id' => 11, 'filename' => 'hero.jpg', 'url' => 'https://prod.test/wp-content/uploads/2024/05/hero.jpg', 'title' => 'hero.jpg', 'alt' => 'A field at dawn', 'caption' => 'Photo: <a href="https://x.test">Ana</a>'],
+                ['id' => 12, 'filename' => 'new.jpg', 'url' => 'https://prod.test/wp-content/uploads/2026/10/new.jpg'],
+                ['id' => 13, 'filename' => 'gone.jpg'],
+            ],
+        ]);
+
+        $media = array_values(array_filter($plan['records'], static fn (array $r): bool => $r['kind'] === 'media'));
+        $this->assertSame(['update', 'create', 'missing'], array_column($media, 'op'));
+        $this->assertSame(['caption', 'alt'], array_keys($media[0]['changes']), 'the title already matches');
+        $this->assertSame('Photo: <a href="https://x.test">Ana</a>', $media[0]['changes']['caption']['new'], 'the caption keeps its link');
+        $this->assertSame('2026/10/new.jpg', $media[1]['key']);
+        $this->assertSame('missing', $media[2]['changes']['file']['status']);
+    }
+
+    public function test_apply_updates_media_metadata_and_clears_what_points_at_a_missing_file(): void
+    {
+        $this->siteAttachment(900, '2024/05/hero.jpg', 'Old alt');
+        $this->sitePost(5, 'page', 'home');
+        new Metabox(['id' => 'taw_media_test', 'title' => 'Media', 'screens' => ['page'], 'fields' => [['id' => 'hero_image', 'type' => 'image']]]);
+        $this->meta['5|_taw_hero_image'] = '777';
+        Functions\when('parse_blocks')->justReturn([['blockName' => 'core/image', 'attrs' => ['id' => 13], 'innerBlocks' => [], 'innerHTML' => '', 'innerContent' => []]]);
+        Functions\when('serialize_blocks')->alias(static fn (array $b): string => '<!-- wp:image ' . json_encode($b[0]['attrs'] ?: new \stdClass()) . ' -->');
+
+        $report = (new Importer())->apply([
+            'meta'  => ['schema' => '1.4', 'source' => ['url' => 'https://prod.test']],
+            'media' => [
+                ['id' => 11, 'filename' => 'hero.jpg', 'url' => 'https://prod.test/wp-content/uploads/2024/05/hero.jpg', 'alt' => 'A field at dawn'],
+                ['id' => 13, 'filename' => 'gone.jpg'],
+            ],
+            'posts' => [['type' => 'page', 'slug' => 'home', 'title' => 'Home', 'fields' => ['hero_image' => 13],
+                'content' => '<!-- wp:image {"id":13} --><figure><img class="wp-image-13"/></figure><!-- /wp:image -->']],
+        ], ['rollback' => false]);
+
+        $this->assertSame('A field at dawn', $this->meta['900|_wp_attachment_image_alt']);
+        $this->assertContains('media:2024/05/hero.jpg', $report['updated']);
+        $this->assertSame('0', (string) $this->meta['5|_taw_hero_image'], 'cleared, not left pointing at an unrelated attachment 777 or 13');
+        $this->assertSame('<!-- wp:image {} -->', $this->posts[5]->post_content, "the image block's id is dropped");
+        $this->assertStringContainsString('gone.jpg', implode("\n", $report['warnings']));
     }
 }

@@ -169,9 +169,11 @@ class Importer
         $this->checkSchema($input);
         $media = new MediaResolver();
         $media->build(is_array($input['media'] ?? null) ? $input['media'] : [], false);
-        $this->refs = $this->buildRefMap($input, $media->idMap());
+        $this->refs = $this->buildRefMap($input, $media->idMap(), $media->missingIds());
 
-        $records = [];
+        // Media first, as apply runs it: files to download, files missing,
+        // and attachments whose alt / caption / title differ.
+        $records = $this->planMedia($media->outcomes());
         foreach (self::operationsFrom($input) as $op) {
             $kind = $op['target']['kind'] ?? '';
             $records[] = match ($kind) {
@@ -288,7 +290,15 @@ class Importer
         // resets $this->warnings.)
         $unchanged = $this->unchangedRecordKeys($input);
         $this->warnings = $mediaWarnings;
-        $this->refs = $this->buildRefMap($input, $idMap);
+        $this->refs = $this->buildRefMap($input, $idMap, $resolver->missingIds());
+        if ($policy === 'update') {
+            foreach ($this->planMedia($resolver->outcomes()) as $record) {
+                if (($record['op'] ?? '') === 'update' && !empty($record['changes'])) {
+                    $this->updateMedia((int) $record['local'], $record['changes']);
+                    $report['updated'][] = 'media:' . $record['key'];
+                }
+            }
+        }
         $this->secondPass = [];
         $this->incomingPosts = [];
         foreach (self::operationsFrom($input) as $op) {
@@ -355,9 +365,10 @@ class Importer
      * source origin to this site's.
      *
      * @param array<string, mixed> $input
-     * @param array<int, int>      $idMap source attachment id => local id
+     * @param array<int, int>      $idMap   source attachment id => local id
+     * @param list<int>            $missing source attachment ids this site won't have
      */
-    private function buildRefMap(array $input, array $idMap): RefMap
+    private function buildRefMap(array $input, array $idMap, array $missing = []): RefMap
     {
         $refs = is_array($input['refs'] ?? null) ? $input['refs'] : [];
         $sourceUrl = (string) ($input['meta']['source']['url'] ?? '');
@@ -385,7 +396,109 @@ class Importer
             $sourceUrl,
             $sourceUrl !== '' ? (string) home_url() : '',
             (string) ($input['meta']['source']['uploads_url'] ?? ''),
+            $missing,
         );
+    }
+
+    /**
+     * The media part of the plan: a file to download (`create`), one this
+     * site can't get (`missing`: what references it is cleared), and an
+     * attachment here whose alt text, caption, title or description differ
+     * (`update`). Media that already matches isn't listed.
+     *
+     * @param list<array{id: int, filename: string, path: string, url: string, status: string, local: int, entry: array<string, mixed>}> $outcomes
+     * @return list<array<string, mixed>>
+     */
+    private function planMedia(array $outcomes): array
+    {
+        $records = [];
+        foreach ($outcomes as $o) {
+            $identity = ['kind' => 'media', 'key' => $o['path'], 'local' => $o['local']];
+            if ($o['status'] === 'would-sideload') {
+                $records[] = $identity + ['op' => 'create', 'changes' => ['file' => ['status' => 'new', 'new' => $o['url']]]];
+                continue;
+            }
+            if (in_array($o['status'], ['missing', 'failed'], true)) {
+                $records[] = $identity + ['op' => 'missing', 'changes' => ['file' => ['status' => 'missing', 'new' => $o['filename']]]];
+                continue;
+            }
+            if ($o['status'] !== 'matched' || $o['local'] <= 0) {
+                continue;
+            }
+            $changes = [];
+            foreach (self::mediaFields($o['entry']) as $prop => $new) {
+                $old = self::currentMediaField($o['local'], $prop);
+                if ($old !== $new) {
+                    $changes[$prop] = ['status' => $old === '' ? 'new' : 'changed', 'old' => $old, 'new' => $new];
+                }
+            }
+            if ($changes !== []) {
+                $records[] = $identity + ['op' => 'update', 'changes' => $changes];
+            }
+        }
+
+        return $records;
+    }
+
+    /**
+     * A media entry's metadata as this site would store it (captions and
+     * descriptions keep their markup, as an editor's save does).
+     *
+     * @param array<string, mixed> $entry
+     * @return array<string, string>
+     */
+    private static function mediaFields(array $entry): array
+    {
+        $out = [];
+        foreach (['title', 'caption', 'alt', 'description'] as $prop) {
+            if (!array_key_exists($prop, $entry) || !is_scalar($entry[$prop])) {
+                continue;
+            }
+            $value = (string) $entry[$prop];
+            $out[$prop] = match ($prop) {
+                'alt'                    => sanitize_text_field($value),
+                'caption', 'description' => wp_kses_post($value),
+                default                  => $value,
+            };
+        }
+
+        return $out;
+    }
+
+    private static function currentMediaField(int $id, string $prop): string
+    {
+        if ($prop === 'alt') {
+            return (string) get_post_meta($id, '_wp_attachment_image_alt', true);
+        }
+        $post = get_post($id);
+
+        return $post instanceof \WP_Post ? (string) match ($prop) {
+            'title'       => $post->post_title,
+            'caption'     => $post->post_excerpt,
+            default       => $post->post_content,
+        } : '';
+    }
+
+    /**
+     * @param array<string, array{new?: mixed}> $changes
+     */
+    private function updateMedia(int $id, array $changes): void
+    {
+        $post = ['ID' => $id];
+        foreach (['title' => 'post_title', 'caption' => 'post_excerpt', 'description' => 'post_content'] as $prop => $column) {
+            if (isset($changes[$prop])) {
+                $post[$column] = (string) ($changes[$prop]['new'] ?? '');
+            }
+        }
+        if (count($post) > 1) {
+            $result = wp_update_post(wp_slash($post), true);
+            if (is_wp_error($result)) {
+                $this->warnings[] = "media #{$id}: update failed: " . $result->get_error_message();
+            }
+        }
+        if (isset($changes['alt'])) {
+            update_post_meta($id, '_wp_attachment_image_alt', wp_slash((string) ($changes['alt']['new'] ?? '')));
+        }
     }
 
     /**
@@ -469,7 +582,7 @@ class Importer
         $t = is_array($opOrRecord['target'] ?? null) ? $opOrRecord['target'] : $opOrRecord;
         $kind = (string) ($t['kind'] ?? '');
 
-        if (in_array($kind, ['option', 'user', 'comment'], true)) {
+        if (in_array($kind, ['option', 'user', 'comment', 'media'], true)) {
             return $kind . ':' . (string) ($t['key'] ?? '');
         }
 
