@@ -58,6 +58,9 @@ final class ExporterTest extends TestCase
         Functions\when('get_taxonomies')->justReturn([]);
         Functions\when('get_object_taxonomies')->justReturn([]);
         Functions\when('get_page_template_slug')->justReturn('');
+        Functions\when('is_post_type_hierarchical')->alias(static fn (string $t): bool => $t === 'page');
+        Functions\when('get_page_uri')->alias(static fn ($p): string => is_object($p) ? (string) $p->post_name : '');
+        Functions\when('maybe_unserialize')->alias(static fn ($v) => is_string($v) && ($u = @unserialize($v)) !== false ? $u : $v);
 
         $page = new \WP_Post([
             'ID' => 10, 'post_type' => 'page', 'post_name' => 'home', 'post_status' => 'publish',
@@ -120,13 +123,51 @@ final class ExporterTest extends TestCase
     {
         $snapshot = (new Exporter())->snapshot();
 
-        $this->assertSame('1.4', $snapshot['meta']['schema']);
+        $this->assertSame('1.5', $snapshot['meta']['schema']);
         $this->assertSame('https://example.test', $snapshot['meta']['source']['url']);
 
         $post = $snapshot['posts'][0];
         $this->assertSame('home', $post['slug']);
         $this->assertSame([['name' => 'Ada']], $post['fields']['team']);
         $this->assertSame(77, $post['fields']['hero']);
+    }
+
+    public function test_pages_carry_their_path_and_name_their_parent_by_path(): void
+    {
+        $pages = [
+            1 => new \WP_Post(['ID' => 1, 'post_type' => 'page', 'post_name' => 'about', 'post_parent' => 0]),
+            2 => new \WP_Post(['ID' => 2, 'post_type' => 'page', 'post_name' => 'company', 'post_parent' => 1]),
+            3 => new \WP_Post(['ID' => 3, 'post_type' => 'page', 'post_name' => 'team', 'post_status' => 'publish', 'post_title' => 'Team',
+                'post_excerpt' => '', 'post_content' => '', 'post_parent' => 2, 'menu_order' => 0, 'post_date_gmt' => '2026-01-01 00:00:00']),
+        ];
+        $uri = static function (\WP_Post $p) use (&$uri, $pages): string {
+            return ($p->post_parent ? $uri($pages[$p->post_parent]) . '/' : '') . $p->post_name;
+        };
+        Functions\when('get_posts')->justReturn([$pages[3]]);
+        Functions\when('get_post')->alias(static fn ($id) => $pages[(int) $id] ?? null);
+        Functions\when('get_page_uri')->alias(static fn ($p): string => $uri(is_object($p) ? $p : $pages[(int) $p]));
+
+        $post = (new Exporter())->snapshot()['posts'][0];
+
+        $this->assertSame('about/company/team', $post['path']);
+        $this->assertSame('about/company', $post['parent']);
+    }
+
+    public function test_terms_of_every_post_taxonomy_with_meta_unserialized(): void
+    {
+        Functions\when('get_taxonomies')->justReturn(['category' => 'category']);
+        Functions\when('get_object_taxonomies')->justReturn(['category', 'internal_tag']);
+        Functions\when('wp_get_object_terms')->justReturn([]);
+        Functions\when('get_terms')->alias(static fn (array $q): array => [new \WP_Term(['term_id' => $q['taxonomy'] === 'category' ? 5 : 6,
+            'taxonomy' => $q['taxonomy'], 'slug' => 'a', 'name' => 'A', 'description' => '', 'parent' => 0])]);
+        Functions\when('get_term_meta')->alias(static fn (int $id) => $id === 5
+            ? ['color' => ['#c00'], 'links' => [serialize(['x', 'y'])], '_private' => ['no']]
+            : []);
+
+        $terms = (new Exporter())->snapshot()['terms'];
+
+        $this->assertSame(['category', 'internal_tag'], array_keys($terms), "a private taxonomy the posts use is exported too");
+        $this->assertSame(['color' => '#c00', 'links' => ['x', 'y']], $terms['category'][0]['meta']);
     }
 
     public function test_fields_with_another_prefix_are_keyed_by_meta_key(): void

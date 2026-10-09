@@ -47,7 +47,7 @@ final class RefMap
      * @param array<int|string, array<string, mixed>>                  $postRefs    snapshot `refs.posts`
      * @param array<int|string, array<string, mixed>>                  $termRefs    snapshot `refs.terms`
      * @param array<int|string, array<string, mixed>>                  $userRefs    snapshot `refs.users`
-     * @param (\Closure(string, string): int)|null                     $findPost    (type, slug) => local id, 0 when absent
+     * @param (\Closure(string, string, string): int)|null             $findPost    (type, slug, path) => local id, 0 when absent
      * @param (\Closure(string, string): int)|null                     $findTerm    (taxonomy, slug) => local id, 0 when absent
      * @param (\Closure(array<string, mixed>): int)|null               $findUser    {login, email} => local id, 0 when absent
      * @param list<array{from: string, to: string}>                    $mediaUrls   each media file's source URL => local URL
@@ -98,7 +98,7 @@ final class RefMap
         }
         $type = (string) ($ref['type'] ?? '');
         $slug = (string) ($ref['slug'] ?? '');
-        $local = $type !== '' && $slug !== '' ? ($this->findPost)($type, $slug) : 0;
+        $local = $type !== '' && $slug !== '' ? ($this->findPost)($type, $slug, (string) ($ref['path'] ?? '')) : 0;
         if ($local > 0) {
             return $this->posts[$id] = $local;
         }

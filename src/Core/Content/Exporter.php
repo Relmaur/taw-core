@@ -30,7 +30,7 @@ use TAW\Core\OptionsPage\OptionsPage;
  */
 class Exporter
 {
-    public const SCHEMA_VERSION = '1.4';
+    public const SCHEMA_VERSION = '1.5';
 
     /**
      * Core (non-`_taw_`) options included in every export. `page_on_front`
@@ -101,6 +101,9 @@ class Exporter
     /** @var array<int, true> post IDs referenced by ID (post_select, block attributes) */
     private array $referencedPosts = [];
 
+    /** @var array<string, true> taxonomies of the exported post types */
+    private array $postTaxonomies = [];
+
     /** @var array<int, true> term IDs referenced by ID (block attributes) */
     private array $referencedTerms = [];
 
@@ -126,6 +129,7 @@ class Exporter
         $this->referencedTerms = [];
         $this->referencedUsers = [];
         $this->urlAttachments = [];
+        $this->postTaxonomies = [];
         $uploads = function_exists('wp_upload_dir') ? wp_upload_dir(null, false) : [];
         $uploadsUrl = (string) ($uploads['baseurl'] ?? '');
         $this->uploadsUrl = (string) preg_replace('#^https?:#', '', $uploadsUrl);
@@ -331,9 +335,22 @@ class Exporter
 
         $this->exportedPosts[(int) $post->ID] = ['type' => (string) $post->post_type, 'slug' => (string) $post->post_name];
 
+        // A hierarchical post is keyed by its path (1.5), and names its
+        // parent by path: `about/team` and `services/team` are two pages.
+        $hierarchical = is_post_type_hierarchical((string) $post->post_type);
+        $parent = $post->post_parent ? get_post($post->post_parent) : null;
+        $parentRef = $parent instanceof \WP_Post
+            ? ($hierarchical ? (string) get_page_uri($parent) : (string) $parent->post_name)
+            : null;
+
         $record = [
             'type'           => $post->post_type,
             'slug'           => $post->post_name,
+        ];
+        if ($hierarchical && (string) $post->post_name !== '') {
+            $record['path'] = (string) get_page_uri($post);
+        }
+        $record += [
             'status'         => $post->post_status,
             'title'          => $post->post_title,
             'excerpt'        => $post->post_excerpt,
@@ -344,7 +361,7 @@ class Exporter
             'comment_status' => (string) $post->comment_status,
             'ping_status'    => (string) $post->ping_status,
             'password'       => (string) $post->post_password,
-            'parent'         => $post->post_parent ? (get_post($post->post_parent)->post_name ?? null) : null,
+            'parent'         => $parentRef !== '' ? $parentRef : null,
             'template'       => get_page_template_slug($post) ?: null,
             'terms'          => $this->postTerms($post),
             'featured_media' => $featured,
@@ -400,6 +417,7 @@ class Exporter
             if (is_wp_error($terms)) {
                 continue;
             }
+            $this->postTaxonomies[(string) $taxonomy] = true;
             // An empty list is kept, so the importer clears what was removed.
             $out[$taxonomy] = array_values(array_map('strval', $terms));
         }
@@ -416,7 +434,14 @@ class Exporter
     private function exportTerms(): array
     {
         $out = [];
-        foreach (get_taxonomies(['public' => true], 'names') as $taxonomy) {
+        // Public taxonomies, and every one the exported posts use: a post's
+        // terms in a private taxonomy would otherwise arrive as new terms
+        // named after their slugs.
+        $taxonomies = array_values(array_unique(array_merge(
+            array_values(get_taxonomies(['public' => true], 'names')),
+            array_keys($this->postTaxonomies)
+        )));
+        foreach ($taxonomies as $taxonomy) {
             if ($taxonomy === 'nav_menu') {
                 continue;
             }
@@ -500,7 +525,9 @@ class Exporter
             if (is_string($key) && str_starts_with($key, '_')) {
                 continue;
             }
-            $out[(string) $key] = is_array($values) ? ($values[0] ?? '') : $values;
+            // Unserialized (1.5): the importer writes the value, and a
+            // serialized string would be stored serialized twice.
+            $out[(string) $key] = maybe_unserialize(is_array($values) ? ($values[0] ?? '') : $values);
         }
         return $out;
     }
