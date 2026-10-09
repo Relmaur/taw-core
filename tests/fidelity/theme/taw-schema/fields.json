@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "kind": "fieldset",
+  "key": "fid_fields",
+  "title": "Every field type",
+  "on": ["page", "post", "fid_book"],
+  "fields": [
+    { "id": "f_text", "type": "text", "label": "Text" },
+    { "id": "f_url", "type": "url", "label": "URL" },
+    { "id": "f_number", "type": "number", "label": "Number" },
+    { "id": "f_textarea", "type": "textarea", "label": "Textarea" },
+    { "id": "f_wysiwyg", "type": "wysiwyg", "label": "Rich text" },
+    { "id": "f_select", "type": "select", "label": "Select", "options": { "a": "A", "b": "B" } },
+    { "id": "f_checkbox", "type": "checkbox", "label": "Checkbox" },
+    { "id": "f_color", "type": "color", "label": "Color" },
+    { "id": "f_date", "type": "datepicker", "label": "Date" },
+    { "id": "f_range", "type": "range", "label": "Range", "min": 0, "max": 10 },
+    { "id": "f_image", "type": "image", "label": "Image" },
+    { "id": "f_icon", "type": "icon", "label": "Icon" },
+    { "id": "f_files", "type": "files", "label": "Files" },
+    { "id": "f_gradient", "type": "gradient_text", "label": "Gradient text" },
+    { "id": "f_hubspot", "type": "hubspot_form", "label": "HubSpot form" },
+    { "id": "f_link", "type": "link", "label": "Link" },
+    { "id": "f_post", "type": "post_select", "label": "One post", "post_type": "page,fid_book,post" },
+    { "id": "f_posts", "type": "post_select", "label": "Several posts", "post_type": "page,fid_book,post", "multiple": true },
+    { "id": "f_group", "type": "group", "label": "Group", "fields": [
+      { "id": "title", "type": "text", "label": "Title" },
+      { "id": "image", "type": "image", "label": "Image" },
+      { "id": "page", "type": "post_select", "label": "Page", "post_type": "page" }
+    ] },
+    { "id": "f_rows", "type": "repeater", "label": "Rows", "fields": [
+      { "id": "label", "type": "text", "label": "Label" },
+      { "id": "image", "type": "image", "label": "Image" },
+      { "id": "target", "type": "post_select", "label": "Target", "post_type": "page,fid_book,post" },
+      { "id": "items", "type": "repeater", "label": "Items", "fields": [
+        { "id": "name", "type": "text", "label": "Name" },
+        { "id": "file", "type": "files", "label": "File" }
+      ] }
+    ] }
+  ]
+}

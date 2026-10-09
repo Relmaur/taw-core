@@ -75,7 +75,7 @@ final class MediaResolver
             // renamed on the way: `photo-1.jpg`), then the path, then the name.
             $existing = ($url !== '' ? self::findBySource($url) : null)
                 ?? ($path !== '' ? self::findByPath($path) : null)
-                ?? self::findByFilename($filename);
+                ?? self::findByFilename($filename, array_values($this->idMap), $url);
             if ($existing !== null) {
                 if ($sourceId > 0) {
                     $this->idMap[$sourceId] = $existing;
@@ -246,16 +246,21 @@ final class MediaResolver
 
     /**
      * Locate an existing attachment whose file is named $filename
-     * (basename match against `_wp_attached_file`).
+     * (basename match against `_wp_attached_file`). Never one in $taken
+     * (already matched to another entry of this import), nor, given the
+     * entry's $url, one an import downloaded from a different URL: two
+     * `hero.jpg` in different month folders are two files.
+     *
+     * @param list<int> $taken
      */
-    public static function findByFilename(string $filename): ?int
+    public static function findByFilename(string $filename, array $taken = [], string $url = ''): ?int
     {
         $filename = wp_basename($filename);
 
         $matches = get_posts([
             'post_type'      => 'attachment',
             'post_status'    => 'inherit',
-            'posts_per_page' => 2,
+            'posts_per_page' => 20,
             'fields'         => 'ids',
             'meta_query'     => [
                 [
@@ -272,7 +277,7 @@ final class MediaResolver
             $matches = get_posts([
                 'post_type'      => 'attachment',
                 'post_status'    => 'inherit',
-                'posts_per_page' => 2,
+                'posts_per_page' => 20,
                 'fields'         => 'ids',
                 'meta_query'     => [
                     [
@@ -285,6 +290,13 @@ final class MediaResolver
         }
 
         foreach ($matches as $id) {
+            if (in_array((int) $id, $taken, true)) {
+                continue;
+            }
+            $source = $url !== '' ? (string) get_post_meta((int) $id, self::SOURCE_META, true) : '';
+            if ($source !== '' && $source !== $url) {
+                continue;
+            }
             $file = get_post_meta((int) $id, '_wp_attached_file', true);
             if (is_string($file) && wp_basename($file) === $filename) {
                 return (int) $id;
@@ -326,14 +338,24 @@ final class MediaResolver
         require_once ABSPATH . 'wp-admin/includes/file.php';
         require_once ABSPATH . 'wp-admin/includes/image.php';
 
-        $tmp = self::download($url);
+        // A `-scaled` file is WordPress's copy of a large upload; uploaded
+        // under that name it'd become `photo-scaled-1.jpg`. The original sits
+        // beside it: download that, and WordPress makes the same copy here.
+        $name = wp_basename((string) ($entry['filename'] ?? parse_url($url, PHP_URL_PATH) ?? 'file'));
+        $original = (string) preg_replace('/-scaled(\.[a-z0-9]+)$/i', '$1', $url);
+        $tmp = $original !== $url ? self::download($original) : null;
+        if ($tmp !== null && !is_wp_error($tmp)) {
+            $name = (string) preg_replace('/-scaled(\.[a-z0-9]+)$/i', '$1', $name);
+        } else {
+            $tmp = self::download($url);
+        }
         if (is_wp_error($tmp)) {
             $error = $tmp->get_error_message();
             return null;
         }
 
         $fileArray = [
-            'name'     => wp_basename((string) ($entry['filename'] ?? parse_url($url, PHP_URL_PATH) ?? 'file')),
+            'name'     => $name,
             'tmp_name' => $tmp,
         ];
 
@@ -345,7 +367,27 @@ final class MediaResolver
             $postData['post_content'] = wp_kses_post((string) $entry['description']);
         }
 
-        $id = media_handle_sideload($fileArray, 0, null, $postData);
+        // Keep the source's month folder (`2024/05/hero.jpg` stays there): a
+        // second `hero.jpg` from another month doesn't become `hero-1.jpg`,
+        // and an import back the other way finds each file by its path.
+        $folder = dirname(self::uploadsPath($url));
+        $keepFolder = static function (array $dirs) use ($folder): array {
+            $dirs['subdir'] = '/' . $folder;
+            $dirs['path'] = $dirs['basedir'] . $dirs['subdir'];
+            $dirs['url'] = $dirs['baseurl'] . $dirs['subdir'];
+            return $dirs;
+        };
+        $monthly = preg_match('#^\d{4}/\d{2}$#', $folder) === 1;
+        if ($monthly) {
+            add_filter('upload_dir', $keepFolder);
+        }
+        try {
+            $id = media_handle_sideload($fileArray, 0, null, $postData);
+        } finally {
+            if ($monthly) {
+                remove_filter('upload_dir', $keepFolder);
+            }
+        }
 
         if (is_wp_error($id)) {
             $error = $id->get_error_message();

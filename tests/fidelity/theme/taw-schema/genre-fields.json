@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "kind": "fieldset",
+  "key": "fid_genre_fields",
+  "title": "Genre details",
+  "on": ["term:fid_genre"],
+  "fields": [
+    { "id": "g_color", "type": "color", "label": "Color" },
+    { "id": "g_image", "type": "image", "label": "Image" },
+    { "id": "g_page", "type": "post_select", "label": "Landing page", "post_type": "page" }
+  ]
+}

@@ -695,7 +695,11 @@ class Exporter
                 continue;
             }
 
-            $out[$name] = get_option($name);
+            $value = get_option($name, null);
+            if ($value === null) {
+                continue; // not set on this site (WPLANG on a single-language install): nothing to carry
+            }
+            $out[$name] = $value;
         }
 
         return $out;

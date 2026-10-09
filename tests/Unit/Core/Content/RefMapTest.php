@@ -85,6 +85,15 @@ final class RefMapTest extends TestCase
         );
     }
 
+    public function test_the_origin_at_the_end_of_a_sentence_is_rewritten(): void
+    {
+        $this->assertSame(
+            'Our address is: http://site.local. Not https://prod.test.example/ nor https://prod.test.evil/.',
+            $this->map()->urls('Our address is: https://prod.test. Not https://prod.test.example/ nor https://prod.test.evil/.'),
+            "a closing period isn't part of a longer host"
+        );
+    }
+
     public function test_the_same_site_rewrites_nothing(): void
     {
         $map = new RefMap([], [], [], [], null, null, null, [], 'https://site.test', 'https://site.test');

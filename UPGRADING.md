@@ -550,6 +550,18 @@ hosts cut large files off mid-transfer), and its warning says why a download fai
 comment or ping status is stored empty at the source (WordPress itself saves the site's default) no
 longer shows as changed on every pull. **Check:** none; only the site you import into needs it.
 
+### v1.88.0: a pull carries everything in one run
+
+Content Interchange, import and export, found by the new fidelity suite (`composer run fidelity`, a
+two-site round trip in CI). A page or term already here whose only change is a link to a page the same
+import creates is now written and linked in that run (before, the link came on the next pull); so is a
+front page, posts page or sticky post the import brings to a site without one. Downloaded files keep the
+source's month folder, so two files of one name stay two files, and a `-scaled` image arrives under its
+own name. An option the source never set (`WPLANG`) is no longer carried, and a site address before a
+sentence's period is mapped. **Check:** none; a site that was pulled into before may hold a duplicate
+`hero-1.jpg`-style copy or a reference to the wrong one of two same-name files: pull again to set the
+references right, then delete the unused copy from the media library.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
