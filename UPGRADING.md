@@ -623,6 +623,19 @@ it should pass as before. **By hand:** copy the stubs from taw-theme v1.12.58+ (
 `build: false` for a classic theme) — each workflow's header lists the same checks as commands.
 **Undo:** restore the old workflow files from git.
 
+**Also in v1.91.0: agent docs come from taw/core.** `AGENTS.md`, `CLAUDE.md` and the Copilot/Windsurf rules
+were full copies of the scaffold's docs (Tier 2: every update meant reviewing their diff; on the live fleet
+no site had edited them). Their framework text now ships with taw/core (`resources/agents/classic/` and
+`block/`) and updates with it; the theme keeps short files (marker `taw:agent-doc`) that import it (CLAUDE.md:
+`@vendor/taw/core/resources/agents/classic/CLAUDE.md`) or point to it, plus a "This site" section for the
+site's own notes, which updates never touch. `sync --apply` converts old copies when `taw.json`'s
+`update.docs` allows (the default); `README.md` is the site's own and no longer synced. **Check:** if you
+had added notes to the old copies, move them under "This site" (the previous text is in git history:
+`git log -p -- AGENTS.md`). **By hand:** `php bin/taw docs:sync --apply`, review, commit. **Undo:**
+`git checkout <previous commit> -- AGENTS.md CLAUDE.md .github/copilot-instructions.md .windsurfrules`.
+When `vendor/taw/core` is a symlink (a path repository in development), Claude Code asks once to allow the
+import from outside the project.
+
 **By hand (taw.json):** `php bin/taw policy --init`, edit `taw.json` (editors that read JSON schemas complete it from
 `vendor/taw/core/resources/schema/taw-json-1.0.json`), check it with `php bin/taw policy`, commit it.
 **Undo:** delete `taw.json` (the defaults apply).

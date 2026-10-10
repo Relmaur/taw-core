@@ -1,27 +1,64 @@
 {
     "$comment": "Single source of truth for which taw-theme paths are framework-owned and safe to sync into a client project. Read by both the update-theme Claude Code skill and TAW\\CLI\\SyncCommand (php bin/taw sync) — keep them pointed at this file rather than hardcoding the lists twice. Tier 1 is always overwritten without confirmation; Tier 2 is diffed and requires human review before being applied; anything not listed is never read or touched.",
     "tier1": [
-        { "path": "functions.php", "type": "file" },
-        { "path": ".claude/skills/", "type": "skills-dir" },
-        { "path": ".agents/skills/", "type": "skills-dir" },
-        { "path": "bin/", "type": "dir" },
-        { "path": ".github/workflows/ci.yml", "type": "file" },
-        { "path": ".github/workflows/framework-sync.yml", "type": "file" },
-        { "path": "tests/bootstrap.php", "type": "file" },
-        { "path": "tests/TestCase.php", "type": "file" },
-        { "path": "resources/js/cleanup-registry.js", "type": "file" }
+        {
+            "path": "functions.php",
+            "type": "file"
+        },
+        {
+            "path": ".claude/skills/",
+            "type": "skills-dir"
+        },
+        {
+            "path": ".agents/skills/",
+            "type": "skills-dir"
+        },
+        {
+            "path": "bin/",
+            "type": "dir"
+        },
+        {
+            "path": ".github/workflows/ci.yml",
+            "type": "file"
+        },
+        {
+            "path": ".github/workflows/framework-sync.yml",
+            "type": "file"
+        },
+        {
+            "path": "tests/bootstrap.php",
+            "type": "file"
+        },
+        {
+            "path": "tests/TestCase.php",
+            "type": "file"
+        },
+        {
+            "path": "resources/js/cleanup-registry.js",
+            "type": "file"
+        }
     ],
     "tier2": [
-        { "path": "AGENTS.md", "type": "file" },
-        { "path": "CLAUDE.md", "type": "file" },
-        { "path": ".github/copilot-instructions.md", "type": "file" },
-        { "path": ".windsurfrules", "type": "file" },
-        { "path": "README.md", "type": "file" },
-        { "path": "composer.json", "type": "file" },
-        { "path": "package.json", "type": "file" },
-        { "path": "vite.config.js", "type": "file" },
-        { "path": "phpstan.neon", "type": "file" },
-        { "path": "phpunit.xml", "type": "file" }
+        {
+            "path": "composer.json",
+            "type": "file"
+        },
+        {
+            "path": "package.json",
+            "type": "file"
+        },
+        {
+            "path": "vite.config.js",
+            "type": "file"
+        },
+        {
+            "path": "phpstan.neon",
+            "type": "file"
+        },
+        {
+            "path": "phpunit.xml",
+            "type": "file"
+        }
     ],
     "skillsReconcile": {
         "$comment": "How `type: skills-dir` entries are synced. Claude Code and the agents runtime only auto-discover skills in `.claude/skills/` and `.agents/skills/`, so framework-managed and site-authored skills have to share the same directory — a plain `rsync -a --delete` (what `type: dir` does) would destroy any skill the client authored for itself. Instead the sync reconciles per skill subdirectory: every skill present in the canonical taw-theme repo is overwritten in place (fresh canonical copy, every run), except when the client's copy of that name says `owner: site` — then it is kept and reported as a `clash` (the framework copy is not installed until the site renames or removes its own); a skill subdirectory present in the client but NOT in canonical is resolved by reading the `owner:` key in its SKILL.md YAML frontmatter — `owner: taw` means it is a framework skill that has been retired upstream, so it is DELETED; `owner: site` means the client authored it, so it is PRESERVED untouched and reported; no `owner:` key (or an unreadable SKILL.md) is treated as unknown — PRESERVED but reported with a warning so a human can decide. Every canonical framework skill carries `owner: taw` in its frontmatter, which is also what makes framework vs site skills greppable in a client's tree (`grep -rl 'owner: taw' .claude/skills`).",
@@ -32,8 +69,21 @@
     "manifestMerge": {
         "$comment": "How sync compares the structured Tier 2 manifests (TAW\\CLI\\ManifestMerge). Only the listed sections are read; within them, keys and repositories the scaffold has and the site lacks are suggested (add), a dependency whose scaffold constraint has a higher lower bound is suggested (bump), and any other difference goes to review. Keys only the site has are its own (emailit, photoswipe, taw/hub-companion…) and are always kept: nothing is ever removed. Optional features are lines new sites get from the scaffold but existing sites only take on purpose; they are reported as optional, never suggested. Labels are dot paths, or repositories[<url>]. `php bin/taw sync --apply-manifests` writes add + bump.",
         "composer.json": {
-            "sections": ["require", "require-dev", "autoload", "autoload-dev", "repositories", "scripts", "config", "minimum-stability", "prefer-stable"],
-            "dependencySections": ["require", "require-dev"],
+            "sections": [
+                "require",
+                "require-dev",
+                "autoload",
+                "autoload-dev",
+                "repositories",
+                "scripts",
+                "config",
+                "minimum-stability",
+                "prefer-stable"
+            ],
+            "dependencySections": [
+                "require",
+                "require-dev"
+            ],
             "optional": {
                 "reactiph": [
                     "require.reactiph/taw-bridge",
@@ -43,16 +93,32 @@
                     "minimum-stability",
                     "prefer-stable"
                 ],
-                "post-create": ["scripts.post-create-project-cmd"]
+                "post-create": [
+                    "scripts.post-create-project-cmd"
+                ]
             }
         },
         "package.json": {
-            "sections": ["dependencies", "devDependencies", "scripts", "type"],
-            "dependencySections": ["dependencies", "devDependencies"],
+            "sections": [
+                "dependencies",
+                "devDependencies",
+                "scripts",
+                "type"
+            ],
+            "dependencySections": [
+                "dependencies",
+                "devDependencies"
+            ],
             "optional": {
-                "chatbot": ["devDependencies.marked", "devDependencies.dompurify"]
+                "chatbot": [
+                    "devDependencies.marked",
+                    "devDependencies.dompurify"
+                ]
             }
         }
     },
-    "$never": "tests/Unit/ is deliberately never listed here, in either tier, and must never become a 'dir' entry — it holds each client project's own block tests (tests/Unit/Blocks/{Name}Test.php), content this manifest doesn't own. A 'dir' entry syncs via 'rsync -a --delete', which would silently delete every client-authored test not present in the canonical repo. Only the harness itself (tests/bootstrap.php, tests/TestCase.php, phpunit.xml) is framework-owned; individual test files are not. The same hazard for .claude/skills/ and .agents/skills/ (client sites legitimately author their own skills) is handled by 'type: skills-dir' + the skillsReconcile rules above, not by omitting them."
+    "$never": "tests/Unit/ is deliberately never listed here, in either tier, and must never become a 'dir' entry — it holds each client project's own block tests (tests/Unit/Blocks/{Name}Test.php), content this manifest doesn't own. A 'dir' entry syncs via 'rsync -a --delete', which would silently delete every client-authored test not present in the canonical repo. Only the harness itself (tests/bootstrap.php, tests/TestCase.php, phpunit.xml) is framework-owned; individual test files are not. The same hazard for .claude/skills/ and .agents/skills/ (client sites legitimately author their own skills) is handled by 'type: skills-dir' + the skillsReconcile rules above, not by omitting them.",
+    "agentDocs": {
+        "$comment": "Since v1.91.0 the agent docs (AGENTS.md, CLAUDE.md, .github/copilot-instructions.md, .windsurfrules) are no longer Tier 2. The framework's part ships with taw/core in resources/agents/<classic|block>/ and updates with it; a theme keeps short site-owned files that import (CLAUDE.md) or point to (the others) it, marked `taw:agent-doc`. `sync --apply` (when taw.json's update.docs allows) and `bin/taw docs:sync --apply` replace old full copies with those files (TAW\\Update\\AgentDocs). README.md is the site's own: never synced."
+    }
 }

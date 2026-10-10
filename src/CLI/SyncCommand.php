@@ -10,6 +10,8 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use TAW\Update\AgentDocs;
+use TAW\Update\Policy;
 
 /**
  * Detects (and optionally applies) drift between this project and the
@@ -133,6 +135,19 @@ class SyncCommand extends Command
                         $report['tier1'][] = $entry;
                     }
 
+                    // The agent docs: full framework copies become short files that
+                    // import or point to taw/core's (AgentDocs), when the site's
+                    // taw.json allows (update.docs, default on).
+                    $docs = new AgentDocs($this->themeDir, 'classic');
+                    $docPlan = $docs->plan();
+                    $report['agent_docs'] = $docPlan + ['applied' => [], 'policy' => Policy::load($this->themeDir)->docs()];
+                    if ($apply && $report['agent_docs']['policy']) {
+                        $report['agent_docs']['applied'] = $docs->apply($docPlan);
+                        foreach ($report['agent_docs']['applied'] as $path) {
+                            $report['applied'][] = $path;
+                        }
+                    }
+
                     $mergeRules = $manifest['manifestMerge'] ?? [];
                     foreach ($manifest['tier2'] as $entry) {
                         $changed = $this->pathDiffers($entry, $clone);
@@ -161,6 +176,7 @@ class SyncCommand extends Command
 
         $report['clean'] = empty($report['errors'])
             && $report['taw_core']['behind'] === false
+            && (($report['agent_docs']['convert'] ?? []) === [] && ($report['agent_docs']['create'] ?? []) === [] || ($report['agent_docs']['applied'] ?? []) !== [])
             && !$this->anyChanged($report['tier1'])
             && !$this->anyChanged($report['tier2']);
 
@@ -703,6 +719,18 @@ class SyncCommand extends Command
 
             if (!$printedSomething) {
                 $io->text('Up to date.');
+            }
+        }
+
+        if (isset($report['agent_docs'])) {
+            $io->section('Agent docs (AGENTS.md, CLAUDE.md, …)');
+            $d = $report['agent_docs'];
+            foreach (array_merge($d['convert'], $d['create']) as $path) {
+                $state = in_array($path, $d['applied'], true) ? 'now points to taw/core' : ($d['policy'] ? 'to point to taw/core (--apply)' : "left as is (taw.json: update.docs is off)");
+                $io->text('- ' . $path . ': ' . $state);
+            }
+            if ($d['convert'] === [] && $d['create'] === []) {
+                $io->text('Up to date (they point to taw/core).');
             }
         }
 
