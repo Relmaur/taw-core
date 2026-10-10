@@ -18,6 +18,7 @@ name: TAW theme CI (shared)
 #   php -l on every theme file · php vendor/taw/core/resources/ci/check-getdata-signature.php .
 #   composer run phpstan · composer run test · vendor/bin/taw schema:validate
 #   npm run check (or npm run build) · the smoke test: see the smoke job below
+#   bash vendor/taw/core/resources/ci/check-committed-files.sh (always runs)
 
 on:
   workflow_call:
@@ -36,6 +37,33 @@ on:
         default: false
 
 jobs:
+  # No database dump, snapshot or credentials file committed: on a pull
+  # request, in any of its commits. Needs no Composer install, so it runs
+  # even when the rest of the build can't.
+  committed-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The script from the taw-core branch the themes call this workflow at.
+      - uses: actions/checkout@v4
+        with:
+          repository: Relmaur/taw-core
+          ref: v1
+          path: .taw-core-ci
+          sparse-checkout: resources/ci
+          persist-credentials: false
+
+      - name: No dumps, snapshots or credentials committed
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          script=.taw-core-ci/resources/ci/check-committed-files.sh
+          if [ -n "$BASE" ]; then bash "$script" "$BASE" "$HEAD"; else bash "$script"; fi
+
   php:
     runs-on: ubuntu-latest
     strategy:
