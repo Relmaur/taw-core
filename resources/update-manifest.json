@@ -31,7 +31,11 @@
         },
         {
             "path": "tests/TestCase.php",
-            "type": "file"
+            "type": "file",
+            "$comment": "keep_edited: the sha256 of every version the taw-theme scaffold shipped (its git history). Sync replaces the site's copy only when it is one of these (an unedited copy) or missing; a copy the site edited (helpers of its own) is kept and reported, never overwritten. Add the new hash when the scaffold's copy changes (SyncCommandTest fails until you do).",
+            "keep_edited": [
+                "d25098329a61847682498733d42a26a0e32f448b52663c6e3ae25303f05f7aa9"
+            ]
         },
         {
             "path": "resources/js/cleanup-registry.js",

@@ -746,6 +746,21 @@ remove the file from the branch's history (not just from the last commit) and ro
 **By hand:** `bash vendor/taw/core/resources/ci/check-committed-files.sh [<base> <head>]`. **Undo:** none; the job
 reads only.
 
+### v1.93.1: sync keeps a `tests/TestCase.php` with the site's own helpers; CI actions on Node 24
+
+**What changed.** `sync` (and so `update` and the weekly framework sync) used to overwrite `tests/TestCase.php` on
+every run. Now it replaces it only when it is a version the taw-theme scaffold shipped (or missing). A copy with the
+site's own changes is kept and reported: "has this site's own changes, left as is" (`kept: true` in `sync --json`; a
+"Kept" section in the weekly pull request). The shared workflows use `actions/checkout@v7`, `setup-node@v7`,
+`upload-artifact@v7` and `create-pull-request@v8` (Node 24), and the smoke test runs on `ubuntu-24.04`, whose image
+ships the MySQL it uses (`ubuntu-latest` moves to Ubuntu 26 on 2026-10-19).
+
+**Why.** Helpers a site added to its `TestCase` were wiped on the next sync (one site moved its own into
+`tests/Unit/Concerns/` to get around it). GitHub is retiring Node 20 for actions.
+
+**Check:** none. **By hand:** when the scaffold's `TestCase` changes and yours is kept, compare the two and take what
+the framework changed. **Undo:** none needed.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

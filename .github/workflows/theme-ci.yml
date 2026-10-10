@@ -41,14 +41,16 @@ jobs:
   # request, in any of its commits. Needs no Composer install, so it runs
   # even when the rest of the build can't.
   committed-files:
-    runs-on: ubuntu-latest
+    # Pinned: this job uses the image's preinstalled MySQL, and ubuntu-latest
+    # moves to Ubuntu 26 on 2026-10-19 (check it still ships MySQL before moving).
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       # The script from the taw-core branch the themes call this workflow at.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: Relmaur/taw-core
           ref: v1
@@ -70,7 +72,7 @@ jobs:
       matrix:
         php: ${{ fromJSON(inputs.php-versions) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -121,7 +123,7 @@ jobs:
     if: inputs.build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Skip without package.json
         id: has
@@ -143,7 +145,7 @@ jobs:
           composer config -g github-oauth.github.com "${{ github.token }}"
           composer install --no-interaction --prefer-dist --no-progress --no-dev
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: steps.has.outputs.npm == 'true'
         with:
           node-version: "22"
@@ -164,7 +166,7 @@ jobs:
     # active, creates one page, and renders every registered block and form
     # against it — the runtime errors no static check sees.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The runner's own MySQL 8 (root/root): no image pull, no Docker Hub limit.
       - name: Start MySQL
