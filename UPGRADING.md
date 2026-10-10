@@ -714,6 +714,19 @@ ahead: taw-fleet updates a theme still on taw/core 1.89/1.90 in one step by movi
 that has `update`, restoring `composer.lock`, and running that `update`. **Check:** none. **Undo:**
 `composer require taw/core:1.91.1`.
 
+### v1.92.0: `taw.json` names the remote an update goes to
+
+**What changed.** A new setting, `"remote"` (default `"origin"`): the git remote `bin/taw update` pushes its
+branch to, and whose GitHub repository its pull request opens on (`gh pr create --repo <owner/name>`). The check
+for an update still waiting, and the report's "Finish" steps, use it too. If the named remote doesn't exist, the
+update refuses before changing anything, with what to do.
+
+**Why.** Some sites deploy from an agency's GitHub organization while `origin` is a copy elsewhere
+(emelambda: `origin-agency`). Without this, the pull request opened on the copy, and merging it deployed nothing.
+
+**Check:** none; without the setting, nothing changes. **By hand:** add `"remote": "<name>"` under `"update"` in
+`taw.json` (`git remote -v` lists the names), commit it. **Undo:** remove the line.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

@@ -151,7 +151,8 @@ final class Report
         $out[] = '';
         if ($branch !== '') {
             $out[] = "On the branch `{$branch}` (`git checkout {$branch}`): commit the fix, then push it and open a pull request";
-            $out[] = "into `{$base}`: `git push -u origin {$branch}`, then `gh pr create --base {$base} --fill` (or on GitHub).";
+            $remote = (string) ($r['remote'] ?? 'origin');
+        $out[] = "into `{$base}`: `git push -u {$remote} {$branch}`, then `gh pr create --base {$base} --fill` (or on GitHub).";
             $out[] = "taw-fleet's M merges it; merging deploys production.";
         }
         $out[] = '';

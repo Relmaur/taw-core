@@ -2012,6 +2012,7 @@ mirrors it; `PolicyTest` keeps them in sync).
 | `docs` | `framework-sections` (the framework's part of the agent docs comes from taw/core: unedited copies become short files that import or point to it), `off` |
 | `checks` | any of `lint`, `phpstan`, `test`, `build`, `smoke` (needs the site running) |
 | `deliver` | `pr` (a pull request to merge), `pr+merge` (merged when checks pass; deploys), `branch` |
+| `remote` | the git remote the update is pushed to, default `origin`; its pull request opens on that remote's GitHub repository (v1.92.0: for a site that deploys from an agency's organization while `origin` is a copy) |
 
 `php bin/taw policy` shows it in words (`--json` for tools, `--init` writes a starter file). An invalid
 file is listed with its errors, and updates refuse to run until it's fixed: never half-applied.

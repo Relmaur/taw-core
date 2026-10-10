@@ -43,6 +43,12 @@
           "description": "pr (default): a pull request for you to merge. pr+merge: merged when every check passes (merging deploys production). branch: committed on a branch, nothing pushed.",
           "enum": ["pr", "pr+merge", "branch"],
           "default": "pr"
+        },
+        "remote": {
+          "description": "The git remote the update branch is pushed to; its pull request opens on that remote's GitHub repository. For a site whose production deploys from another remote than origin (an agency's organization).",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+          "default": "origin"
         }
       }
     }

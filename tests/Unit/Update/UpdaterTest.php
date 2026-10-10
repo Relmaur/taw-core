@@ -163,6 +163,40 @@ final class UpdaterTest extends TestCase
         $this->assertStringContainsString('(taw/core 1.90.0 → 1.91.0)', (string) file_get_contents($this->dir . '/.taw/update-report.md'));
     }
 
+    public function test_it_delivers_to_the_remote_taw_json_names(): void
+    {
+        // An agency site: origin is a copy, production deploys from "agency".
+        $agency = dirname($this->dir) . '/agency.git';
+        exec('git init -q --bare ' . escapeshellarg($agency));
+        $git = 'git -C ' . escapeshellarg($this->dir);
+        file_put_contents($this->dir . '/taw.json', '{"update": {"remote": "agency"}}');
+        exec("{$git} remote add agency " . escapeshellarg($agency) . " && {$git} add taw.json && {$git} commit -qm policy");
+
+        $r = $this->updater()->run();
+        $this->assertSame('updated', $r['status'], json_encode($r['failure']));
+        $this->assertStringContainsString('taw/update-', (string) shell_exec('git -C ' . escapeshellarg($agency) . ' branch --list'), 'pushed to agency');
+        $this->assertSame('', trim((string) shell_exec('git -C ' . escapeshellarg($this->remote) . ' branch --list')), 'not to origin');
+        $this->assertSame('Pushing taw/update-20261009-120000 and opening a pull request', end($this->said));
+    }
+
+    public function test_a_missing_remote_is_refused_before_anything_changes(): void
+    {
+        file_put_contents($this->dir . '/taw.json', '{"update": {"remote": "agency"}}');
+        exec('git -C ' . escapeshellarg($this->dir) . ' add taw.json && git -C ' . escapeshellarg($this->dir) . ' commit -qm policy');
+
+        $r = $this->updater()->run();
+        $this->assertSame('refused', $r['status']);
+        $this->assertStringContainsString('the "agency" git remote, which this repository doesn\'t have', $r['failure']['reason']);
+        $this->assertNotContains('git checkout -b taw/update-20261009-120000', $this->ran);
+    }
+
+    public function test_the_pull_request_opens_on_the_remotes_github_repository(): void
+    {
+        $this->assertSame('EmeLambda/emelambda--theme', Updater::githubRepo('git@github.com:EmeLambda/emelambda--theme.git'));
+        $this->assertSame('Relmaur/taw-core', Updater::githubRepo('https://github.com/Relmaur/taw-core'));
+        $this->assertNull(Updater::githubRepo('/tmp/origin.git'));
+    }
+
     public function test_composer_commands_keep_quoted_paths_whole(): void
     {
         $this->assertSame(
