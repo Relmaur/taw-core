@@ -594,7 +594,8 @@ couldn't add a command, and a new command needed a scaffold release. This is the
 update a plain `composer update` (umbrella plan `docs/plans/taw-platform.md` § 5.0).
 
 **Check:** none; nothing a site wrote changes. Run `vendor/bin/taw list` (or `php bin/taw list`): a
-classic theme lists 28 commands, a block theme `schema:validate` and `skills:sync`.
+classic theme lists 28 commands, a block theme `schema:validate` and `skills:sync` (from v1.91.0: 33 and 6,
+with `policy`, `docs:sync`, `configs:sync` (classic only), `upgrade` and `update`).
 
 **By hand** (the scaffold's sync does it for you): replace the theme's `bin/taw` with the scaffold's new
 one (taw-theme v1.12.57+ / taw-gutenberg v0.3.59+), or call taw/core directly:
@@ -614,8 +615,8 @@ working either way.
 taw/core's range (`patch`, `minor`, or `pinned:1.90.0`), framework files, `composer.json`/`package.json`
 additions, the framework's sections of the agent docs, which checks must pass, and how the update is
 delivered (`pr`, `pr+merge`, `branch`). `bin/taw policy` shows the effective policy in words;
-`--init` writes a starter file. Nothing acts on it yet: the coming `bin/taw update` (and taw-fleet's
-"Update this site") will.
+`--init` writes a starter file. `bin/taw update` (below) follows every setting; from v1.91.1 the migrations
+follow `scaffold` and `docs` wherever they run. The weekly `theme-framework-sync.yml` doesn't read it yet.
 
 **Why.** So "update this site" can run without asking questions: the site decides once, in a file it
 owns and commits, and every updater (the dashboard, the weekly CI job, a person) follows the same rules
@@ -635,12 +636,13 @@ it should pass as before. **By hand:** copy the stubs from taw-theme v1.12.58+ (
 **Undo:** restore the old workflow files from git.
 
 **Also in v1.91.0: agent docs come from taw/core.** `AGENTS.md`, `CLAUDE.md` and the Copilot/Windsurf rules
-were full copies of the scaffold's docs (Tier 2: every update meant reviewing their diff; on the live fleet
-no site had edited them). Their framework text now ships with taw/core (`resources/agents/classic/` and
+were full copies of the scaffold's docs (Tier 2: every update meant reviewing their diff). Their framework text now ships with taw/core (`resources/agents/classic/` and
 `block/`) and updates with it; the theme keeps short files (marker `taw:agent-doc`) that import it (CLAUDE.md:
 `@vendor/taw/core/resources/agents/classic/CLAUDE.md`) or point to it, plus a "This site" section for the
-site's own notes, which updates never touch. `sync --apply` converts old copies when `taw.json`'s
-`update.docs` allows (the default); `README.md` is the site's own and no longer synced. **Check:** if you
+site's own notes, which updates never touch. The `1.91.0/agent-docs` migration converts old copies;
+`README.md` is the site's own and no longer synced. In v1.91.0 it replaced every unmarked copy, edited or
+not (`sync --apply` too); from v1.91.1 only copies identical to a version the scaffold shipped
+(`resources/agents/known.json`), and an edited one is left with the steps for a person. **Check:** if you
 had added notes to the old copies, move them under "This site" (the previous text is in git history:
 `git log -p -- AGENTS.md`). **By hand:** `php bin/taw docs:sync --apply`, review, commit. **Undo:**
 `git checkout <previous commit> -- AGENTS.md CLAUDE.md .github/copilot-instructions.md .windsurfrules`.
@@ -651,7 +653,7 @@ import from outside the project.
 and `phpstan.neon` were full copies of the scaffold's (Tier 2). Their base now ships with taw/core
 (`classicTheme()` in `resources/vite/taw-vite.mjs`, `resources/phpstan/classic.neon`) and updates with it; the
 theme keeps a short file (marker `taw:config`) that loads it, with room for the site's own settings
-(Vite's `mergeConfig`; PHPStan parameters merge). `sync --apply` (when `taw.json`'s `update.scaffold` allows)
+(Vite's `mergeConfig`; PHPStan parameters merge). The `1.91.0/configs` migration (and in v1.91.0, `sync --apply`)
 replaces a file only when it is identical to a version the scaffold once shipped
 (`resources/configs/known.json`); a file the site edited is left alone and reported with what to do by hand.
 `phpunit.xml` is the site's own and no longer synced. After this, Tier 2 is `composer.json`/`package.json`
@@ -673,9 +675,36 @@ It never fails the update: a migration that fails is reported with `vendor/bin/t
 `TAW_NO_UPGRADE=1 composer update`, or `"extra": {"taw": {"upgrade": false}}`. A site pinned below 1.91
 (`taw.json`: `"core": "pinned:1.90.0"`) must not have the line: Composer can't find the class there.
 
+**`bin/taw update` (v1.91.0): all of the above in one step.** See "How to upgrade" at the top.
+
 **By hand (taw.json):** `php bin/taw policy --init`, edit `taw.json` (editors that read JSON schemas complete it from
 `vendor/taw/core/resources/schema/taw-json-1.0.json`), check it with `php bin/taw policy`, commit it.
 **Undo:** delete `taw.json` (the defaults apply).
+
+### v1.91.1: migrations follow `taw.json`; edited agent docs are kept
+
+**What changed.**
+- **The migrations follow `taw.json`** in `update`, `composer update`'s hook and `upgrade --apply`:
+  `"docs": "off"` holds back `1.91.0/agent-docs`, `"scaffold": "off"` holds back `1.89.0/site-skills` and
+  `1.91.0/configs`. A held-back migration is listed ("off in taw.json") with how to do it by hand
+  (`upgrade --explain <id>`). The commands you run for one job, `docs:sync` and `configs:sync`, do what you ask.
+- **Edited agent docs are kept.** `1.91.0/agent-docs` replaces only copies identical to a version the scaffold
+  shipped; a copy with the site's own notes stays as it is, with a "For you" step. `docs:sync --apply --force`
+  replaces it when you've moved your notes aside.
+- **`sync --apply` no longer writes the agent docs or the configs**: it reports them, and the migrations write
+  them. The weekly `theme-framework-sync.yml` now runs `upgrade --apply` after `sync`.
+- **`update`**: `--composer` keeps quoted parts whole (a PHP path with spaces, as under Local), progress lines
+  as each step runs (on stderr with `--json`), `--plan --json` prints JSON, and the report lists held-back
+  migrations.
+- **`hub:install` / `hub:enroll`** are registered again as hidden stubs that say what replaced them.
+
+**Why.** Found while documenting v1.91.0: two client themes had their own notes in `CLAUDE.md`, which v1.91.0
+would have replaced, and `"docs"`/`"scaffold": "off"` didn't stop the migrations.
+
+**Check:** none. A theme already migrated by v1.91.0 is unaffected; if it had notes in an agent doc, they
+are in git history (`git log -p -- CLAUDE.md`): put them under "This site".
+
+**Undo:** `composer require taw/core:1.91.0`.
 
 ## Opt-in features you may want
 

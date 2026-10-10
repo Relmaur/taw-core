@@ -14,7 +14,8 @@ use TAW\Update\Migrations;
  *
  * After every `composer update` it runs the migrations the theme still needs
  * (the same as `vendor/bin/taw upgrade --apply`): new site skills, docs and
- * configs from taw/core, whatever a release changes in a theme. Not after
+ * configs from taw/core, whatever a release changes in a theme, as far as the
+ * theme's taw.json allows (a held-back migration gets one line). Not after
  * `composer install`, which must reproduce the lock without changing files.
  *
  * Never breaks the update: a migration that fails is reported with the
@@ -48,6 +49,9 @@ final class ComposerScripts
             return;
         }
 
+        foreach (Migrations::held($themeDir) as $h) {
+            $say('<comment>TAW:</comment> ' . Migrations::heldNote($h['migration'], $h['setting']));
+        }
         $pending = Migrations::pending($themeDir);
         if ($pending === []) {
             return; // quiet when there's nothing to do

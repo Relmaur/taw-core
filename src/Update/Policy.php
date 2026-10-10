@@ -6,9 +6,12 @@ namespace TAW\Update;
 
 /**
  * A site's update policy: what an update changes on its own, read from the
- * theme's `taw.json` ("update" key). Site-owned, never synced; `bin/taw
- * update`, the weekly framework-sync workflow and taw-fleet's "Update this
- * site" all read the same rules (umbrella plan docs/plans/taw-platform.md § 5).
+ * theme's `taw.json` ("update" key). Site-owned, never synced. `bin/taw
+ * update` follows all of it; the migrations follow `scaffold` and `docs`
+ * wherever they run (`update`, `composer update`'s hook, `upgrade`). The
+ * weekly framework-sync workflow doesn't read it yet: moving that workflow
+ * onto `bin/taw update` is the follow-up (umbrella plan
+ * docs/plans/taw-platform.md § 5).
  *
  * Every setting has a default, so a site without taw.json updates the way
  * the defaults say. An invalid file is never half-applied: the policy reports
@@ -37,8 +40,8 @@ final class Policy
             'default' => 'auto',
             'values' => ['auto', 'off'],
             'means' => [
-                'auto' => 'framework-owned files (Tier 1: functions.php, bin/, workflows, framework skills) are replaced',
-                'off' => 'framework-owned files are left alone (reported, not written)',
+                'auto' => 'framework-owned files (Tier 1: functions.php, bin/, workflows, framework skills) are replaced, and unedited vite.config.js/phpstan.neon load taw/core\'s base',
+                'off' => 'framework-owned files and configs are left alone (reported, not written)',
             ],
         ],
         'manifests' => [
@@ -53,8 +56,8 @@ final class Policy
             'default' => 'framework-sections',
             'values' => ['framework-sections', 'off'],
             'means' => [
-                'framework-sections' => "the framework's sections of AGENTS.md/CLAUDE.md are refreshed; the site's own text is kept",
-                'off' => 'agent and README docs are left alone',
+                'framework-sections' => "the framework's part of the agent docs comes from taw/core: unedited AGENTS.md/CLAUDE.md/Copilot/Windsurf copies become short files that import or point to it; edited ones are left for a person",
+                'off' => 'updates leave the agent docs alone',
             ],
         ],
         'checks' => [
@@ -255,6 +258,20 @@ final class Policy
     public function docs(): bool
     {
         return $this->values['docs'] === 'framework-sections';
+    }
+
+    /**
+     * Whether an on/off setting (scaffold, manifests, docs) lets an update
+     * do that kind of change on its own. Migrations name theirs (PolicyGated).
+     */
+    public function allows(string $setting): bool
+    {
+        return match ($setting) {
+            'scaffold' => $this->scaffold(),
+            'manifests' => $this->manifests(),
+            'docs' => $this->docs(),
+            default => true,
+        };
     }
 
     /** @return list<string> */

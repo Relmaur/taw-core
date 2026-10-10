@@ -24,10 +24,12 @@ final class ComposerScriptsTest extends TestCase
         $this->dir = sys_get_temp_dir() . '/taw-composer-' . getmypid() . '-' . uniqid();
         @mkdir($this->dir . '/vendor', 0777, true);
         $this->lines = [];
+        \TAW\Update\AgentDocs::useKnown(['classic' => ['AGENTS.md' => ["# old full copy\n"]]]);
     }
 
     protected function tearDown(): void
     {
+        \TAW\Update\AgentDocs::useKnown(null);
         putenv('TAW_NO_UPGRADE');
         exec('rm -rf ' . escapeshellarg($this->dir));
         parent::tearDown();

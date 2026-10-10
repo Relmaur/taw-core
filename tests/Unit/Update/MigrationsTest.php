@@ -7,6 +7,7 @@ namespace TAW\Tests\Unit\Update;
 use Symfony\Component\Console\Tester\CommandTester;
 use TAW\CLI\UpgradeCommand;
 use TAW\Tests\TestCase;
+use TAW\Update\AgentDocs;
 use TAW\Update\Migration;
 use TAW\Update\MigrationResult;
 use TAW\Update\Migrations;
@@ -26,11 +27,16 @@ final class MigrationsTest extends TestCase
         $this->dir = sys_get_temp_dir() . '/taw-migrations-' . getmypid() . '-' . uniqid();
         @mkdir($this->dir, 0777, true);
         Migrations::reset();
+        AgentDocs::useKnown(['classic' => [
+            'AGENTS.md' => ["# AGENTS.md — AI Agent Guide for TAW Theme\n…\n", "# old copy\n"],
+            'CLAUDE.md' => ["# CLAUDE.md — Claude Code Instructions\n…\n"],
+        ]]);
     }
 
     protected function tearDown(): void
     {
         Migrations::reset();
+        AgentDocs::useKnown(null);
         exec('rm -rf ' . escapeshellarg($this->dir));
         parent::tearDown();
     }
@@ -69,6 +75,34 @@ final class MigrationsTest extends TestCase
         $this->assertSame([], Migrations::pending($this->dir), 'nothing left');
         $this->assertFileExists($this->dir . '/.claude/skills/resolve-comments/SKILL.md');
         $this->assertStringContainsString('taw:agent-doc', (string) file_get_contents($this->dir . '/CLAUDE.md'));
+    }
+
+    public function test_taw_json_holds_back_what_it_turns_off(): void
+    {
+        file_put_contents($this->dir . '/AGENTS.md', "# old copy\n");
+        file_put_contents($this->dir . '/taw.json', '{"update": {"docs": "off", "scaffold": "off"}}');
+
+        $this->assertSame([], Migrations::pending($this->dir), 'nothing runs on its own');
+        $held = array_map(fn ($h) => $h['migration']->id() . '=' . $h['setting'], Migrations::held($this->dir));
+        $this->assertSame(['1.89.0/site-skills=scaffold', '1.91.0/agent-docs=docs'], $held);
+        $this->assertStringContainsString('1.91.0/agent-docs is off in taw.json ("docs": "off")', Migrations::heldNote(Migrations::held($this->dir)[1]['migration'], 'docs'));
+
+        $tester = new CommandTester(new UpgradeCommand($this->dir));
+        $tester->execute(['--apply' => true, '--json' => true]);
+        $report = json_decode($tester->getDisplay(), true);
+        $this->assertSame([], $report['applied']);
+        $this->assertSame(['1.89.0/site-skills', '1.91.0/agent-docs'], array_column($report['held'], 'id'));
+        $this->assertSame("# old copy\n", file_get_contents($this->dir . '/AGENTS.md'), 'held back: untouched');
+    }
+
+    public function test_an_edited_agent_doc_is_left_with_the_steps_for_a_person(): void
+    {
+        file_put_contents($this->dir . '/AGENTS.md', "# old copy\n\nOur client writes in Spanish.\n");
+        $result = Migrations::find('1.91.0/agent-docs')?->run($this->dir);
+        $this->assertNotNull($result);
+        $this->assertSame(['CLAUDE.md'], $result->changed, 'the missing CLAUDE.md is created; AGENTS.md is the site\'s');
+        $this->assertStringContainsString("AGENTS.md has this site's own changes", $result->manual[0]);
+        $this->assertStringContainsString('Our client writes in Spanish.', (string) file_get_contents($this->dir . '/AGENTS.md'));
     }
 
     public function test_an_edited_config_stays_pending_with_the_steps_for_a_person(): void

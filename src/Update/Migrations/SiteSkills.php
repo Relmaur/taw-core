@@ -13,8 +13,13 @@ use TAW\Update\MigrationResult;
  * perf-audit…) are installed in the theme's .claude/skills/, where Claude
  * Code finds them. Refreshes them when taw/core's copy changed.
  */
-final class SiteSkills implements \TAW\Update\Migration
+final class SiteSkills implements \TAW\Update\Migration, \TAW\Update\PolicyGated
 {
+    public function policySetting(): string
+    {
+        return 'scaffold';
+    }
+
     public function id(): string
     {
         return '1.89.0/site-skills';

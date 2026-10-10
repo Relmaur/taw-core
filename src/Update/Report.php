@@ -46,14 +46,17 @@ final class Report
             }
             $out[] = '';
         }
-        if (($r['migrations'] ?? []) !== [] || ($r['manual'] ?? []) !== []) {
+        if (($r['migrations'] ?? []) !== [] || ($r['manual'] ?? []) !== [] || ($r['held'] ?? []) !== []) {
             $out[] = '## Migrations';
             $out[] = '';
-            foreach ($r['migrations'] as $id) {
+            foreach ($r['migrations'] ?? [] as $id) {
                 $out[] = '- `' . $id . '` (what, why, by hand, undo: `vendor/bin/taw upgrade --explain ' . $id . '`)';
             }
-            foreach ($r['manual'] as $step) {
+            foreach ($r['manual'] ?? [] as $step) {
                 $out[] = '- **For you:** ' . $step;
+            }
+            foreach ($r['held'] ?? [] as $note) {
+                $out[] = '- **Off in taw.json:** ' . $note;
             }
             $out[] = '';
         }

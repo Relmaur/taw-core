@@ -30,7 +30,8 @@ final class UpgradeCommand extends Command
             ->setHelp(
                 "Each taw/core release that changes something in a theme ships a migration: it finds its own work,\n" .
                 "so running it again does nothing, and anything it shouldn't decide (a file the site edited) is left\n" .
-                "as is, with the steps for a person.\n\n" .
+                "as is, with the steps for a person. A migration that taw.json turns off (\"scaffold\" or \"docs\":\n" .
+                "\"off\") is listed as held back and doesn't run; --explain <id> says how to do it by hand.\n\n" .
                 "  <info>vendor/bin/taw upgrade</info>                       what's pending\n" .
                 "  <info>vendor/bin/taw upgrade --apply</info>               run them\n" .
                 "  <info>vendor/bin/taw upgrade --explain <id></info>        what one does, why, by hand, undo\n" .
@@ -62,6 +63,7 @@ final class UpgradeCommand extends Command
         }
 
         $pending = Migrations::pending($this->themeDir);
+        $held = Migrations::held($this->themeDir);
         $results = [];
         if ($input->getOption('apply')) {
             foreach ($pending as $m) {
@@ -74,13 +76,17 @@ final class UpgradeCommand extends Command
                 'pending' => array_map(fn ($m) => ['id' => $m->id(), 'title' => $m->title()], $pending),
                 'applied' => $results,
                 'manual' => array_merge([], ...array_map(fn ($r) => $r['manual'], array_values($results))),
+                'held' => array_map(fn ($h) => ['id' => $h['migration']->id(), 'title' => $h['migration']->title(), 'setting' => $h['setting'], 'note' => Migrations::heldNote($h['migration'], $h['setting'])], $held),
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
             return Command::SUCCESS;
         }
 
+        foreach ($held as $h) {
+            $output->writeln('  <comment>–</comment> ' . Migrations::heldNote($h['migration'], $h['setting']));
+        }
         if ($pending === []) {
-            $output->writeln('<info>✓</info> Nothing to migrate: this theme is up to date with its taw/core.');
+            $output->writeln('<info>✓</info> Nothing ' . ($held === [] ? '' : 'else ') . 'to migrate: this theme is up to date with its taw/core' . ($held === [] ? '' : ' and its taw.json') . '.');
 
             return Command::SUCCESS;
         }
