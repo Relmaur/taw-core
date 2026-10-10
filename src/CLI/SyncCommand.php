@@ -10,6 +10,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use TAW\Update\AgentDocs;
+use TAW\Update\ConfigFiles;
+use TAW\Update\Policy;
 
 /**
  * Detects (and optionally applies) drift between this project and the
@@ -94,6 +97,7 @@ class SyncCommand extends Command
             'errors' => [],
         ];
 
+        $pendingFiles = false; // converted configs or agent docs still to apply
         $manifest = $this->loadManifest();
         if ($manifest === null) {
             $report['errors'][] = 'Could not load resources/update-manifest.json — this ships with taw/core, reinstall it if missing.';
@@ -133,6 +137,34 @@ class SyncCommand extends Command
                         $report['tier1'][] = $entry;
                     }
 
+                    // The agent docs: full framework copies become short files that
+                    // import or point to taw/core's (AgentDocs), when the site's
+                    // taw.json allows (update.docs, default on).
+                    $docs = new AgentDocs($this->themeDir, 'classic');
+                    $docPlan = $docs->plan();
+                    $report['agent_docs'] = $docPlan + ['applied' => [], 'policy' => Policy::load($this->themeDir)->docs()];
+                    if ($apply && $report['agent_docs']['policy']) {
+                        $report['agent_docs']['applied'] = $docs->apply($docPlan);
+                        foreach ($report['agent_docs']['applied'] as $path) {
+                            $report['applied'][] = $path;
+                        }
+                    }
+                    $pendingFiles = ($docPlan['convert'] !== [] || $docPlan['create'] !== []) && $report['agent_docs']['applied'] === [];
+
+                    // vite.config.js / phpstan.neon: unedited copies become short files
+                    // that load taw/core's base (ConfigFiles), when taw.json's
+                    // update.scaffold allows (default on). Edited ones are reported.
+                    $configs = new ConfigFiles($this->themeDir);
+                    $configPlan = $configs->plan();
+                    $report['configs'] = $configPlan + ['applied' => [], 'by_hand' => array_intersect_key(ConfigFiles::BY_HAND, array_flip($configPlan['custom']))];
+                    if ($apply && Policy::load($this->themeDir)->scaffold()) {
+                        $report['configs']['applied'] = $configs->apply($configPlan);
+                        foreach ($report['configs']['applied'] as $path) {
+                            $report['applied'][] = $path;
+                        }
+                    }
+                    $pendingFiles = $pendingFiles || ($configPlan['convert'] !== [] && $report['configs']['applied'] === []);
+
                     $mergeRules = $manifest['manifestMerge'] ?? [];
                     foreach ($manifest['tier2'] as $entry) {
                         $changed = $this->pathDiffers($entry, $clone);
@@ -161,6 +193,7 @@ class SyncCommand extends Command
 
         $report['clean'] = empty($report['errors'])
             && $report['taw_core']['behind'] === false
+            && !$pendingFiles
             && !$this->anyChanged($report['tier1'])
             && !$this->anyChanged($report['tier2']);
 
@@ -703,6 +736,32 @@ class SyncCommand extends Command
 
             if (!$printedSomething) {
                 $io->text('Up to date.');
+            }
+        }
+
+        if (isset($report['configs'])) {
+            $io->section('Configs (vite.config.js, phpstan.neon)');
+            $c = $report['configs'];
+            foreach ($c['convert'] as $path) {
+                $io->text('- ' . $path . ': ' . (in_array($path, $c['applied'], true) ? 'now loads taw/core\'s base' : 'to load taw/core\'s base (--apply)'));
+            }
+            foreach ($c['custom'] as $path) {
+                $io->text('- ' . $path . ': has this site\'s own changes, left as is. By hand: ' . $c['by_hand'][$path]);
+            }
+            if ($c['convert'] === [] && $c['custom'] === []) {
+                $io->text('Up to date (they load taw/core\'s base).');
+            }
+        }
+
+        if (isset($report['agent_docs'])) {
+            $io->section('Agent docs (AGENTS.md, CLAUDE.md, …)');
+            $d = $report['agent_docs'];
+            foreach (array_merge($d['convert'], $d['create']) as $path) {
+                $state = in_array($path, $d['applied'], true) ? 'now points to taw/core' : ($d['policy'] ? 'to point to taw/core (--apply)' : "left as is (taw.json: update.docs is off)");
+                $io->text('- ' . $path . ': ' . $state);
+            }
+            if ($d['convert'] === [] && $d['create'] === []) {
+                $io->text('Up to date (they point to taw/core).');
             }
         }
 

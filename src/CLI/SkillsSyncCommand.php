@@ -41,9 +41,9 @@ class SkillsSyncCommand extends Command
                 "Compares .claude/skills/ with the site skills this taw/core ships (resources/skills/).\n" .
                 "Without --apply it only reports. A skill of the same name the site wrote itself\n" .
                 "(owner: site in its SKILL.md) is kept; other skills in the folder are never touched.\n\n" .
-                "  <info>php bin/taw skills:sync</info>           what would change\n" .
-                "  <info>php bin/taw skills:sync --apply</info>   install or refresh them\n" .
-                "  <info>php bin/taw skills:sync --json</info>    for scripts (taw-fleet)"
+                "  <info>vendor/bin/taw skills:sync</info>           what would change\n" .
+                "  <info>vendor/bin/taw skills:sync --apply</info>   install or refresh them\n" .
+                "  <info>vendor/bin/taw skills:sync --json</info>    for scripts (taw-fleet)"
             )
             ->addOption('apply', null, InputOption::VALUE_NONE, 'Write the changes')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Machine-readable output');
@@ -95,7 +95,7 @@ class SkillsSyncCommand extends Command
         }
         if ($plan['overwrite'] !== [] && !$applied) {
             $io->writeln('');
-            $io->writeln('Run <info>php bin/taw skills:sync --apply</info> to install them.');
+            $io->writeln('Run <info>vendor/bin/taw skills:sync --apply</info> to install them.');
         }
 
         return Command::SUCCESS;

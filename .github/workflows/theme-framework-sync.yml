@@ -1,0 +1,211 @@
+name: TAW theme framework sync (shared)
+
+# Called by every TAW theme's .github/workflows/framework-sync.yml stub, on a
+# weekly schedule:
+#
+#   on: { schedule: [{ cron: "0 9 * * 1" }], workflow_dispatch: {} }
+#   permissions: { contents: write, pull-requests: write }
+#   jobs:
+#     sync:
+#       uses: Relmaur/taw-core/.github/workflows/theme-framework-sync.yml@v1
+#       with: { smoke: true }
+#
+# Bumps taw/core, applies Tier 1 framework files, runs the same checks as CI
+# on the result, and opens one pull request (or nothing, when nothing drifted).
+# It lives here so the job itself updates with taw/core.
+#
+# By hand, the same update is (from the theme folder, on a branch):
+#   composer update taw/core --with-dependencies
+#   vendor/bin/taw sync --apply      (Tier 1; Tier 2 is listed for review)
+#   then the checks in theme-ci.yml, commit, push, open a pull request.
+
+on:
+  workflow_call:
+    inputs:
+      smoke:
+        description: Run the WordPress smoke test on the updated code (classic themes)
+        type: boolean
+        default: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The runner's own MySQL 8 (root/root): no image pull, so no Docker Hub rate limit.
+      - name: Start MySQL
+        run: |
+          sudo systemctl start mysql.service
+          mysqladmin --user=root --password=root --host=127.0.0.1 --silent --wait=30 ping
+          mysql --user=root --password=root --host=127.0.0.1 -e "CREATE DATABASE IF NOT EXISTS wordpress_smoke_test"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          tools: composer:v2
+          extensions: mysqli
+          coverage: none
+
+      # setup-php's wp-cli download 404s (releases ship wp-cli-<version>.phar), so
+      # install the pinned release phar and check it against its published sha512.
+      - name: Install WP-CLI
+        env:
+          WP_CLI_VERSION: "2.12.0"
+        run: |
+          base="https://github.com/wp-cli/wp-cli/releases/download/v${WP_CLI_VERSION}/wp-cli-${WP_CLI_VERSION}.phar"
+          curl -fsSL -o /tmp/wp-cli.phar "$base"
+          echo "$(curl -fsSL "${base}.sha512" | cut -d' ' -f1)  /tmp/wp-cli.phar" | sha512sum -c -
+          sudo install -m 0755 /tmp/wp-cli.phar /usr/local/bin/wp
+          wp --info
+
+      - name: Authenticate Composer with GitHub
+        run: composer config -g github-oauth.github.com "${{ github.token }}"
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Bump taw/core to latest
+        run: composer update taw/core --with-dependencies --no-interaction --prefer-dist --no-progress
+
+      - name: Run sync check and apply Tier 1
+        id: sync
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          tool=vendor/bin/taw; [ -x "$tool" ] || tool="php bin/taw" # taw/core < 1.90
+          REPORT=$($tool sync --apply --json)
+          echo "$REPORT" > "$RUNNER_TEMP/sync-report.json"
+          echo "report_path=$RUNNER_TEMP/sync-report.json" >> "$GITHUB_OUTPUT"
+
+      - name: Check for local changes
+        id: diff
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: PHP lint (php -l on every file)
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          find . -name "*.php" \
+            -not -path "./vendor/*" \
+            -not -path "./node_modules/*" \
+            -print0 | xargs -0 -n1 -P4 php -l
+
+      - name: MetaBlock getData() signature check
+        if: steps.diff.outputs.changed == 'true' && hashFiles('Blocks/**/*.php') != ''
+        run: |
+          script=vendor/taw/core/resources/ci/check-getdata-signature.php
+          [ -f "$script" ] || script=bin/ci/check-getdata-signature.php # taw/core < 1.91
+          php "$script" "$PWD"
+
+      - name: Static analysis
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          if composer run-script --list 2>/dev/null | grep -qE '^\s+phpstan(\s|$)'; then composer run phpstan
+          else echo "No phpstan script: skipped."; fi
+
+      - name: Install WordPress core (for smoke test)
+        if: steps.diff.outputs.changed == 'true' && inputs.smoke
+        run: |
+          wp core download --path=/tmp/wordpress
+          wp config create --path=/tmp/wordpress \
+            --dbname=wordpress_smoke_test --dbuser=root --dbpass=root --dbhost=127.0.0.1
+          wp core install --path=/tmp/wordpress \
+            --url=http://localhost:8080 --title="CI Smoke Test" \
+            --admin_user=admin --admin_password=admin --admin_email=admin@example.com
+
+      - name: Install and activate this theme (post-sync state)
+        if: steps.diff.outputs.changed == 'true' && inputs.smoke
+        run: |
+          rsync -a --exclude=.git "$GITHUB_WORKSPACE/" /tmp/wordpress/wp-content/themes/ci-theme/
+          wp theme activate ci-theme --path=/tmp/wordpress
+
+      - name: Create a test post
+        if: steps.diff.outputs.changed == 'true' && inputs.smoke
+        id: smoke_post
+        run: |
+          POST_ID=$(wp post create --path=/tmp/wordpress \
+            --post_type=page --post_title="Smoke Test" --post_status=publish --porcelain)
+          echo "post_id=$POST_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Run block/form smoke test against the post-sync codebase
+        if: steps.diff.outputs.changed == 'true' && inputs.smoke
+        run: |
+          theme=/tmp/wordpress/wp-content/themes/ci-theme
+          script=$theme/vendor/taw/core/resources/ci/smoke-test.php
+          [ -f "$script" ] || script=$theme/bin/ci/smoke-test.php # taw/core < 1.91
+          php "$script" /tmp/wordpress/wp-load.php ${{ steps.smoke_post.outputs.post_id }}
+
+      - name: Build PR body
+        if: steps.diff.outputs.changed == 'true'
+        id: body
+        run: |
+          REPORT="${{ steps.sync.outputs.report_path }}"
+
+          {
+            echo "body<<SYNC_PR_BODY_EOF"
+            echo "Automated weekly framework sync — verified against the same checks CI runs on every push (php lint, getData signature check, phpstan, and a real WordPress smoke test rendering every block/form) before this PR was opened."
+            echo ""
+            INSTALLED=$(jq -r '.taw_core.installed' "$REPORT")
+            LATEST=$(jq -r '.taw_core.latest' "$REPORT")
+            BEHIND=$(jq -r '.taw_core.behind' "$REPORT")
+            if [ "$BEHIND" = "true" ]; then
+              echo "### taw/core"
+              echo "Bumped \`$INSTALLED\` → \`$LATEST\`."
+              echo ""
+            fi
+
+            APPLIED=$(jq -r '.applied[]?' "$REPORT")
+            if [ -n "$APPLIED" ]; then
+              echo "### Tier 1 (applied automatically)"
+              echo "$APPLIED" | sed 's/^/- /'
+              echo ""
+            fi
+
+            PRESERVED=$(jq -r '[.tier1[].reconcile.preserve // [] | .[]] | unique | .[]?' "$REPORT")
+            if [ -n "$PRESERVED" ]; then
+              echo "### Site-authored skills (preserved, not touched)"
+              echo "$PRESERVED" | sed 's/^/- /'
+              echo ""
+            fi
+
+            WARNED=$(jq -r '[.tier1[].reconcile.warn // [] | .[]] | unique | .[]?' "$REPORT")
+            if [ -n "$WARNED" ]; then
+              echo "### Skills needing a human decision"
+              echo "Not in the canonical scaffold and missing an \`owner:\` marker — left untouched. Add \`owner: site\` to keep one, or delete the folder if it's a retired framework skill."
+              echo "$WARNED" | sed 's/^/- /'
+              echo ""
+            fi
+
+            TIER2_CHANGED=$(jq -r '[.tier2[] | select(.changed == true)] | length' "$REPORT")
+            if [ "$TIER2_CHANGED" -gt 0 ]; then
+              echo "### Tier 2 — review before applying (NOT written by this workflow)"
+              echo "These files differ from the canonical taw-theme repo but were deliberately left untouched — review each diff and apply by hand if appropriate."
+              echo ""
+              jq -r '.tier2[] | select(.changed == true) | "<details><summary>" + .path + "</summary>\n\n```diff\n" + (.diff // "") + "\n```\n\n</details>\n"' "$REPORT"
+            fi
+
+            echo "SYNC_PR_BODY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ github.token }}
+          commit-message: "chore: automated framework sync (taw/core + Tier 1 scaffold)"
+          branch: framework-sync/auto
+          delete-branch: true
+          title: "Framework sync: taw/core + scaffold updates available"
+          body: ${{ steps.body.outputs.body }}

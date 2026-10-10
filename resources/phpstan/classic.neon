@@ -1,0 +1,18 @@
+# PHPStan base for classic TAW themes (taw-theme and its client themes). Ships
+# with taw/core and updates with it; the theme's phpstan.neon includes it and
+# adds its own settings (scanFiles, ignoreErrors, more paths…), which merge in.
+# Paths are relative to this file (PHPStan's rule): five levels up from
+# vendor/taw/core/resources/phpstan/ is the theme folder.
+includes:
+    - ../../../../szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - ../../../../../Blocks
+        - ../../../../../inc
+
+    excludePaths:
+        - ../../../../../vendor/
+        - ../../../../../node_modules/ (?)
+        - ../../../../../public/build/ (?)

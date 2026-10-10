@@ -13,6 +13,7 @@ import {
     hotFile,
     phpReload,
     wordpressExternals,
+    classicTheme,
 } from '../../resources/vite/taw-vite.mjs';
 
 /** Evaluate a virtual module's code as a real ES module. */
@@ -146,5 +147,40 @@ describe('phpReload', () => {
         watcher.emit('change', '/theme/src/main.ts');
 
         assert.deepEqual(sent, [{ type: 'full-reload' }]);
+    });
+});
+
+describe('classicTheme', () => {
+    let root;
+    beforeEach(() => {
+        root = mkdtempSync(join(tmpdir(), 'taw-classic-'));
+    });
+    afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+    it('builds every block asset into public/build, with the theme plugins in the middle', async () => {
+        const { mkdirSync, writeFileSync } = await import('node:fs');
+        mkdirSync(join(root, 'Blocks/Hero'), { recursive: true });
+        writeFileSync(join(root, 'Blocks/Hero/style.scss'), '');
+        writeFileSync(join(root, 'Blocks/Hero/script.js'), '');
+        writeFileSync(join(root, 'Blocks/Hero/Hero.php'), '');
+        const tailwind = { name: 'tailwind' };
+
+        const build = classicTheme({ command: 'build' }, { root, plugins: [tailwind], input: ['resources/js/extra.js'] });
+        assert.equal(build.base, './');
+        assert.equal(build.build.outDir, 'public/build');
+        assert.deepEqual(build.build.rollupOptions.input, [
+            'resources/scss/critical.scss',
+            'resources/js/app.js',
+            'Blocks/Hero/script.js',
+            'Blocks/Hero/style.scss',
+            'resources/js/extra.js',
+        ]);
+        assert.deepEqual(build.plugins.map((p) => p.name), ['taw-hot-file', 'tailwind', 'taw-php-reload']);
+        assert.equal(classicTheme({ command: 'serve' }, { root }).base, '/');
+        assert.equal(build.server.strictPort, false);
+    });
+
+    it('works without a Blocks folder', () => {
+        assert.deepEqual(classicTheme({ command: 'build' }, { root }).build.rollupOptions.input, ['resources/scss/critical.scss', 'resources/js/app.js']);
     });
 });

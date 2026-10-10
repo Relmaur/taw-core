@@ -1984,6 +1984,83 @@ TAW\CLI\CommandRegistry::add(fn (string $themeDir) => new App\Cli\ReportCommand(
 
 A registered command can't take a core command's name. `$TAW_THEME_DIR` points the tool at another theme.
 
+### Update policy (`taw.json`, v1.91.0)
+
+A theme's `taw.json` (site-owned, never synced) says what an update changes on its own. Every setting is
+optional; the defaults are shown. Schema: `resources/schema/taw-json-1.0.json` (`TAW\Update\Policy`
+mirrors it; `PolicyTest` keeps them in sync).
+
+```json
+{
+  "$schema": "./vendor/taw/core/resources/schema/taw-json-1.0.json",
+  "update": {
+    "core": "minor",
+    "scaffold": "auto",
+    "manifests": "add+bump",
+    "docs": "framework-sections",
+    "checks": ["lint", "phpstan", "test", "build"],
+    "deliver": "pr"
+  }
+}
+```
+
+| Setting | Values |
+|---|---|
+| `core` | `patch` (1.90.x only), `minor` (every 1.x), `pinned:<version>` |
+| `scaffold` | `auto` (replace framework-owned files), `off` |
+| `manifests` | `add+bump` (what a new taw/core needs; never removals), `off` |
+| `docs` | `framework-sections` (refresh the framework's parts of AGENTS.md/CLAUDE.md), `off` |
+| `checks` | any of `lint`, `phpstan`, `test`, `build`, `smoke` (needs the site running) |
+| `deliver` | `pr` (a pull request to merge), `pr+merge` (merged when checks pass; deploys), `branch` |
+
+`php bin/taw policy` shows it in words (`--json` for tools, `--init` writes a starter file). An invalid
+file is listed with its errors, and updates refuse to run until it's fixed: never half-applied.
+
+### One-step update (`bin/taw update`, v1.91.0)
+
+`vendor/bin/taw update` is the whole update of a theme, as its `taw.json` says, with no questions
+(`TAW\Update\Updater`): preflight (valid policy, clean git tree, no earlier update waiting) → a branch
+`taw/update-<date>` → `composer update taw/core` within the range (`--with taw/core:~x.y.z` for `patch`,
+`composer require` for a pin) → framework files (`sync --apply`, `--apply-manifests`, then Composer for the
+packages those added) → migrations → checks (`lint`, `phpstan`, `test`, `build`; one that can't run here, like
+`smoke` or a build without `node_modules`, is marked "not run here", never passed) → commit → deliver
+(`branch`, `pr`, or `pr+merge` via GitHub auto-merge). Every step after Composer runs through the new
+`vendor/bin/taw` in its own process. A failure stops at a commit on the branch, never a push; the report
+`.taw/update-report.md` (also the pull request's description) has what failed, the runbook for that kind of
+failure (`resources/runbooks/`), verify, finish and undo: the guide a person follows and the prompt "Fix with
+Claude" receives (umbrella ADR-0004). `--plan`, `--no-deliver`, `--json`, `--composer="php composer.phar"`.
+
+### Migrations (`bin/taw upgrade`, v1.91.0)
+
+What a taw/core release changes in a theme, it does by code: after `composer update taw/core`, run
+`php bin/taw upgrade --apply`. Each migration (`TAW\Update\Migration`, id `<version>/<slug>`) finds its own
+work, so running again does nothing, and leaves anything it shouldn't decide (a file the site edited) for
+a person, with the steps. `php bin/taw upgrade` lists what's pending, `--explain <id>` (or `all`) says what
+one does, why, how to do it by hand and how to undo it, `--json` is for tools. Extensions add their own
+with `TAW\Update\Migrations::add()`.
+
+**`composer update` runs them**: a theme's `composer.json` lists
+`"post-update-cmd": ["TAW\\CLI\\ComposerScripts::postUpdate"]` (both scaffolds do), so every `composer update` ends
+with the pending migrations, quietly when there are none. Not on `composer install`. It never fails the
+update; off with `TAW_NO_UPGRADE=1` or `"extra": {"taw": {"upgrade": false}}`.
+
+### Theme CI (v1.91.0)
+
+A theme's CI is two short stubs calling taw/core's shared workflows, so the checks update with taw/core:
+
+```yaml
+jobs:
+  ci:
+    uses: Relmaur/taw-core/.github/workflows/theme-ci.yml@v1
+    with: { smoke: true, build: false } # classic theme; a block theme: php-versions: '["8.2", "8.4"]'
+```
+
+`theme-ci.yml` runs PHP lint, the MetaBlock `getData()` check (when there's `Blocks/`), phpstan and tests
+(when composer.json has those scripts), `schema:validate` (when there's `taw-schema/`), the front-end
+`npm run check` or `build` (input `build`), and the WordPress smoke test (input `smoke`).
+`theme-framework-sync.yml` is the weekly update: bump taw/core, apply Tier 1, run the checks, open one
+pull request. Each workflow's header lists the same steps as commands, for running them by hand.
+
 ```bash
 php bin/taw make:block HeroSection --type=meta --group=sections
 php bin/taw import:block path/to/block

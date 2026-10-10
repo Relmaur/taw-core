@@ -1,0 +1,21 @@
+{
+    "$comment": "sha256 of every version of these files the taw-theme scaffold ever shipped (from its git history). A theme's copy that matches one is unedited, so it is safe to replace with the short taw:config version (TAW\\\\Update\\\\ConfigFiles). Regenerate when the scaffold's copy changes: see ConfigFilesTest.",
+    "classic": {
+        "vite.config.js": [
+            "0be16e2aeac4540ed834b9cbf57dcc758b5fac9ca5109c013bd6d6fa2e785482",
+            "259f45e11591285c56001497755364f304d412c04038ba281c22b8d0faa1ff99",
+            "2a3fe309a1fb31e249828884505a2db6cad25f8936ed7beeaeda55e5b1762c13",
+            "45a2195fb4f214cc45cc9744b2bafc125530e50c71cfaf20b4db3a56fb6e814d",
+            "726acc23438eefa40145c531680ab6ecf7c76f226a9273bd9aae5e3e3c8d73ae",
+            "992d0fe7a70c5fa6a6000276b965bcdb3a81d32b6ccaea5400ae32b46f2fdcca",
+            "a748e66ee6cd4fc746ef4056de20b45fa0aa1316997084076c5c4e6e8beda935",
+            "b5296a9ddc60a88fb03ccc7e11b7158edd91362b82089a26757abc1ce7c867d2",
+            "b5ea628107b2a8418e044a66ba7ccb3d9af79552e39776ddbe6754cd784a210c",
+            "bfa040413c1cdfae95bcebb7ad00fb93aad58a8499d28548c813a51a43b97e42"
+        ],
+        "phpstan.neon": [
+            "1ea5af4eeb3e77c454a208117f8e08da4fe2ce4d7c663cf391f1b8e1ff4eaf7c",
+            "591842a9698266ff73f5d1148c37ba2c34e6dcdc892c023167ef9a05a6c8c458"
+        ]
+    }
+}

@@ -7,6 +7,26 @@
 The `taw` tool is `vendor/bin/taw` in a theme (v1.90.0: `TAW\CLI\Application` owns the command list,
 per theme kind; `CommandRegistry` takes outside commands). A new command goes into
 `Application::coreCommands()`, not into the scaffolds' `bin/taw` (now a hand-over shim).
+`TAW\Update\Policy` (v1.91.0) reads a theme's `taw.json` "update" settings (pure, pre-boot: no ABSPATH
+guard); `resources/schema/taw-json-1.0.json` mirrors it and `PolicyTest` keeps them in sync — change both
+together.
+Theme agent docs live in `resources/agents/{classic,block}/` (since v1.91.0; `TAW\Update\AgentDocs`,
+`docs:sync`): edit those, never a theme's `AGENTS.md`/`CLAUDE.md` (short site files that import/point here).
+Classic themes' `vite.config.js`/`phpstan.neon` load `classicTheme()` (`resources/vite/taw-vite.mjs`) and
+`resources/phpstan/classic.neon` (v1.91.0, `TAW\Update\ConfigFiles`, `configs:sync`). When taw-theme's copy of
+either changes, regenerate `resources/configs/known.json` (`ConfigFilesTest` fails until you do).
+**A release that changes anything in a theme ships a migration** (v1.91.0+): a class in
+`src/Update/Migrations/` implementing `TAW\Update\Migration`, added to `Migrations::all()` oldest first, id
+`<version>/<slug>`. It finds its own work (`pending()`; running twice does nothing), never guesses (a file
+the site edited → a manual step in the result), and `explain()` has What/Why/By hand/Undo (umbrella
+ADR-0004; `MigrationsTest` fails without them). UPGRADING.md names the migration instead of a **Check**.
+`bin/taw update` = `TAW\Update\Updater` (+ `Report`, `Shell`/`ProcessShell`; tests use real git against a
+bare repo with Composer/taw/gh faked). After Composer, every step runs the *new* `vendor/bin/taw` in a
+subprocess (this code is the old taw/core by then). A new kind of failure gets a `resources/runbooks/<step>.md`.
+Themes' CI is `.github/workflows/theme-ci.yml` and `theme-framework-sync.yml` here (`workflow_call`,
+ADR-0019), called by stubs at `@v1`; their scripts are `resources/ci/`. **Every release moves the `v1`
+branch** (`git push origin vX.Y.Z^{commit}:refs/heads/v1`, umbrella `taw-release` § 4). Lint workflow
+changes with `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7`.
 
 | Task | Command |
 |------|---------|

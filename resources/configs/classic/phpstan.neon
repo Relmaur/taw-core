@@ -1,0 +1,10 @@
+# PHPStan. taw:config 1
+# The base (level, paths, the WordPress extension) comes from taw/core and
+# updates with `composer update taw/core`; this file is the site's own and
+# updates never change it. Add this site's own settings below (scanFiles,
+# ignoreErrors, more paths…); they merge with the base.
+includes:
+    - vendor/taw/core/resources/phpstan/classic.neon
+
+parameters:
+    # This site's own settings.

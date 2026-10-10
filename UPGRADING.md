@@ -10,6 +10,13 @@ to the site you're updating.
 
 ## How to upgrade
 
+**From taw/core 1.91 on, one command does all of it:** `vendor/bin/taw update`. On a new branch it updates
+taw/core within the site's policy (`taw.json`), applies the framework files, runs the migrations and the
+checks, commits, and opens a pull request — no questions. It refuses to start on uncommitted changes or while
+an earlier update is still waiting; if a check fails, nothing is pushed and `.taw/update-report.md` holds the
+step-by-step fix (the same file you can hand to Claude). `--plan` says what it would do; `--no-deliver` stops
+at the commit. The steps below are what it does, for doing it by hand.
+
 1. **Find the installed version:** `composer show taw/core | grep versions` (or `composer.lock`).
 2. **Theme scaffold first (optional, recommended):** run the `update-theme` skill (`php bin/taw sync`).
    It syncs `functions.php`, `bin/`, CI and the framework skills, and never touches `Blocks/`, `inc/` or
@@ -25,8 +32,12 @@ to the site you're updating.
    needs `enshrined/svg-sanitize ^1.0`) changes nothing and still exits 0 with "Nothing to modify in lock
    file". **Check the version moved** (`composer show taw/core | grep versions`); if it didn't,
    `composer why-not taw/core <version>` says what holds it back.
-4. **Read the sections below** for every version newer than the one you came from, and do the checks
-   marked **Check**.
+4. **Run the migrations (taw/core 1.91+):** `php bin/taw upgrade --apply`. Each change a release makes
+   to a theme ships as a migration that does it for you; anything it shouldn't decide (a file the site
+   edited) is listed with the steps, marked "For you". `php bin/taw upgrade --explain <id>` says what one
+   does, why, how to do it by hand, and how to undo it. Then **read the sections below** for every version
+   newer than the one you came from, and do any checks marked **Check** (from v1.91.0 on, a change to a
+   theme is a migration, not a check).
 5. **Verify:**
    - `composer run test`, and `composer run phpstan` when the theme has it;
    - load the front page and a few pages with forms and blocks (the `visual-check` skill);
@@ -596,6 +607,75 @@ TAW\CLI\CommandRegistry::add(fn (string $themeDir) => new App\Cli\ReportCommand(
 
 **Undo:** restore the previous `bin/taw` from git (`git checkout <commit> -- bin/taw`); taw/core keeps
 working either way.
+
+### v1.91.0: `taw.json`, the site's update policy
+
+**What changed.** A theme can now say, in its own `taw.json`, what an update changes on its own:
+taw/core's range (`patch`, `minor`, or `pinned:1.90.0`), framework files, `composer.json`/`package.json`
+additions, the framework's sections of the agent docs, which checks must pass, and how the update is
+delivered (`pr`, `pr+merge`, `branch`). `bin/taw policy` shows the effective policy in words;
+`--init` writes a starter file. Nothing acts on it yet: the coming `bin/taw update` (and taw-fleet's
+"Update this site") will.
+
+**Why.** So "update this site" can run without asking questions: the site decides once, in a file it
+owns and commits, and every updater (the dashboard, the weekly CI job, a person) follows the same rules
+(umbrella plan `docs/plans/taw-platform.md` § 5).
+
+**Check:** none. A site without `taw.json` gets the defaults: every 1.x release, framework files
+replaced, additions applied, lint + phpstan + test + build, a pull request to merge.
+
+**Also in v1.91.0: CI comes from taw/core.** A theme's `.github/workflows/ci.yml` and `framework-sync.yml`
+become stubs of a few lines that call taw/core's shared workflows (`theme-ci.yml`,
+`theme-framework-sync.yml` at `@v1`): the checks now update with taw/core. Each check runs only when the
+theme has what it checks (phpstan/test scripts, `Blocks/`, `taw-schema/`, a front-end check or build).
+The CI scripts move to `vendor/taw/core/resources/ci/`; until a site's taw/core has them, the shared
+workflows fall back to the theme's own `bin/ci/`. **Check:** after the sync, the next push runs CI:
+it should pass as before. **By hand:** copy the stubs from taw-theme v1.12.58+ (`smoke: true`,
+`build: false` for a classic theme) — each workflow's header lists the same checks as commands.
+**Undo:** restore the old workflow files from git.
+
+**Also in v1.91.0: agent docs come from taw/core.** `AGENTS.md`, `CLAUDE.md` and the Copilot/Windsurf rules
+were full copies of the scaffold's docs (Tier 2: every update meant reviewing their diff; on the live fleet
+no site had edited them). Their framework text now ships with taw/core (`resources/agents/classic/` and
+`block/`) and updates with it; the theme keeps short files (marker `taw:agent-doc`) that import it (CLAUDE.md:
+`@vendor/taw/core/resources/agents/classic/CLAUDE.md`) or point to it, plus a "This site" section for the
+site's own notes, which updates never touch. `sync --apply` converts old copies when `taw.json`'s
+`update.docs` allows (the default); `README.md` is the site's own and no longer synced. **Check:** if you
+had added notes to the old copies, move them under "This site" (the previous text is in git history:
+`git log -p -- AGENTS.md`). **By hand:** `php bin/taw docs:sync --apply`, review, commit. **Undo:**
+`git checkout <previous commit> -- AGENTS.md CLAUDE.md .github/copilot-instructions.md .windsurfrules`.
+When `vendor/taw/core` is a symlink (a path repository in development), Claude Code asks once to allow the
+import from outside the project.
+
+**Also in v1.91.0: the Vite and PHPStan base come from taw/core.** A classic theme's `vite.config.js` (92 lines)
+and `phpstan.neon` were full copies of the scaffold's (Tier 2). Their base now ships with taw/core
+(`classicTheme()` in `resources/vite/taw-vite.mjs`, `resources/phpstan/classic.neon`) and updates with it; the
+theme keeps a short file (marker `taw:config`) that loads it, with room for the site's own settings
+(Vite's `mergeConfig`; PHPStan parameters merge). `sync --apply` (when `taw.json`'s `update.scaffold` allows)
+replaces a file only when it is identical to a version the scaffold once shipped
+(`resources/configs/known.json`); a file the site edited is left alone and reported with what to do by hand.
+`phpunit.xml` is the site's own and no longer synced. After this, Tier 2 is `composer.json`/`package.json`
+only, whose additions and bumps apply by rule. **Check:** after converting, `npm run build` and
+`composer run phpstan` pass as before (taw-theme: same 7 build entries). **By hand:**
+`php bin/taw configs:sync --apply`; for an edited file, the command prints the steps. **Undo:**
+`git checkout <previous commit> -- vite.config.js phpstan.neon`.
+
+**Migrations (v1.91.0).** `php bin/taw upgrade` runs these changes for you after `composer update taw/core`:
+`1.89.0/site-skills`, `1.91.0/agent-docs`, `1.91.0/configs` (each: `--explain <id>`). From this release on,
+anything a release changes in a theme ships as a migration (`TAW\Update\Migration`), never a manual check.
+
+**`composer update` runs them (v1.91.0).** With `"post-update-cmd": ["TAW\\CLI\\ComposerScripts::postUpdate"]` in the
+theme's `composer.json` scripts (taw-theme v1.12.58+ / taw-gutenberg v0.3.60+ have it; sync adds it to older
+sites as a `composer.json` addition), every `composer update` ends by running the pending migrations and
+printing what it changed and any "For you" step. Not on `composer install`, which only reproduces the lock.
+It never fails the update: a migration that fails is reported with `vendor/bin/taw upgrade --explain <id>`.
+**By hand:** add that line, or run `vendor/bin/taw upgrade --apply` after updating. **Off:**
+`TAW_NO_UPGRADE=1 composer update`, or `"extra": {"taw": {"upgrade": false}}`. A site pinned below 1.91
+(`taw.json`: `"core": "pinned:1.90.0"`) must not have the line: Composer can't find the class there.
+
+**By hand (taw.json):** `php bin/taw policy --init`, edit `taw.json` (editors that read JSON schemas complete it from
+`vendor/taw/core/resources/schema/taw-json-1.0.json`), check it with `php bin/taw policy`, commit it.
+**Undo:** delete `taw.json` (the defaults apply).
 
 ## Opt-in features you may want
 
