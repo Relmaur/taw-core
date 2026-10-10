@@ -362,13 +362,20 @@ final class Updater
         ));
     }
 
+    /**
+     * taw/core's version as the theme commits it: composer.lock (what git
+     * has), else vendor/ when there's no lock. vendor/ may run ahead of the
+     * lock: taw-fleet moves an old theme's vendor/ to a taw/core that has
+     * `update` and puts the lock back, so this update starts from what git has.
+     */
     private function installedCore(): string
     {
-        $file = $this->themeDir . '/vendor/composer/installed.json';
-        $data = is_file($file) ? json_decode((string) file_get_contents($file), true) : null;
-        foreach ((is_array($data) ? ($data['packages'] ?? $data) : []) as $package) {
-            if (is_array($package) && ($package['name'] ?? '') === 'taw/core') {
-                return (string) ($package['version'] ?? '');
+        foreach (['/composer.lock', '/vendor/composer/installed.json'] as $file) {
+            $data = is_file($this->themeDir . $file) ? json_decode((string) file_get_contents($this->themeDir . $file), true) : null;
+            foreach (is_array($data) ? ($data['packages'] ?? $data) : [] as $package) {
+                if (is_array($package) && ($package['name'] ?? '') === 'taw/core') {
+                    return (string) ($package['version'] ?? '');
+                }
             }
         }
 

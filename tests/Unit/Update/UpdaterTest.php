@@ -40,6 +40,7 @@ final class UpdaterTest extends TestCase
         file_put_contents($this->dir . '/composer.json', json_encode(['name' => 'acme/theme', 'scripts' => []]));
         file_put_contents($this->dir . '/.gitignore', "vendor/\n");
         $this->installed('v1.90.0');
+        $this->lock('v1.90.0');
         $git = 'git -C ' . escapeshellarg($this->dir);
         exec("{$git} init -q -b main && {$git} config user.email t@t && {$git} config user.name t && {$git} add -A && {$git} commit -qm base && {$git} remote add origin " . escapeshellarg($this->remote));
         $this->ran = [];
@@ -59,6 +60,11 @@ final class UpdaterTest extends TestCase
     private function installed(string $version): void
     {
         file_put_contents($this->dir . '/vendor/composer/installed.json', json_encode(['packages' => [['name' => 'taw/core', 'version' => $version]]]));
+    }
+
+    private function lock(string $version): void
+    {
+        file_put_contents($this->dir . '/composer.lock', json_encode(['packages' => [['name' => 'taw/core', 'version' => $version]]]));
     }
 
     private function updater(): Updater
@@ -96,7 +102,7 @@ final class UpdaterTest extends TestCase
     public function composerRan(): void
     {
         $this->installed('v1.91.0');
-        file_put_contents($this->dir . '/composer.lock', '{"taw/core": "1.91.0"}');
+        $this->lock('v1.91.0');
         file_put_contents($this->dir . '/AGENTS.md', "# short taw:agent-doc file\n");
     }
 
@@ -144,6 +150,17 @@ final class UpdaterTest extends TestCase
         $this->assertContains('  ✓ lint passed', $this->said);
         $this->assertContains('  – test: not run here (composer.json has no "test" script)', $this->said);
         $this->assertSame('Pushing taw/update-20261009-120000 and opening a pull request', end($this->said));
+    }
+
+    public function test_the_version_comes_from_the_lock_when_vendor_runs_ahead(): void
+    {
+        // taw-fleet's first update of an old theme: vendor/ already has the new
+        // taw/core (for its `update`), composer.lock is still what git has.
+        $this->installed('v1.91.2');
+        $r = $this->updater()->run();
+
+        $this->assertSame(['from' => 'v1.90.0', 'to' => 'v1.91.0'], $r['core'], 'from = the committed lock; to = after Composer');
+        $this->assertStringContainsString('(taw/core 1.90.0 → 1.91.0)', (string) file_get_contents($this->dir . '/.taw/update-report.md'));
     }
 
     public function test_composer_commands_keep_quoted_paths_whole(): void
