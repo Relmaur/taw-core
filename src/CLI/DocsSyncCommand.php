@@ -31,13 +31,17 @@ final class DocsSyncCommand extends Command
                 "AGENTS.md, CLAUDE.md and the Copilot/Windsurf rules: the framework's part ships with taw/core\n" .
                 "and updates with it. The theme keeps short files that import or point to it, with a\n" .
                 "\"This site\" section for its own notes; updates never change those.\n\n" .
-                "This finds old full copies and replaces them (--apply). Their previous text stays in git\n" .
-                "history (git log -p -- AGENTS.md); undo with git checkout <commit> -- AGENTS.md.\n\n" .
-                "  <info>vendor/bin/taw docs:sync</info>           what would change\n" .
-                "  <info>vendor/bin/taw docs:sync --apply</info>   convert them\n" .
-                "  <info>vendor/bin/taw docs:sync --json</info>    for scripts"
+                "This finds old full copies and replaces the unedited ones (identical to a version the scaffold\n" .
+                "shipped) with --apply. A copy the site edited is left as is unless you add --force: move your\n" .
+                "notes into \"This site\" afterwards. Previous text stays in git history (git log -p -- AGENTS.md);\n" .
+                "undo with git checkout <commit> -- AGENTS.md.\n\n" .
+                "  <info>vendor/bin/taw docs:sync</info>                   what would change\n" .
+                "  <info>vendor/bin/taw docs:sync --apply</info>           convert the unedited copies\n" .
+                "  <info>vendor/bin/taw docs:sync --apply --force</info>   edited copies too\n" .
+                "  <info>vendor/bin/taw docs:sync --json</info>            for scripts"
             )
             ->addOption('apply', null, InputOption::VALUE_NONE, 'Write the changes')
+            ->addOption('force', null, InputOption::VALUE_NONE, 'With --apply: replace copies the site edited too')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Machine-readable output');
     }
 
@@ -45,7 +49,7 @@ final class DocsSyncCommand extends Command
     {
         $docs = new AgentDocs($this->themeDir, Application::isBlockTheme($this->themeDir) ? 'block' : 'classic');
         $plan = $docs->plan();
-        $written = $input->getOption('apply') ? $docs->apply($plan) : [];
+        $written = $input->getOption('apply') ? $docs->apply($plan, (bool) $input->getOption('force')) : [];
 
         if ($input->getOption('json')) {
             $output->writeln((string) json_encode($plan + ['applied' => $written], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
@@ -55,6 +59,11 @@ final class DocsSyncCommand extends Command
         $done = $written !== [];
         foreach ($plan['convert'] as $path) {
             $output->writeln(($done ? '  <info>✓ converted</info> ' : '  <comment>↻ to convert</comment> ') . $path . ' <comment>(a full copy of the framework docs)</comment>');
+        }
+        foreach ($plan['custom'] as $path) {
+            $output->writeln(in_array($path, $written, true)
+                ? '  <info>✓ replaced</info> ' . $path . ' <comment>(it had this site\'s own changes: put your notes back under "This site")</comment>'
+                : '  <comment>! ' . $path . '</comment> has this site\'s own changes, so it is left as is. By hand: ' . \TAW\Update\AgentDocs::BY_HAND);
         }
         foreach ($plan['create'] as $path) {
             $output->writeln(($done ? '  <info>✓ created</info> ' : '  <comment>+ to create</comment> ') . $path);

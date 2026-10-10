@@ -28,9 +28,13 @@ final class Updater
     /** @var \Closure(): \DateTimeImmutable */
     private \Closure $now;
 
+    /** @var \Closure(string): void */
+    private \Closure $progress;
+
     /**
      * @param list<string> $composer how to run Composer, e.g. ['composer'] or [php, composer.phar]
      * @param (\Closure(): \DateTimeImmutable)|null $now
+     * @param (\Closure(string): void)|null $progress gets a line as each step starts and ends
      */
     public function __construct(
         private string $themeDir,
@@ -38,8 +42,23 @@ final class Updater
         private array $composer = ['composer'],
         ?\Closure $now = null,
         private string $php = PHP_BINARY,
+        ?\Closure $progress = null,
     ) {
         $this->now = $now ?? static fn () => new \DateTimeImmutable();
+        $this->progress = $progress ?? static function (string $line): void {};
+    }
+
+    /**
+     * Splits a command line such as `--composer` into its words, keeping
+     * quoted parts whole: '"/Users/me/Application Support/php" composer.phar'.
+     *
+     * @return list<string>
+     */
+    public static function words(string $command): array
+    {
+        preg_match_all('/"([^"]*)"|\'([^\']*)\'|(\S+)/', $command, $m, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL);
+
+        return array_map(static fn (array $match): string => (string) ($match[1] ?? $match[2] ?? $match[3]), $m);
     }
 
     /**
@@ -56,6 +75,7 @@ final class Updater
             'changed' => [],
             'migrations' => [],
             'manual' => [],
+            'held' => [],
             'checks' => [],
             'failure' => null,
             'core' => ['from' => $this->installedCore(), 'to' => null],
@@ -81,6 +101,7 @@ final class Updater
         $branch = 'taw/update-' . ($this->now)()->format('Ymd-His');
         $result['base'] = $base;
         $result['branch'] = $branch;
+        $this->say("Working on a new branch, {$branch} (from {$base})");
         if (!$this->step($result, 'branch', ['git', 'checkout', '-b', $branch])) {
             return $this->fail($result, 'branch');
         }
@@ -88,6 +109,7 @@ final class Updater
         // 1. taw/core, within the policy's range. The theme's own post-update hook
         // is held back: the migrations run below, through the new taw/core.
         $core = $this->coreCommand($policy, (string) $result['core']['from']);
+        $this->say($core === null ? 'taw/core stays at ' . ltrim((string) $result['core']['from'], 'v') . ' (pinned in taw.json)' : 'Updating taw/core (taw.json: core = ' . $policy->core() . ')');
         if ($core !== null && !$this->step($result, 'composer', array_merge($this->composer, $core), ['TAW_NO_UPGRADE' => '1'])) {
             return $this->fail($result, 'composer');
         }
@@ -101,6 +123,7 @@ final class Updater
             if ($policy->manifests()) {
                 $sync[] = '--apply-manifests';
             }
+            $this->say('Applying the framework files');
             $out = $this->taw($result, 'sync', $sync);
             if ($out === null) {
                 return $this->fail($result, 'sync');
@@ -112,17 +135,25 @@ final class Updater
         }
 
         // 3. Migrations, from the taw/core just installed.
+        $this->say('Running the migrations');
         $upgrade = $this->taw($result, 'migration', ['upgrade', '--apply', '--json']);
         if ($upgrade === null) {
             return $this->fail($result, 'migration');
         }
         $result['migrations'] = array_keys(is_array($upgrade['applied'] ?? null) ? $upgrade['applied'] : []);
         $result['manual'] = is_array($upgrade['manual'] ?? null) ? array_values($upgrade['manual']) : [];
+        $result['held'] = array_values(array_map(fn ($h) => (string) ($h['note'] ?? ''), is_array($upgrade['held'] ?? null) ? $upgrade['held'] : []));
 
         // 4. Checks.
         $failed = null;
         foreach ($policy->checks() as $check) {
+            $this->say('Check: ' . $check);
             $outcome = $this->check($check);
+            $this->say(match ($outcome['status']) {
+                'pass' => '  ✓ ' . $check . ' passed',
+                'fail' => '  ✗ ' . $check . ' failed',
+                default => '  – ' . $check . ': not run here (' . ($outcome['reason'] ?? '') . ')',
+            });
             $result['checks'][] = $outcome;
             if ($outcome['status'] === 'fail' && $failed === null) {
                 $failed = $check;
@@ -233,6 +264,7 @@ final class Updater
         if ($how === 'branch') {
             return ['how' => 'branch', 'note' => 'Committed on ' . $branch . ' (taw.json: deliver = branch). Push it and open a pull request when you\'re ready.'];
         }
+        $this->say('Pushing ' . $branch . ' and opening a pull request');
         if ($this->git(['push', '-u', 'origin', $branch])['code'] !== 0) {
             return ['how' => 'branch', 'note' => 'Committed on ' . $branch . ', but it couldn\'t be pushed (no "origin" remote, or no access). Push it yourself: git push -u origin ' . $branch . ', then open a pull request.'];
         }
@@ -256,6 +288,11 @@ final class Updater
 
     // --- helpers -------------------------------------------------------------
 
+    private function say(string $line): void
+    {
+        ($this->progress)($line);
+    }
+
     /**
      * @param array<string, mixed> $result
      * @param list<string> $command
@@ -265,6 +302,7 @@ final class Updater
     {
         $r = $this->shell->run($command, $this->themeDir, $env);
         $result['steps'][] = ['name' => $name, 'command' => implode(' ', $command), 'ok' => $r['code'] === 0, 'out' => $r['code'] === 0 ? '' : self::tail($r['out'])];
+        $this->say(($r['code'] === 0 ? '  ✓ ' : '  ✗ ') . implode(' ', $command));
 
         return $r['code'] === 0;
     }
@@ -283,6 +321,7 @@ final class Updater
         $json = json_decode(trim($r['out']), true);
         $ok = is_array($json) && ($name !== 'sync' || ($json['errors'] ?? []) === []);
         $result['steps'][] = ['name' => $name, 'command' => 'vendor/bin/taw ' . implode(' ', $args), 'ok' => $ok, 'out' => $ok ? '' : self::tail($r['out'])];
+        $this->say(($ok ? '  ✓ ' : '  ✗ ') . 'vendor/bin/taw ' . implode(' ', $args));
 
         return $ok ? $json : null;
     }

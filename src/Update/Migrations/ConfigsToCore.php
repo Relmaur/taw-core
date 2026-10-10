@@ -12,8 +12,13 @@ use TAW\Update\MigrationResult;
  * become short files that load taw/core's base (ConfigFiles). Edited ones are
  * left for a person, with the steps.
  */
-final class ConfigsToCore implements \TAW\Update\Migration
+final class ConfigsToCore implements \TAW\Update\Migration, \TAW\Update\PolicyGated
 {
+    public function policySetting(): string
+    {
+        return 'scaffold';
+    }
+
     public function id(): string
     {
         return '1.91.0/configs';

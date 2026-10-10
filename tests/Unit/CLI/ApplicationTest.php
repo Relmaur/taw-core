@@ -42,7 +42,8 @@ final class ApplicationTest extends TestCase
         foreach (['make:block', 'sync', 'skills:sync', 'schema:validate', 'content:import', 'wp', 'log:tail', 'canon-law:install'] as $name) {
             $this->assertTrue($app->has($name), $name);
         }
-        $this->assertCount(33, Application::coreCommands($this->dir), 'the list the scaffold bin/taw had, plus skills:sync, policy, docs:sync, configs:sync, upgrade and update');
+        $this->assertCount(35, Application::coreCommands($this->dir), 'the list the scaffold bin/taw had, plus skills:sync, policy, docs:sync, configs:sync, upgrade and update, and the two hidden hub:* stubs');
+        $this->assertTrue($app->get('hub:install')->isHidden(), 'retired: hidden, but it says what replaced it');
     }
 
     public function test_a_block_theme_gets_the_commands_that_work_without_the_classic_scaffold(): void

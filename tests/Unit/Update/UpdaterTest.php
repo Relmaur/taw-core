@@ -21,6 +21,9 @@ final class UpdaterTest extends TestCase
     /** @var list<string> commands run, joined */
     public array $ran = [];
 
+    /** @var list<string> the progress lines */
+    public array $said = [];
+
     /** @var array<string, array{code: int, out: string}> fake answers by command prefix */
     public array $answers = [];
 
@@ -84,7 +87,9 @@ final class UpdaterTest extends TestCase
             }
         };
 
-        return new Updater($this->dir, $shell, ['composer'], fn () => new \DateTimeImmutable('2026-10-09 12:00:00'), 'php');
+        return new Updater($this->dir, $shell, ['composer'], fn () => new \DateTimeImmutable('2026-10-09 12:00:00'), 'php', function (string $line): void {
+            $this->said[] = $line;
+        });
     }
 
     /** The fake composer update: taw/core moves and the lock changes. */
@@ -126,6 +131,29 @@ final class UpdaterTest extends TestCase
         $this->assertStringContainsString('Pull request opened for you to merge', $md);
         $this->assertStringContainsString('upgrade --explain 1.91.0/agent-docs', $md);
         $this->assertSame('', trim((string) shell_exec('git -C ' . escapeshellarg($this->dir) . ' status --porcelain -- . ":!.taw"')), 'everything committed but the report');
+    }
+
+    public function test_it_says_what_it_is_doing_as_it_goes(): void
+    {
+        $this->updater()->run();
+
+        $this->assertSame('Working on a new branch, taw/update-20261009-120000 (from main)', $this->said[0]);
+        $this->assertContains('Updating taw/core (taw.json: core = minor)', $this->said);
+        $this->assertContains('  ✓ composer update taw/core --with-dependencies --no-interaction', $this->said);
+        $this->assertContains('Running the migrations', $this->said);
+        $this->assertContains('  ✓ lint passed', $this->said);
+        $this->assertContains('  – test: not run here (composer.json has no "test" script)', $this->said);
+        $this->assertSame('Pushing taw/update-20261009-120000 and opening a pull request', end($this->said));
+    }
+
+    public function test_composer_commands_keep_quoted_paths_whole(): void
+    {
+        $this->assertSame(
+            ['/Users/me/Library/Application Support/Local/php', '/Users/me/Library/Application Support/Local/composer.phar'],
+            Updater::words('"/Users/me/Library/Application Support/Local/php" \'/Users/me/Library/Application Support/Local/composer.phar\''),
+        );
+        $this->assertSame(['php', '/opt/composer.phar'], Updater::words('  php   /opt/composer.phar '));
+        $this->assertSame([], Updater::words(''));
     }
 
     public function test_a_waiting_update_is_never_doubled(): void

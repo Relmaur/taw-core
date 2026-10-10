@@ -19,7 +19,10 @@ either changes, regenerate `resources/configs/known.json` (`ConfigFilesTest` fai
 `src/Update/Migrations/` implementing `TAW\Update\Migration`, added to `Migrations::all()` oldest first, id
 `<version>/<slug>`. It finds its own work (`pending()`; running twice does nothing), never guesses (a file
 the site edited → a manual step in the result), and `explain()` has What/Why/By hand/Undo (umbrella
-ADR-0004; `MigrationsTest` fails without them). UPGRADING.md names the migration instead of a **Check**.
+ADR-0004; `MigrationsTest` fails without them). A migration a `taw.json` on/off setting controls implements
+`TAW\Update\PolicyGated` (v1.91.1): while it's off, `Migrations::pending()` leaves it out and `held()` lists it.
+`AgentDocs` and `ConfigFiles` replace only copies whose sha256 is in `resources/agents/known.json` /
+`resources/configs/known.json` (every version the scaffolds shipped); tests set `AgentDocs::useKnown()`. UPGRADING.md names the migration instead of a **Check**.
 `bin/taw update` = `TAW\Update\Updater` (+ `Report`, `Shell`/`ProcessShell`; tests use real git against a
 bare repo with Composer/taw/gh faked). After Composer, every step runs the *new* `vendor/bin/taw` in a
 subprocess (this code is the old taw/core by then). A new kind of failure gets a `resources/runbooks/<step>.md`.

@@ -7,6 +7,7 @@ namespace TAW\CLI;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use TAW\Update\Policy;
 use TAW\Update\ProcessShell;
@@ -38,7 +39,7 @@ final class UpdateCommand extends Command
                 "  <info>vendor/bin/taw update --plan</info>          what it would do, nothing changed\n" .
                 "  <info>vendor/bin/taw update --no-deliver</info>    stop at the commit on the branch\n" .
                 "  <info>vendor/bin/taw update --json</info>          the result as JSON (taw-fleet reads it)\n" .
-                "  <info>--composer=\"php /path/composer.phar\"</info>  how to run Composer (default: composer)"
+                "  <info>--composer=\"php /path/composer.phar\"</info>  how to run Composer (default: composer; quote a part with spaces)"
             )
             ->addOption('plan', null, InputOption::VALUE_NONE, 'Say what it would do; change nothing')
             ->addOption('no-deliver', null, InputOption::VALUE_NONE, 'Commit on the branch; don\'t push or open a pull request')
@@ -50,6 +51,16 @@ final class UpdateCommand extends Command
     {
         $policy = Policy::load($this->themeDir);
         if ($input->getOption('plan')) {
+            if ($input->getOption('json')) {
+                $output->writeln((string) json_encode([
+                    'valid' => $policy->valid(),
+                    'errors' => $policy->errors(),
+                    'policy' => $policy->toArray(),
+                    'would' => array_combine(array_keys(Policy::SETTINGS), array_map(fn (string $k) => $policy->explain($k), array_keys(Policy::SETTINGS))),
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+
+                return $policy->valid() ? Command::SUCCESS : Command::FAILURE;
+            }
             $output->writeln('An update of ' . basename($this->themeDir) . ' would, on a new branch:');
             foreach (array_keys(Policy::SETTINGS) as $key) {
                 $output->writeln('  <info>' . $key . '</info>: ' . $policy->explain($key));
@@ -61,8 +72,13 @@ final class UpdateCommand extends Command
             return $policy->valid() ? Command::SUCCESS : Command::FAILURE;
         }
 
-        $composer = preg_split('/\s+/', trim((string) $input->getOption('composer'))) ?: ['composer'];
-        $result = (new Updater($this->themeDir, new ProcessShell(), $composer))->run(!$input->getOption('no-deliver'));
+        $composer = Updater::words((string) $input->getOption('composer')) ?: ['composer'];
+        // Progress as it goes: on stderr with --json, so stdout stays one JSON document.
+        $progress = $input->getOption('json') && $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+        $say = static function (string $line) use ($progress): void {
+            $progress->writeln($line, OutputInterface::OUTPUT_RAW);
+        };
+        $result = (new Updater($this->themeDir, new ProcessShell(), $composer, null, PHP_BINARY, $say))->run(!$input->getOption('no-deliver'));
 
         if ($input->getOption('json')) {
             $output->writeln((string) json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));

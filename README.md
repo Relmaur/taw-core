@@ -1974,7 +1974,7 @@ Before v1.81.0, `X-Forwarded-For` was trusted from any client.
 The `taw` tool ships with taw/core as **`vendor/bin/taw`** (v1.90.0, `TAW\CLI\Application`): its commands
 update with `composer update taw/core`. A theme's `bin/taw` hands over to it, so `php bin/taw …` and
 `vendor/bin/taw …` are the same. A classic theme gets every command below; a block theme
-(`theme.json` + `templates/`) gets `schema:validate` and `skills:sync`. **Your own commands** go through
+(`theme.json` + `templates/`) gets `schema:validate`, `skills:sync`, `policy`, `docs:sync`, `upgrade` and `update`. **Your own commands** go through
 `TAW\CLI\CommandRegistry`, from a file the theme's `composer.json` autoloads (never `bin/`, which the
 scaffold owns):
 
@@ -2009,12 +2009,14 @@ mirrors it; `PolicyTest` keeps them in sync).
 | `core` | `patch` (1.90.x only), `minor` (every 1.x), `pinned:<version>` |
 | `scaffold` | `auto` (replace framework-owned files), `off` |
 | `manifests` | `add+bump` (what a new taw/core needs; never removals), `off` |
-| `docs` | `framework-sections` (refresh the framework's parts of AGENTS.md/CLAUDE.md), `off` |
+| `docs` | `framework-sections` (the framework's part of the agent docs comes from taw/core: unedited copies become short files that import or point to it), `off` |
 | `checks` | any of `lint`, `phpstan`, `test`, `build`, `smoke` (needs the site running) |
 | `deliver` | `pr` (a pull request to merge), `pr+merge` (merged when checks pass; deploys), `branch` |
 
 `php bin/taw policy` shows it in words (`--json` for tools, `--init` writes a starter file). An invalid
 file is listed with its errors, and updates refuse to run until it's fixed: never half-applied.
+`bin/taw update` follows every setting; the migrations follow `scaffold` and `docs` wherever they run
+(v1.91.1). The weekly `theme-framework-sync.yml` doesn't read `taw.json` yet.
 
 ### One-step update (`bin/taw update`, v1.91.0)
 
@@ -2028,7 +2030,9 @@ packages those added) → migrations → checks (`lint`, `phpstan`, `test`, `bui
 `vendor/bin/taw` in its own process. A failure stops at a commit on the branch, never a push; the report
 `.taw/update-report.md` (also the pull request's description) has what failed, the runbook for that kind of
 failure (`resources/runbooks/`), verify, finish and undo: the guide a person follows and the prompt "Fix with
-Claude" receives (umbrella ADR-0004). `--plan`, `--no-deliver`, `--json`, `--composer="php composer.phar"`.
+Claude" receives (umbrella ADR-0004). `--plan`, `--no-deliver`, `--json`, `--composer="php composer.phar"` (quote a
+part with spaces: `--composer='"/path with spaces/php" /path/composer.phar'`, v1.91.1). It prints a line as each
+step starts and ends (on stderr with `--json`, so stdout stays one JSON document; taw-fleet shows them live).
 
 ### Migrations (`bin/taw upgrade`, v1.91.0)
 
@@ -2037,7 +2041,13 @@ What a taw/core release changes in a theme, it does by code: after `composer upd
 work, so running again does nothing, and leaves anything it shouldn't decide (a file the site edited) for
 a person, with the steps. `php bin/taw upgrade` lists what's pending, `--explain <id>` (or `all`) says what
 one does, why, how to do it by hand and how to undo it, `--json` is for tools. Extensions add their own
-with `TAW\Update\Migrations::add()`.
+with `TAW\Update\Migrations::add()`. A migration that implements `TAW\Update\PolicyGated` names a `taw.json`
+setting; while that setting is `off`, the migration is held back (listed, never run) in `upgrade`, `update`
+and the Composer hook (v1.91.1): `site-skills` and `configs` follow `scaffold`, `agent-docs` follows `docs`.
+The single-job commands do what you ask: `docs:sync [--apply] [--force]` converts the agent docs (only
+copies identical to a scaffold version, `resources/agents/known.json`; `--force` replaces edited ones too)
+and `configs:sync [--apply]` the Vite/PHPStan configs (`resources/configs/known.json`). `sync` reports both
+and leaves them to these.
 
 **`composer update` runs them**: a theme's `composer.json` lists
 `"post-update-cmd": ["TAW\\CLI\\ComposerScripts::postUpdate"]` (both scaffolds do), so every `composer update` ends
@@ -2074,6 +2084,11 @@ php bin/taw sync --json                              # check for framework drift
 php bin/taw sync --apply                             # also write Tier 1 scaffold changes
 php bin/taw sync --apply-manifests                   # also write the composer.json/package.json suggestions
 php bin/taw skills:sync --apply                       # taw/core's site skills into .claude/skills/ (block themes too)
+php bin/taw docs:sync --apply                         # agent docs → short files that import taw/core's (block themes too)
+php bin/taw configs:sync --apply                      # vite.config.js/phpstan.neon → short files on taw/core's base
+php bin/taw policy                                    # the site's update policy (taw.json) in words
+php bin/taw upgrade --apply                           # the migrations this theme still needs
+php bin/taw update                                    # the whole update, as taw.json says (see above)
 php bin/taw export:static                            # static HTML export for edge hosting (see below)
 php bin/taw export:static --dir=/path --prod-url=https://my-site.pages.dev
 php bin/taw seo:extract 42 --output=.taw/seo-dump.json         # copy audit: extract text fields (see below)
@@ -2093,7 +2108,7 @@ php bin/taw corpus:export /path/to/bible.sqlite /path/to/bible-export.json  # po
 
 `make:block` generates the block folder, PHP class, template file, and Vite entry points.
 
-`hub:install` and `hub:enroll` were retired with taw-hub (v1.77.0): they're hidden stubs that say what replaced them. The companion now ships with the theme as an mu-plugin (composer `taw/hub-companion`, whose `mu-loader/taw-companion.php` the theme's deploy copies to `wp-content/mu-plugins/`), and [taw-fleet](https://github.com/Relmaur/taw-fleet) reads the sites through it (`taw-fleet live`).
+`hub:install` and `hub:enroll` were retired with taw-hub (v1.77.0): they're hidden stubs that say what replaced them (registered again in v1.91.1; v1.90.0–v1.91.0 left them out). The companion now ships with the theme as an mu-plugin (composer `taw/hub-companion`, whose `mu-loader/taw-companion.php` the theme's deploy copies to `wp-content/mu-plugins/`), and [taw-fleet](https://github.com/Relmaur/taw-fleet) reads the sites through it (`taw-fleet live`).
 
 `fields:get`/`fields:set` are the read/write halves of the same primitive `VisualEditorEndpoint` uses for its REST-driven saves — they resolve a field's type from the live `Metabox` registry (the post type's own fields first; a bare id that matches fields with two prefixes on that post type is refused, so pass the qualified id or the meta key), then dispatch to the matching type-aware getter/sanitizer (`Metabox::get_repeater()`, `sanitizeRepeaterRows()`, etc.), so a repeater, `post_select`, or `files` field is read/written in exactly the shape the admin form itself would produce, with the same sanitization rules (XSS-stripping, ID coercion, JSON re-encoding). `fields:set` takes `--file=path.json` for repeater/array-shaped values, to sidestep shell JSON-quoting, and `--dry-run` to preview the sanitized result without writing. Both commands boot WordPress, like `inspect` — field configs and post data only exist once WordPress is loaded, so they walk up from the theme directory to find `wp-load.php` via the shared `TAW\CLI\WpLoader` helper.
 

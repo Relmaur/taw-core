@@ -7,7 +7,7 @@
   "properties": {
     "$schema": { "type": "string" },
     "update": {
-      "description": "What an update (bin/taw update, the framework-sync workflow, taw-fleet's Update this site) changes on its own.",
+      "description": "What an update changes on its own: bin/taw update follows every setting; the migrations (composer update, bin/taw upgrade) follow scaffold and docs. The weekly framework-sync workflow doesn't read this yet.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -18,7 +18,7 @@
           "default": "minor"
         },
         "scaffold": {
-          "description": "auto (default): framework-owned files (Tier 1) are replaced. off: reported, not written.",
+          "description": "auto (default): framework-owned files (Tier 1) are replaced, and unedited vite.config.js/phpstan.neon load taw/core's base. off: reported, not written.",
           "enum": ["auto", "off"],
           "default": "auto"
         },
@@ -28,7 +28,7 @@
           "default": "add+bump"
         },
         "docs": {
-          "description": "framework-sections (default): the framework's sections of AGENTS.md/CLAUDE.md are refreshed, the site's text kept. off: left alone.",
+          "description": "framework-sections (default): the framework's part of the agent docs comes from taw/core; unedited AGENTS.md/CLAUDE.md/Copilot/Windsurf copies become short files that import or point to it, edited ones are left for a person. off: updates leave the agent docs alone.",
           "enum": ["framework-sections", "off"],
           "default": "framework-sections"
         },

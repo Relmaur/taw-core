@@ -111,6 +111,9 @@ final class Application
             new CanonLawInstallCommand($themeDir),
             new CanonLawExportCommand(),
             new ConfigsSyncCommand($themeDir),
+            // Retired with taw-hub (v1.77.0): hidden, they say what replaced them.
+            new HubInstallCommand(),
+            new HubEnrollCommand(),
         ], $everywhere);
     }
 

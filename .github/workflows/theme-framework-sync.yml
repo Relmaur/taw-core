@@ -10,14 +10,19 @@ name: TAW theme framework sync (shared)
 #       uses: Relmaur/taw-core/.github/workflows/theme-framework-sync.yml@v1
 #       with: { smoke: true }
 #
-# Bumps taw/core, applies Tier 1 framework files, runs the same checks as CI
-# on the result, and opens one pull request (or nothing, when nothing drifted).
-# It lives here so the job itself updates with taw/core.
+# Bumps taw/core, applies Tier 1 framework files, runs the migrations, runs
+# the same checks as CI on the result, and opens one pull request (or nothing,
+# when nothing drifted). It lives here so the job itself updates with taw/core.
+# It doesn't read the theme's taw.json yet, except through the migrations
+# (they follow its "scaffold" and "docs"); moving this job onto
+# `vendor/bin/taw update`, which follows all of it, is the next step.
 #
 # By hand, the same update is (from the theme folder, on a branch):
 #   composer update taw/core --with-dependencies
 #   vendor/bin/taw sync --apply      (Tier 1; Tier 2 is listed for review)
+#   vendor/bin/taw upgrade --apply   (migrations; taw/core 1.91+)
 #   then the checks in theme-ci.yml, commit, push, open a pull request.
+# Or, with taw/core 1.91+, all of it: vendor/bin/taw update
 
 on:
   workflow_call:
@@ -84,6 +89,11 @@ jobs:
           REPORT=$($tool sync --apply --json)
           echo "$REPORT" > "$RUNNER_TEMP/sync-report.json"
           echo "report_path=$RUNNER_TEMP/sync-report.json" >> "$GITHUB_OUTPUT"
+
+      - name: Run the migrations (taw/core 1.91+)
+        run: |
+          tool=vendor/bin/taw; [ -x "$tool" ] || exit 0 # taw/core < 1.90: no migrations
+          if $tool list --raw | grep -q '^upgrade '; then $tool upgrade --apply; fi
 
       - name: Check for local changes
         id: diff
