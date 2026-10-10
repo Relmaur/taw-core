@@ -73,6 +73,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.59.2 | taw-core's Spanish translation now actually loads in classic themes; tabs work by keyboard |
 | < v1.76.1 | Options-page and metabox tabs have a new look; check theme CSS that restyles `.taw-tabbed` |
 | < v1.81 | Per-IP limits stop trusting `X-Forwarded-For` (sites behind Cloudflare: set `TAW_TRUSTED_PROXIES`); an enabled chatbot needs Turnstile keys and an updated widget |
+| < v1.93 | Theme CI fails when a database dump, snapshot or credentials file is committed |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -726,6 +727,24 @@ update refuses before changing anything, with what to do.
 
 **Check:** none; without the setting, nothing changes. **By hand:** add `"remote": "<name>"` under `"update"` in
 `taw.json` (`git remote -v` lists the names), commit it. **Undo:** remove the line.
+
+### v1.93.0: theme CI refuses committed dumps and credentials
+
+**What changed.** The shared `theme-ci.yml` has a new job, `committed-files`
+(`resources/ci/check-committed-files.sh`). It fails when the repository tracks anything under `.sync/`, a
+`*.sql`/`*.wpress` file (compressed too), `remote.env`, `.env`/`.env.*` (not `*.example`, `*.sample`, `*.dist`,
+`*.template`) or `wp-config.php`, or a file that looks like a MySQL dump or a private key. On a pull request it
+also checks every commit in it: a dump added and then removed again still fails, because a merge commit keeps it
+in the history.
+
+**Why.** A full database dump (users with password hashes, options, content) reached a public theme repository
+through a `.gitignore` line without a final newline. Every TAW theme ignores `/.sync/` now; this catches what an
+ignore rule can't (`git add -f`, a dump written elsewhere).
+
+**Check:** none for the site; it needs no Composer install and runs on every push and pull request. If it fails,
+remove the file from the branch's history (not just from the last commit) and rotate any credential it held.
+**By hand:** `bash vendor/taw/core/resources/ci/check-committed-files.sh [<base> <head>]`. **Undo:** none; the job
+reads only.
 
 ## Opt-in features you may want
 

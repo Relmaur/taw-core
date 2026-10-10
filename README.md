@@ -2070,7 +2070,10 @@ jobs:
 
 `theme-ci.yml` runs PHP lint, the MetaBlock `getData()` check (when there's `Blocks/`), phpstan and tests
 (when composer.json has those scripts), `schema:validate` (when there's `taw-schema/`), the front-end
-`npm run check` or `build` (input `build`), and the WordPress smoke test (input `smoke`).
+`npm run check` or `build` (input `build`), and the WordPress smoke test (input `smoke`). Its
+`committed-files` job (v1.93.0) always runs: it fails when the repository holds a database dump, a content
+snapshot (`.sync/`) or a credentials file (`remote.env`, `.env`, `wp-config.php`, a private key), on a pull
+request in any of its commits.
 `theme-framework-sync.yml` is the weekly update: bump taw/core, apply Tier 1, run the checks, open one
 pull request. Each workflow's header lists the same steps as commands, for running them by hand.
 
