@@ -10,7 +10,7 @@ jobs:
   committed-files:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -59,7 +59,7 @@ jobs:
         run: composer run i18n:check
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
 
@@ -73,10 +73,10 @@ jobs:
         working-directory: resources/data-panel
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -101,10 +101,12 @@ jobs:
   # every value must point at the same record on both sites, B's export must import
   # back into A without a change, and undo must restore B.
   fidelity:
-    runs-on: ubuntu-latest
+    # Pinned: this job uses the image's preinstalled MySQL, and ubuntu-latest
+    # moves to Ubuntu 26 on 2026-10-19 (check it still ships MySQL before moving).
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # The runner's own MySQL 8 (root/root): no image pull, so no Docker Hub rate limit.
       - name: Start MySQL
@@ -147,7 +149,7 @@ jobs:
 
       - name: Keep the snapshots and key dumps
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fidelity
           path: |

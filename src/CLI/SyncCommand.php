@@ -126,6 +126,14 @@ class SyncCommand extends Command
                         }
 
                         $changed = $this->pathDiffers($entry, $clone);
+                        if ($changed && isset($entry['keep_edited']) && self::isEditedCopy(
+                            rtrim($this->themeDir, '/') . '/' . $entry['path'],
+                            rtrim($clone, '/') . '/' . $entry['path'],
+                            (array) $entry['keep_edited']
+                        )) {
+                            $changed = false;
+                            $entry['kept'] = true; // the site's own changes: reported, never overwritten
+                        }
                         $entry['changed'] = $changed;
 
                         if ($changed && $apply) {
@@ -276,7 +284,7 @@ class SyncCommand extends Command
 
     /**
      * @return array{
-     *     tier1: array<int, array{path: string, type: string}>,
+     *     tier1: array<int, array{path: string, type: string, keep_edited?: list<string>}>,
      *     tier2: array<int, array{path: string, type: string}>,
      *     skillsReconcile?: array<string, mixed>,
      *     manifestMerge?: array<string, array<string, mixed>>
@@ -311,6 +319,23 @@ class SyncCommand extends Command
     /**
      * @param array{path: string, type: string} $entry
      */
+    /**
+     * Whether a site's copy of a `keep_edited` file holds its own changes: it
+     * exists and is neither one of the versions the scaffold shipped (their
+     * sha256 in `$known`) nor the current canonical copy. Such a copy is kept.
+     *
+     * @param list<string> $known
+     */
+    public static function isEditedCopy(string $local, string $canonical, array $known): bool
+    {
+        if (!is_file($local)) {
+            return false;
+        }
+        $hash = (string) hash_file('sha256', $local);
+
+        return !in_array($hash, $known, true) && (!is_file($canonical) || $hash !== hash_file('sha256', $canonical));
+    }
+
     private function pathDiffers(array $entry, string $cloneDir): bool
     {
         $local = rtrim($this->themeDir, '/') . '/' . $entry['path'];
@@ -701,6 +726,12 @@ class SyncCommand extends Command
             foreach ($report[$key] as $entry) {
                 if (isset($entry['reconcile'])) {
                     $printedSomething = $this->renderSkillsReconcile($io, $entry, $applied) || $printedSomething;
+                    continue;
+                }
+
+                if (!empty($entry['kept'])) {
+                    $io->text('- ' . $entry['path'] . ': has this site\'s own changes, left as is. By hand: compare it with taw-theme\'s copy and take what the framework changed.');
+                    $printedSomething = true;
                     continue;
                 }
 
