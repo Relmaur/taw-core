@@ -23,6 +23,9 @@ namespace TAW\Update;
 final class Policy
 {
     public const FILE = 'taw.json';
+
+    /** A git remote's name, as taw.json's "remote" may give it. */
+    public const REMOTE_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9._-]*$/';
     public const SCHEMA = 'vendor/taw/core/resources/schema/taw-json-1.0.json';
 
     /** What each setting may be, and what it means — the `policy` command shows these. */
@@ -80,10 +83,15 @@ final class Policy
                 'branch' => 'the update is committed on a branch; nothing is pushed',
             ],
         ],
+        'remote' => [
+            'default' => 'origin',
+            'values' => ['<a git remote>'],
+            'means' => [],
+        ],
     ];
 
     /**
-     * @param array{core: string, scaffold: string, manifests: string, docs: string, checks: list<string>, deliver: string} $values
+     * @param array{core: string, scaffold: string, manifests: string, docs: string, checks: list<string>, deliver: string, remote: string} $values
      * @param list<string> $fromFile the settings taw.json set (the rest are defaults)
      * @param list<string> $errors what's wrong with taw.json; empty = valid
      */
@@ -142,12 +150,12 @@ final class Policy
             $fromFile[] = $key;
         }
 
-        /** @var array{core: string, scaffold: string, manifests: string, docs: string, checks: list<string>, deliver: string} $values */
+        /** @var array{core: string, scaffold: string, manifests: string, docs: string, checks: list<string>, deliver: string, remote: string} $values */
         return new self($values, $fromFile, $errors, $hasFile);
     }
 
     /**
-     * @return array{core: string, scaffold: string, manifests: string, docs: string, checks: list<string>, deliver: string}
+     * @return array{core: string, scaffold: string, manifests: string, docs: string, checks: list<string>, deliver: string, remote: string}
      */
     public static function defaults(): array
     {
@@ -176,6 +184,11 @@ final class Policy
         }
         if (!is_string($value)) {
             return sprintf('"%s" must be one of: %s', $key, implode(', ', $allowed));
+        }
+        if ($key === 'remote') {
+            return preg_match(self::REMOTE_PATTERN, $value) === 1
+                ? null
+                : '"remote" is the name of a git remote, such as "origin" or "agency" (git remote -v lists them)';
         }
         if ($key === 'core' && str_starts_with($value, 'pinned:')) {
             return preg_match('/^pinned:v?\d+\.\d+\.\d+$/', $value) === 1
@@ -209,7 +222,7 @@ final class Policy
     }
 
     /**
-     * @return array{core: string, scaffold: string, manifests: string, docs: string, checks: list<string>, deliver: string}
+     * @return array{core: string, scaffold: string, manifests: string, docs: string, checks: list<string>, deliver: string, remote: string}
      */
     public function toArray(): array
     {
@@ -285,6 +298,12 @@ final class Policy
         return $this->values['deliver'];
     }
 
+    /** The git remote an update is delivered to. */
+    public function remote(): string
+    {
+        return $this->values['remote'];
+    }
+
     /** What a setting's current value means, in words. */
     public function explain(string $key): string
     {
@@ -297,6 +316,10 @@ final class Policy
         $value = $this->values[$key];
         if ($key === 'core' && ($pin = $this->pinnedVersion()) !== null) {
             return 'taw/core stays at exactly ' . $pin;
+        }
+        if ($key === 'remote') {
+            return 'the update branch is pushed to the "' . $value . '" git remote, and its pull request opened on that repository'
+                . ($value === 'origin' ? '' : ' (the one production deploys from)');
         }
 
         return $means[$value] ?? $value;

@@ -91,8 +91,13 @@ final class Updater
         if ($this->dirty() !== []) {
             return $this->refuse($result, 'The theme has uncommitted changes (' . implode(', ', array_slice($this->dirty(), 0, 5)) . '), so nothing was changed. Commit or stash them (git status shows them), then run the update again.');
         }
-        if (($waiting = $this->waitingUpdate()) !== null) {
-            return $this->refuse($result, "An earlier update is still waiting on {$waiting} (not merged yet), so a second one wasn't started. Merge its pull request (M in taw-fleet, or on GitHub), or drop it: git branch -D {$waiting} and git push origin --delete {$waiting}. Then run the update again.");
+        $remote = $policy->remote();
+        $result['remote'] = $remote;
+        if ($policy->deliver() !== 'branch' && $this->git(['remote', 'get-url', $remote])['code'] !== 0) {
+            return $this->refuse($result, "taw.json says to deliver the update to the \"{$remote}\" git remote, which this repository doesn't have, so nothing was changed. Add it (git remote add {$remote} <url>), or set \"remote\" in taw.json to one that exists (git remote -v lists them), then run the update again.");
+        }
+        if (($waiting = $this->waitingUpdate($remote)) !== null) {
+            return $this->refuse($result, "An earlier update is still waiting on {$waiting} (not merged yet), so a second one wasn't started. Merge its pull request (M in taw-fleet, or on GitHub), or drop it: git branch -D {$waiting} and git push {$remote} --delete {$waiting}. Then run the update again.");
         }
         $base = trim($this->git(['rev-parse', '--abbrev-ref', 'HEAD'])['out']);
         if ($base === '' || $base === 'HEAD') {
@@ -265,11 +270,16 @@ final class Updater
             return ['how' => 'branch', 'note' => 'Committed on ' . $branch . ' (taw.json: deliver = branch). Push it and open a pull request when you\'re ready.'];
         }
         $this->say('Pushing ' . $branch . ' and opening a pull request');
-        if ($this->git(['push', '-u', 'origin', $branch])['code'] !== 0) {
-            return ['how' => 'branch', 'note' => 'Committed on ' . $branch . ', but it couldn\'t be pushed (no "origin" remote, or no access). Push it yourself: git push -u origin ' . $branch . ', then open a pull request.'];
+        $remote = (string) ($result['remote'] ?? 'origin');
+        if ($this->git(['push', '-u', $remote, $branch])['code'] !== 0) {
+            return ['how' => 'branch', 'note' => 'Committed on ' . $branch . ', but it couldn\'t be pushed (no access to the "' . $remote . '" remote?). Push it yourself: git push -u ' . $remote . ' ' . $branch . ', then open a pull request.'];
         }
         $this->write($result + ['status' => 'updated']); // the PR body
-        $pr = $this->shell->run(['gh', 'pr', 'create', '--base', (string) $result['base'], '--head', $branch, '--title', self::title($result), '--body-file', $this->themeDir . '/' . self::REPORT . '.md'], $this->themeDir);
+        $create = ['gh', 'pr', 'create', '--base', (string) $result['base'], '--head', $branch, '--title', self::title($result), '--body-file', $this->themeDir . '/' . self::REPORT . '.md'];
+        if (($repo = self::githubRepo(trim($this->git(['remote', 'get-url', $remote])['out']))) !== null) {
+            array_push($create, '--repo', $repo); // the remote's repository, not gh's guess among several
+        }
+        $pr = $this->shell->run($create, $this->themeDir);
         if ($pr['code'] !== 0) {
             return ['how' => 'branch', 'note' => 'Pushed ' . $branch . ', but the pull request couldn\'t be opened (the GitHub CLI, gh, is missing or not logged in). Open it on GitHub; the description is in ' . self::REPORT . '.md.'];
         }
@@ -287,6 +297,12 @@ final class Updater
     }
 
     // --- helpers -------------------------------------------------------------
+
+    /** owner/name of a GitHub remote URL (SSH or HTTPS), else null. */
+    public static function githubRepo(string $url): ?string
+    {
+        return preg_match('#github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?/?$#', $url, $m) === 1 ? $m[1] . '/' . $m[2] : null;
+    }
 
     private function say(string $line): void
     {
@@ -340,11 +356,11 @@ final class Updater
      * one (merged pull requests delete theirs), else locally among the
      * branches not merged into this one.
      */
-    private function waitingUpdate(): ?string
+    private function waitingUpdate(string $remote): ?string
     {
-        $remote = $this->git(['ls-remote', '--heads', 'origin', 'taw/update-*']);
-        if ($remote['code'] === 0) {
-            return preg_match('#refs/heads/(taw/update-\S+)#', $remote['out'], $m) === 1 ? $m[1] : null;
+        $heads = $this->git(['ls-remote', '--heads', $remote, 'taw/update-*']);
+        if ($heads['code'] === 0) {
+            return preg_match('#refs/heads/(taw/update-\S+)#', $heads['out'], $m) === 1 ? $m[1] : null;
         }
         $local = trim($this->git(['branch', '--list', 'taw/update-*', '--no-merged', 'HEAD', '--format=%(refname:short)'])['out']);
 

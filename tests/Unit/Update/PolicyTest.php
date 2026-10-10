@@ -35,7 +35,7 @@ final class PolicyTest extends TestCase
         $p = Policy::load($this->dir);
         $this->assertFalse($p->hasFile());
         $this->assertTrue($p->valid());
-        $this->assertSame(['core' => 'minor', 'scaffold' => 'auto', 'manifests' => 'add+bump', 'docs' => 'framework-sections', 'checks' => ['lint', 'phpstan', 'test', 'build'], 'deliver' => 'pr'], $p->toArray());
+        $this->assertSame(['core' => 'minor', 'scaffold' => 'auto', 'manifests' => 'add+bump', 'docs' => 'framework-sections', 'checks' => ['lint', 'phpstan', 'test', 'build'], 'deliver' => 'pr', 'remote' => 'origin'], $p->toArray());
         $this->assertTrue($p->scaffold() && $p->manifests() && $p->docs());
     }
 
