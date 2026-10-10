@@ -76,6 +76,7 @@ final class Application
             new SkillsSyncCommand($themeDir),
             new PolicyCommand($themeDir),
             new DocsSyncCommand($themeDir),
+            new UpgradeCommand($themeDir),
         ];
         if (self::isBlockTheme($themeDir)) {
             return $everywhere;

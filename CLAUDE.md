@@ -15,6 +15,11 @@ Theme agent docs live in `resources/agents/{classic,block}/` (since v1.91.0; `TA
 Classic themes' `vite.config.js`/`phpstan.neon` load `classicTheme()` (`resources/vite/taw-vite.mjs`) and
 `resources/phpstan/classic.neon` (v1.91.0, `TAW\Update\ConfigFiles`, `configs:sync`). When taw-theme's copy of
 either changes, regenerate `resources/configs/known.json` (`ConfigFilesTest` fails until you do).
+**A release that changes anything in a theme ships a migration** (v1.91.0+): a class in
+`src/Update/Migrations/` implementing `TAW\Update\Migration`, added to `Migrations::all()` oldest first, id
+`<version>/<slug>`. It finds its own work (`pending()`; running twice does nothing), never guesses (a file
+the site edited → a manual step in the result), and `explain()` has What/Why/By hand/Undo (umbrella
+ADR-0004; `MigrationsTest` fails without them). UPGRADING.md names the migration instead of a **Check**.
 Themes' CI is `.github/workflows/theme-ci.yml` and `theme-framework-sync.yml` here (`workflow_call`,
 ADR-0019), called by stubs at `@v1`; their scripts are `resources/ci/`. **Every release moves the `v1`
 branch** (`git push origin vX.Y.Z^{commit}:refs/heads/v1`, umbrella `taw-release` § 4). Lint workflow

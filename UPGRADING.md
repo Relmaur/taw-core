@@ -25,8 +25,12 @@ to the site you're updating.
    needs `enshrined/svg-sanitize ^1.0`) changes nothing and still exits 0 with "Nothing to modify in lock
    file". **Check the version moved** (`composer show taw/core | grep versions`); if it didn't,
    `composer why-not taw/core <version>` says what holds it back.
-4. **Read the sections below** for every version newer than the one you came from, and do the checks
-   marked **Check**.
+4. **Run the migrations (taw/core 1.91+):** `php bin/taw upgrade --apply`. Each change a release makes
+   to a theme ships as a migration that does it for you; anything it shouldn't decide (a file the site
+   edited) is listed with the steps, marked "For you". `php bin/taw upgrade --explain <id>` says what one
+   does, why, how to do it by hand, and how to undo it. Then **read the sections below** for every version
+   newer than the one you came from, and do any checks marked **Check** (from v1.91.0 on, a change to a
+   theme is a migration, not a check).
 5. **Verify:**
    - `composer run test`, and `composer run phpstan` when the theme has it;
    - load the front page and a few pages with forms and blocks (the `visual-check` skill);
@@ -648,6 +652,10 @@ only, whose additions and bumps apply by rule. **Check:** after converting, `npm
 `composer run phpstan` pass as before (taw-theme: same 7 build entries). **By hand:**
 `php bin/taw configs:sync --apply`; for an edited file, the command prints the steps. **Undo:**
 `git checkout <previous commit> -- vite.config.js phpstan.neon`.
+
+**Migrations (v1.91.0).** `php bin/taw upgrade` runs these changes for you after `composer update taw/core`:
+`1.89.0/site-skills`, `1.91.0/agent-docs`, `1.91.0/configs` (each: `--explain <id>`). From this release on,
+anything a release changes in a theme ships as a migration (`TAW\Update\Migration`), never a manual check.
 
 **By hand (taw.json):** `php bin/taw policy --init`, edit `taw.json` (editors that read JSON schemas complete it from
 `vendor/taw/core/resources/schema/taw-json-1.0.json`), check it with `php bin/taw policy`, commit it.

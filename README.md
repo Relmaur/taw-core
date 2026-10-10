@@ -2016,6 +2016,15 @@ mirrors it; `PolicyTest` keeps them in sync).
 `php bin/taw policy` shows it in words (`--json` for tools, `--init` writes a starter file). An invalid
 file is listed with its errors, and updates refuse to run until it's fixed: never half-applied.
 
+### Migrations (`bin/taw upgrade`, v1.91.0)
+
+What a taw/core release changes in a theme, it does by code: after `composer update taw/core`, run
+`php bin/taw upgrade --apply`. Each migration (`TAW\Update\Migration`, id `<version>/<slug>`) finds its own
+work, so running again does nothing, and leaves anything it shouldn't decide (a file the site edited) for
+a person, with the steps. `php bin/taw upgrade` lists what's pending, `--explain <id>` (or `all`) says what
+one does, why, how to do it by hand and how to undo it, `--json` is for tools. Extensions add their own
+with `TAW\Update\Migrations::add()`.
+
 ### Theme CI (v1.91.0)
 
 A theme's CI is two short stubs calling taw/core's shared workflows, so the checks update with taw/core:

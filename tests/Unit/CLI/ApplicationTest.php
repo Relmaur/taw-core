@@ -42,7 +42,7 @@ final class ApplicationTest extends TestCase
         foreach (['make:block', 'sync', 'skills:sync', 'schema:validate', 'content:import', 'wp', 'log:tail', 'canon-law:install'] as $name) {
             $this->assertTrue($app->has($name), $name);
         }
-        $this->assertCount(31, Application::coreCommands($this->dir), 'the list the scaffold bin/taw had, plus skills:sync, policy, docs:sync and configs:sync');
+        $this->assertCount(32, Application::coreCommands($this->dir), 'the list the scaffold bin/taw had, plus skills:sync, policy, docs:sync, configs:sync and upgrade');
     }
 
     public function test_a_block_theme_gets_the_commands_that_work_without_the_classic_scaffold(): void
@@ -56,6 +56,7 @@ final class ApplicationTest extends TestCase
         $this->assertTrue($app->has('skills:sync'));
         $this->assertTrue($app->has('policy'));
         $this->assertTrue($app->has('docs:sync'));
+        $this->assertTrue($app->has('upgrade'));
         $this->assertFalse($app->has('make:block'));
         $this->assertFalse($app->has('sync'));
         $this->assertFalse($app->has('configs:sync'), 'classic configs only');
