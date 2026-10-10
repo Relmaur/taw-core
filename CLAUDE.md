@@ -20,6 +20,9 @@ either changes, regenerate `resources/configs/known.json` (`ConfigFilesTest` fai
 `<version>/<slug>`. It finds its own work (`pending()`; running twice does nothing), never guesses (a file
 the site edited → a manual step in the result), and `explain()` has What/Why/By hand/Undo (umbrella
 ADR-0004; `MigrationsTest` fails without them). UPGRADING.md names the migration instead of a **Check**.
+`bin/taw update` = `TAW\Update\Updater` (+ `Report`, `Shell`/`ProcessShell`; tests use real git against a
+bare repo with Composer/taw/gh faked). After Composer, every step runs the *new* `vendor/bin/taw` in a
+subprocess (this code is the old taw/core by then). A new kind of failure gets a `resources/runbooks/<step>.md`.
 Themes' CI is `.github/workflows/theme-ci.yml` and `theme-framework-sync.yml` here (`workflow_call`,
 ADR-0019), called by stubs at `@v1`; their scripts are `resources/ci/`. **Every release moves the `v1`
 branch** (`git push origin vX.Y.Z^{commit}:refs/heads/v1`, umbrella `taw-release` § 4). Lint workflow

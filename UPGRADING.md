@@ -10,6 +10,13 @@ to the site you're updating.
 
 ## How to upgrade
 
+**From taw/core 1.91 on, one command does all of it:** `vendor/bin/taw update`. On a new branch it updates
+taw/core within the site's policy (`taw.json`), applies the framework files, runs the migrations and the
+checks, commits, and opens a pull request — no questions. It refuses to start on uncommitted changes or while
+an earlier update is still waiting; if a check fails, nothing is pushed and `.taw/update-report.md` holds the
+step-by-step fix (the same file you can hand to Claude). `--plan` says what it would do; `--no-deliver` stops
+at the commit. The steps below are what it does, for doing it by hand.
+
 1. **Find the installed version:** `composer show taw/core | grep versions` (or `composer.lock`).
 2. **Theme scaffold first (optional, recommended):** run the `update-theme` skill (`php bin/taw sync`).
    It syncs `functions.php`, `bin/`, CI and the framework skills, and never touches `Blocks/`, `inc/` or

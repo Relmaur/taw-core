@@ -2016,6 +2016,20 @@ mirrors it; `PolicyTest` keeps them in sync).
 `php bin/taw policy` shows it in words (`--json` for tools, `--init` writes a starter file). An invalid
 file is listed with its errors, and updates refuse to run until it's fixed: never half-applied.
 
+### One-step update (`bin/taw update`, v1.91.0)
+
+`vendor/bin/taw update` is the whole update of a theme, as its `taw.json` says, with no questions
+(`TAW\Update\Updater`): preflight (valid policy, clean git tree, no earlier update waiting) → a branch
+`taw/update-<date>` → `composer update taw/core` within the range (`--with taw/core:~x.y.z` for `patch`,
+`composer require` for a pin) → framework files (`sync --apply`, `--apply-manifests`, then Composer for the
+packages those added) → migrations → checks (`lint`, `phpstan`, `test`, `build`; one that can't run here, like
+`smoke` or a build without `node_modules`, is marked "not run here", never passed) → commit → deliver
+(`branch`, `pr`, or `pr+merge` via GitHub auto-merge). Every step after Composer runs through the new
+`vendor/bin/taw` in its own process. A failure stops at a commit on the branch, never a push; the report
+`.taw/update-report.md` (also the pull request's description) has what failed, the runbook for that kind of
+failure (`resources/runbooks/`), verify, finish and undo: the guide a person follows and the prompt "Fix with
+Claude" receives (umbrella ADR-0004). `--plan`, `--no-deliver`, `--json`, `--composer="php composer.phar"`.
+
 ### Migrations (`bin/taw upgrade`, v1.91.0)
 
 What a taw/core release changes in a theme, it does by code: after `composer update taw/core`, run

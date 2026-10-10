@@ -77,6 +77,7 @@ final class Application
             new PolicyCommand($themeDir),
             new DocsSyncCommand($themeDir),
             new UpgradeCommand($themeDir),
+            new UpdateCommand($themeDir),
         ];
         if (self::isBlockTheme($themeDir)) {
             return $everywhere;
