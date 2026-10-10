@@ -2032,7 +2032,9 @@ packages those added) → migrations → checks (`lint`, `phpstan`, `test`, `bui
 failure (`resources/runbooks/`), verify, finish and undo: the guide a person follows and the prompt "Fix with
 Claude" receives (umbrella ADR-0004). `--plan`, `--no-deliver`, `--json`, `--composer="php composer.phar"` (quote a
 part with spaces: `--composer='"/path with spaces/php" /path/composer.phar'`, v1.91.1). It prints a line as each
-step starts and ends (on stderr with `--json`, so stdout stays one JSON document; taw-fleet shows them live).
+step starts and ends (on stderr with `--json`, so stdout stays one JSON document; taw-fleet shows them live). The
+versions it reports come from `composer.lock` (what git has), so `vendor/` may already hold a newer taw/core
+(v1.91.2): that's how taw-fleet updates a theme on taw/core < 1.91 in one step.
 
 ### Migrations (`bin/taw upgrade`, v1.91.0)
 

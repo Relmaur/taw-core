@@ -706,6 +706,14 @@ are in git history (`git log -p -- CLAUDE.md`): put them under "This site".
 
 **Undo:** `composer require taw/core:1.91.0`.
 
+### v1.91.2: `update` starts from the committed composer.lock
+
+**What changed.** `bin/taw update` reads taw/core's version (the report's "from → to", the `patch` range and a
+pin) from `composer.lock`, what git has, and from `vendor/` only when there is no lock. So `vendor/` may run
+ahead: taw-fleet updates a theme still on taw/core 1.89/1.90 in one step by moving its `vendor/` to a taw/core
+that has `update`, restoring `composer.lock`, and running that `update`. **Check:** none. **Undo:**
+`composer require taw/core:1.91.1`.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
