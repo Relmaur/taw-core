@@ -46,18 +46,6 @@
         {
             "path": "package.json",
             "type": "file"
-        },
-        {
-            "path": "vite.config.js",
-            "type": "file"
-        },
-        {
-            "path": "phpstan.neon",
-            "type": "file"
-        },
-        {
-            "path": "phpunit.xml",
-            "type": "file"
         }
     ],
     "skillsReconcile": {
@@ -120,5 +108,8 @@
     "$never": "tests/Unit/ is deliberately never listed here, in either tier, and must never become a 'dir' entry — it holds each client project's own block tests (tests/Unit/Blocks/{Name}Test.php), content this manifest doesn't own. A 'dir' entry syncs via 'rsync -a --delete', which would silently delete every client-authored test not present in the canonical repo. Only the harness itself (tests/bootstrap.php, tests/TestCase.php, phpunit.xml) is framework-owned; individual test files are not. The same hazard for .claude/skills/ and .agents/skills/ (client sites legitimately author their own skills) is handled by 'type: skills-dir' + the skillsReconcile rules above, not by omitting them.",
     "agentDocs": {
         "$comment": "Since v1.91.0 the agent docs (AGENTS.md, CLAUDE.md, .github/copilot-instructions.md, .windsurfrules) are no longer Tier 2. The framework's part ships with taw/core in resources/agents/<classic|block>/ and updates with it; a theme keeps short site-owned files that import (CLAUDE.md) or point to (the others) it, marked `taw:agent-doc`. `sync --apply` (when taw.json's update.docs allows) and `bin/taw docs:sync --apply` replace old full copies with those files (TAW\\Update\\AgentDocs). README.md is the site's own: never synced."
+    },
+    "configFiles": {
+        "$comment": "Since v1.91.0 vite.config.js and phpstan.neon are no longer Tier 2: their base ships with taw/core (classicTheme() in resources/vite/taw-vite.mjs, resources/phpstan/classic.neon) and the theme keeps a short `taw:config` file of its own. `sync --apply` (when taw.json's update.scaffold allows) and `bin/taw configs:sync --apply` replace only unedited copies (resources/configs/known.json); edited ones are reported with the by-hand steps (TAW\\Update\\ConfigFiles). phpunit.xml is the site's own: never synced."
     }
 }

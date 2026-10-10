@@ -108,6 +108,7 @@ final class Application
             new CatechismExportCommand(),
             new CanonLawInstallCommand($themeDir),
             new CanonLawExportCommand(),
+            new ConfigsSyncCommand($themeDir),
         ], $everywhere);
     }
 

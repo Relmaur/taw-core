@@ -12,6 +12,9 @@ guard); `resources/schema/taw-json-1.0.json` mirrors it and `PolicyTest` keeps t
 together.
 Theme agent docs live in `resources/agents/{classic,block}/` (since v1.91.0; `TAW\Update\AgentDocs`,
 `docs:sync`): edit those, never a theme's `AGENTS.md`/`CLAUDE.md` (short site files that import/point here).
+Classic themes' `vite.config.js`/`phpstan.neon` load `classicTheme()` (`resources/vite/taw-vite.mjs`) and
+`resources/phpstan/classic.neon` (v1.91.0, `TAW\Update\ConfigFiles`, `configs:sync`). When taw-theme's copy of
+either changes, regenerate `resources/configs/known.json` (`ConfigFilesTest` fails until you do).
 Themes' CI is `.github/workflows/theme-ci.yml` and `theme-framework-sync.yml` here (`workflow_call`,
 ADR-0019), called by stubs at `@v1`; their scripts are `resources/ci/`. **Every release moves the `v1`
 branch** (`git push origin vX.Y.Z^{commit}:refs/heads/v1`, umbrella `taw-release` § 4). Lint workflow

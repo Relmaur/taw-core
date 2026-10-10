@@ -11,6 +11,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use TAW\Update\AgentDocs;
+use TAW\Update\ConfigFiles;
 use TAW\Update\Policy;
 
 /**
@@ -96,6 +97,7 @@ class SyncCommand extends Command
             'errors' => [],
         ];
 
+        $pendingFiles = false; // converted configs or agent docs still to apply
         $manifest = $this->loadManifest();
         if ($manifest === null) {
             $report['errors'][] = 'Could not load resources/update-manifest.json — this ships with taw/core, reinstall it if missing.';
@@ -147,6 +149,21 @@ class SyncCommand extends Command
                             $report['applied'][] = $path;
                         }
                     }
+                    $pendingFiles = ($docPlan['convert'] !== [] || $docPlan['create'] !== []) && $report['agent_docs']['applied'] === [];
+
+                    // vite.config.js / phpstan.neon: unedited copies become short files
+                    // that load taw/core's base (ConfigFiles), when taw.json's
+                    // update.scaffold allows (default on). Edited ones are reported.
+                    $configs = new ConfigFiles($this->themeDir);
+                    $configPlan = $configs->plan();
+                    $report['configs'] = $configPlan + ['applied' => [], 'by_hand' => array_intersect_key(ConfigFiles::BY_HAND, array_flip($configPlan['custom']))];
+                    if ($apply && Policy::load($this->themeDir)->scaffold()) {
+                        $report['configs']['applied'] = $configs->apply($configPlan);
+                        foreach ($report['configs']['applied'] as $path) {
+                            $report['applied'][] = $path;
+                        }
+                    }
+                    $pendingFiles = $pendingFiles || ($configPlan['convert'] !== [] && $report['configs']['applied'] === []);
 
                     $mergeRules = $manifest['manifestMerge'] ?? [];
                     foreach ($manifest['tier2'] as $entry) {
@@ -176,7 +193,7 @@ class SyncCommand extends Command
 
         $report['clean'] = empty($report['errors'])
             && $report['taw_core']['behind'] === false
-            && (($report['agent_docs']['convert'] ?? []) === [] && ($report['agent_docs']['create'] ?? []) === [] || ($report['agent_docs']['applied'] ?? []) !== [])
+            && !$pendingFiles
             && !$this->anyChanged($report['tier1'])
             && !$this->anyChanged($report['tier2']);
 
@@ -719,6 +736,20 @@ class SyncCommand extends Command
 
             if (!$printedSomething) {
                 $io->text('Up to date.');
+            }
+        }
+
+        if (isset($report['configs'])) {
+            $io->section('Configs (vite.config.js, phpstan.neon)');
+            $c = $report['configs'];
+            foreach ($c['convert'] as $path) {
+                $io->text('- ' . $path . ': ' . (in_array($path, $c['applied'], true) ? 'now loads taw/core\'s base' : 'to load taw/core\'s base (--apply)'));
+            }
+            foreach ($c['custom'] as $path) {
+                $io->text('- ' . $path . ': has this site\'s own changes, left as is. By hand: ' . $c['by_hand'][$path]);
+            }
+            if ($c['convert'] === [] && $c['custom'] === []) {
+                $io->text('Up to date (they load taw/core\'s base).');
             }
         }
 

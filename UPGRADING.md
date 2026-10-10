@@ -636,6 +636,19 @@ had added notes to the old copies, move them under "This site" (the previous tex
 When `vendor/taw/core` is a symlink (a path repository in development), Claude Code asks once to allow the
 import from outside the project.
 
+**Also in v1.91.0: the Vite and PHPStan base come from taw/core.** A classic theme's `vite.config.js` (92 lines)
+and `phpstan.neon` were full copies of the scaffold's (Tier 2). Their base now ships with taw/core
+(`classicTheme()` in `resources/vite/taw-vite.mjs`, `resources/phpstan/classic.neon`) and updates with it; the
+theme keeps a short file (marker `taw:config`) that loads it, with room for the site's own settings
+(Vite's `mergeConfig`; PHPStan parameters merge). `sync --apply` (when `taw.json`'s `update.scaffold` allows)
+replaces a file only when it is identical to a version the scaffold once shipped
+(`resources/configs/known.json`); a file the site edited is left alone and reported with what to do by hand.
+`phpunit.xml` is the site's own and no longer synced. After this, Tier 2 is `composer.json`/`package.json`
+only, whose additions and bumps apply by rule. **Check:** after converting, `npm run build` and
+`composer run phpstan` pass as before (taw-theme: same 7 build entries). **By hand:**
+`php bin/taw configs:sync --apply`; for an edited file, the command prints the steps. **Undo:**
+`git checkout <previous commit> -- vite.config.js phpstan.neon`.
+
 **By hand (taw.json):** `php bin/taw policy --init`, edit `taw.json` (editors that read JSON schemas complete it from
 `vendor/taw/core/resources/schema/taw-json-1.0.json`), check it with `php bin/taw policy`, commit it.
 **Undo:** delete `taw.json` (the defaults apply).

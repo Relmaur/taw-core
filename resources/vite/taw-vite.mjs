@@ -18,8 +18,8 @@
  * above it.
  */
 
-import { mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
-import { basename, dirname } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 
 /**
  * Imports that WordPress already ships as browser globals. Bundling our own
@@ -242,6 +242,63 @@ export function phpReload(options = {}) {
                     server.ws.send({ type: 'full-reload' });
                 }
             });
+        },
+    };
+}
+
+/**
+ * The classic TAW theme's whole Vite config (taw-theme and its client
+ * themes), so the theme's vite.config.js is a few lines and this part
+ * updates with `composer update taw/core`:
+ *
+ *   const { classicTheme } = await import(tawVite);
+ *   export default defineConfig((env) => mergeConfig(classicTheme(env, { plugins: [tailwindcss()] }), {
+ *       // this site's own settings
+ *   }));
+ *
+ * Entries: resources/scss/critical.scss, resources/js/app.js and every
+ * block's style.css / style.scss / script.js under Blocks/. Built to
+ * public/build (manifest.json), relative asset URLs in production, the
+ * dev server's origin in public/build/hot (TAW\Support\ViteLoader reads it),
+ * full reload on PHP and Twig changes, the next free port when 5173 is taken.
+ *
+ * @param {{ command: string }} env Vite's config env.
+ * @param {{ root?: string, plugins?: import('vite').PluginOption[], input?: string[] }} [options]
+ *   `plugins`: the theme's own (e.g. tailwindcss(), installed in the theme);
+ *   `input`: more entries; `root`: the theme folder (default: the working directory).
+ */
+export function classicTheme(env, options = {}) {
+    const root = options.root ?? process.cwd();
+    const blocks = join(root, 'Blocks');
+    const blockAssets = existsSync(blocks)
+        ? readdirSync(blocks, { recursive: true })
+              .map(String)
+              .filter((file) => file.endsWith('style.css') || file.endsWith('style.scss') || file.endsWith('script.js'))
+              .sort()
+              .map((file) => `Blocks/${file}`)
+        : [];
+
+    return {
+        // './' keeps font/asset URLs in the compiled CSS relative, so they resolve from the theme's
+        // path; dev stays '/' (HMR breaks with a relative base when scripts are served cross-origin).
+        base: env.command === 'build' ? './' : '/',
+        plugins: [hotFile({ path: 'public/build/hot' }), ...(options.plugins ?? []), phpReload({ extensions: ['.php', '.twig'] })],
+        build: {
+            outDir: 'public/build',
+            emptyOutDir: true,
+            manifest: 'manifest.json',
+            rollupOptions: {
+                input: ['resources/scss/critical.scss', 'resources/js/app.js', ...blockAssets, ...(options.input ?? [])],
+            },
+        },
+        server: {
+            host: 'localhost',
+            port: 5173,
+            // The next free port when another TAW project's dev server has 5173; hotFile() publishes
+            // the real one, so nothing points at a stale port.
+            strictPort: false,
+            cors: true,
+            watch: { usePolling: true },
         },
     };
 }
