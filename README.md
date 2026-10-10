@@ -2025,6 +2025,11 @@ a person, with the steps. `php bin/taw upgrade` lists what's pending, `--explain
 one does, why, how to do it by hand and how to undo it, `--json` is for tools. Extensions add their own
 with `TAW\Update\Migrations::add()`.
 
+**`composer update` runs them**: a theme's `composer.json` lists
+`"post-update-cmd": ["TAW\\CLI\\ComposerScripts::postUpdate"]` (both scaffolds do), so every `composer update` ends
+with the pending migrations, quietly when there are none. Not on `composer install`. It never fails the
+update; off with `TAW_NO_UPGRADE=1` or `"extra": {"taw": {"upgrade": false}}`.
+
 ### Theme CI (v1.91.0)
 
 A theme's CI is two short stubs calling taw/core's shared workflows, so the checks update with taw/core:

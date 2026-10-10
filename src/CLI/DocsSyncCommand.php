@@ -33,9 +33,9 @@ final class DocsSyncCommand extends Command
                 "\"This site\" section for its own notes; updates never change those.\n\n" .
                 "This finds old full copies and replaces them (--apply). Their previous text stays in git\n" .
                 "history (git log -p -- AGENTS.md); undo with git checkout <commit> -- AGENTS.md.\n\n" .
-                "  <info>php bin/taw docs:sync</info>           what would change\n" .
-                "  <info>php bin/taw docs:sync --apply</info>   convert them\n" .
-                "  <info>php bin/taw docs:sync --json</info>    for scripts"
+                "  <info>vendor/bin/taw docs:sync</info>           what would change\n" .
+                "  <info>vendor/bin/taw docs:sync --apply</info>   convert them\n" .
+                "  <info>vendor/bin/taw docs:sync --json</info>    for scripts"
             )
             ->addOption('apply', null, InputOption::VALUE_NONE, 'Write the changes')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Machine-readable output');
@@ -64,7 +64,7 @@ final class DocsSyncCommand extends Command
         }
         if (!$done && ($plan['convert'] !== [] || $plan['create'] !== [])) {
             $output->writeln('');
-            $output->writeln('Run <info>php bin/taw docs:sync --apply</info>, then review and commit. Move any notes of your own into "This site".');
+            $output->writeln('Run <info>vendor/bin/taw docs:sync --apply</info>, then review and commit. Move any notes of your own into "This site".');
         }
 
         return Command::SUCCESS;

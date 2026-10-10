@@ -116,7 +116,7 @@ final class MigrationsTest extends TestCase
         $this->assertStringContainsString('# old copy', (string) file_get_contents($this->dir . '/AGENTS.md'), 'a check writes nothing');
 
         $tester->execute(['--explain' => '1.91.0/agent-docs']);
-        $this->assertStringContainsString('By hand: php bin/taw docs:sync --apply', $tester->getDisplay());
+        $this->assertStringContainsString('By hand: vendor/bin/taw docs:sync --apply', $tester->getDisplay());
         $this->assertSame(1, $tester->execute(['--explain' => 'nope']));
 
         $tester->execute(['--apply' => true, '--json' => true]);

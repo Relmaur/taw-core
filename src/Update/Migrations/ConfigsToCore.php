@@ -39,7 +39,7 @@ final class ConfigsToCore implements \TAW\Update\Migration
 
             Why: the build and analysis settings then update with composer update taw/core.
 
-            By hand: php bin/taw configs:sync --apply, then npm run build and composer run phpstan; commit.
+            By hand: vendor/bin/taw configs:sync --apply, then npm run build and composer run phpstan; commit.
             For an edited file: copy vendor/taw/core/resources/configs/classic/<file> over it and move the
             site's own settings into it (Vite: the object passed to mergeConfig; PHPStan: under parameters).
 

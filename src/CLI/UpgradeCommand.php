@@ -31,10 +31,10 @@ final class UpgradeCommand extends Command
                 "Each taw/core release that changes something in a theme ships a migration: it finds its own work,\n" .
                 "so running it again does nothing, and anything it shouldn't decide (a file the site edited) is left\n" .
                 "as is, with the steps for a person.\n\n" .
-                "  <info>php bin/taw upgrade</info>                       what's pending\n" .
-                "  <info>php bin/taw upgrade --apply</info>               run them\n" .
-                "  <info>php bin/taw upgrade --explain <id></info>        what one does, why, by hand, undo\n" .
-                "  <info>php bin/taw upgrade --json</info>                for scripts and taw-fleet"
+                "  <info>vendor/bin/taw upgrade</info>                       what's pending\n" .
+                "  <info>vendor/bin/taw upgrade --apply</info>               run them\n" .
+                "  <info>vendor/bin/taw upgrade --explain <id></info>        what one does, why, by hand, undo\n" .
+                "  <info>vendor/bin/taw upgrade --json</info>                for scripts and taw-fleet"
             )
             ->addOption('apply', null, InputOption::VALUE_NONE, 'Run the pending migrations')
             ->addOption('explain', null, InputOption::VALUE_REQUIRED, 'Explain one migration (all of them: --explain all)')
@@ -97,7 +97,7 @@ final class UpgradeCommand extends Command
         }
         $output->writeln('');
         $output->writeln($results === []
-            ? 'Run <info>php bin/taw upgrade --apply</info>. What each one does, why, by hand and how to undo: <info>php bin/taw upgrade --explain <id></info>.'
+            ? 'Run <info>vendor/bin/taw upgrade --apply</info>. What each one does, why, by hand and how to undo: <info>vendor/bin/taw upgrade --explain <id></info>.'
             : 'Review the changes (git diff) and commit them. Steps marked "For you" stay listed until they\'re done.');
 
         return Command::SUCCESS;

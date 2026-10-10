@@ -31,9 +31,9 @@ final class PolicyCommand extends Command
                 "Reads taw.json in the theme (the \"update\" settings) and says what each one means.\n" .
                 "Settings the file leaves out take their defaults. An invalid file is listed with\n" .
                 "its errors, and updates refuse to run until it's fixed.\n\n" .
-                "  <info>php bin/taw policy</info>          in words\n" .
-                "  <info>php bin/taw policy --json</info>   for taw-fleet and scripts\n" .
-                "  <info>php bin/taw policy --init</info>   write a starter taw.json with every default\n\n" .
+                "  <info>vendor/bin/taw policy</info>          in words\n" .
+                "  <info>vendor/bin/taw policy --json</info>   for taw-fleet and scripts\n" .
+                "  <info>vendor/bin/taw policy --init</info>   write a starter taw.json with every default\n\n" .
                 "Edit taw.json by hand; editors that read JSON schemas complete and check it."
             )
             ->addOption('json', null, InputOption::VALUE_NONE, 'Machine-readable output')
@@ -70,7 +70,7 @@ final class PolicyCommand extends Command
 
         $output->writeln($policy->hasFile()
             ? 'Update policy from <info>' . Policy::FILE . '</info> (settings it leaves out are defaults):'
-            : 'No ' . Policy::FILE . ' here, so updates follow the defaults (<info>php bin/taw policy --init</info> writes one):');
+            : 'No ' . Policy::FILE . ' here, so updates follow the defaults (<info>vendor/bin/taw policy --init</info> writes one):');
         $output->writeln('');
         foreach (array_keys(Policy::SETTINGS) as $key) {
             $value = $policy->toArray()[$key];

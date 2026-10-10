@@ -39,7 +39,7 @@ final class SiteSkills implements \TAW\Update\Migration
 
             Why: Claude Code finds skills in the theme folder; taw-fleet starts it there (X, a).
 
-            By hand: php bin/taw skills:sync --apply, then commit .claude/skills/.
+            By hand: vendor/bin/taw skills:sync --apply, then commit .claude/skills/.
 
             Undo: delete the skill folders (they come back on the next update unless a same-named skill of
             the site's own, marked owner: site, takes the name).

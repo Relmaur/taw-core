@@ -34,9 +34,9 @@ final class ConfigsSyncCommand extends Command
                 "Only a file identical to a version the scaffold once shipped is replaced (an unedited copy).\n" .
                 "A file the site edited is left alone and listed with what to do by hand.\n" .
                 "The previous text stays in git history (git log -p -- vite.config.js).\n\n" .
-                "  <info>php bin/taw configs:sync</info>           what would change\n" .
-                "  <info>php bin/taw configs:sync --apply</info>   convert the unedited copies\n" .
-                "  <info>php bin/taw configs:sync --json</info>    for scripts"
+                "  <info>vendor/bin/taw configs:sync</info>           what would change\n" .
+                "  <info>vendor/bin/taw configs:sync --apply</info>   convert the unedited copies\n" .
+                "  <info>vendor/bin/taw configs:sync --json</info>    for scripts"
             )
             ->addOption('apply', null, InputOption::VALUE_NONE, 'Write the changes')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Machine-readable output');
@@ -64,7 +64,7 @@ final class ConfigsSyncCommand extends Command
         }
         if ($written === [] && $plan['convert'] !== []) {
             $output->writeln('');
-            $output->writeln('Run <info>php bin/taw configs:sync --apply</info>, then <info>npm run build</info> and <info>composer run phpstan</info>, and commit.');
+            $output->writeln('Run <info>vendor/bin/taw configs:sync --apply</info>, then <info>npm run build</info> and <info>composer run phpstan</info>, and commit.');
         }
 
         return Command::SUCCESS;

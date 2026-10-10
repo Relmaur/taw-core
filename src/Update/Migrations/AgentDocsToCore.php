@@ -40,7 +40,7 @@ final class AgentDocsToCore implements \TAW\Update\Migration
             Why: the framework's docs then update with composer update taw/core, and an update never needs
             anyone to review a 2,000-line diff (on the live fleet no site had edited its copy).
 
-            By hand: php bin/taw docs:sync --apply; move any notes you had added into "This site"; commit.
+            By hand: vendor/bin/taw docs:sync --apply; move any notes you had added into "This site"; commit.
 
             Undo: git checkout <the commit before> -- AGENTS.md CLAUDE.md .github/copilot-instructions.md .windsurfrules
             TXT;

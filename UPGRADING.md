@@ -657,6 +657,15 @@ only, whose additions and bumps apply by rule. **Check:** after converting, `npm
 `1.89.0/site-skills`, `1.91.0/agent-docs`, `1.91.0/configs` (each: `--explain <id>`). From this release on,
 anything a release changes in a theme ships as a migration (`TAW\Update\Migration`), never a manual check.
 
+**`composer update` runs them (v1.91.0).** With `"post-update-cmd": ["TAW\\CLI\\ComposerScripts::postUpdate"]` in the
+theme's `composer.json` scripts (taw-theme v1.12.58+ / taw-gutenberg v0.3.60+ have it; sync adds it to older
+sites as a `composer.json` addition), every `composer update` ends by running the pending migrations and
+printing what it changed and any "For you" step. Not on `composer install`, which only reproduces the lock.
+It never fails the update: a migration that fails is reported with `vendor/bin/taw upgrade --explain <id>`.
+**By hand:** add that line, or run `vendor/bin/taw upgrade --apply` after updating. **Off:**
+`TAW_NO_UPGRADE=1 composer update`, or `"extra": {"taw": {"upgrade": false}}`. A site pinned below 1.91
+(`taw.json`: `"core": "pinned:1.90.0"`) must not have the line: Composer can't find the class there.
+
 **By hand (taw.json):** `php bin/taw policy --init`, edit `taw.json` (editors that read JSON schemas complete it from
 `vendor/taw/core/resources/schema/taw-json-1.0.json`), check it with `php bin/taw policy`, commit it.
 **Undo:** delete `taw.json` (the defaults apply).
