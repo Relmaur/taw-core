@@ -88,7 +88,7 @@ abstract class BaseBlock
     private function enqueueDevAssets(string $relative_dir, string $assetId): void
     {
         $style_ext = $this->resolveStyleExtension();
-        $head_done = did_action('wp_head') > 0;
+        $head_done = self::headPassed(8); // wp_print_styles prints enqueued styles at wp_head 8
 
         if ($style_ext) {
             $url = ViteLoader::devServerOrigin() . '/' . $relative_dir . '/' . $style_ext;
@@ -135,10 +135,8 @@ abstract class BaseBlock
         $js_key    = $relative_dir . '/script.js';
         $style_key = isset($manifest[$scss_key]) ? $scss_key : (isset($manifest[$css_key]) ? $css_key : null);
 
-        $head_done = did_action('wp_head') > 0;
-
         if ($style_key) {
-            $this->enqueueCssFile($manifest[$style_key]['file'], $assetId, $head_done);
+            $this->enqueueCssFile($manifest[$style_key]['file'], $assetId);
         }
 
         if (isset($manifest[$js_key])) {
@@ -149,9 +147,30 @@ abstract class BaseBlock
 
             foreach ($manifest[$js_key]['css'] ?? [] as $index => $css_file) {
                 $css_id = $index === 0 ? $assetId . '-script' : $assetId . '-script-' . $index;
-                $this->enqueueCssFile($css_file, $css_id, $head_done);
+                $this->enqueueCssFile($css_file, $css_id);
             }
         }
+    }
+
+    /**
+     * Whether a wp_head callback at $priority would no longer run: wp_head has
+     * finished, or is running at or past that priority. Not just
+     * did_action('wp_head'): BlockRegistry::queue()'d blocks enqueue on
+     * wp_enqueue_scripts, which WordPress fires from wp_head (priority 1),
+     * and a callback added now for a later priority still runs.
+     */
+    private static function headPassed(int $priority): bool
+    {
+        if (!did_action('wp_head')) {
+            return false;
+        }
+        if (!doing_action('wp_head')) {
+            return true;
+        }
+        $hook = $GLOBALS['wp_filter']['wp_head'] ?? null;
+        $current = $hook instanceof \WP_Hook ? $hook->current_priority() : false;
+
+        return $current === false || $current >= $priority;
     }
 
     /**
@@ -160,13 +179,13 @@ abstract class BaseBlock
      * enqueueProdAssets(). Shared by the block's own style.scss/style.css
      * and any CSS a script.js entry carries as a Rollup side-output.
      */
-    private function enqueueCssFile(string $file, string $styleId, bool $head_done): void
+    private function enqueueCssFile(string $file, string $styleId): void
     {
         $url      = ViteLoader::distUrl($file);
         $css_path = Framework::themePath(ViteLoader::distDir() . '/' . $file);
 
         if ($this->critical) {
-            if ($head_done) {
+            if (self::headPassed(11)) {
                 // wp_head already fired — best-effort sync <link> in body
                 printf('<link rel="stylesheet" href="%s">' . "\n", esc_url($url));
             } else {
@@ -178,7 +197,7 @@ abstract class BaseBlock
                     ViteLoader::inlineCssFile($css_path, 'block-' . $styleId);
                 }, 11);
             }
-        } elseif ($head_done) {
+        } elseif (self::headPassed(50)) {
             // Non-critical, after head (below-fold render) — async, no noscript needed
             printf(
                 '<link rel="stylesheet" href="%s" media="print" onload="this.media=\'all\'">' . "\n",
