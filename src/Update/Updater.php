@@ -83,7 +83,7 @@ final class Updater
 
         // Preflight: never start on top of someone's unfinished work.
         if (!$policy->valid()) {
-            return $this->refuse($result, Policy::FILE . ' has problems, so nothing was changed: ' . implode('; ', $policy->errors()) . '. Fix it (vendor/bin/taw policy lists them), commit, and run the update again.');
+            return $this->refuse($result, Policy::FILE . ' has problems, so nothing was changed: ' . implode('; ', $policy->errors()) . '. Fix it (taw policy lists them, or vendor/bin/taw policy), commit, and run the update again.');
         }
         if ($this->git(['rev-parse', '--is-inside-work-tree'])['code'] !== 0) {
             return $this->refuse($result, 'The theme folder isn\'t a git repository, so an update can\'t be put on its own branch. Run git init, commit, then update.');

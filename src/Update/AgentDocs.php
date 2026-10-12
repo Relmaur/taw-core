@@ -48,7 +48,7 @@ final class AgentDocs
     ];
 
     /** What a person does with a copy the site edited. */
-    public const BY_HAND = 'Move this site\'s own notes out of it: copy the file aside, run vendor/bin/taw docs:sync --apply --force, then put your notes back under its "This site" section and commit.';
+    public const BY_HAND = 'Move this site\'s own notes out of it: copy the file aside, run taw docs:sync --apply --force, then put your notes back under its "This site" section and commit.';
 
     public function __construct(private string $themeDir, private string $kind)
     {

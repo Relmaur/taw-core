@@ -5,6 +5,7 @@ shouldn't decide about. Its "For you" steps say exactly what to do.
 
 ## Steps
 
-1. See what's left: `vendor/bin/taw upgrade`.
-2. For each one, read what it does, why, and how to do it by hand: `vendor/bin/taw upgrade --explain <id>`.
-3. Do those steps, then run `vendor/bin/taw upgrade` again: when nothing is listed, it's done.
+1. See what's left: `taw upgrade` (`taw` comes with taw-fleet; without it, run `vendor/bin/taw upgrade`
+   from the theme folder).
+2. For each one, read what it does, why, and how to do it by hand: `taw upgrade --explain <id>`.
+3. Do those steps, then run `taw upgrade` again: when nothing is listed, it's done.

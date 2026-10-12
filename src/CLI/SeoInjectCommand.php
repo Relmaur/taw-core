@@ -77,9 +77,9 @@ class SeoInjectCommand extends Command
                 if any field on that post fails validation, nothing is written for it.
 
                 Examples:
-                  <info>php bin/taw seo:inject 42</info>
-                  <info>php bin/taw seo:inject 42 --input=.taw/seo-optimized.json --dry-run</info>
-                  <info>php bin/taw seo:inject --all --input=.taw/seo-site-optimized.json</info>
+                  <info>taw seo:inject 42</info>
+                  <info>taw seo:inject 42 --input=.taw/seo-optimized.json --dry-run</info>
+                  <info>taw seo:inject --all --input=.taw/seo-site-optimized.json</info>
                 HELP)
             ->addArgument('post_id', InputArgument::OPTIONAL, 'Post ID to write copy back to (omit when using --all)')
             ->addOption('all', null, InputOption::VALUE_NONE, 'Apply a {"posts": [...]} site-wide dump instead of a single post_id')

@@ -41,11 +41,11 @@ class ContentImportCommand extends Command
             ->setDescription('Import a content snapshot or change-set — dry-run by default, --yes to apply (writes a rollback snapshot first)')
             ->setHelp(<<<'HELP'
                 Examples:
-                  <info>php bin/taw content:import site.json</info>              dry-run: show the diff, write nothing
-                  <info>php bin/taw content:import site.json --yes</info>        apply it
-                  <info>php bin/taw content:import changes.json --yes --policy=create</info>  create new records only, skip existing
-                  <info>php bin/taw content:import --undo</info>                 preview undoing the last import
-                  <info>php bin/taw content:import --undo --yes</info>           undo it (values edited since are kept)
+                  <info>taw content:import site.json</info>              dry-run: show the diff, write nothing
+                  <info>taw content:import site.json --yes</info>        apply it
+                  <info>taw content:import changes.json --yes --policy=create</info>  create new records only, skip existing
+                  <info>taw content:import --undo</info>                 preview undoing the last import
+                  <info>taw content:import --undo --yes</info>           undo it (values edited since are kept)
                 HELP)
             ->addArgument('file', InputArgument::OPTIONAL, 'Path to the snapshot / change-set JSON')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Force dry-run even if --yes is given')

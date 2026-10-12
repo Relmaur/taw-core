@@ -110,7 +110,7 @@ class ContentReindexCommand extends Command
         $io->newLine(2);
 
         if ($failures > 0) {
-            $io->warning("{$failures} post(s) failed to index — check `php bin/taw log:tail` for details.");
+            $io->warning("{$failures} post(s) failed to index — check `taw log:tail` for details.");
         }
 
         $io->success(sprintf('Indexed %d post(s).', count($ids) - $failures));

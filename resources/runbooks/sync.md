@@ -5,7 +5,8 @@ framework file couldn't be written.
 
 ## Steps
 
-1. Run it yourself: `vendor/bin/taw sync` (a report, nothing written), then `vendor/bin/taw sync --apply`.
+1. Run it yourself: `taw sync` (a report, nothing written), then `taw sync --apply`. `taw` comes with
+   taw-fleet; without it, run `vendor/bin/taw` from the theme folder.
 2. If it can't clone: check the network and `git ls-remote https://github.com/Relmaur/taw-theme.git`.
 3. Framework-owned files (`functions.php`, `bin/`, workflows, framework skills) are safe to replace; never
    put the site's own code in them.

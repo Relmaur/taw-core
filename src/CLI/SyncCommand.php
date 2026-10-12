@@ -71,10 +71,10 @@ class SyncCommand extends Command
                 `composer update taw/core` separately if it reports being behind.
 
                 Examples:
-                  <info>php bin/taw sync</info>              human-readable report, no changes made
-                  <info>php bin/taw sync --json</info>        machine-readable JSON (for CI / scripts)
-                  <info>php bin/taw sync --apply</info>       also writes Tier 1 changes to disk
-                  <info>php bin/taw sync --apply-manifests</info>  also writes the composer.json/package.json suggestions
+                  <info>taw sync</info>              human-readable report, no changes made
+                  <info>taw sync --json</info>        machine-readable JSON (for CI / scripts)
+                  <info>taw sync --apply</info>       also writes Tier 1 changes to disk
+                  <info>taw sync --apply-manifests</info>  also writes the composer.json/package.json suggestions
                 HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output machine-readable JSON instead of a formatted report')
             ->addOption('apply', null, InputOption::VALUE_NONE, 'Write Tier 1 changes to disk (Tier 2 is report-only)')
@@ -754,7 +754,7 @@ class SyncCommand extends Command
             $io->section('Configs (vite.config.js, phpstan.neon)');
             $c = $report['configs'];
             foreach ($c['convert'] as $path) {
-                $io->text('- ' . $path . ': to load taw/core\'s base (vendor/bin/taw upgrade --apply, or configs:sync --apply)');
+                $io->text('- ' . $path . ': to load taw/core\'s base (taw upgrade --apply, or configs:sync --apply)');
             }
             foreach ($c['custom'] as $path) {
                 $io->text('- ' . $path . ': has this site\'s own changes, left as is. By hand: ' . $c['by_hand'][$path]);
@@ -768,7 +768,7 @@ class SyncCommand extends Command
             $io->section('Agent docs (AGENTS.md, CLAUDE.md, …)');
             $d = $report['agent_docs'];
             foreach (array_merge($d['convert'], $d['create']) as $path) {
-                $io->text('- ' . $path . ': to point to taw/core (vendor/bin/taw upgrade --apply, or docs:sync --apply)');
+                $io->text('- ' . $path . ': to point to taw/core (taw upgrade --apply, or docs:sync --apply)');
             }
             foreach ($d['custom'] as $path) {
                 $io->text('- ' . $path . ': has this site\'s own changes, left as is. By hand: ' . AgentDocs::BY_HAND);

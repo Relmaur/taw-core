@@ -35,12 +35,12 @@ For authoritative/current API detail, prefer the `mcp__taw-docs__search_document
 
 ## New Blocks
 
-Scaffold with the CLI: `php bin/taw make:block Name --type=meta --with-style`, then `composer dump-autoload`.
+Scaffold with the CLI: `taw make:block Name --type=meta --with-style`, then `composer dump-autoload`. `taw` comes with taw-fleet and runs this theme's own `vendor/bin/taw`; where it isn't installed, run `vendor/bin/taw` from the theme folder.
 Or manually create `Blocks/{Name}/{Name}.php` + `Blocks/{Name}/index.php` — no other changes needed.
 
 ## Reading/writing field data directly
 
-`php bin/taw fields:get <post_id> <field_id> --json` / `fields:set <post_id> <field_id> <value>` read or write a Metabox/OptionsPage field with the exact same sanitization as a real admin save. Use `--file=path.json` for repeater/array values (avoids shell quoting), `--dry-run` to preview. Don't hand-craft repeater JSON or raw `wp post meta update` calls — this command already knows each field's shape and sanitizer.
+`taw fields:get <post_id> <field_id> --json` / `fields:set <post_id> <field_id> <value>` read or write a Metabox/OptionsPage field with the exact same sanitization as a real admin save. Use `--file=path.json` for repeater/array values (avoids shell quoting), `--dry-run` to preview. Don't hand-craft repeater JSON or raw `wp post meta update` calls — this command already knows each field's shape and sanitizer.
 
 ## Options Page
 

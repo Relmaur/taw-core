@@ -2261,8 +2261,8 @@ msgid "The chat is paused (kill switch). Visitors get a \"paused\" message until
 msgstr "El chat está en pausa (interruptor de emergencia). Los visitantes verán un mensaje de pausa hasta que se vuelva a activar."
 
 #: src/Core/Rag/Usage/UsageAdminScreen.php
-msgid "The chat is refusing every message: its usage ledger cannot be read. See php bin/taw log:tail."
-msgstr "El chat está rechazando todos los mensajes: no se puede leer su registro de uso. Revisa php bin/taw log:tail."
+msgid "The chat is refusing every message: its usage ledger cannot be read. See taw log:tail."
+msgstr "El chat está rechazando todos los mensajes: no se puede leer su registro de uso. Revisa taw log:tail."
 
 #: src/Core/Rag/Usage/UsageAdminScreen.php
 msgid "The chat is refusing every message: the human check is set to Turnstile, but TAW_TURNSTILE_SITE_KEY and TAW_TURNSTILE_SECRET_KEY are not defined in wp-config.php."
@@ -2365,8 +2365,8 @@ msgid "The upload failed — please try again."
 msgstr "La subida falló; inténtalo de nuevo."
 
 #: src/Core/Rag/Usage/UsageAdminScreen.php
-msgid "The usage ledger could not be read, so the chat is refusing messages. See php bin/taw log:tail."
-msgstr "No se pudo leer el registro de uso, así que el chat está rechazando mensajes. Revisa php bin/taw log:tail."
+msgid "The usage ledger could not be read, so the chat is refusing messages. See taw log:tail."
+msgstr "No se pudo leer el registro de uso, así que el chat está rechazando mensajes. Revisa taw log:tail."
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "The weekday’s name."

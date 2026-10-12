@@ -44,15 +44,15 @@ class FieldsGetCommand extends Command
             ->setDescription("Read a Metabox/OptionsPage field's current value for a post (or a site-wide option), decoded according to its type")
             ->setHelp(<<<'HELP'
                 Looks the field up in the live Metabox/OptionsPage field registry (the
-                same one `php bin/taw inspect --json` reports) to know its type, then
+                same one `taw inspect --json` reports) to know its type, then
                 decodes the stored value accordingly — repeaters, post_select,
                 gradient_text and hubspot_form come back as arrays, checkboxes as
                 booleans, everything else as its raw value.
 
                 Examples:
-                  <info>php bin/taw fields:get 42 hero_heading</info>
-                  <info>php bin/taw fields:get 42 team_members --json</info>
-                  <info>php bin/taw fields:get options company_phone</info>
+                  <info>taw fields:get 42 hero_heading</info>
+                  <info>taw fields:get 42 team_members --json</info>
+                  <info>taw fields:get options company_phone</info>
                 HELP)
             ->addArgument('post_id', InputArgument::REQUIRED, "Post ID the field is stored against, or the literal 'options' for a site-wide OptionsPage field")
             ->addArgument('field_id', InputArgument::REQUIRED, "Field ID without the meta key prefix (e.g. 'hero_heading', or 'hero_cta_text' for a group sub-field), a qualified id ('hero.hero_heading'), or the full meta key")
@@ -100,7 +100,7 @@ class FieldsGetCommand extends Command
 
         if ($fieldConfig === null) {
             $registry = $isOptionsTarget ? 'OptionsPage' : 'Metabox';
-            $io->error("Unknown {$registry} field: '{$fieldId}'. Run 'php bin/taw inspect --json' to see registered field IDs per block.");
+            $io->error("Unknown {$registry} field: '{$fieldId}'. Run 'taw inspect --json' to see registered field IDs per block.");
             return Command::FAILURE;
         }
 

@@ -74,10 +74,10 @@ class SeoExtractCommand extends Command
                 SeoInjectCommand expects back after editing.
 
                 Examples:
-                  <info>php bin/taw seo:extract 42</info>
-                  <info>php bin/taw seo:extract 42 --output=.taw/seo-dump.json</info>
-                  <info>php bin/taw seo:extract --all</info>
-                  <info>php bin/taw seo:extract --all --output=.taw/seo-site-dump.json</info>
+                  <info>taw seo:extract 42</info>
+                  <info>taw seo:extract 42 --output=.taw/seo-dump.json</info>
+                  <info>taw seo:extract --all</info>
+                  <info>taw seo:extract --all --output=.taw/seo-site-dump.json</info>
                 HELP)
             ->addArgument('post_id', InputArgument::OPTIONAL, 'Post ID to extract copy from (omit when using --all)')
             ->addOption('all', null, InputOption::VALUE_NONE, 'Extract every published page/post instead of a single post_id')

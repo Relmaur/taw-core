@@ -55,22 +55,22 @@ class FieldsSetCommand extends Command
                 nothing was silently stripped.
 
                 Plain fields — pass the value directly:
-                  <info>php bin/taw fields:set 42 hero_heading "Welcome"</info>
+                  <info>taw fields:set 42 hero_heading "Welcome"</info>
 
                 Repeaters / post_select / files / gradient_text / hubspot_form / link — value
                 must be JSON. Prefer --file over inline JSON to sidestep shell quoting:
-                  <info>php bin/taw fields:set 42 team_members --file=/tmp/team.json</info>
-                  <info>php bin/taw fields:set 42 team_members '[{"name":"Ada","role":"CTO"}]'</info>
+                  <info>taw fields:set 42 team_members --file=/tmp/team.json</info>
+                  <info>taw fields:set 42 team_members '[{"name":"Ada","role":"CTO"}]'</info>
 
                 A field id shared by two fieldsets on the post's type (with different
                 prefixes) is ambiguous; pass the qualified id or the meta key:
-                  <info>php bin/taw fields:set 42 book_details.subtitle "Second edition"</info>
+                  <info>taw fields:set 42 book_details.subtitle "Second edition"</info>
 
                 OptionsPage field — pass the literal 'options' instead of a post ID:
-                  <info>php bin/taw fields:set options company_phone "555-1234"</info>
+                  <info>taw fields:set options company_phone "555-1234"</info>
 
                 Preview without writing:
-                  <info>php bin/taw fields:set 42 hero_heading "Welcome" --dry-run</info>
+                  <info>taw fields:set 42 hero_heading "Welcome" --dry-run</info>
                 HELP)
             ->addArgument('post_id', InputArgument::REQUIRED, "Post ID the field is stored against, or the literal 'options' for a site-wide OptionsPage field")
             ->addArgument('field_id', InputArgument::REQUIRED, "Field ID without the meta key prefix (e.g. 'hero_heading', or 'hero_cta_text' for a group sub-field), a qualified id ('hero.hero_heading'), or the full meta key")
@@ -144,7 +144,7 @@ class FieldsSetCommand extends Command
 
         if ($fieldConfig === null) {
             $registry = $isOptionsTarget ? 'OptionsPage' : 'Metabox';
-            $io->error("Unknown {$registry} field: '{$fieldId}'. Run 'php bin/taw inspect --json' to see registered field IDs per block.");
+            $io->error("Unknown {$registry} field: '{$fieldId}'. Run 'taw inspect --json' to see registered field IDs per block.");
             return Command::FAILURE;
         }
 

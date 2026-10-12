@@ -57,10 +57,10 @@ class WpCliCommand extends Command
                 --path and runs `wp` normally, just without the extra -d flags.
 
                 Examples:
-                  <info>php bin/taw wp post list --post_type=page --fields=ID,post_title</info>
-                  <info>php bin/taw wp option get siteurl</info>
-                  <info>php bin/taw wp eval 'echo home_url();'</info>
-                  <info>php bin/taw wp shell</info>
+                  <info>taw wp post list --post_type=page --fields=ID,post_title</info>
+                  <info>taw wp option get siteurl</info>
+                  <info>taw wp eval 'echo home_url();'</info>
+                  <info>taw wp shell</info>
                 HELP)
             ->ignoreValidationErrors();
     }

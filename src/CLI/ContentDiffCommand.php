@@ -40,8 +40,8 @@ class ContentDiffCommand extends Command
             ->setDescription('Diff two content snapshots into a change-set for content:import')
             ->setHelp(<<<'HELP'
                 Examples:
-                  <info>php bin/taw content:diff before.json after.json</info>
-                  <info>php bin/taw content:diff before.json after.json --out=.taw/changes.json</info>
+                  <info>taw content:diff before.json after.json</info>
+                  <info>taw content:diff before.json after.json --out=.taw/changes.json</info>
                 HELP)
             ->addArgument('a', InputArgument::REQUIRED, 'The "from" snapshot')
             ->addArgument('b', InputArgument::REQUIRED, 'The "to" snapshot')

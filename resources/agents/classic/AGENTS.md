@@ -30,7 +30,7 @@
 | `resources/css/app.css` | Tailwind v4 directives — imported by `app.js`, not its own Vite entry | Yes |
 | `resources/scss/critical.scss` | Inlined `<head>` CSS, keep <14 KB, no `@font-face` | Yes |
 | `resources/fonts/` | Self-hosted WOFF2 | Yes |
-| `bin/taw` | Symfony CLI: `make:block`, `export/import:block`, `inspect`, `fields:get/set`, `sync`, `content:reindex`, `content:reindex-kb`, `schema:validate` | read-only tool, not a source dir |
+| `bin/taw` | Symfony CLI, run as `taw <command>` (§ "CLI Tools"): `make:block`, `export/import:block`, `inspect`, `fields:get/set`, `sync`, `content:reindex`, `content:reindex-kb`, `schema:validate` | read-only tool, not a source dir |
 | `tests/Unit/Blocks/{Name}Test.php` | Unit test for `{Name}::getData()` — required for every block, see § "Testing Blocks" | Yes — written alongside every new block |
 
 Full path-by-path detail: § "Quick Orientation" and § "PSR-4 Autoloading" below.
@@ -219,7 +219,7 @@ For each new MetaBlock needed:
 
 ```bash
 # Preferred — scaffolds all files and runs dump-autoload reminder
-php bin/taw make:block SectionName --type=meta --with-style
+taw make:block SectionName --type=meta --with-style
 ```
 
 Or manually create:
@@ -768,7 +768,7 @@ Every block gets a matching `tests/Unit/Blocks/{Name}Test.php` testing `getData(
 
 > **Shortcut:** Use the CLI scaffolder instead of writing files manually:
 > ```bash
-> php bin/taw make:block Features --type=meta --with-style
+> taw make:block Features --type=meta --with-style
 > ```
 
 ---
@@ -905,7 +905,7 @@ Metabox::get_posts(int $postId, string $fieldId): array   // post_select → arr
 Metabox::get_repeater(int $postId, string $fieldId): array // repeater → array of rows
 ```
 
-**Default content goes in `'defaults'`, not in `getData()`** (taw/core ≥ v1.80.0). `'defaults' => ['field_id' => value]` on the metabox (or options page) is what the field reads and shows in the editor while nothing is stored, so write `$this->getMeta($postId, 'hero_heading')`, not `getMeta(...) ?: 'Welcome'`. A `?:` fallback is invisible to wp-admin and to content exports; a default can be saved as a record (Tools → TAW Data → *Defaults*, or `php bin/taw content:defaults --apply`). Repeater defaults are arrays of rows. Full detail: taw/core README § "Metabox System → Defaults".
+**Default content goes in `'defaults'`, not in `getData()`** (taw/core ≥ v1.80.0). `'defaults' => ['field_id' => value]` on the metabox (or options page) is what the field reads and shows in the editor while nothing is stored, so write `$this->getMeta($postId, 'hero_heading')`, not `getMeta(...) ?: 'Welcome'`. A `?:` fallback is invisible to wp-admin and to content exports; a default can be saved as a record (Tools → TAW Data → *Defaults*, or `taw content:defaults --apply`). Repeater defaults are arrays of rows. Full detail: taw/core README § "Metabox System → Defaults".
 
 ### Locking Metabox Order
 
@@ -1258,23 +1258,23 @@ Search for posts across post types. Powers the `post_selector` metabox field typ
 
 ## WP-CLI — live site data access
 
-`bin/taw` (below) is for framework-specific scaffolding — blocks, live registry introspection. It knows nothing about actual site *content*. For that, use WordPress's own official CLI, **WP-CLI** (the `wp` command) — it's not bundled by this theme (it's a host-level tool, present on virtually every real WordPress host and every local dev environment: Local, Herd, DDEV), but it's the single highest-leverage tool an agent has for reading or mutating live site data directly: posts, options, users, terms, transients, arbitrary PHP via `wp eval`/`wp eval-file`, even an interactive `wp shell`.
+`taw` (below) is for framework-specific scaffolding — blocks, live registry introspection. It knows nothing about actual site *content*. For that, use WordPress's own official CLI, **WP-CLI** (the `wp` command) — it's not bundled by this theme (it's a host-level tool, present on virtually every real WordPress host and every local dev environment: Local, Herd, DDEV), but it's the single highest-leverage tool an agent has for reading or mutating live site data directly: posts, options, users, terms, transients, arbitrary PHP via `wp eval`/`wp eval-file`, even an interactive `wp shell`.
 
-**Prefer `php bin/taw wp <args>` over a bare `wp` command** — it's a thin passthrough to the real `wp` binary (every argument forwarded exactly as given) that automatically resolves `--path` and, under Local by Flywheel, the per-site MySQL socket (see the Warning below) — no manual configuration needed:
+**Prefer `taw wp <args>` over a bare `wp` command** — it's a thin passthrough to the real `wp` binary (every argument forwarded exactly as given) that automatically resolves `--path` and, under Local by Flywheel, the per-site MySQL socket (see the Warning below) — no manual configuration needed:
 
 ```bash
-php bin/taw wp post list --post_type=page --fields=ID,post_title,post_status
-php bin/taw wp option get siteurl
-php bin/taw wp option get _taw_company_phone   # OptionsPage-backed option, prefix per Metabox field convention
-php bin/taw wp user list --fields=ID,user_login,roles
-php bin/taw wp eval 'echo home_url();'
-php bin/taw wp db query "SELECT COUNT(*) FROM wp_posts WHERE post_status='publish'"
-php bin/taw wp shell   # interactive — TTY passthrough works too
+taw wp post list --post_type=page --fields=ID,post_title,post_status
+taw wp option get siteurl
+taw wp option get _taw_company_phone   # OptionsPage-backed option, prefix per Metabox field convention
+taw wp user list --fields=ID,user_login,roles
+taw wp eval 'echo home_url();'
+taw wp db query "SELECT COUNT(*) FROM wp_posts WHERE post_status='publish'"
+taw wp shell   # interactive — TTY passthrough works too
 ```
 
-A bare `wp` command (without the `bin/taw wp` wrapper) still works the same as always, and is still exactly what `wp-wpcli-and-ops` and other external WP-CLI documentation assumes — just without the automatic socket/path resolution below.
+A bare `wp` command (without the `taw wp` wrapper) still works the same as always, and is still exactly what `wp-wpcli-and-ops` and other external WP-CLI documentation assumes — just without the automatic socket/path resolution below.
 
-> **Warning — Local by Flywheel connection quirk:** `wp-config.php`'s `DB_HOST` is `localhost`, but Local runs a per-site MySQL instance on its own Unix socket, not the system default. A bare `wp` command fails with `Error establishing a database connection` even though the site works fine in the browser — `php bin/taw wp` (above) resolves this automatically and is the reason it's preferred over a bare `wp` command in this project. If you need to run the real `wp` binary directly anyway (a tool that shells out to it itself, for instance), the manual fix is the same thing `bin/taw wp` does internally:
+> **Warning — Local by Flywheel connection quirk:** `wp-config.php`'s `DB_HOST` is `localhost`, but Local runs a per-site MySQL instance on its own Unix socket, not the system default. A bare `wp` command fails with `Error establishing a database connection` even though the site works fine in the browser — `taw wp` (above) resolves this automatically and is the reason it's preferred over a bare `wp` command in this project. If you need to run the real `wp` binary directly anyway (a tool that shells out to it itself, for instance), the manual fix is the same thing `taw wp` does internally:
 >
 > ```bash
 > # Find the running mysqld's socket path for this site — Local names run
@@ -1299,7 +1299,9 @@ For general WP-CLI operations beyond this framework's scope, see the `wp-wpcli-a
 
 ## CLI Tools
 
-Provided by `taw/core` (namespace `TAW\CLI`). Powered by Symfony Console. Entry point: `bin/taw`.
+Provided by `taw/core` (namespace `TAW\CLI`). Powered by Symfony Console. Entry point: `vendor/bin/taw` (the theme's `bin/taw` runs the same commands).
+
+Run the commands as `taw <command>`, from the theme folder or any folder under it. `taw` comes with taw-fleet (`brew install Relmaur/tap/taw-fleet`) and runs this theme's own `vendor/bin/taw` with the Local site's PHP and MySQL socket; it is never a copy of taw/core, so each site keeps its own version. From another folder, name the theme: `taw @<site> <command>` (`taw @<site>/<theme>` when a site has two TAW themes). Where `taw` isn't installed (CI, another machine), `vendor/bin/taw` is the same command, run from the theme folder.
 
 ### `make:block`
 
@@ -1307,16 +1309,16 @@ Scaffold a new block with the correct folder structure, class, and template.
 
 ```bash
 # Interactive (prompts for type)
-php bin/taw make:block MyBlock
+taw make:block MyBlock
 
 # Non-interactive
-php bin/taw make:block MyBlock --type=meta --with-style --with-script
+taw make:block MyBlock --type=meta --with-style --with-script
 
 # UI block
-php bin/taw make:block Badge --type=ui
+taw make:block Badge --type=ui
 
 # Overwrite existing
-php bin/taw make:block Hero --type=meta --force
+taw make:block Hero --type=meta --force
 ```
 
 | Option | Description |
@@ -1334,7 +1336,7 @@ After scaffolding, run `composer dump-autoload` to register the new class.
 Export a block as a portable ZIP archive with a `block.json` manifest.
 
 ```bash
-php bin/taw export:block Hero
+taw export:block Hero
 ```
 
 ### `import:block`
@@ -1342,7 +1344,7 @@ php bin/taw export:block Hero
 Import a block from a ZIP archive exported by `export:block`.
 
 ```bash
-php bin/taw import:block path/to/Hero.zip
+taw import:block path/to/Hero.zip
 ```
 
 ### `inspect`
@@ -1350,8 +1352,8 @@ php bin/taw import:block path/to/Hero.zip
 Live introspection of the *current* site state — the registered blocks and their actual metabox field schemas, registered forms, the installed `taw/core` version, and whether `MetaboxOrder` is locked. Unlike the other CLI commands, this one boots WordPress (it needs `after_setup_theme`/`init` to have fired for the registries to be populated), so it must be run from within the theme in an environment where WordPress can actually connect to its database.
 
 ```bash
-php bin/taw inspect          # human-readable summary (table output)
-php bin/taw inspect --json   # machine-readable, for AI agents / scripts
+taw inspect          # human-readable summary (table output)
+taw inspect --json   # machine-readable, for AI agents / scripts
 ```
 
 Prefer this over `grep`-ing `Blocks/*/*.php` by hand to answer "what blocks/fields/forms actually exist right now" — it reports live registry state, not static source, so it reflects reality even if a block's `getData()` doesn't match its `registerMetaboxes()`, or a form was conditionally registered.
@@ -1361,14 +1363,14 @@ Prefer this over `grep`-ing `Blocks/*/*.php` by hand to answer "what blocks/fiel
 Read or write a single Metabox/OptionsPage field's value directly, without going through the wp-admin UI. This is the same read/write primitive `VisualEditorEndpoint` uses for its REST-driven saves — the field's type is resolved from the live `Metabox` registry (the same one `inspect` reports), then dispatched to the matching type-aware getter/sanitizer. A repeater is read back as a decoded array and written with the exact sanitization a real admin form save would apply (XSS-stripping via `wp_kses_post()`/`sanitize_text_field()`, attachment IDs coerced with `absint()`, JSON re-encoded clean) — not a hand-rolled approximation.
 
 ```bash
-php bin/taw fields:get 42 hero_heading --json
-php bin/taw fields:get 42 team_members --json                        # repeater comes back as a decoded array
+taw fields:get 42 hero_heading --json
+taw fields:get 42 team_members --json                        # repeater comes back as a decoded array
 
-php bin/taw fields:set 42 hero_heading "Welcome"
-php bin/taw fields:set 42 team_members --file=/tmp/team.json         # --file avoids shell JSON-quoting for repeater/array-shaped values
-php bin/taw fields:set 42 hero_heading "Welcome" --dry-run           # preview the sanitized result without writing
+taw fields:set 42 hero_heading "Welcome"
+taw fields:set 42 team_members --file=/tmp/team.json         # --file avoids shell JSON-quoting for repeater/array-shaped values
+taw fields:set 42 hero_heading "Welcome" --dry-run           # preview the sanitized result without writing
 
-php bin/taw fields:set options company_phone "555-1234"              # 'options' targets a site-wide OptionsPage field, not a post
+taw fields:set options company_phone "555-1234"              # 'options' targets a site-wide OptionsPage field, not a post
 ```
 
 For a group sub-field, use the compound ID exactly as `inspect` reports it (e.g. `hero_cta_text` for the `cta_text` sub-field of a `hero_cta` group) — it's registered in the field registry under that compound key already.
@@ -1528,7 +1530,7 @@ README § "Schema"; decisions in taw-core ADR-0004):
   and `Schema::optionsPage()`. Put it in `inc/customizations.php`, never `functions.php`.
 - **JSON:** one entity per file in `taw-schema/` (subfolders one level deep are fine), with
   `"$schema": "../vendor/taw/core/resources/schema/taw-schema-1.0.json"` for editor autocomplete.
-  Validate with `php bin/taw schema:validate` (no WordPress needed; run it before committing).
+  Validate with `taw schema:validate` (no WordPress needed; run it before committing).
 
 Fieldsets compile into regular Metaboxes (`_taw_{field}` meta, `Metabox::get()` reads, REST, content
 export), so nothing else changes. Schema post types always get `custom-fields` support so their meta
@@ -1546,11 +1548,11 @@ is identical (verified hook-for-hook).
 Provided by `taw/core` (`TAW\Core\Content\*`, since v1.25.0; whole-site **state** migration since v1.26.0). A portable snapshot / change-set format for moving a site's state — posts + `_taw_*` fields, `_taw_*` options, terms, media, and (opt-in) authorship, users, comments, environment settings — between environments, or handing it to a code agent. Same **serialize → review → apply** shape as `seo:extract`/`seo:inject`. Schema `1.1` (importer also accepts `1.0`).
 
 ```bash
-php bin/taw content:export --migrate --output=/tmp/site.json   # full state (users, settings, all media, drafts)
-php bin/taw content:import /tmp/site.json                      # dry-run diff — writes nothing
-php bin/taw content:import /tmp/site.json --yes --with-settings # apply (rollback snapshot written first)
-php bin/taw content:diff a.json b.json --out=changes.json
-php bin/taw content:defaults [--apply | --undo=<journal>]       # save fields' `defaults` into empty fields
+taw content:export --migrate --output=/tmp/site.json   # full state (users, settings, all media, drafts)
+taw content:import /tmp/site.json                      # dry-run diff — writes nothing
+taw content:import /tmp/site.json --yes --with-settings # apply (rollback snapshot written first)
+taw content:diff a.json b.json --out=changes.json
+taw content:defaults [--apply | --undo=<journal>]       # save fields' `defaults` into empty fields
 ```
 
 - **Import is always a dry-run first.** Without `--yes` it prints a field-level diff and exits. `apply()` writes a full **maximal-scope** `Exporter` snapshot to `wp-content/uploads/taw-private/` before it touches the DB, in the order **users → terms → media → posts → comments → settings**.
@@ -1586,10 +1588,10 @@ Configuration (LLM base URL/model, indexed post types for the site's own content
 - **Turnstile keys.** Define `TAW_TURNSTILE_SITE_KEY`/`TAW_TURNSTILE_SECRET_KEY` in wp-config.php, or the chat refuses every message (`503 not_protected`).
 - **Refusals.** They carry a `code` (`rate_limited`, `budget_exhausted`, `paused`, `human_check_failed`), and their visitor copy is localized from `Chatbot.php` (`window.tawChatbot.copy`, translatable).
 - **Kill switch.** When it's on (`TAW_RAG_CHAT_DISABLED` or the setting), `index.php` renders nothing.
-- **Budgets, limits and spend.** These live in wp-admin (Budget / Limits tabs, **TAW Chatbot → Usage**) and in `php bin/taw rag:usage`.
+- **Budgets, limits and spend.** These live in wp-admin (Budget / Limits tabs, **TAW Chatbot → Usage**) and in `taw rag:usage`.
 - **Before giving a site a key:** set its budget, prices and Assistant Scope, use a provider key with a hard monthly limit, and check the Usage screen's "Resolved" IP (behind Cloudflare, set `TAW_TRUSTED_PROXIES`).
 
-Manual re-ingestion commands (`content:reindex` for the site's own content, `content:reindex-kb <id>` for one uploaded knowledge base) are registered in `bin/taw` — see `taw/core` README for usage. Uploading a new knowledge base itself is a wp-admin action, not a CLI one.
+Manual re-ingestion commands (`content:reindex` for the site's own content, `content:reindex-kb <id>` for one uploaded knowledge base) are `taw` commands — see `taw/core` README for usage. Uploading a new knowledge base itself is a wp-admin action, not a CLI one.
 
 ---
 
@@ -1621,7 +1623,7 @@ Logger::warning('hero.missing_background', 'Hero has no background image — fal
 // debug() info() notice() warning() error() critical()  — PSR-3 minus alert/emergency
 ```
 
-Each entry has a human `message` **and** a machine-stable `code` (`subsystem.event`) plus a `context` array. Two sinks by default: PHP `error_log()` (one readable line) and `wp-content/taw-logs/taw.log.jsonl` (size-rotated JSON Lines). Read it back with `php bin/taw log:tail [--level=] [--code=] [--since=] [--json]`, or — on a production site — `taw-fleet live <site> --logs 20` (the companion's `/logs` route). Full API (sinks, the `taw_core_log_sinks` / `taw_core_log_entry` filters, `LogReader`): `taw/core` README § "Logging".
+Each entry has a human `message` **and** a machine-stable `code` (`subsystem.event`) plus a `context` array. Two sinks by default: PHP `error_log()` (one readable line) and `wp-content/taw-logs/taw.log.jsonl` (size-rotated JSON Lines). Read it back with `taw log:tail [--level=] [--code=] [--since=] [--json]`, or — on a production site — `taw-fleet live <site> --logs 20` (the companion's `/logs` route). Full API (sinks, the `taw_core_log_sinks` / `taw_core_log_entry` filters, `LogReader`): `taw/core` README § "Logging".
 
 ---
 
@@ -1857,7 +1859,7 @@ When a session is active, this agent applies incoming changes following the TAW-
 | Vite | v7 | Build tool + HMR |
 | SCSS | via `sass` | Optional per-block or global styles |
 | Composer | v2 | PSR-4 autoloading + `taw/core` package management |
-| Symfony Console | — | CLI scaffolding commands (`bin/taw`) |
+| Symfony Console | — | CLI scaffolding commands (`taw`) |
 
 ---
 
@@ -1928,13 +1930,13 @@ After adding new block classes, run `composer dump-autoload`.
 | `composer install` | Install PHP dependencies (including `taw/core`) |
 | `composer update taw/core --with-dependencies` | Pull the latest framework package update (and the dependencies it needs) |
 | `composer dump-autoload` | Rebuild autoload classmap (after adding new blocks) |
-| `php bin/taw make:block Name` | Scaffold a new block |
-| `php bin/taw export:block Name` | Export a block as a ZIP |
-| `php bin/taw import:block path.zip` | Import a block from a ZIP |
-| `php bin/taw sync --json` | Check for drift: `taw/core` version + `taw-theme` Tier 1/Tier 2 scaffold paths |
-| `php bin/taw sync --apply` | Also write Tier 1 scaffold changes (Tier 2 is report-only) |
-| `php bin/taw sync --apply-manifests` | Also write the rule-based `composer.json`/`package.json` suggestions (additions and raised constraints, never removals; taw/core ≥ v1.78.0) |
-| `php bin/taw log:tail --level=error` | Read back the structured log (`wp-content/taw-logs/`) — see § "Logging" |
+| `taw make:block Name` | Scaffold a new block |
+| `taw export:block Name` | Export a block as a ZIP |
+| `taw import:block path.zip` | Import a block from a ZIP |
+| `taw sync --json` | Check for drift: `taw/core` version + `taw-theme` Tier 1/Tier 2 scaffold paths |
+| `taw sync --apply` | Also write Tier 1 scaffold changes (Tier 2 is report-only) |
+| `taw sync --apply-manifests` | Also write the rule-based `composer.json`/`package.json` suggestions (additions and raised constraints, never removals; taw/core ≥ v1.78.0) |
+| `taw log:tail --level=error` | Read back the structured log (`wp-content/taw-logs/`) — see § "Logging" |
 | `composer run phpstan` | Static analysis (`Blocks/`, `inc/`) — also runs in CI |
 | `composer run test` | Run the block unit test suite (`tests/Unit/`) — see § "Testing Blocks" |
 
@@ -1954,7 +1956,7 @@ After adding new block classes, run `composer dump-autoload`.
 
 ## Automated framework-drift detection
 
-`php bin/taw sync` (shipped by `taw/core`, see its README for the full command reference) is the scriptable core of the `update-theme` skill — it checks whether the installed `taw/core` version is behind the latest GitHub tag, and whether this project's Tier 1/Tier 2 `taw-theme` scaffold paths (defined once in `taw/core`'s `resources/update-manifest.json`) differ from the canonical repo. It never boots WordPress and never touches `taw/core` itself.
+`taw sync` (shipped by `taw/core`, see its README for the full command reference) is the scriptable core of the `update-theme` skill — it checks whether the installed `taw/core` version is behind the latest GitHub tag, and whether this project's Tier 1/Tier 2 `taw-theme` scaffold paths (defined once in `taw/core`'s `resources/update-manifest.json`) differ from the canonical repo. It never boots WordPress and never touches `taw/core` itself.
 
 `.github/workflows/framework-sync.yml` runs this unattended on a weekly schedule (`workflow_dispatch` also available for a manual run): bumps `taw/core`, applies Tier 1 changes, runs the exact same verification `ci.yml` runs on every push (`php -l`, the `getData()` signature check, PHPStan, and the dynamic smoke test below), and — only if something actually changed and verification passed — opens a pull request with Tier 2 diffs included in the body for human review. Tier 2 is never written automatically, by either this workflow or `sync --apply`; a human always reviews those diffs before they're applied, same as the interactive `update-theme` skill. Nothing happens (no PR, no noise) when the project is already current.
 

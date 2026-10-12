@@ -46,8 +46,8 @@ final class AgentDocsToCore implements \TAW\Update\Migration, \TAW\Update\Policy
             Why: the framework's docs then update with composer update taw/core, and an update never needs
             anyone to review a 2,000-line diff.
 
-            By hand: vendor/bin/taw docs:sync --apply converts the unedited copies. For an edited one, copy it
-            aside, run vendor/bin/taw docs:sync --apply --force, put your notes back under "This site"; commit.
+            By hand: taw docs:sync --apply converts the unedited copies. For an edited one, copy it
+            aside, run taw docs:sync --apply --force, put your notes back under "This site"; commit.
 
             Undo: git checkout <the commit before> -- AGENTS.md CLAUDE.md .github/copilot-instructions.md .windsurfrules
             TXT;

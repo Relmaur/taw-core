@@ -50,8 +50,8 @@ class InspectCommand extends Command
                 data agents would otherwise have to reconstruct by grepping PHP source.
 
                 Examples:
-                  <info>php bin/taw inspect</info>              human-readable summary
-                  <info>php bin/taw inspect --json</info>       machine-readable JSON (for AI agents / scripts)
+                  <info>taw inspect</info>              human-readable summary
+                  <info>taw inspect --json</info>       machine-readable JSON (for AI agents / scripts)
                 HELP)
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output machine-readable JSON instead of a formatted summary');
     }

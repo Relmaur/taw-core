@@ -6,7 +6,8 @@ Full reference: **`AGENTS.md` next to this file** (`vendor/taw/core/resources/ag
 
 - FSE block theme; everything visual is `theme.json` + `templates/` + `parts/`.
 - Data layer = taw/core via `\TAW\Core\Boot::data()` (never `Theme::boot()`); data is defined in
-  `taw-schema/*.json`, validated with `php bin/taw schema:validate`.
+  `taw-schema/*.json`, validated with `taw schema:validate` (`taw` comes with taw-fleet; without it,
+  `vendor/bin/taw` from the theme folder).
 - Editor lockdown = taw/core editing policies via `Boot::editing()` (`Setup\Editing`); policy in
   `taw-schema/editing.json` (ships `open`), per-install level via `TAW_EDITING_PRESET`. No lockdown code here.
 - JS/CSS: Vite + TS (ADR-0003) through taw/core's `Assets\Vite`; blocks in `src/blocks/<name>/`

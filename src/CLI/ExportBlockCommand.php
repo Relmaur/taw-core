@@ -36,9 +36,9 @@ class ExportBlockCommand extends Command
 
                 The block name can include its group path:
 
-                  <info>php bin/taw export:block Hero</info>
-                  <info>php bin/taw export:block sections/Hero</info>
-                  <info>php bin/taw export:block ui/cards/Badge -o ./exports</info>
+                  <info>taw export:block Hero</info>
+                  <info>taw export:block sections/Hero</info>
+                  <info>taw export:block ui/cards/Badge -o ./exports</info>
                 HELP)
             ->addArgument(
                 'name',
