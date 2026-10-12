@@ -113,6 +113,8 @@ class Form
     /** @var self[] All registered forms, keyed by form ID. */
     private static array $registry = [];
 
+    private static bool $styleHooked = false;
+
     private string $id;
     private array $config;
 
@@ -172,9 +174,39 @@ class Form
         add_action('wp_ajax_nopriv_taw_form_' . $this->id, [$this, 'process']);
         add_action('wp_ajax_taw_form_' . $this->id, [$this, 'process']);
 
-        add_action('wp_enqueue_scripts', static function () {
-            wp_enqueue_style('taw-form', Framework::url('assets/form.css'), [], Framework::version());
-        });
+        if (!self::$styleHooked) {
+            self::$styleHooked = true;
+            add_action('wp_enqueue_scripts', static function () {
+                wp_enqueue_style('taw-form', Framework::url('assets/form.css'), [], Framework::version());
+            });
+            add_filter('style_loader_tag', [self::class, 'asyncStyleTag'], 100, 2);
+        }
+    }
+
+    /**
+     * form.css stays in <head> (where it always was, so a theme's own form
+     * styles that come after it keep winning), but doesn't block rendering:
+     * media="print" + onload, with a <noscript> copy, as BaseBlock loads
+     * block CSS. Forms register on every request, so the stylesheet is on
+     * every page, and as a plain <link> it held up first paint even on pages
+     * without a form. Priority 100 reads the href from the tag, after a cache
+     * plugin (Hummingbird) has rewritten it. `taw_form_css_async` (false)
+     * keeps the plain, render-blocking <link>.
+     */
+    public static function asyncStyleTag(string $html, string $handle): string
+    {
+        if ($handle !== 'taw-form' || str_contains($html, 'media="print"') || str_contains($html, "media='print'")
+            || !apply_filters('taw_form_css_async', true)) {
+            return $html;
+        }
+        if (!preg_match('/href=[\'"]([^\'"]+)[\'"]/', $html, $match)) {
+            return $html;
+        }
+        $id = 'taw-form-css';
+        $url = esc_url($match[1]);
+
+        return '<link rel="stylesheet" id="' . $id . '" href="' . $url . '" media="print" onload="this.media=\'all\'">' . "\n"
+            . '<noscript><link rel="stylesheet" id="' . $id . '" href="' . $url . '"></noscript>' . "\n";
     }
 
     /* -------------------------------------------------------------------------
