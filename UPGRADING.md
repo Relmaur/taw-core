@@ -868,6 +868,20 @@ and the homepage kept the old page until a second clear.
 
 **Check:** none. **Undo:** none needed.
 
+### v1.95.2: a metabox's defaults stay on the posts it applies to
+
+**What changed.** A field's `defaults` (v1.80.0) now reach only the posts their metabox applies to: its post types,
+templates and slugs. Before, when only one metabox declared a default for a field, every post read it, including
+posts the metabox doesn't cover; and when several declared one and none applied, the first one's default was used.
+
+**Why.** Themes with one metabox per page variation (same field ids, different `screens`) showed one variation's
+fallback text on another variation's page, e.g. a FAQ pretitle on a page whose variation declares none.
+
+**Check:** a page that rendered text from a default declared by a metabox that doesn't apply to it now renders the
+field empty. Rendering every published page of a site that uses defaults (chcapital) showed no such page. If one
+of yours relied on it, add the page to that metabox's `screens`, or declare the default on the metabox that
+applies. **Undo:** none needed.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
