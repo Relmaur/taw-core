@@ -13,6 +13,9 @@ namespace TAW\Update;
  */
 final class Report
 {
+    /** A page cache cleared while the deploy still runs is rebuilt from the old code (fsspx, #198). */
+    public const CACHE_AFTER_DEPLOY = 'Once the deploy has finished, not while it runs, clear the site\'s page cache (Hummingbird, WP Rocket, the host\'s cache): a cache cleared during the deploy is rebuilt from the old code.';
+
     /**
      * @param array<string, mixed> $r the Updater's result
      */
@@ -83,6 +86,8 @@ final class Report
             $out[] = '';
             $out[] = (string) $r['delivered']['note'];
             $out[] = '';
+            $out[] = self::CACHE_AFTER_DEPLOY;
+            $out[] = '';
         }
 
         $out[] = '<details><summary>For a maintainer: the policy and every command</summary>';
@@ -152,8 +157,10 @@ final class Report
         if ($branch !== '') {
             $out[] = "On the branch `{$branch}` (`git checkout {$branch}`): commit the fix, then push it and open a pull request";
             $remote = (string) ($r['remote'] ?? 'origin');
-        $out[] = "into `{$base}`: `git push -u {$remote} {$branch}`, then `gh pr create --base {$base} --fill` (or on GitHub).";
+            $out[] = "into `{$base}`: `git push -u {$remote} {$branch}`, then `gh pr create --base {$base} --fill` (or on GitHub).";
             $out[] = "taw-fleet's M merges it; merging deploys production.";
+            $out[] = '';
+            $out[] = self::CACHE_AFTER_DEPLOY;
         }
         $out[] = '';
         $out[] = '## Undo';

@@ -2045,7 +2045,8 @@ packages those added) → migrations → checks (`lint`, `phpstan`, `test`, `bui
 `vendor/bin/taw` in its own process. A failure stops at a commit on the branch, never a push; the report
 `.taw/update-report.md` (also the pull request's description) has what failed, the runbook for that kind of
 failure (`resources/runbooks/`), verify, finish and undo: the guide a person follows and the prompt "Fix with
-Claude" receives (umbrella ADR-0004). `--plan`, `--no-deliver`, `--json`, `--composer="php composer.phar"` (quote a
+Claude" receives (umbrella ADR-0004). Its next or finish steps end with "clear the page cache once the deploy has
+finished" (v1.95.1): a cache cleared while the deploy runs is rebuilt from the old code. `--plan`, `--no-deliver`, `--json`, `--composer="php composer.phar"` (quote a
 part with spaces: `--composer='"/path with spaces/php" /path/composer.phar'`, v1.91.1). It prints a line as each
 step starts and ends (on stderr with `--json`, so stdout stays one JSON document; taw-fleet shows them live). The
 versions it reports come from `composer.lock` (what git has), so `vendor/` may already hold a newer taw/core

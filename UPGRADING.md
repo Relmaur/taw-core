@@ -858,6 +858,16 @@ output (`TAW\Core\Seo\SocialImage`, registered by `Theme::boot()`).
 stays as it is: pick the image from the media library instead. **Undo:**
 `add_filter('taw_social_image_original', '__return_false');`.
 
+### v1.95.1: the update report says when to clear page caches
+
+**What changed.** The update report's "Next" steps (and the "Finish" steps of a failed update) end with: clear the
+site's page cache once the deploy has finished, not while it runs.
+
+**Why.** On a real site the cache was cleared while the deploy was still running; it was rebuilt from the old code,
+and the homepage kept the old page until a second clear.
+
+**Check:** none. **Undo:** none needed.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
