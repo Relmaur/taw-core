@@ -1876,6 +1876,15 @@ This is a **replace**, not a dual-format generation — core has no built-in mec
 the original format and a modern-format sibling side by side, so the resulting files simply *are*
 AVIF/WebP. `wp_get_attachment_image_src()`, `srcset`, and everything built on them — including
 `TAW\Helpers\Image::render()` — pick this up automatically with **no template changes required**.
+
+**Except link previews** (v1.95.0): Facebook, WhatsApp, LinkedIn and X don't read AVIF for `og:image` /
+`twitter:image`. `TAW\Core\Seo\SocialImage::url($id)` returns the original upload (WordPress keeps it as the
+"original image" when it converts the format) when the served file isn't JPEG/PNG/GIF, if the original is at most
+5 MB. `SeoMeta` uses it, and `SocialImage::register()` (from `Theme::boot()`) hooks the same swap into Yoast
+(`wpseo_opengraph_image`, `wpseo_twitter_image`, and `wpseo_opengraph_image_type`), Rank Math
+(`rank_math/opengraph/{facebook,twitter}/image`) and SmartCrawl (`smartcrawl_get_{opengraph,twitter}_images`).
+`add_filter('taw_social_image_original', '__return_false')` turns it off. A block theme calls
+`SocialImage::register()` itself.
 No `<picture>`-based fallback is needed either: AVIF/WebP support has been universal in shipping
 browsers for years.
 

@@ -843,6 +843,21 @@ login (`gh auth token`), for 5,000 requests an hour.
 **Check:** none. **By hand:** if you see the rate-limit message, `gh auth login` once (or set `GITHUB_TOKEN`).
 **Undo:** none needed.
 
+### v1.95.0: link previews get a JPEG/PNG, not the AVIF
+
+**What changed.** With `modern_image_formats` on (the default), WordPress serves an uploaded JPEG or PNG as AVIF
+(or WebP) and keeps the upload as the "original image". Social tags (`og:image`, `twitter:image`) now point at that
+original when the served file is AVIF/WebP and the original is a JPEG/PNG/GIF of at most 5 MB: in taw/core's own
+SEO tags, the Yoast og-image URL `SeoMeta` writes, and, through new filters, in Yoast, Rank Math and SmartCrawl's
+output (`TAW\Core\Seo\SocialImage`, registered by `Theme::boot()`).
+
+**Why.** Facebook, WhatsApp, LinkedIn and X don't read AVIF for link previews: a shared page showed no picture.
+
+**Check:** share a page (or use a preview tool such as the Facebook Sharing Debugger) and confirm `og:image` ends in
+`.jpg`/`.png`. A share image you pasted into an SEO plugin's field as an `.avif` URL that isn't an attachment URL
+stays as it is: pick the image from the media library instead. **Undo:**
+`add_filter('taw_social_image_original', '__return_false');`.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

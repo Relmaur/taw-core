@@ -6,7 +6,6 @@ namespace TAW\Core\Seo;
 
 use TAW\Core\Metabox\Metabox;
 use TAW\Core\OptionsPage\OptionsPage;
-use TAW\Helpers\Image;
 
 if (!defined('ABSPATH')) {
     exit;
@@ -228,7 +227,7 @@ final class SeoMeta
 
             if (self::isYoastActive()) {
                 update_post_meta($postId, self::YOAST_OG_IMAGE_ID_KEY, $ogImageId);
-                update_post_meta($postId, self::YOAST_OG_IMAGE_URL_KEY, $ogImageId > 0 ? Image::url($ogImageId, 'full') : '');
+                update_post_meta($postId, self::YOAST_OG_IMAGE_URL_KEY, $ogImageId > 0 ? SocialImage::url($ogImageId) : '');
             } else {
                 update_post_meta($postId, '_taw_' . self::OG_IMAGE_FIELD, $ogImageId);
             }
@@ -337,7 +336,7 @@ final class SeoMeta
         $description = $context['description'];
         $url = $context['url'];
         $ogType = $context['og_type'];
-        $imageUrl = $context['image_id'] ? Image::url($context['image_id'], 'full') : '';
+        $imageUrl = $context['image_id'] ? SocialImage::url($context['image_id']) : ''; // the original JPEG/PNG when served as AVIF/WebP
 
         if ($url !== '') {
             printf('<link rel="canonical" href="%s">' . "\n", esc_url($url));

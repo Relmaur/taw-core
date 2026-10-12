@@ -152,6 +152,7 @@ class Theme
         // Stands entirely down if any known SEO plugin (Yoast, RankMath,
         // SmartCrawl) is active — see SeoMeta's own docblock for why.
         new SeoMeta();
+        \TAW\Core\Seo\SocialImage::register(); // og:image/twitter:image in a format crawlers read (also for Yoast, Rank Math, SmartCrawl)
 
         // ── 9. SEO structured data (JSON-LD) ──────────────────────────────────
         // Organization/WebSite/Article/BreadcrumbList on wp_footer, plus
