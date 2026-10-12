@@ -778,6 +778,20 @@ site. Where it isn't installed (CI, another machine), `vendor/bin/taw` is the sa
 
 **Check:** none; nothing in the theme changes, and `vendor/bin/taw` works as before. **Undo:** none needed.
 
+### v1.93.3: the form stylesheet no longer blocks rendering
+
+**What changed.** `taw-form` (form.css) is still printed in `<head>`, in the same place, but as
+`media="print" onload="this.media='all'"` with a `<noscript>` copy, like block stylesheets. Before, it was a plain
+`<link>` on every page (forms register on every request), so it held up first paint even on pages without a form:
+on one live site it was the only render-blocking request (452 ms on mobile).
+
+**Why it stays in `<head>`.** A theme's own form styles come after it and win ties by coming later; moving it
+would change how forms look. The computed styles of every form element were checked identical before and after.
+
+**Check:** if your theme already makes `taw-form` async in a `style_loader_tag` filter, you can drop `taw-form`
+from it (it's harmless to keep: an already-async tag is left alone). **By hand:** none. **Undo:**
+`add_filter('taw_form_css_async', '__return_false');` keeps the plain `<link>`.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
