@@ -792,6 +792,20 @@ would change how forms look. The computed styles of every form element were chec
 from it (it's harmless to keep: an already-async tag is left alone). **By hand:** none. **Undo:**
 `add_filter('taw_form_css_async', '__return_false');` keeps the plain `<link>`.
 
+### v1.93.4: critical CSS has to carry the first viewport
+
+**What changed.** Guidance only: the classic agent docs, the perf-audit skill and `make:block`'s help now say
+what `resources/scss/critical.scss` must cover, now that nothing render-blocking hides its gaps (v1.93.3 made the
+form stylesheet async).
+
+**Why.** On one live site, desktop CLS went from 0 to about 1.0 on every page after v1.93.3: `critical.scss` had the
+header `position: sticky` where `app.css` had `fixed`, and interior templates' top sections weren't covered.
+
+**Check:** after updating to 1.93.3 or later, measure CLS throttled on desktop and mobile, home and an interior
+page (the perf-audit skill). Over 0.1: make `critical.scss` position the header exactly like `app.css` (`@use` the
+token partials and the same `var()`s), cover each template's top section, and set
+`protected bool $critical = true;` on blocks that render right under a page's banner. **Undo:** none needed.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

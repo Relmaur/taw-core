@@ -79,7 +79,7 @@ Image::render($id, 'large', ['above_fold' => true]);
 
 **Vite helpers are on `ViteLoader`**: use `ViteLoader::isDevServerRunning()` / `ViteLoader::assetUrl()` — never the removed `vite_is_dev()` / `vite_asset_url()`.
 
-**`app.css` loads async (`media="print"` swap), genuinely — `resources/scss/critical.scss` must contain real hand-authored layout rules for above-the-fold markup (header/hero), not the empty placeholder scaffold, or every page flashes unstyled HTML on load.** See AGENTS.md § "CSS entry points" for why a scoped Tailwind `@source` in `critical.scss` doesn't work as a shortcut here.
+**`app.css` loads async (`media="print"` swap), genuinely — `resources/scss/critical.scss` must contain real hand-authored layout rules for above-the-fold markup (header/hero), not the empty placeholder scaffold, or every page flashes unstyled HTML on load.** Since taw/core 1.93.3 nothing render-blocking hides its gaps: it must position the header exactly like `app.css` and cover the top section of every template, and blocks that render right under a page's banner set `protected bool $critical = true;`. See AGENTS.md § "CSS entry points" for both, and for why a scoped Tailwind `@source` in `critical.scss` doesn't work as a shortcut here.
 
 ## Forms
 
