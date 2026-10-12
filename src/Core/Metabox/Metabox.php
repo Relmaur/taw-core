@@ -362,8 +362,10 @@ class Metabox
     }
 
     /**
-     * The metabox whose default a meta key uses on a post: the one that
-     * declares it, or, when several do, the one that applies to the post.
+     * The metabox whose default a meta key uses on a post: one that declares
+     * it and applies to the post, else none (a page variation without that
+     * default shows none, not another variation's). Without a post, the
+     * first that declares it.
      */
     private static function defaultBox(int $postId, string $metaKey): ?self
     {
@@ -372,15 +374,17 @@ class Metabox
             return null;
         }
 
-        if (count($boxes) > 1 && ($post = get_post($postId)) instanceof \WP_Post) {
-            foreach ($boxes as $candidate) {
-                if ($candidate->appliesTo($post)) {
-                    return $candidate;
-                }
+        $post = $postId > 0 ? get_post($postId) : null;
+        if (!$post instanceof \WP_Post) {
+            return $boxes[0];
+        }
+        foreach ($boxes as $candidate) {
+            if ($candidate->appliesTo($post)) {
+                return $candidate;
             }
         }
 
-        return $boxes[0];
+        return null;
     }
 
     /**

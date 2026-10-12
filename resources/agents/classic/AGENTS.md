@@ -905,7 +905,7 @@ Metabox::get_posts(int $postId, string $fieldId): array   // post_select → arr
 Metabox::get_repeater(int $postId, string $fieldId): array // repeater → array of rows
 ```
 
-**Default content goes in `'defaults'`, not in `getData()`** (taw/core ≥ v1.80.0). `'defaults' => ['field_id' => value]` on the metabox (or options page) is what the field reads and shows in the editor while nothing is stored, so write `$this->getMeta($postId, 'hero_heading')`, not `getMeta(...) ?: 'Welcome'`. A `?:` fallback is invisible to wp-admin and to content exports; a default can be saved as a record (Tools → TAW Data → *Defaults*, or `taw content:defaults --apply`). Repeater defaults are arrays of rows. Full detail: taw/core README § "Metabox System → Defaults".
+**Default content goes in `'defaults'`, not in `getData()`** (taw/core ≥ v1.80.0). `'defaults' => ['field_id' => value]` on the metabox (or options page) is what the field reads and shows in the editor while nothing is stored, so write `$this->getMeta($postId, 'hero_heading')`, not `getMeta(...) ?: 'Welcome'`. A `?:` fallback is invisible to wp-admin and to content exports; a default can be saved as a record (Tools → TAW Data → *Defaults*, or `taw content:defaults --apply`). Repeater defaults are arrays of rows. A default reaches only the posts its metabox applies to (taw/core ≥ v1.95.2), so with one metabox per page variation, declare each page's defaults on its own variation. Full detail: taw/core README § "Metabox System → Defaults".
 
 ### Locking Metabox Order
 

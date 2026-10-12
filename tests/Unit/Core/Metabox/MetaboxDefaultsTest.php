@@ -29,6 +29,7 @@ final class MetaboxDefaultsTest extends TestCase
         Functions\when('post_type_exists')->alias(static fn (string $t): bool => in_array($t, ['page', 'book', 'movie'], true));
         Functions\when('get_post_meta')->alias(fn (int $id, string $key) => $this->meta[$id . $key] ?? '');
         Functions\when('wp_json_encode')->alias(static fn ($v, int $flags = 0) => json_encode($v, $flags));
+        Functions\when('get_post')->alias(static fn (int $id) => new \WP_Post(['ID' => $id, 'post_type' => 'page', 'post_name' => 'page-' . $id]));
     }
 
     protected function tearDown(): void
@@ -105,6 +106,28 @@ final class MetaboxDefaultsTest extends TestCase
 
         $this->assertSame('A book', Metabox::get(1, 'subtitle'));
         $this->assertSame('A movie', Metabox::get(2, 'subtitle'));
+    }
+
+    /** Issue #200: one metabox per page variation, same field ids, each with its own defaults. */
+    public function test_a_default_only_reaches_posts_its_metabox_applies_to(): void
+    {
+        new Metabox(['id' => 'faqs_nsd', 'title' => 'FAQs', 'screens' => ['nsd'], 'fields' => [['id' => 'faqs_pretitle', 'type' => 'text']], 'defaults' => ['faqs_pretitle' => 'FAQ']]);
+        new Metabox(['id' => 'faqs_nsa', 'title' => 'FAQs', 'screens' => ['nsa'], 'fields' => [['id' => 'faqs_pretitle', 'type' => 'text']]]);
+        Functions\when('get_post')->alias(static fn (int $id) => new \WP_Post(['ID' => $id, 'post_type' => 'page', 'post_name' => [1 => 'nsd', 2 => 'nsa'][$id] ?? 'about']));
+
+        $this->assertSame('FAQ', Metabox::get(1, 'faqs_pretitle'));
+        $this->assertSame('', Metabox::get(2, 'faqs_pretitle'), 'its variation declares none');
+        $this->assertSame('', Metabox::get(3, 'faqs_pretitle'), 'no variation covers the page');
+        $this->assertNull(Metabox::defaultValue(2, '_taw_faqs_pretitle'));
+    }
+
+    public function test_without_a_post_the_declared_default_still_applies(): void
+    {
+        new Metabox(['id' => 'faqs_nsd', 'title' => 'FAQs', 'screens' => ['nsd'], 'fields' => [['id' => 'faqs_pretitle', 'type' => 'text']], 'defaults' => ['faqs_pretitle' => 'FAQ']]);
+        Functions\when('get_post')->justReturn(null);
+
+        $this->assertSame('FAQ', Metabox::get(0, 'faqs_pretitle'));
+        $this->assertSame('FAQ', Metabox::get(99, 'faqs_pretitle'), 'an id that resolves to no post');
     }
 
     public function test_the_edit_screen_shows_the_default_so_saving_keeps_it(): void
