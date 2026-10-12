@@ -805,6 +805,10 @@ paints with `critical.scss` alone, and on four sites desktop CLS went from about
 header positioned differently in `critical.scss` than in `app.css`, and interior templates' top sections not
 covered. Mobile stayed at 0, and mobile LCP improved a lot (one site: Performance 74 → 95).
 
+**Also fixed:** a `protected bool $critical = true;` block queued with `BlockRegistry::queue()` printed a
+render-blocking `<link>` in `<head>` instead of inlining its CSS (`<style id="block-…">`), because the queue
+enqueues from inside `wp_head`; a queued non-critical block lost its `<noscript>` copy. Both work as documented now.
+
 **Check:** none to keep things as they were. To get the faster first paint: make `critical.scss` position the
 header exactly like `app.css` (`@use` the token partials and the same `var()`s), cover each template's top
 section, set `protected bool $critical = true;` on blocks that render right under a page's banner, measure CLS
