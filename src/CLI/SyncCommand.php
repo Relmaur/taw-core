@@ -221,20 +221,7 @@ class SyncCommand extends Command
         ]);
 
         $response = @file_get_contents(self::CORE_REPO_API, false, $context);
-
-        if ($response === false) {
-            $error = 'Could not reach the GitHub API to check the latest taw/core tag.';
-        } else {
-            $tags = json_decode($response, true);
-            if (!is_array($tags)) {
-                $error = 'Unexpected response from the GitHub tags API.';
-            } else {
-                $latest = $this->highestSemverTag($tags);
-                if ($latest === null) {
-                    $error = 'No usable version tags found on taw-core.';
-                }
-            }
-        }
+        ['latest' => $latest, 'error' => $error] = self::latestFromTagsResponse($response);
 
         $behind = false;
         if ($installed !== null && $latest !== null) {
@@ -250,12 +237,41 @@ class SyncCommand extends Command
     }
 
     /**
-     * @param array<int, array<string, mixed>> $tags
+     * The latest taw/core tag from the GitHub tags API's response, or why not.
+     * A JSON object instead of a list is GitHub telling us something (a rate
+     * limit: 60 requests an hour without a token; bad credentials), never tags.
+     *
+     * @return array{latest: ?string, error: ?string}
      */
-    private function highestSemverTag(array $tags): ?string
+    public static function latestFromTagsResponse(string|false $response): array
+    {
+        if ($response === false) {
+            return ['latest' => null, 'error' => 'Could not reach the GitHub API to check the latest taw/core tag.'];
+        }
+        $tags = json_decode($response, true);
+        if (is_array($tags) && !array_is_list($tags)) {
+            $message = is_string($tags['message'] ?? null) ? $tags['message'] : 'an error';
+            $hint = str_contains(strtolower($message), 'rate limit')
+                ? ' Set GITHUB_TOKEN, or sign in with gh (gh auth login): 5,000 requests an hour instead of 60.'
+                : '';
+
+            return ['latest' => null, 'error' => 'GitHub API: ' . $message . '.' . $hint];
+        }
+        if (!is_array($tags)) {
+            return ['latest' => null, 'error' => 'Unexpected response from the GitHub tags API.'];
+        }
+        $latest = self::highestSemverTag($tags);
+
+        return ['latest' => $latest, 'error' => $latest === null ? 'No usable version tags found on taw-core.' : null];
+    }
+
+    /**
+     * @param array<int|string, mixed> $tags
+     */
+    private static function highestSemverTag(array $tags): ?string
     {
         $names = array_filter(array_map(
-            static fn(array $tag): ?string => is_string($tag['name'] ?? null) ? $tag['name'] : null,
+            static fn(mixed $tag): ?string => is_array($tag) && is_string($tag['name'] ?? null) ? $tag['name'] : null,
             $tags
         ));
 
@@ -274,12 +290,30 @@ class SyncCommand extends Command
     {
         $headers = "User-Agent: taw-core-sync-command\r\nAccept: application/vnd.github+json\r\n";
 
-        $token = getenv('GITHUB_TOKEN');
-        if (is_string($token) && $token !== '') {
+        $token = self::githubToken();
+        if ($token !== '') {
             $headers .= 'Authorization: Bearer ' . $token . "\r\n";
         }
 
         return $headers;
+    }
+
+    /**
+     * A GitHub token for the API (5,000 requests an hour instead of 60, which a
+     * fleet-wide update uses up): GITHUB_TOKEN, else GH_TOKEN, else the gh CLI's
+     * (`gh auth token`, as taw-fleet does). Empty without any. Never printed.
+     */
+    private static function githubToken(): string
+    {
+        foreach (['GITHUB_TOKEN', 'GH_TOKEN'] as $name) {
+            $token = getenv($name);
+            if (is_string($token) && $token !== '') {
+                return $token;
+            }
+        }
+        exec('gh auth token 2>/dev/null', $out, $code);
+
+        return $code === 0 ? trim(implode('', $out)) : '';
     }
 
     /**

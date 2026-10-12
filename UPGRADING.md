@@ -832,6 +832,17 @@ folder: `bash vendor/taw/core/resources/ci/check-committed-files.sh --staged`. G
 of the theme gets the hook on its next `composer update taw/core` or `taw update`. **Undo:** `git config --unset
 core.hooksPath` (CI still checks every push).
 
+### v1.94.1: `sync` survives a GitHub rate limit
+
+**What changed.** When GitHub's API refused the tags request (a rate limit: 60 requests an hour without a token,
+which a fleet-wide update uses up), `taw sync` ended in a TypeError, so `taw update` stopped at its sync step and
+the report blamed the network. Now it reports GitHub's message ("GitHub API: API rate limit exceeded…") and goes
+on. The request also authenticates without setup when it can: `GITHUB_TOKEN`, else `GH_TOKEN`, else the gh CLI's
+login (`gh auth token`), for 5,000 requests an hour.
+
+**Check:** none. **By hand:** if you see the rate-limit message, `gh auth login` once (or set `GITHUB_TOKEN`).
+**Undo:** none needed.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
