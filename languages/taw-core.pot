@@ -2264,7 +2264,7 @@ msgid "The chat is paused (kill switch). Visitors get a \"paused\" message until
 msgstr ""
 
 #: src/Core/Rag/Usage/UsageAdminScreen.php
-msgid "The chat is refusing every message: its usage ledger cannot be read. See php bin/taw log:tail."
+msgid "The chat is refusing every message: its usage ledger cannot be read. See taw log:tail."
 msgstr ""
 
 #: src/Core/Rag/Usage/UsageAdminScreen.php
@@ -2368,7 +2368,7 @@ msgid "The upload failed — please try again."
 msgstr ""
 
 #: src/Core/Rag/Usage/UsageAdminScreen.php
-msgid "The usage ledger could not be read, so the chat is refusing messages. See php bin/taw log:tail."
+msgid "The usage ledger could not be read, so the chat is refusing messages. See taw log:tail."
 msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts

@@ -33,9 +33,9 @@ class ContentDefaultsCommand extends Command
             ->setDescription('Save the fields\' defaults to the database (preview by default, --apply to write)')
             ->setHelp(<<<'HELP'
                 Examples:
-                  <info>php bin/taw content:defaults</info>                 preview: every empty field and what it would get
-                  <info>php bin/taw content:defaults --apply</info>         save them (writes a journal first)
-                  <info>php bin/taw content:defaults --undo=defaults-20261009-120000.json</info>
+                  <info>taw content:defaults</info>                 preview: every empty field and what it would get
+                  <info>taw content:defaults --apply</info>         save them (writes a journal first)
+                  <info>taw content:defaults --undo=defaults-20261009-120000.json</info>
                 HELP)
             ->addOption('apply', null, InputOption::VALUE_NONE, 'Write the defaults (otherwise only preview)')
             ->addOption('undo', null, InputOption::VALUE_REQUIRED, 'Reverse a journal from uploads/taw-private (fields edited since are kept)')

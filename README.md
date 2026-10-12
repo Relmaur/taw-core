@@ -210,7 +210,7 @@ new Metabox([
 - Keys are field ids (group sub-fields by their compound id, `group_sub`). Unknown keys, and empty values, are ignored.
 - A field falls back to its default when its stored value is empty as `?:` saw it: nothing, `''`, `'0'`, or an empty JSON list or object (a repeater saved with no rows stores `'[]'`, an image field saved blank `'0'`). A checkbox's `'0'` is a value: unchecked is a choice.
 - `OptionsPage` takes the same key; `OptionsPage::get()` falls back to it before its `$default` argument.
-- **Save them to the database:** Tools → TAW Data → *Defaults*, or `php bin/taw content:defaults` (preview) / `--apply`. Only empty fields are written, on the posts each metabox applies to (its post types, templates and slugs) and on options pages. A journal of the writes goes to `uploads/taw-private/` first; *Undo it* on the screen, or `--undo=<journal>`, reverses them and keeps any field edited since. The preview marks (`*`) a default the field's sanitizing would change (tags in a `text` or `textarea` field): saving stores the sanitized value.
+- **Save them to the database:** Tools → TAW Data → *Defaults*, or `taw content:defaults` (preview) / `--apply`. Only empty fields are written, on the posts each metabox applies to (its post types, templates and slugs) and on options pages. A journal of the writes goes to `uploads/taw-private/` first; *Undo it* on the screen, or `--undo=<journal>`, reverses them and keeps any field edited since. The preview marks (`*`) a default the field's sanitizing would change (tags in a `text` or `textarea` field): saving stores the sanitized value.
 - Not yet in the block editor's data panel (ADR-0007): there the field shows empty until the defaults are saved.
 
 ### Field Types
@@ -923,7 +923,7 @@ to the engine, like `->with()`.
 - **Caching:** in production (`wp_get_environment_type()`), validated files are cached in a transient keyed
   by each file's path, mtime and size plus the taw/core version, so editing a file invalidates the cache.
   Elsewhere they're re-read on every request.
-- **Validate without WordPress:** `php bin/taw schema:validate [paths…] [--json]`. It exits non-zero on
+- **Validate without WordPress:** `taw schema:validate [paths…] [--json]`. It exits non-zero on
   errors, each reported with a JSON pointer (`/fields/2/type`). It warns about duplicates and about targets
   that aren't defined post types. Editors get autocomplete from `"$schema"` →
   `resources/schema/taw-schema-1.0.json`.
@@ -1767,11 +1767,11 @@ Every entry carries **both** a human sentence (`message`) and a machine-stable, 
 | Sink | Destination | For |
 |---|---|---|
 | `ErrorLogSink` | PHP `error_log()` — one line: `[TAW] [ERROR] mail.emailit_send_failed: … {"context":"json"}` | humans; whatever already tails the error log |
-| `JsonlFileSink` | `wp-content/taw-logs/taw.log.jsonl` — one JSON object per line, size-rotated (~5 MB × 3) | machines: `bin/taw log:tail`, and the `taw-hub-companion` `/logs` route |
+| `JsonlFileSink` | `wp-content/taw-logs/taw.log.jsonl` — one JSON object per line, size-rotated (~5 MB × 3) | machines: `taw log:tail`, and the `taw-hub-companion` `/logs` route |
 
 The log directory sits in `wp-content/` (not the public `uploads/`) and is seeded with a deny-all `.htaccess` + `index.php` on first write. Two filters: `taw_core_log_sinks` (swap/add destinations) and `taw_core_log_entry` (enrich every entry — e.g. tag it with a site id — without `taw/core` knowing what's listening). `Logger::setSinks()` overrides them outright, mainly for tests.
 
-`TAW\Core\Log\LogReader` reads the JSONL file back (level / `code`-prefix / `since` filters); it's the shared building block behind `bin/taw log:tail` and the Hub route.
+`TAW\Core\Log\LogReader` reads the JSONL file back (level / `code`-prefix / `since` filters); it's the shared building block behind `taw log:tail` and the Hub route.
 
 ---
 
@@ -1973,7 +1973,12 @@ Before v1.81.0, `X-Forwarded-For` was trusted from any client.
 
 The `taw` tool ships with taw/core as **`vendor/bin/taw`** (v1.90.0, `TAW\CLI\Application`): its commands
 update with `composer update taw/core`. A theme's `bin/taw` hands over to it, so `php bin/taw …` and
-`vendor/bin/taw …` are the same. A classic theme gets every command below; a block theme
+`vendor/bin/taw …` are the same. On a Mac, type `taw <command>` in the theme folder or any folder under it:
+`taw` comes with taw-fleet (`brew install Relmaur/tap/taw-fleet`, 1.17.0+) and runs that theme's own
+`vendor/bin/taw` with the Local site's PHP and MySQL socket. It is never a copy of taw/core, so each site
+keeps its own version. From another folder, name the theme: `taw @<site> <command>` (`@<site>/<theme>` when a
+site has two TAW themes). Where `taw` isn't installed (CI, another machine), `vendor/bin/taw` is the same
+command, run from the theme folder. The examples below use `taw`. A classic theme gets every command below; a block theme
 (`theme.json` + `templates/`) gets `schema:validate`, `skills:sync`, `policy`, `docs:sync`, `upgrade` and `update`. **Your own commands** go through
 `TAW\CLI\CommandRegistry`, from a file the theme's `composer.json` autoloads (never `bin/`, which the
 scaffold owns):
@@ -2014,14 +2019,14 @@ mirrors it; `PolicyTest` keeps them in sync).
 | `deliver` | `pr` (a pull request to merge), `pr+merge` (merged when checks pass; deploys), `branch` |
 | `remote` | the git remote the update is pushed to, default `origin`; its pull request opens on that remote's GitHub repository (v1.92.0: for a site that deploys from an agency's organization while `origin` is a copy) |
 
-`php bin/taw policy` shows it in words (`--json` for tools, `--init` writes a starter file). An invalid
+`taw policy` shows it in words (`--json` for tools, `--init` writes a starter file). An invalid
 file is listed with its errors, and updates refuse to run until it's fixed: never half-applied.
-`bin/taw update` follows every setting; the migrations follow `scaffold` and `docs` wherever they run
+`taw update` follows every setting; the migrations follow `scaffold` and `docs` wherever they run
 (v1.91.1). The weekly `theme-framework-sync.yml` doesn't read `taw.json` yet.
 
-### One-step update (`bin/taw update`, v1.91.0)
+### One-step update (`taw update`, v1.91.0)
 
-`vendor/bin/taw update` is the whole update of a theme, as its `taw.json` says, with no questions
+`taw update` is the whole update of a theme, as its `taw.json` says, with no questions
 (`TAW\Update\Updater`): preflight (valid policy, clean git tree, no earlier update waiting) → a branch
 `taw/update-<date>` → `composer update taw/core` within the range (`--with taw/core:~x.y.z` for `patch`,
 `composer require` for a pin) → framework files (`sync --apply`, `--apply-manifests`, then Composer for the
@@ -2037,12 +2042,12 @@ step starts and ends (on stderr with `--json`, so stdout stays one JSON document
 versions it reports come from `composer.lock` (what git has), so `vendor/` may already hold a newer taw/core
 (v1.91.2): that's how taw-fleet updates a theme on taw/core < 1.91 in one step.
 
-### Migrations (`bin/taw upgrade`, v1.91.0)
+### Migrations (`taw upgrade`, v1.91.0)
 
 What a taw/core release changes in a theme, it does by code: after `composer update taw/core`, run
-`php bin/taw upgrade --apply`. Each migration (`TAW\Update\Migration`, id `<version>/<slug>`) finds its own
+`taw upgrade --apply`. Each migration (`TAW\Update\Migration`, id `<version>/<slug>`) finds its own
 work, so running again does nothing, and leaves anything it shouldn't decide (a file the site edited) for
-a person, with the steps. `php bin/taw upgrade` lists what's pending, `--explain <id>` (or `all`) says what
+a person, with the steps. `taw upgrade` lists what's pending, `--explain <id>` (or `all`) says what
 one does, why, how to do it by hand and how to undo it, `--json` is for tools. Extensions add their own
 with `TAW\Update\Migrations::add()`. A migration that implements `TAW\Update\PolicyGated` names a `taw.json`
 setting; while that setting is `off`, the migration is held back (listed, never run) in `upgrade`, `update`
@@ -2078,38 +2083,38 @@ request in any of its commits.
 pull request. Each workflow's header lists the same steps as commands, for running them by hand.
 
 ```bash
-php bin/taw make:block HeroSection --type=meta --group=sections
-php bin/taw import:block path/to/block
-php bin/taw export:block HeroSection
-php bin/taw inspect --json                          # live registry: blocks, fields, forms
-php bin/taw fields:get 42 hero_heading --json        # read a field's current value
-php bin/taw fields:set 42 hero_heading "Welcome"     # write a field's value
-php bin/taw fields:set 42 book_details.subtitle "…"  # qualified id (fieldset.field) or the meta key also work
-php bin/taw fields:set options company_phone "555-1234"  # write a site-wide OptionsPage field instead
-php bin/taw sync --json                              # check for framework drift (see below)
-php bin/taw sync --apply                             # also write Tier 1 scaffold changes
-php bin/taw sync --apply-manifests                   # also write the composer.json/package.json suggestions
-php bin/taw skills:sync --apply                       # taw/core's site skills into .claude/skills/ (block themes too)
-php bin/taw docs:sync --apply                         # agent docs → short files that import taw/core's (block themes too)
-php bin/taw configs:sync --apply                      # vite.config.js/phpstan.neon → short files on taw/core's base
-php bin/taw policy                                    # the site's update policy (taw.json) in words
-php bin/taw upgrade --apply                           # the migrations this theme still needs
-php bin/taw update                                    # the whole update, as taw.json says (see above)
-php bin/taw export:static                            # static HTML export for edge hosting (see below)
-php bin/taw export:static --dir=/path --prod-url=https://my-site.pages.dev
-php bin/taw seo:extract 42 --output=.taw/seo-dump.json         # copy audit: extract text fields (see below)
-php bin/taw seo:inject 42 --input=.taw/seo-optimized.json      # copy audit: write rewrites back
-php bin/taw wp post list --post_type=page                      # WP-CLI passthrough, socket/--path auto-resolved (see below)
-php bin/taw icons:sync                                          # re-vendor the Lucide icon set (see Icon System)
-php bin/taw log:tail --level=error --limit=100                  # read back the structured log (see Logging)
-php bin/taw content:export --output=/tmp/site.json              # portable content snapshot (see Content Interchange)
-php bin/taw content:import /tmp/site.json                       # dry-run diff; add --yes to apply (rollback snapshot written first)
-php bin/taw content:diff a.json b.json --out=changes.json       # two snapshots → a change-set for content:import
-php bin/taw content:reindex --post-type=post,page --batch=20    # backfill/refresh the RAG chatbot's WP-content vectors (see Sovereign Hybrid-RAG Chatbot)
-php bin/taw content:reindex-kb kb-a1b2c3d4                      # re-run ingestion for one admin-uploaded RAG knowledge base
-php bin/taw rag:usage --days=30                                 # the chatbot's metered spend vs its budgets (--uninstall drops the ledger)
-php bin/taw corpus:install /path/to/bible.sqlite bible-straubinger.sqlite   # install a reference corpus (see Bible Reader Corpus)
-php bin/taw corpus:export /path/to/bible.sqlite /path/to/bible-export.json  # portable export for a host with no pdo_sqlite
+taw make:block HeroSection --type=meta --group=sections
+taw import:block path/to/block
+taw export:block HeroSection
+taw inspect --json                          # live registry: blocks, fields, forms
+taw fields:get 42 hero_heading --json        # read a field's current value
+taw fields:set 42 hero_heading "Welcome"     # write a field's value
+taw fields:set 42 book_details.subtitle "…"  # qualified id (fieldset.field) or the meta key also work
+taw fields:set options company_phone "555-1234"  # write a site-wide OptionsPage field instead
+taw sync --json                              # check for framework drift (see below)
+taw sync --apply                             # also write Tier 1 scaffold changes
+taw sync --apply-manifests                   # also write the composer.json/package.json suggestions
+taw skills:sync --apply                       # taw/core's site skills into .claude/skills/ (block themes too)
+taw docs:sync --apply                         # agent docs → short files that import taw/core's (block themes too)
+taw configs:sync --apply                      # vite.config.js/phpstan.neon → short files on taw/core's base
+taw policy                                    # the site's update policy (taw.json) in words
+taw upgrade --apply                           # the migrations this theme still needs
+taw update                                    # the whole update, as taw.json says (see above)
+taw export:static                            # static HTML export for edge hosting (see below)
+taw export:static --dir=/path --prod-url=https://my-site.pages.dev
+taw seo:extract 42 --output=.taw/seo-dump.json         # copy audit: extract text fields (see below)
+taw seo:inject 42 --input=.taw/seo-optimized.json      # copy audit: write rewrites back
+taw wp post list --post_type=page                      # WP-CLI passthrough, socket/--path auto-resolved (see below)
+php bin/taw icons:sync                                          # re-vendor the Lucide icon set, run in taw-core itself (see Icon System)
+taw log:tail --level=error --limit=100                  # read back the structured log (see Logging)
+taw content:export --output=/tmp/site.json              # portable content snapshot (see Content Interchange)
+taw content:import /tmp/site.json                       # dry-run diff; add --yes to apply (rollback snapshot written first)
+taw content:diff a.json b.json --out=changes.json       # two snapshots → a change-set for content:import
+taw content:reindex --post-type=post,page --batch=20    # backfill/refresh the RAG chatbot's WP-content vectors (see Sovereign Hybrid-RAG Chatbot)
+taw content:reindex-kb kb-a1b2c3d4                      # re-run ingestion for one admin-uploaded RAG knowledge base
+taw rag:usage --days=30                                 # the chatbot's metered spend vs its budgets (--uninstall drops the ledger)
+taw corpus:install /path/to/bible.sqlite bible-straubinger.sqlite   # install a reference corpus (see Bible Reader Corpus)
+taw corpus:export /path/to/bible.sqlite /path/to/bible-export.json  # portable export for a host with no pdo_sqlite
 ```
 
 `make:block` generates the block folder, PHP class, template file, and Vite entry points.
@@ -2124,7 +2129,7 @@ Pass the literal `options` in place of the post ID to target a site-wide `Option
 
 The two skills directories (`.claude/skills/`, `.agents/skills/`) are Tier 1 but use `type: skills-dir` rather than `type: dir`: instead of `rsync -a --delete` (which would wipe a client's own agent skills — they have to live in the same directory the framework's do, since that's the only place the agent runtimes auto-discover skills), `sync` reconciles per skill folder. A skill present in the canonical repo is overwritten, unless the client's folder of that name says `owner: site` (then it's kept and reported as a `clash`, and the framework copy isn't installed; since v1.59.2); a skill present only in the client is kept or removed based on its `SKILL.md` YAML frontmatter — `owner: site` is preserved untouched, `owner: taw` (a retired framework skill) is deleted, and an unmarked skill is preserved with a warning. Every framework skill in the canonical `taw-theme` repo carries `owner: taw`. The marker key and values are declared in `resources/update-manifest.json` under `skillsReconcile`.
 
-**Site skills from taw/core (v1.89.0).** taw/core itself ships the site skills every TAW site gets, classic or block: `resources/skills/<name>/` (`resolve-comments`: BugSmash client comments → fixes; `perf-audit`: GTMetrix + PageSpeed loop). They read the site from taw-fleet (`taw-fleet show|comments <site> --json`) and write to production only through `taw-fleet wp-remote`, so they work on any Mac with taw-fleet, without the TAW umbrella. `sync` adds them to the `.claude/skills/` set (taw/core's copy wins a shared name), and `php bin/taw skills:sync [--apply] [--json]` installs only these, without cloning anything: the way block themes (taw-gutenberg) get them, and a quick refresh after `composer update taw/core`. It keeps a site's own skill of the same name (`owner: site`) and never touches skills taw/core doesn't ship. taw-fleet starts Claude Code in the theme folder, where Claude Code finds them.
+**Site skills from taw/core (v1.89.0).** taw/core itself ships the site skills every TAW site gets, classic or block: `resources/skills/<name>/` (`resolve-comments`: BugSmash client comments → fixes; `perf-audit`: GTMetrix + PageSpeed loop). They read the site from taw-fleet (`taw-fleet show|comments <site> --json`) and write to production only through `taw-fleet wp-remote`, so they work on any Mac with taw-fleet, without the TAW umbrella. `sync` adds them to the `.claude/skills/` set (taw/core's copy wins a shared name), and `taw skills:sync [--apply] [--json]` installs only these, without cloning anything: the way block themes (taw-gutenberg) get them, and a quick refresh after `composer update taw/core`. It keeps a site's own skill of the same name (`owner: site`) and never touches skills taw/core doesn't ship. taw-fleet starts Claude Code in the theme folder, where Claude Code finds them.
 
 **`composer.json` / `package.json` suggestions (v1.78.0, `TAW\CLI\ManifestMerge`).** A raw diff of these against the scaffold shows every dependency the site added itself (an `emailit`, a `photoswipe`, `taw/hub-companion` and its `extra.taw-companion` key) as a removal, which made the review a judgment call. `sync` now also gives each a `merge` entry, built by the rules in `update-manifest.json` § `manifestMerge`: only the listed sections are read (`require`, `require-dev`, `autoload`, `autoload-dev`, `repositories`, `scripts`, `config`, `minimum-stability`, `prefer-stable`; for npm `dependencies`, `devDependencies`, `scripts`, `type`). `add` = keys or repositories (matched by URL) the scaffold has and the site lacks; `bump` = a dependency whose scaffold constraint has a higher lower bound (a site's newer constraint is left alone); `review` = any other difference, such as a changed script, an autoload path or a constraint like `*` that can't be compared; `optional` = lines of optional starter features (Reactiph, the chatbot), never suggested; `site_only` = how many of the site's own keys were kept. Nothing is ever removed. `--apply-manifests` writes `add` + `bump` into the files in place, keeping key order and indentation; if `require` changed, run `composer update` for those packages afterwards.
 
@@ -2252,14 +2257,14 @@ A first-class way to move a TAW site's **state** — posts / CPT entries, `_taw_
 > **Migrate state, deploy code.** This tool never touches theme/plugin PHP or the DB binary internals — code travels through git and the deploy pipeline. Single-site only (no multisite).
 
 ```bash
-php bin/taw content:export --output=/tmp/site.json          # content snapshot
-php bin/taw content:export --migrate --output=/tmp/site.json # + users, settings, all media, drafts
-php bin/taw content:import /tmp/site.json                   # dry-run: field-level diff, writes nothing
-php bin/taw content:import /tmp/site.json --yes             # apply (rollback snapshot written first)
-php bin/taw content:import /tmp/site.json --yes --with-settings   # also apply environment settings
-php bin/taw content:import /tmp/site.json --yes --user=marco      # as this user (default: the first administrator)
-php bin/taw content:diff before.json after.json --out=changes.json
-php bin/taw content:defaults [--apply | --undo=<journal>]   # save fields' defaults as records (see Metabox → Defaults)
+taw content:export --output=/tmp/site.json          # content snapshot
+taw content:export --migrate --output=/tmp/site.json # + users, settings, all media, drafts
+taw content:import /tmp/site.json                   # dry-run: field-level diff, writes nothing
+taw content:import /tmp/site.json --yes             # apply (rollback snapshot written first)
+taw content:import /tmp/site.json --yes --with-settings   # also apply environment settings
+taw content:import /tmp/site.json --yes --user=marco      # as this user (default: the first administrator)
+taw content:diff before.json after.json --out=changes.json
+taw content:defaults [--apply | --undo=<journal>]   # save fields' defaults as records (see Metabox → Defaults)
 ```
 
 Also, in wp-admin: **Tools → TAW Data** (Export with option checkboxes + Import-with-review), and `GET /wp-json/taw/v1/content/export` (capability `export`; content-only — no users/settings over REST).
@@ -2352,8 +2357,8 @@ TAW\Core\Rag\RagSettings::enable();
 The site's own WordPress content is always present as a built-in, non-deletable `wp-content` knowledge base — it isn't stored in the registry option at all, since it's fully derived from the `Settings → TAW Chatbot` post-type/chunking settings below and the existing `save_post`/`before_delete_post` ingestion pipeline. A post is eligible only while `publish` status, an indexed post type, and not password-protected — losing any of those (unpublish, trash, add a password) removes it from the index immediately, inline (no WP-Cron round-trip), so it never stays searchable after it's no longer publicly readable.
 
 ```bash
-php bin/taw content:reindex --post-type=post,page --batch=20   # backfill/refresh the wp-content knowledge base
-php bin/taw content:reindex-kb kb-a1b2c3d4                     # re-run ingestion for one uploaded knowledge base
+taw content:reindex --post-type=post,page --batch=20   # backfill/refresh the wp-content knowledge base
+taw content:reindex-kb kb-a1b2c3d4                     # re-run ingestion for one uploaded knowledge base
 ```
 
 Uploading itself is wp-admin only, by design — there's no CLI import step; the upload handler validates the SQLite magic-byte header before accepting a file, and ingestion runs via WP-Cron (never inline on the upload request).
@@ -2394,7 +2399,7 @@ Every refusal is `{"code": "…", "error": "English fallback"}`, so a widget can
 
 **The human check.** `POST /wp-json/taw/v1/chat/session` with `{"turnstile_token": "…"}` verifies the token with Cloudflare and returns `{"token", "expires_in", "max_messages"}`, a signed session good for 30 minutes or 30 messages. Send it on each message as `X-TAW-Chat-Session`; on `401 session_required`, run Turnstile again. There are no WordPress nonces, so page caching can't serve a stale one. With the mode on and the keys missing, the chat refuses every message rather than run unprotected.
 
-**Spend.** Every successful LLM call, chat or embedding, is metered from the provider's `usage` into `{prefix}taw_rag_usage` (MySQL, so it works on hosts without `pdo_sqlite`). A message is refused when today's or this month's spend plus its worst-case cost would cross the budget. That worst case comes from the same caps that limit the message: answer length (600 tokens), message length (1000 characters), history (last 6 turns × 1500 characters), tool results (6000 characters), 3 tool calls per reply, 3 tool rounds. The site admin gets one email at 80% of the month and one when a budget pauses the chat (`taw_rag_budget_alert_recipients` filters the list). **TAW Chatbot → Usage** shows spend, the worst case per message and the active protections; so does `php bin/taw rag:usage [--days=30]`. `--uninstall` drops the table.
+**Spend.** Every successful LLM call, chat or embedding, is metered from the provider's `usage` into `{prefix}taw_rag_usage` (MySQL, so it works on hosts without `pdo_sqlite`). A message is refused when today's or this month's spend plus its worst-case cost would cross the budget. That worst case comes from the same caps that limit the message: answer length (600 tokens), message length (1000 characters), history (last 6 turns × 1500 characters), tool results (6000 characters), 3 tool calls per reply, 3 tool rounds. The site admin gets one email at 80% of the month and one when a budget pauses the chat (`taw_rag_budget_alert_recipients` filters the list). **TAW Chatbot → Usage** shows spend, the worst case per message and the active protections; so does `taw rag:usage [--days=30]`. `--uninstall` drops the table.
 
 **Scope.** The assistant answers questions about the site and declines unrelated requests (homework, code, general chat). Describe the site's subject in **Access → Assistant Scope**, or replace the prompt with the `taw_rag_system_prompt` filter (`fn (string $prompt, string $scope): string`).
 
@@ -2412,18 +2417,18 @@ A read-only REST surface over a developer-installed reference corpus — current
 
 `TAW\Core\Storage\ProtectedSqlite::isAvailable()` checks `extension_loaded('pdo_sqlite')` *and* attempts a real `sqlite::memory:` connection (a loaded extension isn't always a functional one on every host build). This is a real, confirmed gap on production managed hosting — not theoretical: WPMUdev's managed hosting has no `pdo_sqlite`/`sqlite3` on either PHP-FPM or CLI, on multiple PHP versions, and declined to add it ("As a Managed Hosting service, we are unable to implement custom extensions... the database we offer is MySQL, not SQLite"). `$wpdb` — and the `mysqli` extension it's built on — is guaranteed on every WordPress host, since WP core itself can't function without it, unlike `pdo_sqlite`, which nothing requires.
 
-Every consumer (`bin/taw corpus:install`, `TAW\Core\Rest\BibleEndpoint`) checks `isAvailable()` and picks a backend accordingly — **zero behavior change on a host where `pdo_sqlite` already works**; the SQLite path is checked first and used unconditionally whenever it's both available and installed.
+Every consumer (`taw corpus:install`, `TAW\Core\Rest\BibleEndpoint`) checks `isAvailable()` and picks a backend accordingly — **zero behavior change on a host where `pdo_sqlite` already works**; the SQLite path is checked first and used unconditionally whenever it's both available and installed.
 
 ### Installing the corpus file
 
-A reference corpus is a curated, developer-placed dataset, not end-user content — installed via CLI, not a wp-admin upload form. `bin/taw corpus:install` accepts either of two source formats, auto-detected by content:
+A reference corpus is a curated, developer-placed dataset, not end-user content — installed via CLI, not a wp-admin upload form. `taw corpus:install` accepts either of two source formats, auto-detected by content:
 
 ```bash
 # 1. Raw .sqlite file — needs pdo_sqlite on THIS host:
-php bin/taw corpus:install /path/to/bible_straubinger.sqlite bible-straubinger.sqlite
+taw corpus:install /path/to/bible_straubinger.sqlite bible-straubinger.sqlite
 
 # 2. Portable JSON export — works on any host, no pdo_sqlite required here at all:
-php bin/taw corpus:install /path/to/bible-export.json bible-straubinger.sqlite   # filename arg is unused for this path
+taw corpus:install /path/to/bible-export.json bible-straubinger.sqlite   # filename arg is unused for this path
 ```
 
 **Path 1 (`.sqlite`)** — `TAW\CLI\CorpusInstallCommand` validates the SQLite magic-byte header (same check `KnowledgeBaseAdminScreen` uses for RAG knowledge-base uploads), confirms `ProtectedSqlite::isAvailable()` on *this* host, then copies the file into a protected uploads subdirectory — `TAW\Core\Corpus\Storage`, `wp-content/uploads/taw-private/corpus/`, a directory deliberately separate from the RAG chatbot's `taw-private/rag/` (see ADR-0001: a reference corpus and a RAG knowledge base are different concerns that happen to share "protected dir + read-only PDO" plumbing, extracted into `TAW\Core\Storage\ProtectedSqlite` rather than duplicated). If `pdo_sqlite` isn't available here, the command fails with a clear message pointing at path 2 instead of a bare `PDOException` from deep inside the reader.
@@ -2431,7 +2436,7 @@ php bin/taw corpus:install /path/to/bible-export.json bible-straubinger.sqlite  
 **Path 2 (portable JSON)** — for a target host with no `pdo_sqlite` at all. First, on a machine that *does* have it (typically a developer's local machine):
 
 ```bash
-php bin/taw corpus:export /path/to/bible_straubinger.sqlite /path/to/bible-export.json
+taw corpus:export /path/to/bible_straubinger.sqlite /path/to/bible-export.json
 ```
 
 `TAW\CLI\CorpusExportCommand` reads the source `.sqlite` via plain PDO (no WordPress dependency — both paths are given directly as arguments) and writes a portable JSON export carrying only the columns `BibleReader` actually reads. Transfer that JSON file to the target server, then run `corpus:install` against it there — `TAW\Core\Corpus\Bible\MysqlBibleInstaller` creates `{$wpdb->prefix}taw_corpus_bible_{books,chapters,verses,sections,notes}` (`FULLTEXT` indexes on `verses.text`/`notes.body`) and bulk-loads the export via `$wpdb`, no `pdo_sqlite` needed on that host at any point.
@@ -2501,15 +2506,15 @@ Adding a second edition is one new array entry plus installing its own `.sqlite`
 
 ### Installing an edition
 
-`bin/taw catechism:install <edition> <path> [filename]` — the same two source formats as `corpus:install`, scoped to one edition at a time:
+`taw catechism:install <edition> <path> [filename]` — the same two source formats as `corpus:install`, scoped to one edition at a time:
 
 ```bash
 # Raw .sqlite — needs pdo_sqlite on THIS host:
-php bin/taw catechism:install pius-x /path/to/catechism-pius-x.sqlite
+taw catechism:install pius-x /path/to/catechism-pius-x.sqlite
 
 # Portable JSON export — any host, no pdo_sqlite required here at all:
-php bin/taw catechism:export /path/to/catechism-pius-x.sqlite /path/to/export.json
-php bin/taw catechism:install pius-x /path/to/export.json
+taw catechism:export /path/to/catechism-pius-x.sqlite /path/to/export.json
+taw catechism:install pius-x /path/to/export.json
 ```
 
 Unlike the Bible's five MySQL tables (one corpus, one table-set), `MysqlCatechismInstaller` writes into **one shared table-set across every edition** — each row carries both `edition` and the source file's own `source_id` (`UNIQUE (edition, source_id)` stands in for the source's primary key, since two independently-exported editions can both legitimately use `id = 1`). Re-running `catechism:install` for one edition only ever touches that edition's own rows: `reload()` issues `DELETE FROM ... WHERE edition = ?`, not `TRUNCATE TABLE` — DML, not DDL, so it carries none of the implicit-commit caveat `MysqlBibleInstaller`'s per-table `TRUNCATE` has. That makes the transaction wrapping around a catechism install a genuine cross-table atomicity guarantee: a failure partway through actually rolls back every `DELETE`/`INSERT` the run issued, not just the table it happened to be mid-way through.
@@ -2561,11 +2566,11 @@ A Code of Canon Law — divisions (libro → parte → sección → título → 
 
 ```bash
 # Host with pdo_sqlite — copies the file into taw-private/corpus/
-php bin/taw canon-law:install cic-1983 /path/to/codigo_1983.sqlite
+taw canon-law:install cic-1983 /path/to/codigo_1983.sqlite
 
 # Host without pdo_sqlite — export on a machine that has it, install the JSON into MySQL
-php bin/taw canon-law:export /path/to/codigo_1983.sqlite /path/to/export.json
-php bin/taw canon-law:install cic-1983 /path/to/export.json
+taw canon-law:export /path/to/codigo_1983.sqlite /path/to/export.json
+taw canon-law:install cic-1983 /path/to/export.json
 ```
 
 The source is the proofreading app's `corpus:export` file: tables `divisions` (`id`, `parent_id`, `kind`, `title`, `order`), `canons` (`id`, `division_id`, `number`, `text`), `canons_fts`, and a `meta` key/value table (`surface`, `slug`, `release_channel`, `source_revision`, `generated_at`, …). Before installing, `canon-law:install` checks the export is what it claims to be: `meta.surface` must be `canon_law` (a Bible or Catechism export is refused), and a `.sha256` sidecar next to a `.sqlite` source (`<file>.sqlite.sha256` or `<file>.sha256`, `sha256sum` format) must match. `canon-law:export` carries `meta` into the JSON so the MySQL path gets the same check. MySQL storage is one shared table-set across editions (`taw_corpus_canon_law_divisions` / `_canons` / `_meta`), reloaded per edition inside one real transaction, exactly like the Catechism installer.

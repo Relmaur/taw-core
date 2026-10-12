@@ -56,9 +56,9 @@ class SchemaValidateCommand extends Command
                 With no arguments, checks this theme's taw-schema/ folder.
 
                 Examples:
-                  <info>php bin/taw schema:validate</info>
-                  <info>php bin/taw schema:validate taw-schema/post-types/book.json</info>
-                  <info>php bin/taw schema:validate ../../taw-schema --json</info>
+                  <info>taw schema:validate</info>
+                  <info>taw schema:validate taw-schema/post-types/book.json</info>
+                  <info>taw schema:validate ../../taw-schema --json</info>
                 HELP)
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::OPTIONAL, 'Files or folders to check (default: <theme>/taw-schema)')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output machine-readable JSON');

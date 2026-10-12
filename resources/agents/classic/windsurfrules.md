@@ -25,7 +25,8 @@ Key rules:
 - Meta key pattern: _taw_{field_id}; option key pattern: _taw_{field_id}
 
 New blocks:
-- Scaffold with: php bin/taw make:block Name --type=meta --with-style && composer dump-autoload
+- Scaffold with: taw make:block Name --type=meta --with-style && composer dump-autoload
+- taw comes with taw-fleet and runs this theme's own vendor/bin/taw; where it isn't installed, run vendor/bin/taw from the theme folder
 - Or manually create Blocks/{Name}/{Name}.php + index.php (no functions.php changes)
 - Required: matching tests/Unit/Blocks/NameTest.php testing getData()'s hydration logic, run `composer run test` to confirm — pattern + rationale: AGENTS.md § "Testing Blocks"
 
@@ -84,7 +85,7 @@ Static analysis:
 - Prefer fixing types over adding ignoreErrors entries
 
 Direct field access:
-- php bin/taw fields:get <post_id> <field_id> --json / fields:set <post_id> <field_id> <value>
+- taw fields:get <post_id> <field_id> --json / fields:set <post_id> <field_id> <value>
 - Same sanitization as a real admin save (via Metabox::sanitizeValue()/sanitizeRepeaterRows())
 - Use --file=path.json for repeater/array values, --dry-run to preview
 - Don't hand-craft repeater JSON via raw wp post meta update — this command already knows each field's shape

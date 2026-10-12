@@ -60,9 +60,9 @@ class ExportStaticCommand extends Command
                 is served from a different domain — see TAW\Core\Rest\Cors.
 
                 Examples:
-                  <info>php bin/taw export:static</info>
-                  <info>php bin/taw export:static --dir=/tmp/build</info>
-                  <info>php bin/taw export:static --prod-url=https://my-site.pages.dev</info>
+                  <info>taw export:static</info>
+                  <info>taw export:static --dir=/tmp/build</info>
+                  <info>taw export:static --prod-url=https://my-site.pages.dev</info>
                 HELP)
             ->addOption(
                 'dir',

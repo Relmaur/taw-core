@@ -44,7 +44,7 @@ final class ComposerScripts
 
         $themeDir = self::themeDir($event);
         if (getenv('TAW_NO_UPGRADE') === '1' || self::disabled($event)) {
-            $say('<comment>TAW: migrations skipped (TAW_NO_UPGRADE or extra.taw.upgrade = false); run vendor/bin/taw upgrade --apply yourself.</comment>');
+            $say('<comment>TAW: migrations skipped (TAW_NO_UPGRADE or extra.taw.upgrade = false); run taw upgrade --apply yourself (or vendor/bin/taw upgrade --apply).</comment>');
 
             return;
         }
@@ -56,13 +56,13 @@ final class ComposerScripts
         if ($pending === []) {
             return; // quiet when there's nothing to do
         }
-        $say('<info>TAW: running ' . count($pending) . ' migration(s) for this theme (vendor/bin/taw upgrade --explain <id> says what each does):</info>');
+        $say('<info>TAW: running ' . count($pending) . ' migration(s) for this theme (taw upgrade --explain <id> says what each does):</info>');
         foreach ($pending as $migration) {
             try {
                 $result = $migration->run($themeDir);
             } catch (\Throwable $e) {
                 $say('  <error>✗ ' . $migration->id() . '</error> failed: ' . $e->getMessage());
-                $say('    By hand: vendor/bin/taw upgrade --explain ' . $migration->id());
+                $say('    By hand: taw upgrade --explain ' . $migration->id());
 
                 continue;
             }

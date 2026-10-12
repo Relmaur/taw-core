@@ -36,11 +36,11 @@ class ContentExportCommand extends Command
             ->setDescription('Export a portable JSON snapshot of this site\'s content, TAW fields, options, terms and referenced media')
             ->setHelp(<<<'HELP'
                 Examples:
-                  <info>php bin/taw content:export</info>
-                  <info>php bin/taw content:export --output=/tmp/site.json</info>
-                  <info>php bin/taw content:export --types=page,post --since=2025-01-01</info>
-                  <info>php bin/taw content:export --posts=12,about --no-media</info>
-                  <info>php bin/taw content:export --migrate --output=/tmp/site.json</info>   full site state
+                  <info>taw content:export</info>
+                  <info>taw content:export --output=/tmp/site.json</info>
+                  <info>taw content:export --types=page,post --since=2025-01-01</info>
+                  <info>taw content:export --posts=12,about --no-media</info>
+                  <info>taw content:export --migrate --output=/tmp/site.json</info>   full site state
 
                 --migrate is a shorthand for --with-users --with-settings --all-media
                 --include-drafts (it does NOT enable --with-user-passwords or

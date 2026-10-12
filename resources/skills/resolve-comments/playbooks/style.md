@@ -37,7 +37,7 @@ What lands here (from real client requests):
 - Branch `bugsmash/<comment_number>-<short-slug>` off the deploy branch.
 - Smallest change that fixes it, in the theme's own styling system (Tailwind classes / SCSS /
   block `style.css` — whichever that component already uses). Don't touch `vendor/` or
-  framework files that `bin/taw sync` owns.
+  framework files that `taw sync` owns.
 - Build the way the theme says (usually `npm run build`) if built assets are committed.
 
 ## 3. Verify in the browser

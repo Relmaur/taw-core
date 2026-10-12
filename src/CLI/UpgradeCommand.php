@@ -32,10 +32,10 @@ final class UpgradeCommand extends Command
                 "so running it again does nothing, and anything it shouldn't decide (a file the site edited) is left\n" .
                 "as is, with the steps for a person. A migration that taw.json turns off (\"scaffold\" or \"docs\":\n" .
                 "\"off\") is listed as held back and doesn't run; --explain <id> says how to do it by hand.\n\n" .
-                "  <info>vendor/bin/taw upgrade</info>                       what's pending\n" .
-                "  <info>vendor/bin/taw upgrade --apply</info>               run them\n" .
-                "  <info>vendor/bin/taw upgrade --explain <id></info>        what one does, why, by hand, undo\n" .
-                "  <info>vendor/bin/taw upgrade --json</info>                for scripts and taw-fleet"
+                "  <info>taw upgrade</info>                       what's pending\n" .
+                "  <info>taw upgrade --apply</info>               run them\n" .
+                "  <info>taw upgrade --explain <id></info>        what one does, why, by hand, undo\n" .
+                "  <info>taw upgrade --json</info>                for scripts and taw-fleet"
             )
             ->addOption('apply', null, InputOption::VALUE_NONE, 'Run the pending migrations')
             ->addOption('explain', null, InputOption::VALUE_REQUIRED, 'Explain one migration (all of them: --explain all)')
@@ -103,7 +103,7 @@ final class UpgradeCommand extends Command
         }
         $output->writeln('');
         $output->writeln($results === []
-            ? 'Run <info>vendor/bin/taw upgrade --apply</info>. What each one does, why, by hand and how to undo: <info>vendor/bin/taw upgrade --explain <id></info>.'
+            ? 'Run <info>taw upgrade --apply</info>. What each one does, why, by hand and how to undo: <info>taw upgrade --explain <id></info>.'
             : 'Review the changes (git diff) and commit them. Steps marked "For you" stay listed until they\'re done.');
 
         return Command::SUCCESS;

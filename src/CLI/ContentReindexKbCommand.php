@@ -73,7 +73,7 @@ class ContentReindexKbCommand extends Command
             return Command::SUCCESS;
         }
 
-        $io->error('Ingestion failed — check `php bin/taw log:tail` for details.');
+        $io->error('Ingestion failed — check `taw log:tail` for details.');
         return Command::FAILURE;
     }
 }

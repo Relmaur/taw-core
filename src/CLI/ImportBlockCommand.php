@@ -41,9 +41,9 @@ class ImportBlockCommand extends Command
                 Use <info>--group</info> to override or specify a different location.
 
                 Examples:
-                  <info>php bin/taw import:block taw-block-Hero.zip</info>
-                  <info>php bin/taw import:block taw-block-Hero.zip --group=sections</info>
-                  <info>php bin/taw import:block taw-block-Hero.zip --force</info>
+                  <info>taw import:block taw-block-Hero.zip</info>
+                  <info>taw import:block taw-block-Hero.zip --group=sections</info>
+                  <info>taw import:block taw-block-Hero.zip --force</info>
                 HELP)
             ->addArgument(
                 'path',

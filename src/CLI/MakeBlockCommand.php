@@ -49,10 +49,10 @@ class MakeBlockCommand extends Command
                 and template. The block is immediately auto-discovered by BlockLoader.
 
                 Examples:
-                  <info>php bin/taw make:block Hero --type=meta --with-style</info>
-                  <info>php bin/taw make:block Badge --type=ui --group=ui</info>
-                  <info>php bin/taw make:block Hero --group=sections/landing</info>
-                  <info>php bin/taw make:block PricingTable</info> (interactive mode)
+                  <info>taw make:block Hero --type=meta --with-style</info>
+                  <info>taw make:block Badge --type=ui --group=ui</info>
+                  <info>taw make:block Hero --group=sections/landing</info>
+                  <info>taw make:block PricingTable</info> (interactive mode)
                 HELP)
             ->addArgument(
                 'name',

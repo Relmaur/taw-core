@@ -92,6 +92,6 @@ final class Migrations
     /** The line a person reads for a migration taw.json holds back. */
     public static function heldNote(Migration $m, string $setting): string
     {
-        return $m->id() . ' is off in taw.json ("' . $setting . '": "off"), so it didn\'t run. To do it anyway: vendor/bin/taw upgrade --explain ' . $m->id() . ' (By hand).';
+        return $m->id() . ' is off in taw.json ("' . $setting . '": "off"), so it didn\'t run. To do it anyway: taw upgrade --explain ' . $m->id() . ' (By hand).';
     }
 }

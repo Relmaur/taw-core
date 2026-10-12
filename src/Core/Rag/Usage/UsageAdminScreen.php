@@ -65,7 +65,7 @@ final class UsageAdminScreen
         try {
             $status = UsageMeter::status();
         } catch (\Throwable) {
-            $this->notice('error', __('The chat is refusing every message: its usage ledger cannot be read. See php bin/taw log:tail.', 'taw-core'));
+            $this->notice('error', __('The chat is refusing every message: its usage ledger cannot be read. See taw log:tail.', 'taw-core'));
             return;
         }
 
@@ -100,7 +100,7 @@ final class UsageAdminScreen
             </p>
 
             <?php if ($status === null) : ?>
-                <div class="notice notice-error inline"><p><?php esc_html_e('The usage ledger could not be read, so the chat is refusing messages. See php bin/taw log:tail.', 'taw-core'); ?></p></div>
+                <div class="notice notice-error inline"><p><?php esc_html_e('The usage ledger could not be read, so the chat is refusing messages. See taw log:tail.', 'taw-core'); ?></p></div>
             <?php else : ?>
                 <table class="widefat striped" style="max-width: 48rem; margin-top: 1rem;">
                     <tbody>

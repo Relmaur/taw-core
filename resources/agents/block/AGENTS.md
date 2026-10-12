@@ -39,11 +39,15 @@ A TAW block (FSE) theme, built from the taw-gutenberg scaffold: a **data-only co
 ```bash
 composer run test          # unit tests, no WordPress
 composer run phpstan       # level max, must stay green
-php bin/taw schema:validate
+taw schema:validate
 npm run dev                # Vite dev server (writes dist/hot; WordPress loads from it)
 npm run build              # production build into dist/
 npm run check              # lint + format + typecheck + Vitest + build (what CI runs)
 ```
+
+`taw` comes with taw-fleet (`brew install Relmaur/tap/taw-fleet`) and runs this theme's own
+`vendor/bin/taw` with the site's PHP. Where it isn't installed (CI, another machine), `vendor/bin/taw`
+is the same command, run from the theme folder.
 
 ## Rules
 

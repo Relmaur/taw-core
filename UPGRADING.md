@@ -10,15 +10,20 @@ to the site you're updating.
 
 ## How to upgrade
 
-**From taw/core 1.91 on, one command does all of it:** `vendor/bin/taw update`. On a new branch it updates
+**From taw/core 1.91 on, one command does all of it:** `taw update`. On a new branch it updates
 taw/core within the site's policy (`taw.json`), applies the framework files, runs the migrations and the
 checks, commits, and opens a pull request — no questions. It refuses to start on uncommitted changes or while
 an earlier update is still waiting; if a check fails, nothing is pushed and `.taw/update-report.md` holds the
 step-by-step fix (the same file you can hand to Claude). `--plan` says what it would do; `--no-deliver` stops
 at the commit. The steps below are what it does, for doing it by hand.
 
+`taw` comes with taw-fleet (`brew install Relmaur/tap/taw-fleet`) and runs the theme's own `vendor/bin/taw`
+with the Local site's PHP, from the theme folder or any folder under it (on a pre-1.90 theme it runs
+`php bin/taw`). Where it isn't installed (CI, another machine), `vendor/bin/taw` is the same command, run
+from the theme folder.
+
 1. **Find the installed version:** `composer show taw/core | grep versions` (or `composer.lock`).
-2. **Theme scaffold first (optional, recommended):** run the `update-theme` skill (`php bin/taw sync`).
+2. **Theme scaffold first (optional, recommended):** run the `update-theme` skill (`taw sync`).
    It syncs `functions.php`, `bin/`, CI and the framework skills, and never touches `Blocks/`, `inc/` or
    templates. For `composer.json`/`package.json`, use its suggestions (`merge` in `sync --json`, since
    v1.78.0) rather than the raw diff: they list only what the scaffold has and the site lacks, never a
@@ -32,9 +37,9 @@ at the commit. The steps below are what it does, for doing it by hand.
    needs `enshrined/svg-sanitize ^1.0`) changes nothing and still exits 0 with "Nothing to modify in lock
    file". **Check the version moved** (`composer show taw/core | grep versions`); if it didn't,
    `composer why-not taw/core <version>` says what holds it back.
-4. **Run the migrations (taw/core 1.91+):** `php bin/taw upgrade --apply`. Each change a release makes
+4. **Run the migrations (taw/core 1.91+):** `taw upgrade --apply`. Each change a release makes
    to a theme ships as a migration that does it for you; anything it shouldn't decide (a file the site
-   edited) is listed with the steps, marked "For you". `php bin/taw upgrade --explain <id>` says what one
+   edited) is listed with the steps, marked "For you". `taw upgrade --explain <id>` says what one
    does, why, how to do it by hand, and how to undo it. Then **read the sections below** for every version
    newer than the one you came from, and do any checks marked **Check** (from v1.91.0 on, a change to a
    theme is a migration, not a check).
@@ -48,8 +53,8 @@ at the commit. The steps below are what it does, for doing it by hand.
 6. **Commit `composer.lock`**, and only when the site's rules allow it. The live site gets the update on
    its next deploy.
 
-**Under Local by Flywheel,** start the site in Local before running `php bin/taw …` commands that need
-the database. Since v1.59.2, `bin/taw wp` says so when the site is stopped, and `bin/taw wp db …` reaches
+**Under Local by Flywheel,** start the site in Local before running `taw …` commands that need
+the database. Since v1.59.2, `taw wp` says so when the site is stopped, and `taw wp db …` reaches
 the site's database (before, it failed with `ERROR 2002 … /tmp/mysql.sock`).
 
 **Forms have side effects.** A real submission can send email to a client or create a post. To check
@@ -760,6 +765,18 @@ ships the MySQL it uses (`ubuntu-latest` moves to Ubuntu 26 on 2026-10-19).
 
 **Check:** none. **By hand:** when the scaffold's `TestCase` changes and yours is kept, compare the two and take what
 the framework changed. **Undo:** none needed.
+
+### v1.93.2: instructions say `taw …`
+
+**What changed.** The theme agent docs (`resources/agents/`), the runbooks, the README, this file's "How to
+upgrade", the commands' help and hints, and the update report's "By hand" lines now write commands as `taw …`.
+`taw` comes with taw-fleet 1.17.0+ (`brew install Relmaur/tap/taw-fleet`): it finds the theme and runs that
+theme's own `vendor/bin/taw` with the Local site's PHP and MySQL socket, so database commands reach the right
+site. Where it isn't installed (CI, another machine), `vendor/bin/taw` is the same command, run from the theme folder.
+
+**Why.** One short command for people and agents, with the site's PHP picked for you.
+
+**Check:** none; nothing in the theme changes, and `vendor/bin/taw` works as before. **Undo:** none needed.
 
 ## Opt-in features you may want
 

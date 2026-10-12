@@ -35,10 +35,10 @@ final class UpdateCommand extends Command
                 "It never asks; it refuses to start on uncommitted changes. If a step fails, nothing is pushed: the work\n" .
                 "stays on the branch and .taw/update-report.md says what failed and how to finish it by hand — the same\n" .
                 "file you can give Claude (\"Fix with Claude\").\n\n" .
-                "  <info>vendor/bin/taw update</info>                 do it\n" .
-                "  <info>vendor/bin/taw update --plan</info>          what it would do, nothing changed\n" .
-                "  <info>vendor/bin/taw update --no-deliver</info>    stop at the commit on the branch\n" .
-                "  <info>vendor/bin/taw update --json</info>          the result as JSON (taw-fleet reads it)\n" .
+                "  <info>taw update</info>                 do it\n" .
+                "  <info>taw update --plan</info>          what it would do, nothing changed\n" .
+                "  <info>taw update --no-deliver</info>    stop at the commit on the branch\n" .
+                "  <info>taw update --json</info>          the result as JSON (taw-fleet reads it)\n" .
                 "  <info>--composer=\"php /path/composer.phar\"</info>  how to run Composer (default: composer; quote a part with spaces)"
             )
             ->addOption('plan', null, InputOption::VALUE_NONE, 'Say what it would do; change nothing')

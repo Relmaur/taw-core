@@ -50,7 +50,7 @@ final class Report
             $out[] = '## Migrations';
             $out[] = '';
             foreach ($r['migrations'] ?? [] as $id) {
-                $out[] = '- `' . $id . '` (what, why, by hand, undo: `vendor/bin/taw upgrade --explain ' . $id . '`)';
+                $out[] = '- `' . $id . '` (what, why, by hand, undo: `taw upgrade --explain ' . $id . '`)';
             }
             foreach ($r['manual'] ?? [] as $step) {
                 $out[] = '- **For you:** ' . $step;
@@ -87,7 +87,7 @@ final class Report
 
         $out[] = '<details><summary>For a maintainer: the policy and every command</summary>';
         $out[] = '';
-        $out[] = 'Policy (`taw.json`, `vendor/bin/taw policy` explains it): `' . json_encode($r['policy'] ?? [], JSON_UNESCAPED_SLASHES) . '`';
+        $out[] = 'Policy (`taw.json`, `taw policy` explains it; without taw-fleet, `vendor/bin/taw policy` from the theme folder): `' . json_encode($r['policy'] ?? [], JSON_UNESCAPED_SLASHES) . '`';
         $out[] = '';
         foreach (array_merge($r['steps'] ?? [], array_filter($r['checks'] ?? [], fn ($c) => ($c['command'] ?? '') !== '')) as $s) {
             $ok = isset($s['ok']) ? ($s['ok'] ? '✓' : '✗') : ($s['status'] === 'pass' ? '✓' : ($s['status'] === 'fail' ? '✗' : '–'));

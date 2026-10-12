@@ -35,10 +35,10 @@ final class DocsSyncCommand extends Command
                 "shipped) with --apply. A copy the site edited is left as is unless you add --force: move your\n" .
                 "notes into \"This site\" afterwards. Previous text stays in git history (git log -p -- AGENTS.md);\n" .
                 "undo with git checkout <commit> -- AGENTS.md.\n\n" .
-                "  <info>vendor/bin/taw docs:sync</info>                   what would change\n" .
-                "  <info>vendor/bin/taw docs:sync --apply</info>           convert the unedited copies\n" .
-                "  <info>vendor/bin/taw docs:sync --apply --force</info>   edited copies too\n" .
-                "  <info>vendor/bin/taw docs:sync --json</info>            for scripts"
+                "  <info>taw docs:sync</info>                   what would change\n" .
+                "  <info>taw docs:sync --apply</info>           convert the unedited copies\n" .
+                "  <info>taw docs:sync --apply --force</info>   edited copies too\n" .
+                "  <info>taw docs:sync --json</info>            for scripts"
             )
             ->addOption('apply', null, InputOption::VALUE_NONE, 'Write the changes')
             ->addOption('force', null, InputOption::VALUE_NONE, 'With --apply: replace copies the site edited too')
@@ -73,7 +73,7 @@ final class DocsSyncCommand extends Command
         }
         if (!$done && ($plan['convert'] !== [] || $plan['create'] !== [])) {
             $output->writeln('');
-            $output->writeln('Run <info>vendor/bin/taw docs:sync --apply</info>, then review and commit. Move any notes of your own into "This site".');
+            $output->writeln('Run <info>taw docs:sync --apply</info>, then review and commit. Move any notes of your own into "This site".');
         }
 
         return Command::SUCCESS;
