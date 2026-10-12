@@ -51,6 +51,7 @@ is the same command, run from the theme folder.
 
 ## Rules
 
+- **Never commit** dumps, snapshots or credentials (`.sync/`, `*.sql`, `*.wpress`, `remote.env`, `.env`, `wp-config.php`, private keys): taw/core's pre-commit hook refuses them (`core.hooksPath` = `vendor/taw/core/resources/git-hooks`, set by the update) and CI's `committed-files` job fails on them. Never `--no-verify` past it.
 - Field ids are namespaced by entity (`book_author`): taw/core's field registry is keyed by bare id,
   and this theme shares the test site's database with taw-theme.
 - New data goes in `taw-schema/` as JSON. `schema:validate` and `SchemaFilesTest` must stay green.

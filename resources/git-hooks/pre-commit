@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# TAW pre-commit hook (ships with taw/core; a theme's core.hooksPath points here,
+# set by the 1.94.0/pre-commit-hook migration). Refuses a commit that would add a
+# database dump, a content snapshot (.sync/) or credentials (remote.env, .env,
+# wp-config.php, a private key): the same check as CI's committed-files job, run
+# before the commit exists instead of after the push.
+#
+# Then runs the clone's own .git/hooks/pre-commit, if there is one, since
+# core.hooksPath would otherwise skip it.
+
+here="$(cd "$(dirname "$0")" && pwd)"
+
+if ! bash "$here/../ci/check-committed-files.sh" --staged; then
+    cat >&2 <<'MSG'
+
+TAW: commit refused. The files above look like a database dump, a content
+snapshot or credentials, and a theme repository can be public.
+Unstage them (git restore --staged <file>) and keep them out: .sync/ is ignored
+for this. If one is a false positive, rename it or ask before going on:
+git commit --no-verify skips this check, but CI runs it again on the push.
+MSG
+    exit 1
+fi
+
+own="$(git rev-parse --git-dir)/hooks/pre-commit"
+if [ -x "$own" ]; then
+    exec "$own" "$@"
+fi

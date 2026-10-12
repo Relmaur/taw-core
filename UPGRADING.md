@@ -815,6 +815,23 @@ section, set `protected bool $critical = true;` on blocks that render right unde
 throttled on desktop and mobile (the perf-audit skill), then add the filter in `inc/performance.php` and measure
 again. **Undo:** remove the filter.
 
+### v1.94.0: commits of dumps and credentials are refused before they exist
+
+**What changed.** taw/core ships a git pre-commit hook (`resources/git-hooks/pre-commit`). It runs the same check
+as CI's `committed-files` job (`resources/ci/check-committed-files.sh --staged`) on what is about to be committed,
+and refuses a database dump (`*.sql`, `*.wpress`), a content snapshot (`.sync/`), credentials (`remote.env`, `.env`,
+`wp-config.php`) or a private key. Migration `1.94.0/pre-commit-hook` installs it: it points the clone's
+`core.hooksPath` at `vendor/taw/core/resources/git-hooks`, so the hook updates with taw/core. The clone's own
+`.git/hooks/pre-commit`, if any, still runs after it.
+
+**Why.** A theme repository can be public, and CI only notices after the push has published the file.
+
+**Check:** none; the migration says when it left a clone alone (a `core.hooksPath` of the site's own, or other hooks
+in `.git/hooks`, which `core.hooksPath` would stop running): then add the check to that hook, run from the theme
+folder: `bash vendor/taw/core/resources/ci/check-committed-files.sh --staged`. Git config is per clone: another clone
+of the theme gets the hook on its next `composer update taw/core` or `taw update`. **Undo:** `git config --unset
+core.hooksPath` (CI still checks every push).
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

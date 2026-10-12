@@ -19,10 +19,17 @@
 # removing the file in a later commit isn't enough: rewrite the branch.
 #
 # Usage, from the repository: bash vendor/taw/core/resources/ci/check-committed-files.sh [<base> [<head>]]
+#   --staged: check what is about to be committed (the index), for the pre-commit
+#   hook (resources/git-hooks/pre-commit); plain messages instead of CI annotations.
 # Needs git and bash only.
 
 set -euo pipefail
 
+staged=0
+if [ "${1:-}" = "--staged" ]; then
+    staged=1
+    shift
+fi
 base="${1:-}"
 head="${2:-HEAD}"
 
@@ -32,7 +39,7 @@ content='^-- (MySQL|MariaDB) dump|INSERT INTO `?[A-Za-z0-9_]*_(users|usermeta|op
 
 found=0
 report() {
-    echo "::error::$1"
+    if [ "$staged" -eq 1 ]; then echo "  $1" >&2; else echo "::error::$1"; fi
     found=1
 }
 
@@ -49,13 +56,13 @@ done < <(printf '%s\n' "$files" | sort -u)
 
 while IFS= read -r file; do
     report "$file: looks like a database dump or a private key"
-done < <(git grep -IlE "$content" -- . || true)
+done < <(if [ "$staged" -eq 1 ]; then git grep --cached -IlE "$content" -- . || true; else git grep -IlE "$content" -- . || true; fi)
 
 if [ -n "$base" ] && git log -p --format= "$base..$head" | grep -E '^\+' | grep -vE '^\+\+\+ ' | grep -qE "${content//^/^\\+}"; then
     report "a commit in $base..$head adds what looks like a database dump or a private key (a later commit removing it isn't enough: rewrite the branch)"
 fi
 
-if [ "$found" -eq 0 ]; then
+if [ "$found" -eq 0 ] && [ "$staged" -eq 0 ]; then
     echo "No dumps, snapshots or credentials committed."
 fi
 exit "$found"

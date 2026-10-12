@@ -2144,6 +2144,7 @@ echo Image::render($card_image_id, 'large');
 
 ## Do NOT
 
+- Commit dumps, snapshots or credentials (`.sync/`, `*.sql`, `*.wpress`, `remote.env`, `.env`, `wp-config.php`, private keys). taw/core's pre-commit hook refuses them (`core.hooksPath` = `vendor/taw/core/resources/git-hooks`, set by the update), and CI's `committed-files` job fails on them. Never `git commit --no-verify` past it: unstage the file, and keep such files in the ignored `.sync/`.
 - Put block logic in `functions.php` — it belongs in the block class
 - Manually register blocks in `functions.php` — `BlockLoader::loadAll()` handles it
 - Call `wp_enqueue_style/script` directly for blocks — the base class handles it
