@@ -2078,7 +2078,10 @@ jobs:
 `npm run check` or `build` (input `build`), and the WordPress smoke test (input `smoke`). Its
 `committed-files` job (v1.93.0) always runs: it fails when the repository holds a database dump, a content
 snapshot (`.sync/`) or a credentials file (`remote.env`, `.env`, `wp-config.php`, a private key), on a pull
-request in any of its commits.
+request in any of its commits. Since v1.94.0 the same check runs before each commit: `resources/git-hooks/pre-commit`
+(`check-committed-files.sh --staged`), which the `1.94.0/pre-commit-hook` migration installs by pointing the
+clone's `core.hooksPath` at `vendor/taw/core/resources/git-hooks` (never over a hooks setup of the site's own; the
+clone's `.git/hooks/pre-commit` still runs). The CI job stays: `--no-verify` skips a hook, nothing skips CI.
 `theme-framework-sync.yml` is the weekly update: bump taw/core, apply Tier 1, run the checks, open one
 pull request. Each workflow's header lists the same steps as commands, for running them by hand.
 

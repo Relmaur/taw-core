@@ -22,6 +22,7 @@ final class Migrations
             new Migrations\SiteSkills(),
             new Migrations\AgentDocsToCore(),
             new Migrations\ConfigsToCore(),
+            new Migrations\PreCommitHook(),
         ], self::$added);
     }
 
