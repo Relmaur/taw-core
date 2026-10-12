@@ -184,19 +184,21 @@ class Form
     }
 
     /**
-     * form.css stays in <head> (where it always was, so a theme's own form
-     * styles that come after it keep winning), but doesn't block rendering:
-     * media="print" + onload, with a <noscript> copy, as BaseBlock loads
-     * block CSS. Forms register on every request, so the stylesheet is on
-     * every page, and as a plain <link> it held up first paint even on pages
-     * without a form. Priority 100 reads the href from the tag, after a cache
-     * plugin (Hummingbird) has rewritten it. `taw_form_css_async` (false)
-     * keeps the plain, render-blocking <link>.
+     * Opt-in (`add_filter('taw_form_css_async', '__return_true')`): form.css
+     * stays in <head> (where it always is, so a theme's own form styles that
+     * come after it keep winning) but doesn't block rendering: media="print"
+     * + onload, with a <noscript> copy, as BaseBlock loads block CSS. Forms
+     * register on every request, so the plain <link> holds up first paint on
+     * every page, form or not. It also hides gaps in a theme's critical CSS:
+     * turn it on once critical.scss carries the first viewport, or the page
+     * shifts when app.css lands (1.93.3 had it on by default; desktop CLS
+     * went to ~1.0 on most sites). Priority 100 reads the href from the tag,
+     * after a cache plugin (Hummingbird) has rewritten it.
      */
     public static function asyncStyleTag(string $html, string $handle): string
     {
         if ($handle !== 'taw-form' || str_contains($html, 'media="print"') || str_contains($html, "media='print'")
-            || !apply_filters('taw_form_css_async', true)) {
+            || !apply_filters('taw_form_css_async', false)) {
             return $html;
         }
         if (!preg_match('/href=[\'"]([^\'"]+)[\'"]/', $html, $match)) {

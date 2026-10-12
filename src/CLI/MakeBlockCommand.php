@@ -57,8 +57,8 @@ class MakeBlockCommand extends Command
                 A block that can render right under a page's banner (the first
                 viewport) should set <comment>protected bool $critical = true;</comment> so its
                 style.scss is inlined into <head> on the pages that render it.
-                Nothing render-blocking hides a missing rule there: it shows as
-                layout shift.
+                With the form stylesheet async (taw_form_css_async), nothing
+                render-blocking hides a missing rule there: it shows as layout shift.
                 HELP)
             ->addArgument(
                 'name',

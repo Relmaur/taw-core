@@ -1442,7 +1442,7 @@ Every block build — via `make-metablock`, `figma-to-block`, or hand-authored �
 
 - **Images:** always render through `Image::render()` (§ "Image Helper" above), never a raw `<img>` tag, so `loading`, `fetchpriority`, `decoding`, and `srcset` are set correctly for the image's fold position. Set `above_fold => true` only for genuinely above-the-fold images (hero/banner); everything else defaults to lazy.
 - **Reserve layout space for every image, regardless of loading strategy.** `width`/`height` attributes alone don't prevent a layout shift if CSS overrides the intrinsic box (e.g. `height: auto` on a flex/marquee track) — the browser still reflows once the real image loads, and because non-`above_fold` images load lazily/low-priority, that reflow lands at an unpredictable time relative to paint. This produces a Cumulative Layout Shift (CLS) that's *flaky* rather than consistently reproducible — same page, same code, a different CLS score on every run. Confirmed live: a partner-logo marquee band shipped with correct `width`/`height` attributes but no matching CSS `aspect-ratio`, and CLS on that page ranged from 0.05 to 0.87 across identical repeat PageSpeed Insights runs, purely from image-load timing. Give any image-bearing element (marquee tracks, card grids, repeaters of `image`/`files` fields) an explicit `aspect-ratio` or fixed-height container in its `style.scss` matching the image's real rendered ratio — don't rely on attribute-only sizing for anything that isn't going through `Image::render()`'s own sizing output.
-- **Above-the-fold markup needs real critical CSS**, not the empty scaffold stub — see § "Vite Integration" → "`critical.scss` must contain real content" below. A new hero/banner-type block should get hand-authored layout rules (flex/grid direction, gap, min-height) added to `critical.scss` if it can appear above the fold on any page, or set `protected bool $critical = true;` so its own `style.scss` is inlined into `<head>` on the pages that render it (any block that renders right under a page's banner). Since taw/core 1.93.3 no stylesheet blocks first paint, so a gap here is a layout shift, not a hidden one.
+- **Above-the-fold markup needs real critical CSS**, not the empty scaffold stub — see § "Vite Integration" → "`critical.scss` must contain real content" below. A new hero/banner-type block should get hand-authored layout rules (flex/grid direction, gap, min-height) added to `critical.scss` if it can appear above the fold on any page, or set `protected bool $critical = true;` so its own `style.scss` is inlined into `<head>` on the pages that render it (any block that renders right under a page's banner). With the form stylesheet async (`taw_form_css_async`), nothing render-blocking hides a gap here: it shows as layout shift.
 - **Queue block assets before `get_header()`** (`BlockRegistry::queue(...)`) — already listed in § "Do NOT"; repeated here because forgetting it falls back to inline assets, which is also a performance regression, not just a code-style miss.
 - **Verify, don't assume a single good run proves it.** After building or editing a block that renders images, check PageSpeed Insights (or GTMetrix) against the page it's wired into at least twice — a single good CLS score doesn't rule out the load-timing flakiness described above.
 
@@ -1712,12 +1712,14 @@ min-height — geometry that prevents CLS) for whatever markup renders above the
 and hero/first-section, typically. Full color/typography fidelity isn't required — a brief color
 flash is an acceptable, standard critical-CSS tradeoff; a layout *jump* is not.
 
-**Since taw/core 1.93.3 nothing render-blocking is left to hide gaps.** The form stylesheet
-(`taw-form`) was the last plain `<link>` in `<head>`; it held first paint until most of the async
-CSS had arrived, so a thin `critical.scss` *looked* fine. Now the page paints with
-`critical.scss` alone, and every difference from `app.css` above the fold shows up as layout shift
-when `app.css` lands (on one live site: desktop CLS 0 → ~1.0 on every page, from a single
-`position: sticky` in `critical.scss` where `app.css` had `position: fixed`). What
+**The form stylesheet hides gaps; making it async exposes them.** taw/core's form stylesheet
+(`taw-form`) is the one plain `<link>` left in `<head>` by default: it holds first paint until most
+of the async CSS has arrived, so a thin `critical.scss` *looks* fine, at the cost of LCP (on one
+live site, 450 ms of render-blocking on mobile). `add_filter('taw_form_css_async', '__return_true')`
+(taw/core 1.93.4+; it was the default in 1.93.3 only) loads it async too, and then the page paints
+with `critical.scss` alone: every difference from `app.css` above the fold shifts the layout when
+`app.css` lands (measured on four sites: desktop CLS from ~0 to ~1.0, from things like a single
+`position: sticky` in `critical.scss` where `app.css` had `position: fixed`). Before turning it on,
 `critical.scss` must carry:
 
 - **The header exactly as `app.css` positions it** (`position`, `top`, height, z-index), plus its
@@ -1733,7 +1735,8 @@ when `app.css` lands (on one live site: desktop CLS 0 → ~1.0 on every page, fr
   on the pages that render it. Prefer that over growing `critical.scss` with every block's rules.
 
 Check it throttled, desktop and mobile, home and interior templates: CLS ≤ 0.1, and the fully
-loaded layout unchanged (the perf-audit skill does this).
+loaded layout unchanged (the perf-audit skill does this). Then add the filter (in
+`inc/performance.php`) and measure again.
 
 <details>
 <summary>Why not just give critical.scss its own scoped Tailwind <code>@source</code> instead of hand-authoring?</summary>

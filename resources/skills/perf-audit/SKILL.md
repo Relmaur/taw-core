@@ -79,9 +79,13 @@ it maps to something in this codebase:
   fix, not a vague "compress your images."
 - **Render-blocking JS/CSS** → check `ViteLoader`'s mode (dev vs. built/production manifest) and
   whether `Support/performance.php`'s asset hints are in play.
-- **Layout shift (CLS), above all on desktop or interior pages** → since taw/core 1.93.3 no
-  stylesheet blocks first paint, so the page paints with `resources/scss/critical.scss` alone and
-  every mismatch with `app.css` above the fold shifts when `app.css` lands. Compare the two for the
+- **Render-blocking `taw-form` (form.css)** → taw/core's form stylesheet blocks first paint by
+  default. `add_filter('taw_form_css_async', '__return_true')` (taw/core 1.93.4+) loads it async,
+  but only once `critical.scss` carries the first viewport (next point): turn it on, measure CLS,
+  and keep it only if CLS stays ≤ 0.1.
+- **Layout shift (CLS), above all on desktop or interior pages** → with nothing render-blocking
+  (`taw_form_css_async` on), the page paints with `resources/scss/critical.scss` alone and every
+  mismatch with `app.css` above the fold shifts when `app.css` lands. Compare the two for the
   header first (`position: sticky` in one and `fixed` in the other shifted a whole site by the
   header's height), then the top section of each template. Fixes: copy `app.css`'s rules exactly
   (`@use` the token partials, same `var()`s), and `protected bool $critical = true;` on blocks that
@@ -153,7 +157,7 @@ whole point of the skill.
 - **Before calling a high desktop CLS an artifact (next point), rule out critical CSS.** A
   bit-for-bit identical shift on every run can also be real: `critical.scss` positioning or sizing
   an above-the-fold element differently from `app.css` (see § 3, "Layout shift"). Check that
-  first; it's the common case since taw/core 1.93.3.
+  first; it's the common case once `taw_form_css_async` is on.
 - **A wildly high desktop CLS from PSI's API that GTMetrix and mobile both disagree with may be
   a lab-measurement artifact, not a real bug — don't chase it with more code fixes past the
   second attempt.** Signature to watch for: the same element/bounding-box shifts every PSI
