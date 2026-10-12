@@ -11,10 +11,10 @@ use TAW\Core\Form\Form;
 use TAW\Tests\TestCase;
 
 /**
- * form.css stays in <head> but doesn't block rendering (issue #186): forms
- * register on every request, so the plain <link> held up first paint on
- * every page, form or not. Keeping it in <head> keeps the cascade order the
- * themes' own form styles rely on.
+ * form.css can load without blocking rendering, opt-in (`taw_form_css_async`,
+ * issues #186/#188): it stays in <head>, where the themes' own form styles
+ * rely on it, and it's off by default because the blocking link hides gaps in
+ * the themes' critical CSS (on by default in 1.93.3: desktop CLS ~1.0).
  */
 final class FormStyleTest extends TestCase
 {
@@ -32,8 +32,15 @@ final class FormStyleTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_the_form_stylesheet_loads_without_blocking_rendering(): void
+    public function test_by_default_the_plain_link_stays(): void
     {
+        $this->assertSame(self::TAG, Form::asyncStyleTag(self::TAG, 'taw-form'));
+    }
+
+    public function test_the_form_stylesheet_loads_without_blocking_rendering_when_asked(): void
+    {
+        Filters\expectApplied('taw_form_css_async')->andReturn(true);
+
         $html = Form::asyncStyleTag(self::TAG, 'taw-form');
 
         $this->assertStringContainsString('<link rel="stylesheet" id="taw-form-css" href="https://example.test/form.css?ver=1" media="print" onload="this.media=\'all\'">', $html);
@@ -42,6 +49,7 @@ final class FormStyleTest extends TestCase
 
     public function test_the_href_a_cache_plugin_rewrote_is_kept(): void
     {
+        Filters\expectApplied('taw_form_css_async')->andReturn(true);
         $tag = str_replace('https://example.test/form.css?ver=1', 'https://cdn.example/hb/08a2e70c.css', self::TAG);
 
         $this->assertStringContainsString('href="https://cdn.example/hb/08a2e70c.css" media="print"', Form::asyncStyleTag($tag, 'taw-form'));
@@ -53,13 +61,6 @@ final class FormStyleTest extends TestCase
 
         $async = '<link rel="stylesheet" id="taw-form-css" href="x.css" media="print" onload="this.media=\'all\'">';
         $this->assertSame($async, Form::asyncStyleTag($async, 'taw-form'), "a theme's own async filter ran first");
-    }
-
-    public function test_the_filter_keeps_the_plain_link(): void
-    {
-        Filters\expectApplied('taw_form_css_async')->once()->andReturn(false);
-
-        $this->assertSame(self::TAG, Form::asyncStyleTag(self::TAG, 'taw-form'));
     }
 
     public function test_many_forms_hook_it_once(): void

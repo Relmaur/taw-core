@@ -790,7 +790,26 @@ would change how forms look. The computed styles of every form element were chec
 
 **Check:** if your theme already makes `taw-form` async in a `style_loader_tag` filter, you can drop `taw-form`
 from it (it's harmless to keep: an already-async tag is left alone). **By hand:** none. **Undo:**
-`add_filter('taw_form_css_async', '__return_false');` keeps the plain `<link>`.
+`add_filter('taw_form_css_async', '__return_false');` keeps the plain `<link>`. **v1.93.4 makes this opt-in again:**
+see below.
+
+### v1.93.4: the async form stylesheet is opt-in
+
+**What changed.** `taw-form` (form.css) is a plain, render-blocking `<link>` again by default, as before v1.93.3.
+`add_filter('taw_form_css_async', '__return_true');` loads it async (`media="print"` + onload, `<noscript>` copy,
+same place in `<head>`). The classic agent docs, the perf-audit skill and `make:block`'s help say what
+`resources/scss/critical.scss` must cover before you turn it on.
+
+**Why.** The blocking stylesheet was hiding gaps in the themes' `critical.scss`. With it async (v1.93.3), the page
+paints with `critical.scss` alone, and on four sites desktop CLS went from about 0 to about 1.0 (throttled): the
+header positioned differently in `critical.scss` than in `app.css`, and interior templates' top sections not
+covered. Mobile stayed at 0, and mobile LCP improved a lot (one site: Performance 74 → 95).
+
+**Check:** none to keep things as they were. To get the faster first paint: make `critical.scss` position the
+header exactly like `app.css` (`@use` the token partials and the same `var()`s), cover each template's top
+section, set `protected bool $critical = true;` on blocks that render right under a page's banner, measure CLS
+throttled on desktop and mobile (the perf-audit skill), then add the filter in `inc/performance.php` and measure
+again. **Undo:** remove the filter.
 
 ## Opt-in features you may want
 
