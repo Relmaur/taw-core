@@ -7,7 +7,7 @@ Accepted (2026-10-09).
 ## Context
 
 `POST taw/v1/chat` (v1.27+, opt-in since v1.30) is public and anonymous by default, and every message
-can call a paid LLM API several times (tool rounds). Before the fsspx-taw site put a paid key behind
+can call a paid LLM API several times (tool rounds). Before a client site put a paid key behind
 it, an audit found nothing that bounded the bill:
 
 - **Spoofable rate limiting.** The only defence was 20 messages per 10 minutes per IP, and
@@ -24,7 +24,7 @@ it, an audit found nothing that bounded the bill:
 
 Constraints: managed hosting without `pdo_sqlite` (ADR-0002), so any new storage must use MySQL;
 page caching (Hummingbird) serves stale WordPress nonces; the only site that enables the chatbot is
-fsspx-taw, whose widget is not rendered yet.
+a client site whose widget is not rendered yet.
 
 ## Decision
 
@@ -80,7 +80,7 @@ fsspx-taw, whose widget is not rendered yet.
   overspending is impossible.
 - **A REST contract change in a minor release** (v1.81.0). `/chat` now needs a session by default
   and caps messages at 1000 characters. Accepted by the owner: the route is opt-in and its only
-  consumer (fsspx-taw) is updated in lockstep. UPGRADING.md lists it.
+  consumer (one client site) is updated in lockstep. UPGRADING.md lists it.
 - Rejected: **WordPress nonces** (stale behind page caching); **binding sessions to IP** (breaks
   mobile visitors, and per-IP limits already apply per message); **a token-count budget instead of
   dollars** (owners think in dollars); **blocking embeddings on budget** (indexing is admin- or

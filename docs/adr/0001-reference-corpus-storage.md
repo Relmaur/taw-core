@@ -6,7 +6,7 @@ Accepted.
 
 ## Context
 
-The Bible-reader feature (fsspx-taw client site) needs a framework-level home for a large
+The Bible-reader feature (a client site) needs a framework-level home for a large
 (~18MB), read-only, curated reference dataset — a Straubinger-translation Spanish Catholic
 Bible shipped as a SQLite file (`books`/`chapters`/`verses`/`sections`/`notes`/
 `scripture_references` + `verses_fts`/`notes_fts`). The source file's own `meta` table
@@ -76,7 +76,7 @@ inventing a new extensibility mechanism. For that filter to be more than decorat
 overridable, `pdo()` is `protected`, and every internal `fetch*`/`normalizeBookRow` helper is
 `protected` rather than `private` — a child class can override just the filename, or just one
 fetch method, and reuse the rest. No `BibleReaderInterface` was extracted for this — one real
-consumer (fsspx-taw) doesn't justify a formal contract yet; `BibleEndpoint::reader()` narrows
+consumer (one client site) doesn't justify a formal contract yet; `BibleEndpoint::reader()` narrows
 the filter's `mixed` return via `instanceof BibleReader` (falling back to the default on a
 misbehaving filter callback) rather than an interface type-check. Revisit once a second
 implementation actually exists to shape the interface against.

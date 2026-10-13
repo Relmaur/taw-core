@@ -728,7 +728,7 @@ for an update still waiting, and the report's "Finish" steps, use it too. If the
 update refuses before changing anything, with what to do.
 
 **Why.** Some sites deploy from an agency's GitHub organization while `origin` is a copy elsewhere
-(emelambda: `origin-agency`). Without this, the pull request opened on the copy, and merging it deployed nothing.
+(for example `origin-agency`). Without this, the pull request opened on the copy, and merging it deployed nothing.
 
 **Check:** none; without the setting, nothing changes. **By hand:** add `"remote": "<name>"` under `"update"` in
 `taw.json` (`git remote -v` lists the names), commit it. **Undo:** remove the line.
@@ -878,7 +878,7 @@ posts the metabox doesn't cover; and when several declared one and none applied,
 fallback text on another variation's page, e.g. a FAQ pretitle on a page whose variation declares none.
 
 **Check:** a page that rendered text from a default declared by a metabox that doesn't apply to it now renders the
-field empty. Rendering every published page of a site that uses defaults (chcapital) showed no such page. If one
+field empty. Rendering every published page of a site that uses defaults showed no such page. If one
 of yours relied on it, add the page to that metabox's `screens`, or declare the default on the metabox that
 applies. **Undo:** none needed.
 
@@ -949,7 +949,7 @@ pages. Group sub-fields are now validated on their unslashed value, as top-level
 error notices now survive the block editor's metabox save (it renders the edit screen unseen, which used to consume
 them): they show on the next reload.
 
-**Why.** A value that's the single source of truth for a page (emelambda's practice previews) must never be replaced
+**Why.** A value that's the single source of truth for a page (a site's practice previews) must never be replaced
 by a bad edit, and nothing typed should be lost.
 
 **Check:** none; existing fields behave as before (`on_invalid` defaults to `'store'` for every other type). **Undo:**

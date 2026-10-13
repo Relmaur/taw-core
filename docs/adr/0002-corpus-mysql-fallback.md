@@ -9,7 +9,7 @@ Accepted.
 ADR-0001 built the Bible Reader Corpus subsystem entirely on `pdo_sqlite`: `ProtectedSqlite`,
 `Corpus\Storage`, and `BibleReader` all assumed a working SQLite driver was available on every
 host. That assumption broke in production: `bin/taw corpus:install` against the real
-~18MB Straubinger corpus file on the fsspx-taw client site (WPMUdev managed hosting) fataled
+~18MB Straubinger corpus file on a client site (WPMUdev managed hosting) fataled
 with `PDOException: could not find driver` — `pdo_sqlite` (and `sqlite3`) are missing from both
 PHP-FPM and CLI on that host, confirmed on two PHP versions. WPMUdev support declined to add
 the extension: *"As a Managed Hosting service, we are unable to implement custom

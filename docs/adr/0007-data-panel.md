@@ -163,8 +163,8 @@ Decision 9's "Saving" changes. The mini editor still serializes its blocks witho
 when it saves. Stored values therefore look exactly like `wp_editor()` output: paragraphs as blank
 lines, no `<p>`.
 
-**Why:** the P3 round-trip on 101 real values from fsspx, lsmexico and chcapital. Most of them
-(76) had no `<p>`, and some templates print the value raw (for example chcapital's FAQ answers,
+**Why:** the P3 round-trip on 101 real values from three client sites. Most of them
+(76) had no `<p>`, and some templates print the value raw (for example one site's FAQ answers,
 `echo wp_kses_post($answer)`). Storing `<p>` HTML would have changed 88 of 101 values and added
 paragraph margins in those templates. With `removep()`, no text changes; 79 values render
 identically through `wpautop()`, and the other 22 differ only by inert `wp-block-*` classes (14),
