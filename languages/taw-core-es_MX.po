@@ -119,6 +119,11 @@ msgstr "Cambiarían %d de %d registros. Todavía no se ha escrito nada."
 msgid "%s (image ID)"
 msgstr "%s (ID de imagen)"
 
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "%s (to upload)"
+msgstr "%s (por subir)"
+
 #. translators: %s: a time span, e.g. "3 days"
 #: src/Core/Bindings/Expression/Library.php
 #, php-format
@@ -514,6 +519,11 @@ msgstr "Categorías, etiquetas o cualquier taxonomía: las de la entrada o todas
 msgid "Change"
 msgstr "Cambiar"
 
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Changed on this site too (it was “%s”)."
+msgstr "También cambió en este sitio (era “%s”)."
+
 #: src/Core/Rag/Usage/UsageAdminScreen.php
 msgid "Chat"
 msgstr "Chat"
@@ -865,10 +875,6 @@ msgstr "Elemento de lista de campo"
 msgid "Field text"
 msgstr "Texto de campo"
 
-#: src/Core/Content/ContentAdminScreen.php
-msgid "Field-level changes"
-msgstr "Cambios por campo"
-
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Fields"
 msgstr "Campos"
@@ -1004,12 +1010,21 @@ msgid "Import"
 msgstr "Importar"
 
 #: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Import %s"
+msgstr "Importar %s"
+
+#: src/Core/Content/ContentAdminScreen.php
 msgid "Import applied in part."
 msgstr "Importación aplicada en parte."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Import applied."
 msgstr "Importación aplicada."
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Import every record"
+msgstr "Importar todos los registros"
 
 #: src/Core/Content/ContentAdminScreen.php
 #, php-format
@@ -1137,6 +1152,10 @@ msgstr "Elementos, separados por comas"
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Joins text together."
 msgstr "Une textos."
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Keep this site's"
+msgstr "Conservar el de este sitio"
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Knowledge Bases"
@@ -2429,6 +2448,10 @@ msgstr "Este sitio"
 msgid "This site allows palette colors only, so it’s ignored."
 msgstr "Este sitio solo permite colores de la paleta, así que se ignora."
 
+#: src/Core/Content/ContentAdminScreen.php
+msgid "This site has its own value, and there is no telling which is newer."
+msgstr "Este sitio tiene su propio valor y no se puede saber cuál es más reciente."
+
 #: resources/data-panel/src/bindings/tags.ts
 msgid "This value isn’t a date."
 msgstr "Este valor no es una fecha."
@@ -2583,6 +2606,10 @@ msgstr "Usarlo para"
 msgid "Use lowercase letters, numbers and single dashes."
 msgstr "Usa letras minúsculas, números y guiones sencillos."
 
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Use the file's"
+msgstr "Usar el del archivo"
+
 #: src/Core/Metabox/Metabox.php
 msgid "Use this image"
 msgstr "Usar esta imagen"
@@ -2614,6 +2641,10 @@ msgstr "Visitante y fecha"
 #: src/Core/Form/Form.php
 msgid "We could not verify you are human. Please try again."
 msgstr "No pudimos verificar que eres humano. Inténtalo de nuevo."
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "What changes"
+msgstr "Qué cambia"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "When a record already exists:"
@@ -2887,7 +2918,7 @@ msgstr "bloqueado"
 msgid "lower case."
 msgstr "minúsculas."
 
-#: src/Core/Editing/EditingAdminScreen.php
+#: src/Core/Content/ContentAdminScreen.php src/Core/Editing/EditingAdminScreen.php
 msgid "none"
 msgstr "ninguno"
 

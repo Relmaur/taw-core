@@ -26,11 +26,11 @@ use TAW\Core\OptionsPage\OptionsPage;
  *
  * Schema: see `resources/schema/content-interchange-1.4.json`.
  *
- * @phpstan-type Scope array{types?: list<string>, since?: string, posts?: list<int|string>, include_media?: bool, all_media?: bool, include_drafts?: bool, include_users?: bool, include_user_passwords?: bool, include_comments?: bool, include_settings?: bool, include_options?: bool, include_terms?: bool, meta_prefixes?: list<string>}
+ * @phpstan-type Scope array{types?: list<string>, since?: string, posts?: list<int|string>, include_media?: bool, all_media?: bool, include_drafts?: bool, include_users?: bool, include_user_passwords?: bool, include_comments?: bool, include_settings?: bool, include_options?: bool, include_terms?: bool, meta_prefixes?: list<string>, media_hashes?: bool}
  */
 class Exporter
 {
-    public const SCHEMA_VERSION = '1.7';
+    public const SCHEMA_VERSION = '1.8';
 
     /**
      * Core (non-`_taw_`) options included in every export. `page_on_front`
@@ -154,6 +154,7 @@ class Exporter
         $this->uploadsUrl = (string) preg_replace('#^https?:#', '', $uploadsUrl);
 
         $includeMedia = $scope['include_media'] ?? true;
+        $this->mediaHashes = !empty($scope['media_hashes']);
 
         // A scoped export (some posts) carries what those posts need: the
         // terms they use (and their parents), no options. Importing "just
@@ -981,7 +982,7 @@ class Exporter
             }
 
             $filename = $this->attachmentFilename($attId);
-            $out[] = [
+            $entry = [
                 'id'          => $attId,
                 'ref'         => $filename,
                 'filename'    => $filename,
@@ -992,8 +993,36 @@ class Exporter
                 'caption'     => $post->post_excerpt,
                 'mime'        => $post->post_mime_type,
             ];
+            if ($this->mediaHashes) {
+                $entry += self::fileFacts($attId);
+            }
+            $out[] = $entry;
         }
         return $out;
+    }
+
+    /** Whether media entries say what their file holds (scope `media_hashes`, 1.8). */
+    private bool $mediaHashes = false;
+
+    /**
+     * An attachment's original file (WordPress's `-scaled` copy is remade on
+     * each site): its path under uploads, sha256 and size. Empty when the
+     * file isn't on disk.
+     *
+     * @return array{file?: string, sha256?: string, bytes?: int}
+     */
+    private static function fileFacts(int $attId): array
+    {
+        $path = function_exists('wp_get_original_image_path') ? wp_get_original_image_path($attId) : false;
+        $path = is_string($path) && $path !== '' ? $path : get_attached_file($attId);
+        if (!is_string($path) || !is_file($path)) {
+            return [];
+        }
+        $uploads = wp_upload_dir();
+        $base = trailingslashit((string) $uploads['basedir']);
+        $relative = str_starts_with($path, $base) ? substr($path, strlen($base)) : wp_basename($path);
+
+        return ['file' => $relative, 'sha256' => (string) hash_file('sha256', $path), 'bytes' => (int) filesize($path)];
     }
 
     private function attachmentFilename(int $attId): string

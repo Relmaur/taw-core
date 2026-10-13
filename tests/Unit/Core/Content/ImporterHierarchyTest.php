@@ -199,7 +199,7 @@ final class ImporterHierarchyTest extends TestCase
         $this->page(2, 'team', 1);
         $input = $this->snapshot([$this->rec('about'), $this->rec('team')]);
 
-        $this->assertSame(['post:team' => ['parent' => ['status' => 'changed', 'old' => 'about', 'new' => '']]], $this->changes($input),
+        $this->assertSame(['post:team' => ['parent' => ['status' => 'changed', 'old' => 'about', 'new' => '', 'label' => 'Parent']]], $this->changes($input),
             'found by its slug (one page has it), and the parent shows as removed');
 
         (new Importer())->apply($input, ['rollback' => false]);
@@ -295,7 +295,7 @@ final class ImporterHierarchyTest extends TestCase
             ['slug' => 'old-parent', 'name' => 'Old-parent', 'description' => '', 'parent' => null, 'meta' => []],
         ]]);
 
-        $this->assertSame(['parent' => ['status' => 'changed', 'old' => 'old-parent', 'new' => '']], $this->changes($input)['term:orphan']);
+        $this->assertSame(['parent' => ['status' => 'changed', 'old' => 'old-parent', 'new' => '', 'label' => 'Parent']], $this->changes($input)['term:orphan']);
 
         $report = (new Importer())->apply($input, ['rollback' => false]);
 

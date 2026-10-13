@@ -214,16 +214,52 @@ class Importer
     /**
      * Dry run — a per-record, field-level diff. **Writes nothing.**
      *
+     * Every record carries its `record_key` (the one {@see self::keyOf()} gives, which
+     * `apply()`'s `keep` option and {@see Publish} use), a `hash` of its changes
+     * (old and new values: a reviewed record whose hash moved isn't the one
+     * reviewed), a `title`, and for a post here its `edit_url`. Each change
+     * carries a `label`; a field's also its `type`, `metabox_id`,
+     * `metabox_title`, `block_id` and `parent_group`.
+     *
+     * A change-set made with a base ({@see ChangeSet::between()} `with_base`)
+     * also says, per change, whether this site's value moved away from the
+     * base since (`conflict`; `null` when the base doesn't say) and whether the
+     * incoming one did (`local_changed`), with the `base` value.
+     *
+     * `$options['keep']` (`record key => [change key, …]`) leaves those values
+     * as this site has them: they aren't listed, and {@see self::apply()} with
+     * the same option doesn't write them.
+     *
+     * @param array<string, mixed> $input
+     * @param array{keep?: array<string, list<string>>} $options
+     * @return array{registry_drift: list<string>, records: list<array<string, mixed>>, warnings: list<string>}
+     */
+    public function plan(array $input, array $options = []): array
+    {
+        $this->keep = self::keepFrom($options['keep'] ?? []);
+
+        return $this->planRecords($input);
+    }
+
+    /**
      * @param array<string, mixed> $input
      * @return array{registry_drift: list<string>, records: list<array<string, mixed>>, warnings: list<string>}
      */
-    public function plan(array $input): array
+    private function planRecords(array $input): array
     {
         $this->warnings = [];
+        $this->withBase = is_array($input['taw_changeset'] ?? null) && isset($input['taw_changeset']['base_fingerprint']);
         $this->checkSchema($input);
         $this->rememberIncoming($input);
         $media = new MediaResolver();
         $media->build(is_array($input['media'] ?? null) ? $input['media'] : [], false);
+        // Files this import would bring: a field pointing at one still holds the source's ID.
+        $this->incomingMedia = [];
+        foreach ($media->outcomes() as $outcome) {
+            if ($outcome['status'] === 'would-sideload' && $outcome['id'] > 0) {
+                $this->incomingMedia[$outcome['id']] = $outcome['entry'] + ['path' => $outcome['path']];
+            }
+        }
         $this->featuredIds = self::featuredIds($input, $media->idMap());
         $this->refs = $this->buildRefMap($input, $media->idMap(), $media->missingIds());
 
@@ -246,9 +282,139 @@ class Importer
 
         return [
             'registry_drift' => $this->registryDrift($input),
-            'records'        => $records,
+            'records'        => array_map(fn (array $record): array => $this->finishRecord($record), $records),
             'warnings'       => $this->warnings,
         ];
+    }
+
+    /** @var array<int, array<string, mixed>> source attachment id => its media entry, for files this import would bring */
+    private array $incomingMedia = [];
+
+    /** @var array<string, string> uploads path => a file on disk to take instead of downloading */
+    private array $staged = [];
+
+    /** @var array<string, array<string, true>> record key => change keys left as this site has them */
+    private array $keep = [];
+
+    /** Whether the input is a change-set that carries its base records (conflicts can be told). */
+    private bool $withBase = false;
+
+    /**
+     * @param mixed $keep record key => list of change keys
+     * @return array<string, array<string, true>>
+     */
+    private static function keepFrom(mixed $keep): array
+    {
+        $out = [];
+        foreach (is_array($keep) ? $keep : [] as $record => $keys) {
+            foreach (is_array($keys) ? $keys : [] as $key) {
+                if (is_string($key) && $key !== '') {
+                    $out[(string) $record][$key] = true;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The change keys of $op's record left as this site has them.
+     *
+     * @param array<string, mixed> $op
+     * @return array<string, true>
+     */
+    private function kept(array $op): array
+    {
+        return $this->keep[self::keyOf($op)] ?? [];
+    }
+
+    /**
+     * A planned record's key and hash, its changes kept here dropped, and
+     * (with a base) whether anything in it conflicts.
+     *
+     * @param array<string, mixed> $record
+     * @return array<string, mixed>
+     */
+    private function finishRecord(array $record): array
+    {
+        $recordKey = self::keyOf($record);
+        $record['record_key'] = $recordKey;
+        $record['hash'] = self::changesHash($record);
+        $changes = is_array($record['changes'] ?? null) ? $record['changes'] : [];
+        $registered = match ((string) ($record['kind'] ?? '')) {
+            'post'  => Metabox::fieldsFor('post', (string) ($record['type'] ?? '')),
+            'term'  => Metabox::fieldsFor('term', (string) ($record['type'] ?? '')),
+            'user'  => Metabox::fieldsFor('user'),
+            default => [],
+        };
+        foreach ($changes as $k => $change) {
+            if (!is_array($change)) {
+                continue;
+            }
+            if (!isset($change['label'])) {
+                $change += self::labelFor((string) $k, $registered);
+                if (($record['kind'] ?? '') === 'option' && $k === 'value') {
+                    $change = array_merge($change, self::optionLabel((string) ($record['key'] ?? '')));
+                }
+            }
+            if ($this->withBase && !array_key_exists('conflict', $change)) {
+                // Media, menus, theme mods: no base to tell by. A new one conflicts with nothing.
+                $here = in_array($record['op'] ?? '', ['update', 'would-delete'], true) && ($record['kind'] ?? '') !== 'media';
+                $change += self::conflictOf($change, null, $here);
+            }
+            $changes[$k] = $change;
+        }
+        if (!isset($record['title'])) {
+            $name = (string) ($record['key'] ?? $recordKey);
+            $record['title'] = ($record['kind'] ?? '') === 'option' ? (string) (self::optionLabel($name)['label'] ?? $name) : $name;
+        }
+        foreach (array_keys($this->keep[$recordKey] ?? []) as $kept) {
+            unset($changes[$kept]);
+        }
+        $record['changes'] = $changes;
+        if ($this->withBase && !array_key_exists('conflict', $record)) {
+            $conflicts = array_map(static fn (mixed $c): mixed => is_array($c) && array_key_exists('conflict', $c) ? $c['conflict'] : false, $changes);
+            $record['conflict'] = in_array(true, $conflicts, true) ? true : (in_array(null, $conflicts, true) ? null : false);
+        }
+
+        return $record;
+    }
+
+    /**
+     * A record's changes as a hash: its op, and each change's status, old and
+     * new value (not labels or conflict flags), so a review and an apply
+     * that re-plans can tell whether a record still reads the same.
+     *
+     * @param array<string, mixed> $record
+     */
+    public static function changesHash(array $record): string
+    {
+        $canonical = ['op' => (string) ($record['op'] ?? '')];
+        foreach (is_array($record['changes'] ?? null) ? $record['changes'] : [] as $key => $change) {
+            $canonical['changes'][(string) $key] = is_array($change)
+                ? ['status' => $change['status'] ?? null, 'old' => $change['old'] ?? null, 'new' => $change['new'] ?? null]
+                : $change;
+        }
+
+        return hash('sha256', (string) json_encode(self::sortedForHash($canonical), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * @param array<mixed> $value
+     * @return array<mixed>
+     */
+    private static function sortedForHash(array $value): array
+    {
+        if (!array_is_list($value)) {
+            ksort($value);
+        }
+        foreach ($value as $k => $v) {
+            if (is_array($v)) {
+                $value[$k] = self::sortedForHash($v);
+            }
+        }
+
+        return $value;
     }
 
     /**
@@ -280,12 +446,19 @@ class Importer
      * `$options['rollback'] === false`). Only call after a reviewed
      * {@see self::plan()} / an explicit `--yes` / the admin confirm.
      *
+     * `$options['keep']` leaves those values as this site has them (see
+     * {@see self::plan()}); a record whose every change is kept is skipped.
+     * `$options['media']` (`MediaResolver::withStaged()`'s map) takes files
+     * from disk instead of downloading them.
+     *
      * @param array<string, mixed> $input
-     * @param array{policy?: string, rollback?: bool, include_settings?: bool} $options
+     * @param array{policy?: string, rollback?: bool, include_settings?: bool, keep?: array<string, list<string>>, media?: array<string, string>} $options
      * @return array<string, mixed>
      */
     public function apply(array $input, array $options = []): array
     {
+        $this->keep = self::keepFrom($options['keep'] ?? []);
+        $this->staged = is_array($options['media'] ?? null) ? array_map('strval', $options['media']) : [];
         // Content is written as the site has it, like an admin's save:
         // kses (on when the current user lacks unfiltered_html, as in a CLI
         // run) would strip embeds, SVG and forms and turn `&` into `&amp;`.
@@ -304,7 +477,7 @@ class Importer
 
     /**
      * @param array<string, mixed> $input
-     * @param array{policy?: string, rollback?: bool, include_settings?: bool} $options
+     * @param array{policy?: string, rollback?: bool, include_settings?: bool, keep?: array<string, list<string>>, media?: array<string, string>} $options
      * @return array<string, mixed>
      */
     private function run(array $input, array $options): array
@@ -375,7 +548,7 @@ class Importer
         // only settle on the next import). Sideloading writes attachments
         // only, never the records compared.
         $media = is_array($input['media'] ?? null) ? $input['media'] : [];
-        $resolver = new MediaResolver();
+        $resolver = (new MediaResolver())->withStaged($this->staged);
         $resolver->build($media, true);
         $idMap = $resolver->idMap();
         $report['media_sideloaded'] = $resolver->sideloadedCount();
@@ -391,8 +564,9 @@ class Importer
         $this->featuredIds = self::featuredIds($input, $idMap);
         if ($policy === 'update') {
             foreach ($this->planMedia($resolver->outcomes()) as $record) {
-                if (($record['op'] ?? '') === 'update' && !empty($record['changes'])) {
-                    $this->updateMedia((int) $record['local'], $record['changes']);
+                $changes = array_diff_key(is_array($record['changes'] ?? null) ? $record['changes'] : [], $this->keep[self::keyOf($record)] ?? []);
+                if (($record['op'] ?? '') === 'update' && $changes !== []) {
+                    $this->updateMedia((int) $record['local'], $changes);
                     $report['updated'][] = 'media:' . $record['key'];
                 }
             }
@@ -630,6 +804,13 @@ class Importer
         $records = [];
         foreach ($outcomes as $o) {
             $identity = ['kind' => 'media', 'key' => $o['path'], 'local' => $o['local']];
+            // What the file is (1.8): a publish uploads it by these.
+            if (($o['entry']['sha256'] ?? '') !== '') {
+                $identity['file'] = (string) ($o['entry']['file'] ?? $o['path']);
+                $identity['sha256'] = (string) $o['entry']['sha256'];
+                $identity['bytes'] = (int) ($o['entry']['bytes'] ?? 0);
+                $identity['mime'] = (string) ($o['entry']['mime'] ?? '');
+            }
             if ($o['status'] === 'would-sideload') {
                 $records[] = $identity + ['op' => 'create', 'changes' => ['file' => ['status' => 'new', 'new' => $o['url']]]];
                 continue;
@@ -745,17 +926,20 @@ class Importer
     {
         foreach ($this->secondPass as ['op' => $op, 'id' => $postId, 'label' => $label]) {
             $incoming = is_array($op['post'] ?? null) ? $op['post'] : [];
+            $kept = $this->kept($op);
             $this->refs()->takeUnresolved();
-            $result = wp_update_post(wp_slash([
-                'ID'           => $postId,
-                'post_content' => BlockRefs::rewrite((string) ($incoming['content'] ?? ''), $this->refs()),
-                'post_excerpt' => BlockRefs::rewrite((string) ($incoming['excerpt'] ?? ''), $this->refs()),
-            ]), true);
+            $update = ['ID' => $postId];
+            foreach (['content' => 'post_content', 'excerpt' => 'post_excerpt'] as $prop => $column) {
+                if (!isset($kept[$prop])) {
+                    $update[$column] = BlockRefs::rewrite((string) ($incoming[$prop] ?? ''), $this->refs());
+                }
+            }
+            $result = count($update) > 1 ? wp_update_post(wp_slash($update), true) : $postId;
             if (is_wp_error($result)) {
                 $this->warnings[] = "{$label}: second pass failed: " . $result->get_error_message();
                 continue;
             }
-            $this->writePostFields($postId, (string) ($op['target']['type'] ?? ''), is_array($incoming['fields'] ?? null) ? $incoming['fields'] : [], []);
+            $this->writePostFields($postId, (string) ($op['target']['type'] ?? ''), self::withoutKept(is_array($incoming['fields'] ?? null) ? $incoming['fields'] : [], $kept, 'fields.'), []);
             $unresolved = $this->refs()->takeUnresolved();
             if ($unresolved !== []) {
                 $this->warnings[] = "{$label}: references " . implode(', ', $unresolved) . " — not on this site, dropped.";
@@ -766,7 +950,7 @@ class Importer
         foreach ($this->termSecondPass as ['op' => $op, 'id' => $termId, 'label' => $label]) {
             $this->refs()->takeUnresolved();
             $fields = is_array($op['fields'] ?? null) ? $op['fields'] : [];
-            $this->writeTermFields($termId, (string) ($op['target']['type'] ?? ''), is_array($fields['fields'] ?? null) ? $fields['fields'] : []);
+            $this->writeTermFields($termId, (string) ($op['target']['type'] ?? ''), self::withoutKept(is_array($fields['fields'] ?? null) ? $fields['fields'] : [], $this->kept($op), 'fields.'));
             $unresolved = $this->refs()->takeUnresolved();
             if ($unresolved !== []) {
                 $this->warnings[] = "{$label}: references " . implode(', ', $unresolved) . " — not on this site, dropped.";
@@ -809,6 +993,18 @@ class Importer
      */
     private function recordKey(array $opOrRecord): string
     {
+        return self::keyOf($opOrRecord);
+    }
+
+    /**
+     * An operation's or a plan record's key (`post:page:about/team`,
+     * `term:category:news`, `option:_taw_footer`, `media:2024/05/hero.jpg`):
+     * what `keep`, a review and {@see Publish} name records by.
+     *
+     * @param array<string, mixed> $opOrRecord
+     */
+    public static function keyOf(array $opOrRecord): string
+    {
         $t = is_array($opOrRecord['target'] ?? null) ? $opOrRecord['target'] : $opOrRecord;
         $kind = (string) ($t['kind'] ?? '');
 
@@ -834,7 +1030,7 @@ class Importer
     private function unchangedRecordKeys(array $input): array
     {
         $keys = [];
-        foreach ($this->plan($input)['records'] as $record) {
+        foreach ($this->planRecords($input)['records'] as $record) {
             $changes = is_array($record['changes'] ?? null) ? $record['changes'] : [];
             if ($changes === [] && ($record['op'] ?? '') !== 'would-delete') {
                 $keys[$this->recordKey($record)] = true;
@@ -867,7 +1063,19 @@ class Importer
         }
 
         if ($explicitOp === 'delete') {
-            return $identity + ['op' => $existing ? 'would-delete' : 'skip'];
+            $record = $identity + ['op' => $existing ? 'would-delete' : 'skip', 'title' => (string) ($existing->post_title ?? $slug)];
+            if ($existing) {
+                $record['edit_url'] = self::editUrl((int) $existing->ID);
+            }
+            if ($this->withBase && $existing) {
+                // Deleting a page changed here since the base loses that change.
+                $base = is_array($op['base'] ?? null) ? $op['base'] : null;
+                $record['conflict'] = $base === null ? null : array_filter(
+                    ['title', 'content', 'excerpt', 'status'],
+                    fn (string $prop): bool => array_key_exists($prop, $base) && !self::sameValue($this->currentPostProp($existing, $prop), $base[$prop])
+                ) !== [];
+            }
+            return $record;
         }
 
         $changes = [];
@@ -997,10 +1205,287 @@ class Importer
             $changes['links'] = ['status' => 'changed', 'old' => null, 'new' => $pending];
         }
 
-        return $identity + [
-            'op' => $existing ? 'update' : 'create',
-            'changes' => $changes,
+        $record = $identity + [
+            'op'      => $existing ? 'update' : 'create',
+            'title'   => (string) ($incoming['title'] ?? ($existing->post_title ?? $slug)),
+            'changes' => $this->describePost($changes, $op, $existing ?: null, $registered),
         ];
+        if ($existing) {
+            $record['edit_url'] = self::editUrl((int) $existing->ID);
+        }
+
+        return $record;
+    }
+
+    /* -----------------------------------------------------------------
+     * Plan details: labels, and conflicts against a base (1.98)
+     * ----------------------------------------------------------------- */
+
+    /** Where a post is edited in wp-admin ('' outside a request that can say). */
+    private static function editUrl(int $postId): string
+    {
+        return function_exists('get_edit_post_link') ? (string) get_edit_post_link($postId, 'raw') : '';
+    }
+
+    /** Labels of a record's own values (fields carry theirs). */
+    private const LABELS = [
+        'title' => 'Title', 'excerpt' => 'Excerpt', 'content' => 'Content', 'status' => 'Status',
+        'menu_order' => 'Order', 'template' => 'Template', 'comment_status' => 'Comments',
+        'ping_status' => 'Pingbacks', 'password' => 'Password', 'parent' => 'Parent', 'date' => 'Date',
+        'author' => 'Author', 'featured_media' => 'Featured image', 'links' => 'Links to pages this brings',
+        'name' => 'Name', 'description' => 'Description', 'value' => 'Value', 'items' => 'Menu items',
+        'file' => 'File', 'alt' => 'Alt text', 'caption' => 'Caption', 'display_name' => 'Display name',
+        'roles' => 'Roles', 'user' => 'User', 'comment' => 'Comment',
+    ];
+
+    /** A post's own values, compared as they're stored. */
+    private const POST_PROPS = ['title', 'excerpt', 'content', 'status', 'menu_order', 'template', 'comment_status', 'ping_status', 'password', 'parent'];
+
+    /**
+     * What a change key is, for people: its label, and for a TAW field its
+     * type, fieldset and block.
+     *
+     * @param array<string, array<string, mixed>> $registered meta key => field config
+     * @return array<string, mixed>
+     */
+    private static function labelFor(string $key, array $registered): array
+    {
+        if (str_starts_with($key, 'fields.')) {
+            $config = FieldKeys::forKey(substr($key, 7), $registered, self::bareConfigLookup())['config'];
+            $out = [
+                'label'         => (string) (($config['label'] ?? '') !== '' ? $config['label'] : substr($key, 7)),
+                'type'          => (string) ($config['type'] ?? 'text'),
+                'metabox_id'    => $config['metabox_id'] ?? null,
+                'metabox_title' => $config['metabox_title'] ?? null,
+                'block_id'      => $config['block_id'] ?? null,
+                'parent_group'  => $config['parent_group'] ?? null,
+            ];
+
+            return array_filter($out, static fn (mixed $v): bool => $v !== null && $v !== '');
+        }
+        if (str_starts_with($key, 'terms.')) {
+            $taxonomy = function_exists('get_taxonomy') ? get_taxonomy(substr($key, 6)) : false;
+            return ['label' => $taxonomy instanceof \WP_Taxonomy ? (string) $taxonomy->labels->name : substr($key, 6)];
+        }
+        if (str_starts_with($key, 'meta.')) {
+            return ['label' => substr($key, 5)];
+        }
+
+        return ['label' => self::LABELS[$key] ?? $key];
+    }
+
+    /**
+     * An option's label: a TAW options-page field's own (`label`, `type`,
+     * `option_page_title`), else the option's name.
+     *
+     * @return array<string, mixed>
+     */
+    private static function optionLabel(string $option): array
+    {
+        $config = str_starts_with($option, '_taw_') && class_exists(\TAW\Core\OptionsPage\OptionsPage::class)
+            ? (\TAW\Core\OptionsPage\OptionsPage::getFieldRegistry()[$option] ?? null)
+            : null;
+        if (!is_array($config)) {
+            return ['label' => $option];
+        }
+
+        return array_filter([
+            'label'             => (string) (($config['label'] ?? '') !== '' ? $config['label'] : $option),
+            'type'              => (string) ($config['type'] ?? 'text'),
+            'option_page_title' => $config['option_page_title'] ?? null,
+        ], static fn (mixed $v): bool => $v !== null && $v !== '');
+    }
+
+    /**
+     * @param array<string, array<string, mixed>>  $changes
+     * @param array<string, mixed>                 $op
+     * @param array<string, array<string, mixed>>  $registered
+     * @return array<string, array<string, mixed>>
+     */
+    private function describePost(array $changes, array $op, ?\WP_Post $existing, array $registered): array
+    {
+        $base = is_array($op['base'] ?? null) ? $op['base'] : null;
+        foreach ($changes as $key => $change) {
+            $key = (string) $key;
+            $change += self::labelFor($key, $registered);
+            if (in_array($change['type'] ?? '', ['image', 'files'], true) || $key === 'featured_media') {
+                $change['media'] = $this->mediaFacts($change, $key === 'featured_media');
+            }
+            if ($this->withBase) {
+                $here = $existing !== null && $key !== 'links';
+                $sides = $here && $base !== null ? $this->postSides($key, $change, $existing, $base, $registered) : null;
+                $change += self::conflictOf($change, $sides, $here);
+            }
+            $changes[$key] = $change;
+        }
+
+        return $changes;
+    }
+
+    /**
+     * The files an image, files or featured-image change is about, so a
+     * review can show them: each side's `{id, file, url}`, the incoming side's
+     * marked `incoming` when it's a file this import brings (its id is then
+     * the source's).
+     *
+     * @param array<string, mixed> $change
+     * @return array{old: list<array<string, mixed>>, new: list<array<string, mixed>>}
+     */
+    private function mediaFacts(array $change, bool $byFilename): array
+    {
+        $side = function (mixed $value, bool $incoming) use ($byFilename): array {
+            $out = [];
+            foreach (is_array($value) ? $value : [$value] as $ref) {
+                if ($byFilename) {
+                    $name = (string) $ref;
+                    if ($name === '') {
+                        continue;
+                    }
+                    $local = $incoming ? ($this->featuredIds[$name] ?? 0) : 0;
+                    $entry = null;
+                    foreach ($incoming ? $this->incomingMedia : [] as $candidate) {
+                        if ((string) ($candidate['filename'] ?? '') === $name) {
+                            $entry = $candidate;
+                        }
+                    }
+                    $out[] = $entry !== null ? self::incomingFile($entry) : ($local > 0 ? self::localFile($local) : ['file' => $name]);
+                    continue;
+                }
+                $id = (int) (is_array($ref) ? ($ref['id'] ?? 0) : $ref);
+                if ($id <= 0) {
+                    continue;
+                }
+                $out[] = $incoming && isset($this->incomingMedia[$id]) ? self::incomingFile($this->incomingMedia[$id]) : self::localFile($id);
+            }
+
+            return $out;
+        };
+
+        return ['old' => $side($change['old'] ?? null, false), 'new' => $side($change['new'] ?? null, true)];
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     * @return array<string, mixed>
+     */
+    private static function incomingFile(array $entry): array
+    {
+        return array_filter([
+            'id'       => (int) ($entry['id'] ?? 0),
+            'file'     => (string) ($entry['file'] ?? $entry['path'] ?? $entry['filename'] ?? ''),
+            'url'      => (string) ($entry['url'] ?? ''),
+            'sha256'   => (string) ($entry['sha256'] ?? ''),
+            'incoming' => true,
+        ], static fn (mixed $v): bool => $v !== '' && $v !== 0);
+    }
+
+    /** @return array<string, mixed> */
+    private static function localFile(int $id): array
+    {
+        $url = function_exists('wp_get_attachment_url') ? wp_get_attachment_url($id) : false;
+        $file = function_exists('get_post_meta') ? get_post_meta($id, '_wp_attached_file', true) : '';
+
+        return array_filter(['id' => $id, 'file' => is_string($file) ? $file : '', 'url' => is_string($url) ? $url : ''],
+            static fn (mixed $v): bool => $v !== '' && $v !== 0);
+    }
+
+    /**
+     * A post value as this site has it now, as the base had it, and as it
+     * comes, in the form each is compared in; null when the base doesn't
+     * carry it.
+     *
+     * @param array<string, mixed>                $change
+     * @param array<string, mixed>                $base   the base's post record (this site's export)
+     * @param array<string, array<string, mixed>> $registered
+     * @return array{now: mixed, base: mixed, new: mixed}|null
+     */
+    private function postSides(string $key, array $change, \WP_Post $existing, array $base, array $registered): ?array
+    {
+        $new = $change['new'] ?? null;
+        if (in_array($key, self::POST_PROPS, true)) {
+            return array_key_exists($key, $base) ? ['now' => $this->currentPostProp($existing, $key), 'base' => $base[$key] ?? '', 'new' => $new] : null;
+        }
+        if ($key === 'date') {
+            return array_key_exists('date', $base) ? ['now' => (string) $existing->post_date_gmt, 'base' => self::realDate($base['date']), 'new' => self::realDate($new)] : null;
+        }
+        if ($key === 'author') {
+            return array_key_exists('author', $base) && $base['author'] !== null
+                ? ['now' => (int) $existing->post_author, 'base' => $this->resolveLocalUserId($base['author']), 'new' => is_int($new) ? $new : $this->resolveLocalUserId($new)]
+                : null;
+        }
+        if ($key === 'featured_media') {
+            $thumb = (int) get_post_thumbnail_id($existing);
+            return array_key_exists('featured_media', $base)
+                ? ['now' => $thumb > 0 ? MediaResolver::attachmentFilename($thumb) : '', 'base' => $base['featured_media'] ?? '', 'new' => $new]
+                : null;
+        }
+        if (str_starts_with($key, 'terms.')) {
+            $taxonomy = substr($key, 6);
+            if (!is_array($base['terms'] ?? null) || !array_key_exists($taxonomy, $base['terms'])) {
+                return null;
+            }
+            $was = array_map('strval', array_values((array) $base['terms'][$taxonomy]));
+            sort($was);
+            $current = wp_get_object_terms($existing->ID, $taxonomy, ['fields' => 'slugs']);
+            $now = is_array($current) ? array_map('strval', $current) : [];
+            sort($now);
+            return ['now' => $now, 'base' => $was, 'new' => $new];
+        }
+        if (str_starts_with($key, 'meta.')) {
+            $metaKey = substr($key, 5);
+            return ['now' => get_post_meta($existing->ID, $metaKey, true), 'base' => is_array($base['meta'] ?? null) ? ($base['meta'][$metaKey] ?? '') : '', 'new' => $new];
+        }
+        if (str_starts_with($key, 'fields.')) {
+            $target = FieldKeys::forKey(substr($key, 7), $registered, self::bareConfigLookup());
+            $config = $target['config'];
+            $baseFields = is_array($base['fields'] ?? null) ? $base['fields'] : [];
+            return [
+                'now'  => FieldCodec::decode($config, get_post_meta($existing->ID, $target['meta_key'], true)),
+                'base' => FieldCodec::decode($config, $baseFields[substr($key, 7)] ?? ''),
+                'new'  => $new,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether this site's value moved away from the base since (`conflict`)
+     * and whether the incoming one did (`local_changed`). A record this site
+     * hasn't got conflicts with nothing; a value the base doesn't carry is
+     * `conflict: null`: there's no telling.
+     *
+     * @param array<string, mixed>                         $change
+     * @param array{now: mixed, base: mixed, new: mixed}|null $sides
+     * @return array<string, mixed>
+     */
+    private static function conflictOf(array $change, ?array $sides, bool $here): array
+    {
+        if (!$here) {
+            return ['conflict' => false, 'local_changed' => true];
+        }
+        if ($sides === null) {
+            return ['conflict' => null, 'local_changed' => true];
+        }
+
+        return [
+            'base'          => $sides['base'],
+            'conflict'      => !self::sameValue($sides['now'], $sides['base']),
+            'local_changed' => !self::sameValue($sides['new'], $sides['base']),
+        ];
+    }
+
+    /** Two values that store the same: empties alike, scalars as strings, arrays by content. */
+    private static function sameValue(mixed $a, mixed $b): bool
+    {
+        if (self::isEmptyValue($a) && self::isEmptyValue($b)) {
+            return true;
+        }
+        if (is_scalar($a) && is_scalar($b)) {
+            return (string) $a === (string) $b;
+        }
+
+        return self::valueKey($a) === self::valueKey($b);
     }
 
     /**
@@ -1056,11 +1541,23 @@ class Importer
             return ['kind' => 'option', 'key' => $key, 'op' => 'update', 'changes' => []];
         }
 
+        $change = ['status' => $exists ? 'changed' : 'new', 'old' => $currentRaw, 'new' => $incoming];
+        if ($this->withBase) {
+            $base = is_array($op['base'] ?? null) && array_key_exists('value', $op['base']) ? $op['base']['value'] : null;
+            $sides = $exists && is_array($op['base'] ?? null) && array_key_exists('value', $op['base'])
+                ? ['now' => $this->optionCompareKey($key, $currentRaw), 'base' => $this->optionCompareKey($key, $base), 'new' => $this->optionCompareKey($key, $incoming)]
+                : null;
+            $change += self::conflictOf($change, $sides, $exists);
+            if ($sides !== null) {
+                $change['base'] = $base;
+            }
+        }
+
         return [
             'kind'    => 'option',
             'key'     => $key,
             'op'      => $exists ? 'update' : 'create',
-            'changes' => ['value' => ['status' => $exists ? 'changed' : 'new', 'old' => $currentRaw, 'new' => $incoming]],
+            'changes' => ['value' => $change],
         ];
     }
 
@@ -1133,8 +1630,51 @@ class Importer
             $changes['links'] = ['status' => 'changed', 'old' => null, 'new' => $pending];
         }
 
+        if ($this->withBase) {
+            $base = is_array($op['base'] ?? null) ? $op['base'] : null;
+            foreach ($changes as $key => $change) {
+                $here = $existing instanceof \WP_Term && $key !== 'links';
+                $sides = $here && $base !== null ? $this->termSides((string) $key, $change, $existing, $base, $registered) : null;
+                $changes[$key] = $change + self::conflictOf($change, $sides, $here);
+            }
+        }
+
         return ['kind' => 'term', 'type' => $taxonomy, 'slug' => $slug,
-                'op' => $existing ? 'update' : 'create', 'changes' => $changes];
+                'op' => $existing ? 'update' : 'create', 'title' => (string) ($fields['name'] ?? ($existing->name ?? $slug)), 'changes' => $changes];
+    }
+
+    /**
+     * A term value now, in the base and incoming (see {@see self::postSides()}).
+     *
+     * @param array<string, mixed>                $change
+     * @param array<string, mixed>                $base
+     * @param array<string, array<string, mixed>> $registered
+     * @return array{now: mixed, base: mixed, new: mixed}|null
+     */
+    private function termSides(string $key, array $change, \WP_Term $existing, array $base, array $registered): ?array
+    {
+        $new = $change['new'] ?? null;
+        if (in_array($key, ['name', 'description'], true)) {
+            return array_key_exists($key, $base) ? ['now' => $existing->{$key}, 'base' => $base[$key], 'new' => $new] : null;
+        }
+        if ($key === 'parent') {
+            return array_key_exists('parent', $base) ? ['now' => $this->termParentSlug($existing), 'base' => (string) ($base['parent'] ?? ''), 'new' => $new] : null;
+        }
+        if (str_starts_with($key, 'meta.')) {
+            $metaKey = substr($key, 5);
+            return ['now' => get_term_meta($existing->term_id, $metaKey, true), 'base' => is_array($base['meta'] ?? null) ? ($base['meta'][$metaKey] ?? '') : '', 'new' => $new];
+        }
+        if (str_starts_with($key, 'fields.')) {
+            $target = FieldKeys::forKey(substr($key, 7), $registered, self::bareConfigLookup());
+            $baseFields = is_array($base['fields'] ?? null) ? $base['fields'] : [];
+            return [
+                'now'  => FieldCodec::decode($target['config'], get_term_meta($existing->term_id, $target['meta_key'], true)),
+                'base' => FieldCodec::decode($target['config'], $baseFields[substr($key, 7)] ?? ''),
+                'new'  => $new,
+            ];
+        }
+
+        return null;
     }
 
     /**
@@ -1307,7 +1847,7 @@ class Importer
             }
             return ['bucket' => 'skipped', 'label' => $label];
         }
-        if ($policy === 'skip' || ($menu instanceof \WP_Term && $policy === 'create')) {
+        if ($policy === 'skip' || ($menu instanceof \WP_Term && ($policy === 'create' || $this->kept($op) !== []))) {
             return ['bucket' => 'skipped', 'label' => $label];
         }
 
@@ -1440,7 +1980,7 @@ class Importer
     {
         $key = (string) ($op['target']['key'] ?? '');
         $label = "theme_mod:{$key}";
-        if (!in_array($key, Exporter::THEME_MOD_ALLOWLIST, true) || $policy === 'skip' || ($op['op'] ?? 'update') !== 'update') {
+        if (!in_array($key, Exporter::THEME_MOD_ALLOWLIST, true) || $policy === 'skip' || ($op['op'] ?? 'update') !== 'update' || $this->kept($op) !== []) {
             return ['bucket' => 'skipped', 'label' => $label];
         }
         $value = $this->localThemeMod($key, $op['fields']['value'] ?? null);
@@ -1651,6 +2191,16 @@ class Importer
             }
         }
 
+        // Values kept as this site has them: wp_update_post() keeps what isn't passed.
+        $kept = $existing ? $this->kept($op) : [];
+        foreach (self::KEEP_COLUMNS as $prop => $columns) {
+            if (isset($kept[$prop])) {
+                foreach ($columns as $column) {
+                    unset($postArr[$column]);
+                }
+            }
+        }
+
         if ($existing) {
             $postArr['ID'] = $existing->ID;
             $result = wp_update_post(wp_slash($postArr), true);
@@ -1668,17 +2218,19 @@ class Importer
         $postId = (int) $result;
         $this->claimSlug($postId, $slug, $label);
 
-        if (array_key_exists('template', $incoming)) {
+        if (array_key_exists('template', $incoming) && !isset($kept['template'])) {
             $tpl = (string) ($incoming['template'] ?? '');
             $tpl === '' ? delete_post_meta($postId, '_wp_page_template') : update_post_meta($postId, '_wp_page_template', $tpl);
         }
 
-        $this->writePostFields($postId, $type, is_array($incoming['fields'] ?? null) ? $incoming['fields'] : [], $idMap);
-        foreach (is_array($incoming['meta'] ?? null) ? $incoming['meta'] : [] as $metaKey => $value) {
+        $this->writePostFields($postId, $type, self::withoutKept(is_array($incoming['fields'] ?? null) ? $incoming['fields'] : [], $kept, 'fields.'), $idMap);
+        foreach (self::withoutKept(is_array($incoming['meta'] ?? null) ? $incoming['meta'] : [], $kept, 'meta.') as $metaKey => $value) {
             update_post_meta($postId, (string) $metaKey, wp_slash(FieldCodec::rewriteStrings($value, $this->refs())));
         }
-        $this->writePostTerms($postId, is_array($incoming['terms'] ?? null) ? $incoming['terms'] : []);
-        if (array_key_exists('featured_media', $incoming) && empty($incoming['featured_media'])) {
+        $this->writePostTerms($postId, self::withoutKept(is_array($incoming['terms'] ?? null) ? $incoming['terms'] : [], $kept, 'terms.'));
+        if (isset($kept['featured_media'])) {
+            // As this site has it.
+        } elseif (array_key_exists('featured_media', $incoming) && empty($incoming['featured_media'])) {
             // No featured image at the source: remove this site's.
             if ((int) get_post_thumbnail_id($postId) > 0) {
                 delete_post_thumbnail($postId);
@@ -1696,6 +2248,30 @@ class Importer
         }
 
         return ['bucket' => $bucket, 'label' => $label];
+    }
+
+    /** The wp_insert_post() columns each of a post's own values is written through. */
+    private const KEEP_COLUMNS = [
+        'title' => ['post_title'], 'excerpt' => ['post_excerpt'], 'content' => ['post_content'],
+        'status' => ['post_status'], 'menu_order' => ['menu_order'], 'comment_status' => ['comment_status'],
+        'ping_status' => ['ping_status'], 'password' => ['post_password'], 'author' => ['post_author'],
+        'parent' => ['post_parent'], 'date' => ['post_date', 'post_date_gmt', 'edit_date'],
+    ];
+
+    /**
+     * $values without the keys kept as this site has them (`$prefix` + key).
+     *
+     * @param array<array-key, mixed> $values
+     * @param array<string, true>     $kept
+     * @return array<array-key, mixed>
+     */
+    private static function withoutKept(array $values, array $kept, string $prefix): array
+    {
+        if ($kept === []) {
+            return $values;
+        }
+
+        return array_filter($values, static fn (mixed $_, int|string $key): bool => !isset($kept[$prefix . $key]), ARRAY_FILTER_USE_BOTH);
     }
 
     /**
@@ -1777,7 +2353,7 @@ class Importer
             delete_option($key);
             return ['bucket' => 'deleted', 'label' => "option:{$key}"];
         }
-        if ($explicitOp === 'skip' || $policy === 'skip' || ($exists && $policy === 'create')) {
+        if ($explicitOp === 'skip' || $policy === 'skip' || ($exists && $policy === 'create') || isset($this->kept($op)['value'])) {
             return ['bucket' => 'skipped', 'label' => "option:{$key}"];
         }
 
@@ -1837,12 +2413,13 @@ class Importer
             return ['bucket' => 'skipped', 'label' => $label];
         }
 
+        $kept = $existing ? $this->kept($op) : [];
         $args = [
-            'description' => (string) ($fields['description'] ?? ($existing->description ?? '')),
+            'description' => isset($kept['description']) ? (string) $existing->description : (string) ($fields['description'] ?? ($existing->description ?? '')),
         ];
         // Parents run before their children (see sortByDependencyOrder).
         // None at the source clears it.
-        if (array_key_exists('parent', $fields)) {
+        if (array_key_exists('parent', $fields) && !isset($kept['parent'])) {
             $ref = (string) ($fields['parent'] ?? '');
             $parent = $ref === '' ? false : get_term_by('slug', $ref, $taxonomy);
             if ($ref === '' || $parent instanceof \WP_Term) {
@@ -1853,7 +2430,7 @@ class Importer
         }
 
         if ($existing) {
-            $args['name'] = (string) ($fields['name'] ?? $existing->name);
+            $args['name'] = isset($kept['name']) ? (string) $existing->name : (string) ($fields['name'] ?? $existing->name);
             wp_update_term($existing->term_id, $taxonomy, $args);
             $bucket = 'updated';
         } else {
@@ -1866,11 +2443,11 @@ class Importer
         }
 
         $termId = $existing ? (int) $existing->term_id : (int) $created['term_id'];
-        foreach (is_array($fields['meta'] ?? null) ? $fields['meta'] : [] as $metaKey => $value) {
+        foreach (self::withoutKept(is_array($fields['meta'] ?? null) ? $fields['meta'] : [], $kept, 'meta.') as $metaKey => $value) {
             update_term_meta($termId, (string) $metaKey, wp_slash($this->termMetaValue($value)));
         }
         $this->refs()->takeUnresolved();
-        $this->writeTermFields($termId, $taxonomy, is_array($fields['fields'] ?? null) ? $fields['fields'] : []);
+        $this->writeTermFields($termId, $taxonomy, self::withoutKept(is_array($fields['fields'] ?? null) ? $fields['fields'] : [], $kept, 'fields.'));
 
         // Terms run before posts: a field pointing at a page this run
         // creates resolves on the second pass, like a post's.
@@ -2487,7 +3064,7 @@ class Importer
     }
 
     /** The private folder for rollback snapshots and journals ('' when it can't be made). */
-    private static function privateDir(): string
+    public static function privateDir(): string
     {
         $uploads = wp_upload_dir();
         $dir = trailingslashit((string) $uploads['basedir']) . 'taw-private';
@@ -2624,5 +3201,54 @@ class Importer
         rename($found['path'], dirname($found['path']) . '/undone-' . basename($found['path']));
 
         return $result + ['journal' => $found['path'], 'error' => null];
+    }
+
+    /**
+     * What {@see self::undo()} would do now, writing nothing.
+     *
+     * @return array{restored: int, deleted: int, recreated: int, kept: list<string>, journal: ?string, error: ?string}
+     */
+    public function undoPreview(string $journal = ''): array
+    {
+        $found = $journal === '' ? self::latestJournal() : self::readJournal($journal);
+        if ($found === null) {
+            return ['restored' => 0, 'deleted' => 0, 'recreated' => 0, 'kept' => [], 'journal' => null,
+                'error' => $journal === '' ? 'No import to undo.' : "That isn't an import journal in uploads/taw-private: {$journal}"];
+        }
+
+        return ImportJournal::preview($found['entries'], new WpRecords()) + ['journal' => $found['path'], 'error' => null];
+    }
+
+    /**
+     * Every import journal, newest first: undone ones too (`undone: true`).
+     *
+     * @return list<array{file: string, created_at: string, source: ?string, counts: array{updated: int, created: int, deleted: int}, undone: bool}>
+     */
+    public static function journals(): array
+    {
+        $dir = self::privateDir();
+        $files = $dir === '' ? [] : array_merge(
+            glob($dir . '/' . self::JOURNAL_PREFIX . '*.json') ?: [],
+            glob($dir . '/undone-' . self::JOURNAL_PREFIX . '*.json') ?: []
+        );
+        $out = [];
+        foreach ($files as $file) {
+            $data = json_decode((string) file_get_contents($file), true);
+            if (!is_array($data) || !is_array($data['entries'] ?? null)) {
+                continue;
+            }
+            $counts = ['updated' => 0, 'created' => 0, 'deleted' => 0];
+            foreach ($data['entries'] as $entry) {
+                $action = is_array($entry) ? (string) ($entry['action'] ?? '') : '';
+                if (isset($counts[$action])) {
+                    $counts[$action]++;
+                }
+            }
+            $out[] = ['file' => basename($file), 'created_at' => (string) ($data['created_at'] ?? ''), 'source' => isset($data['source']) ? (string) $data['source'] : null,
+                'counts' => $counts, 'undone' => str_starts_with(basename($file), 'undone-')];
+        }
+        usort($out, static fn (array $a, array $b): int => strcmp($b['created_at'], $a['created_at']) ?: strcmp($b['file'], $a['file']));
+
+        return $out;
     }
 }

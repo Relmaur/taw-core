@@ -46,6 +46,9 @@ class ContentImportCommand extends Command
                   <info>taw content:import changes.json --yes --policy=create</info>  create new records only, skip existing
                   <info>taw content:import --undo</info>                 preview undoing the last import
                   <info>taw content:import --undo --yes</info>           undo it (values edited since are kept)
+                  <info>taw content:import local.json --base=prod.json</info>  only what changed since prod.json, with what this site changed since (conflicts)
+                  <info>taw content:import changes.json --keep=post:page:about:fields.hero_heading --yes</info>  leave that value as this site has it
+                  <info>taw content:import changes.json --staged=uploaded/ --yes</info>  take media files from a folder (by their path under uploads) instead of downloading
                 HELP)
             ->addArgument('file', InputArgument::OPTIONAL, 'Path to the snapshot / change-set JSON')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Force dry-run even if --yes is given')
@@ -54,7 +57,10 @@ class ContentImportCommand extends Command
             ->addOption('with-settings', null, InputOption::VALUE_NONE, 'Also apply environment-settings options (permalink_structure, timezone, sticky_posts, …) — skipped by default')
             ->addOption('user', null, InputOption::VALUE_REQUIRED, 'Import as this user (login, email or ID); default: the first administrator')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Output the plan/report as JSON')
-            ->addOption('undo', null, InputOption::VALUE_OPTIONAL, 'Undo an import from its journal (default: the last one); with --yes', false);
+            ->addOption('undo', null, InputOption::VALUE_OPTIONAL, 'Undo an import from its journal (default: the last one); with --yes', false)
+            ->addOption('base', null, InputOption::VALUE_REQUIRED, "A snapshot of this site the file was made against: import only what changed since, and show what this site changed since (conflicts)")
+            ->addOption('keep', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, "Leave a value as this site has it: <record key>:<change key> (repeatable; keys as the plan's record_key and change names)")
+            ->addOption('staged', null, InputOption::VALUE_REQUIRED, 'A folder holding media files by their path under uploads (yyyy/mm/name): taken instead of downloaded');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -77,6 +83,29 @@ class ContentImportCommand extends Command
                 $io->error('That file is not valid JSON.');
                 return Command::FAILURE;
             }
+            $baseFile = (string) $input->getOption('base');
+            if ($baseFile !== '') {
+                $base = is_readable($baseFile) ? json_decode((string) file_get_contents($baseFile), true) : null;
+                if (!is_array($base)) {
+                    $io->error("Cannot read the base snapshot: {$baseFile}");
+                    return Command::FAILURE;
+                }
+                $data = \TAW\Core\Content\ChangeSet::between($base, $data, ['with_base' => true]);
+            }
+        }
+        $keep = self::keepOption((array) $input->getOption('keep'));
+        if ($keep === null) {
+            $io->error('--keep is <record key>:<change key>, e.g. post:page:about:fields.hero_heading');
+            return Command::FAILURE;
+        }
+        $staged = [];
+        $stagedDir = (string) $input->getOption('staged');
+        if ($stagedDir !== '') {
+            if (!is_dir($stagedDir)) {
+                $io->error("No such folder: {$stagedDir}");
+                return Command::FAILURE;
+            }
+            $staged = self::stagedFiles($stagedDir);
         }
 
         $policy = (string) $input->getOption('policy');
@@ -115,7 +144,7 @@ class ContentImportCommand extends Command
             return $this->undo($io, $output, $importer, is_string($undo) ? $undo : '', $apply, $asJson);
         }
 
-        $plan = $importer->plan($data);
+        $plan = $importer->plan($data, ['keep' => $keep]);
 
         if (!$apply) {
             $this->renderPlan($io, $output, $plan, $asJson);
@@ -128,6 +157,8 @@ class ContentImportCommand extends Command
         $report = $importer->apply($data, [
             'policy'           => $policy,
             'include_settings' => (bool) $input->getOption('with-settings'),
+            'keep'             => $keep,
+            'media'            => $staged,
         ]);
 
         $ok = $report['error'] === null && $report['failed'] === [];
@@ -180,14 +211,21 @@ class ContentImportCommand extends Command
         }
 
         if (!$apply) {
-            $counts = array_count_values(array_map(static fn (array $e): string => (string) ($e['action'] ?? ''), $found['entries']));
+            $preview = $importer->undoPreview($found['path']);
+            if ($asJson) {
+                $output->writeln((string) json_encode($preview, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+                return Command::SUCCESS;
+            }
             $io->text(sprintf('<info>%s</info> — import of %s, %s', basename($found['path']), $found['source'] ?? 'a file', $found['created_at']));
             $io->definitionList(
-                ['Records it updated' => (string) ($counts['updated'] ?? 0)],
-                ['Records it created (deleted on undo)' => (string) ($counts['created'] ?? 0)],
-                ['Records it deleted (restored on undo)' => (string) ($counts['deleted'] ?? 0)],
+                ['Values put back' => (string) $preview['restored']],
+                ['Records it created, deleted' => (string) $preview['deleted']],
+                ['Records it deleted, recreated' => (string) $preview['recreated']],
             );
-            $io->note('Preview — nothing was changed. Re-run with --yes to undo. Values edited since the import are kept.');
+            foreach ($preview['kept'] as $kept) {
+                $io->warning("Kept: {$kept}");
+            }
+            $io->note('Preview — nothing was changed. Re-run with --yes to undo.');
             return Command::SUCCESS;
         }
 
@@ -206,6 +244,48 @@ class ContentImportCommand extends Command
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * `--keep` values as `record key => [change key]`; null when one isn't
+     * `<record key>:<change key>`. The change key is what follows the last
+     * colon (record keys have colons, change keys don't).
+     *
+     * @param list<mixed> $values
+     * @return array<string, list<string>>|null
+     */
+    public static function keepOption(array $values): ?array
+    {
+        $keep = [];
+        foreach ($values as $value) {
+            $value = (string) $value;
+            $at = strrpos($value, ':');
+            if ($at === false || $at === 0 || $at === strlen($value) - 1) {
+                return null;
+            }
+            $keep[substr($value, 0, $at)][] = substr($value, $at + 1);
+        }
+
+        return $keep;
+    }
+
+    /**
+     * Every file under $dir, by its path relative to it (`2024/05/hero.jpg`).
+     *
+     * @return array<string, string>
+     */
+    public static function stagedFiles(string $dir): array
+    {
+        $root = rtrim((string) realpath($dir), '/');
+        $out = [];
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS));
+        foreach ($files as $file) {
+            if ($file instanceof \SplFileInfo && $file->isFile()) {
+                $out[substr($file->getPathname(), strlen($root) + 1)] = $file->getPathname();
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -230,7 +310,12 @@ class ContentImportCommand extends Command
             }
             $summary = [];
             foreach ($changes as $field => $delta) {
-                $summary[] = $field . ': ' . ($delta['status'] ?? '');
+                $label = (string) ($delta['label'] ?? $field);
+                if (($delta['metabox_title'] ?? '') !== '') {
+                    $label = $delta['metabox_title'] . ' › ' . $label;
+                }
+                $conflict = ($delta['conflict'] ?? false) === true ? ' (changed here too)' : '';
+                $summary[] = $label . ': ' . ($delta['status'] ?? '') . $conflict;
             }
             $rows[] = [
                 ($record['kind'] ?? '') . ':' . ($record['type'] ?? $record['key'] ?? '') . ':' . ($record['slug'] ?? ''),

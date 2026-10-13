@@ -60,6 +60,7 @@ class ContentExportCommand extends Command
             ->addOption('with-options', null, InputOption::VALUE_NONE, 'With --posts/--types/--since: also export options (left out by default)')
             ->addOption('meta', null, InputOption::VALUE_REQUIRED, "Also carry post meta whose keys start with these prefixes (comma-separated, e.g. _wds_ for SmartCrawl); left out by default")
             ->addOption('with-terms', null, InputOption::VALUE_NONE, 'With --posts/--types/--since: export every term, not only those the posts use')
+            ->addOption('media-hashes', null, InputOption::VALUE_NONE, "Say what each media file holds (its original's path, sha256 and size): a publish uploads what the target hasn't got")
             ->addOption('migrate', null, InputOption::VALUE_NONE, '= --with-users --with-settings --all-media --include-drafts');
     }
 
@@ -91,6 +92,7 @@ class ContentExportCommand extends Command
             'include_user_passwords' => (bool) $input->getOption('with-user-passwords'),
             'include_comments'       => (bool) $input->getOption('with-comments'),
             'include_settings'       => $migrate || (bool) $input->getOption('with-settings'),
+            'media_hashes'           => (bool) $input->getOption('media-hashes'),
         ];
         // A scoped export leaves out options and unrelated terms unless asked.
         if ($migrate || $input->getOption('with-options')) {

@@ -42,10 +42,12 @@ class ContentDiffCommand extends Command
                 Examples:
                   <info>taw content:diff before.json after.json</info>
                   <info>taw content:diff before.json after.json --out=.taw/changes.json</info>
+                  <info>taw content:diff production.json local.json --with-base</info>  each change carries production's record, so an import there shows what it changed since
                 HELP)
             ->addArgument('a', InputArgument::REQUIRED, 'The "from" snapshot')
             ->addArgument('b', InputArgument::REQUIRED, 'The "to" snapshot')
-            ->addOption('out', null, InputOption::VALUE_REQUIRED, 'Write the change-set here instead of stdout');
+            ->addOption('out', null, InputOption::VALUE_REQUIRED, 'Write the change-set here instead of stdout')
+            ->addOption('with-base', null, InputOption::VALUE_NONE, "Carry each changed record as <a> has it, so an import into <a>'s site can tell what changed there since (conflicts)");
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -58,7 +60,7 @@ class ContentDiffCommand extends Command
             return Command::FAILURE;
         }
 
-        $changeSet = ChangeSet::between($a, $b);
+        $changeSet = ChangeSet::between($a, $b, ['with_base' => (bool) $input->getOption('with-base')]);
         $encoded = (string) json_encode($changeSet, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         $out = $input->getOption('out');

@@ -39,6 +39,27 @@ final class MediaResolver
 
     private int $sideloadedCount = 0;
 
+    /** @var array<string, string> a file's path under uploads (its `file`) => where its bytes are on disk */
+    private array $staged = [];
+
+    /** @var array<int, string> attachment id => sha256 of its original file ('' = no file) */
+    private array $hashes = [];
+
+    /**
+     * Files to take from disk instead of downloading them: what a publish
+     * uploaded ({@see Publish}), keyed by the entry's `file` (its original's
+     * path under uploads). With any given, nothing is downloaded: an entry
+     * whose file isn't among them is missing.
+     *
+     * @param array<string, string> $staged
+     */
+    public function withStaged(array $staged): self
+    {
+        $this->staged = $staged;
+
+        return $this;
+    }
+
     /**
      * How each entry resolved: `matched` (an attachment here), `sideloaded`,
      * `would-sideload` (a dry run), `missing` (not here, no URL) or `failed`
@@ -76,6 +97,12 @@ final class MediaResolver
             $existing = ($url !== '' ? self::findBySource($url) : null)
                 ?? ($path !== '' ? self::findByPath($path) : null)
                 ?? self::findByFilename($filename, array_values($this->idMap), $url);
+            // An entry that says what its file holds (1.8) matches only a file
+            // holding the same: the same name with other bytes is a new file.
+            $sha = (string) ($entry['sha256'] ?? '');
+            if ($existing !== null && $sha !== '' && $this->fileHash($existing) !== $sha) {
+                $existing = null;
+            }
             if ($existing !== null) {
                 if ($sourceId > 0) {
                     $this->idMap[$sourceId] = $existing;
@@ -84,7 +111,9 @@ final class MediaResolver
                 continue;
             }
 
-            if ($url === '') {
+            $file = (string) ($entry['file'] ?? $path);
+            $stagedFile = $this->staged[$file] ?? '';
+            if ($url === '' && $stagedFile === '') {
                 $this->warnings[] = "Media '{$filename}' is not on the target site and has no URL to sideload from — references to it are cleared.";
                 $this->outcomes[] = ['status' => 'missing'] + $outcome;
                 continue;
@@ -95,8 +124,14 @@ final class MediaResolver
                 continue;
             }
 
+            if ($this->staged !== [] && $stagedFile === '') {
+                $this->warnings[] = "Media '{$filename}' wasn't uploaded — references to it are cleared.";
+                $this->outcomes[] = ['status' => 'missing'] + $outcome;
+                continue;
+            }
+
             $error = '';
-            $newId = $this->sideload($url, $entry, $error);
+            $newId = $this->sideload($url, $entry, $error, $stagedFile);
             if ($newId === null) {
                 $this->warnings[] = "Failed to sideload media '{$filename}' from {$url} ({$error}) — references to it are cleared.";
                 $this->outcomes[] = ['status' => 'failed'] + $outcome;
@@ -327,31 +362,59 @@ final class MediaResolver
     }
 
     /**
-     * Sideload a remote file into the media library.
+     * sha256 of an attachment's original file (WordPress's own `-scaled`
+     * copy differs from site to site), '' when it has none.
+     */
+    private function fileHash(int $id): string
+    {
+        if (!isset($this->hashes[$id])) {
+            $file = function_exists('wp_get_original_image_path') ? wp_get_original_image_path($id) : false;
+            $file = is_string($file) && $file !== '' ? $file : get_attached_file($id);
+            $this->hashes[$id] = is_string($file) && is_file($file) ? (string) hash_file('sha256', $file) : '';
+        }
+
+        return $this->hashes[$id];
+    }
+
+    /**
+     * Sideload a remote file into the media library, or a file on disk
+     * ($staged, which is copied: the original stays where it is).
      *
      * @param array<string, mixed> $entry
      * @param string               $error why it failed, when it did
      */
-    private function sideload(string $url, array $entry, string &$error = ''): ?int
+    private function sideload(string $url, array $entry, string &$error = '', string $staged = ''): ?int
     {
         require_once ABSPATH . 'wp-admin/includes/media.php';
         require_once ABSPATH . 'wp-admin/includes/file.php';
         require_once ABSPATH . 'wp-admin/includes/image.php';
 
-        // A `-scaled` file is WordPress's copy of a large upload; uploaded
-        // under that name it'd become `photo-scaled-1.jpg`. The original sits
-        // beside it: download that, and WordPress makes the same copy here.
         $name = wp_basename((string) ($entry['filename'] ?? parse_url($url, PHP_URL_PATH) ?? 'file'));
-        $original = (string) preg_replace('/-scaled(\.[a-z0-9]+)$/i', '$1', $url);
-        $tmp = $original !== $url ? self::download($original) : null;
-        if ($tmp !== null && !is_wp_error($tmp)) {
-            $name = (string) preg_replace('/-scaled(\.[a-z0-9]+)$/i', '$1', $name);
+        if ($staged !== '') {
+            // The original's bytes, under the original's name and folder.
+            $file = (string) ($entry['file'] ?? '');
+            $name = $file !== '' ? wp_basename($file) : (string) preg_replace('/-scaled(\.[a-z0-9]+)$/i', '$1', $name);
+            $url = $file !== '' ? 'uploads://' . $file : $url;
+            $tmp = wp_tempnam($name);
+            if ($tmp === '' || !@copy($staged, $tmp)) {
+                $error = "couldn't copy the uploaded file";
+                return null;
+            }
         } else {
-            $tmp = self::download($url);
-        }
-        if (is_wp_error($tmp)) {
-            $error = $tmp->get_error_message();
-            return null;
+            // A `-scaled` file is WordPress's copy of a large upload; uploaded
+            // under that name it'd become `photo-scaled-1.jpg`. The original sits
+            // beside it: download that, and WordPress makes the same copy here.
+            $original = (string) preg_replace('/-scaled(\.[a-z0-9]+)$/i', '$1', $url);
+            $tmp = $original !== $url ? self::download($original) : null;
+            if ($tmp !== null && !is_wp_error($tmp)) {
+                $name = (string) preg_replace('/-scaled(\.[a-z0-9]+)$/i', '$1', $name);
+            } else {
+                $tmp = self::download($url);
+            }
+            if (is_wp_error($tmp)) {
+                $error = $tmp->get_error_message();
+                return null;
+            }
         }
 
         $fileArray = [
@@ -370,7 +433,7 @@ final class MediaResolver
         // Keep the source's month folder (`2024/05/hero.jpg` stays there): a
         // second `hero.jpg` from another month doesn't become `hero-1.jpg`,
         // and an import back the other way finds each file by its path.
-        $folder = dirname(self::uploadsPath($url));
+        $folder = str_starts_with($url, 'uploads://') ? dirname(substr($url, 10)) : dirname(self::uploadsPath($url));
         $keepFolder = static function (array $dirs) use ($folder): array {
             $dirs['subdir'] = '/' . $folder;
             $dirs['path'] = $dirs['basedir'] . $dirs['subdir'];
@@ -397,7 +460,7 @@ final class MediaResolver
             return null;
         }
 
-        update_post_meta($id, self::SOURCE_META, esc_url_raw($url));
+        update_post_meta($id, self::SOURCE_META, esc_url_raw((string) ($entry['url'] ?? $url)));
         if (!empty($entry['alt'])) {
             update_post_meta($id, '_wp_attachment_image_alt', sanitize_text_field((string) $entry['alt']));
         }
