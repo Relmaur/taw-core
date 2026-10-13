@@ -893,6 +893,16 @@ new-site skill (taw-fleet 1.25) writes the brief from a link and hands over to i
 **Check:** the migration `1.89.0/site-skills` installs it in `.claude/skills/build-site/` (or `taw skills:sync
 --apply`). **Undo:** delete the folder.
 
+### v1.97.0: a shared deploy, for any host
+
+**What changed.** taw/core ships a shared deploy: `.github/workflows/theme-deploy.yml` (called at `@v1`), the stub
+that calls it (`resources/deploy/deploy.yml`) and the script that does the work (`resources/ci/deploy.sh`). SSH +
+rsync or git push, configured by repository variables and one secret, with the server's host key pinned and a
+payload check that refuses dumps and credentials. See README § Theme deploy.
+
+**Check:** none: a theme deploys this way only once its `.github/workflows/deploy.yml` is the stub and its
+variables are set (`taw-fleet deploy setup`). A theme's own deploy workflow is untouched. **Undo:** none needed.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
