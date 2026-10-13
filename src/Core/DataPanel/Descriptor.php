@@ -34,8 +34,14 @@ use TAW\Core\Schema\Field;
  */
 final class Descriptor
 {
-    /** Every type the panel renders: all of Field::TYPES (ADR-0007 § 8). */
-    public const TYPES = Field::TYPES;
+    /**
+     * Every type the panel renders: Field::TYPES (ADR-0007 § 8) except
+     * `json`, which has no panel control yet, so a fieldset with one stays
+     * a metabox.
+     */
+    public const TYPES = ['text', 'url', 'number', 'textarea', 'wysiwyg', 'select', 'checkbox',
+        'color', 'datepicker', 'range', 'image', 'icon', 'files', 'gradient_text',
+        'hubspot_form', 'group', 'post_select', 'repeater', 'link'];
 
     /** Field keys passed through as-is (when JSON-safe). */
     private const PASS_KEYS = [

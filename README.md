@@ -237,8 +237,9 @@ new Metabox([
 | `gradient_text` | Ordered `{text, highlighted}` segments; stores JSON array (see [Gradient Text](#gradient-text)) |
 | `hubspot_form` | HubSpot embed config (`portal_id`/`form_id`/`region`); stores JSON object (see [HubSpot Form](#hubspot-form)) |
 | `link` | URL, link text and "open in a new tab"; stores one JSON object (see [Link](#link-v1590)) |
+| `json` | JSON text in a code editor; stores compact JSON, never invalid JSON (see [JSON](#json-v1990)) |
 
-All fields accept: `id`, `label`, `description`, `placeholder`, `default`, `required`, `width` (%), `readonly` (see [Readonly Fields](#readonly-fields)).
+All fields accept: `id`, `label`, `description`, `placeholder`, `default`, `required`, `width` (%), `readonly` (see [Readonly Fields](#readonly-fields)), `validate` (a callable: `true`, or `false`/an error message) and `on_invalid` (v1.99.0: `'store'`, the default, saves the input even when `validate` fails and shows the error; `'keep'` leaves the stored value as it was and puts the rejected input back in the field on the next load, so nothing typed is lost; a `json` field keeps by default).
 
 ### Tabs
 
@@ -337,6 +338,20 @@ echo $cta->html(['class' => 'btn']);
 - **Everywhere:** metabox and options page (including repeater rows and groups), term and user screens, the data
   panel, REST (raw meta plus the decoded `taw_<id>` object), content snapshots and `fields:get`/`fields:set`.
   The visual editor lists it without an inline editor, like `hubspot_form`.
+
+### JSON (v1.99.0+)
+
+```php
+['id' => 'request', 'type' => 'json', 'label' => 'Request', 'rows' => 16,
+ 'validate' => static fn (mixed $data, string $text) => isset($data['hero']) ?: 'The request needs a hero.']
+```
+
+- **Editor:** a monospace textarea (`rows`, default 12) with a **Format** button (pretty-print). While you type, a parse error shows with its line and column. Stored JSON shows pretty-printed; text with line breaks shows as typed.
+- **Storage:** compact JSON (`{"hero":{}}`), decoded and re-encoded with objects as objects, so `{}` stays `{}` and `[]` stays `[]`. Never a text sanitizer.
+- **Validation, in order:** `required` (empty fails), the JSON parse check ("Request: invalid JSON (Syntax error)."), then your `validate`, called only once the JSON parses, with the decoded value as PHP arrays and, if it takes a second parameter, the submitted text (decode that yourself, `json_decode($text)`, to tell `{}` from `[]`, e.g. for a JSON Schema validator). An empty json field isn't checked. Built-in callables (`'is_array'`) get one argument.
+- **Invalid input never replaces the stored value:** a json field defaults to `'on_invalid' => 'keep'`. The stored JSON stays live; on the next load of the edit screen the field shows the rejected text with "Not saved: <the error>. The saved value is unchanged; this is what you entered." (that user, for an hour, or until the field saves fine). In the block editor nothing reloads after a save: the text stays in the field, and the note and the error notice show on the next reload. Metaboxes (posts, terms, users) and options pages. `'on_invalid' => 'store'` opts out (invalid JSON then stores `''`).
+- **Reading:** `getMeta()` / `Metabox::get()` return the stored JSON text, so `json_decode($this->getMeta($id, 'request'))` keeps objects as objects. `Taw::post()->field('request')->value()` decodes to PHP arrays (`{}` reads as `[]`); printing the value prints nothing.
+- **Elsewhere:** content export/import and REST carry the JSON text as a string (`meta._taw_request`), so `{}` survives. A REST write must send valid JSON: that path can't keep the old value, and invalid text stores `''`. `taw fields:get` prints the decoded value; `taw fields:set` refuses text that doesn't parse. Not in the block editor's data panel yet (the fieldset stays a metabox), not bindable, and off in the visual editor unless the field sets `'editor' => true`. Inside a repeater row there's no server validation (rows aren't validated): invalid JSON in a row stores `''`, so rely on the editor's error.
 
 ### Reading Values
 
@@ -1085,7 +1100,7 @@ Group sub-fields are each stored as their own option, named `{prefix}{group_id}_
 
 ### Validation
 
-`required`, `url`, and `number` (`min`/`max`) fields are validated on save; a custom `validate` callable may also be supplied per field. Failures are surfaced inline via WordPress's `settings_errors()` and the previous saved value is kept.
+`required`, `url`, and `number` (`min`/`max`) fields are validated on save, and `json` fields must parse; a custom `validate` callable may also be supplied per field. Failures are surfaced inline via WordPress's `settings_errors()` and the previous saved value is kept. With `'on_invalid' => 'keep'` (a `json` field's default), the rejected input also comes back in the form.
 
 ### REST
 

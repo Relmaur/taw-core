@@ -57,8 +57,8 @@ class FieldsSetCommand extends Command
                 Plain fields — pass the value directly:
                   <info>taw fields:set 42 hero_heading "Welcome"</info>
 
-                Repeaters / post_select / files / gradient_text / hubspot_form / link — value
-                must be JSON. Prefer --file over inline JSON to sidestep shell quoting:
+                Repeaters / post_select / files / gradient_text / hubspot_form / link / json — value
+                must be JSON (a json field refuses text that doesn't parse). Prefer --file over inline JSON to sidestep shell quoting:
                   <info>taw fields:set 42 team_members --file=/tmp/team.json</info>
                   <info>taw fields:set 42 team_members '[{"name":"Ada","role":"CTO"}]'</info>
 
@@ -153,6 +153,12 @@ class FieldsSetCommand extends Command
             ? ($fieldConfig['prefix'] ?? '_taw_') . $fieldId
             : Metabox::metaKeyOf($fieldConfig);
         $target = $isOptionsTarget ? 'options' : $postId;
+
+        // A json field never stores text that doesn't parse (it would store '').
+        if ($type === 'json' && trim($rawValue) !== '' && !($parsed = Metabox::parseJson(trim($rawValue)))['ok']) {
+            $io->error(sprintf('%s: invalid JSON (%s). Nothing was written.', $fieldId, $parsed['error']));
+            return Command::FAILURE;
+        }
 
         if ($dryRun) {
             // Same sanitization writeMeta()/writeOption() would apply, without the write.

@@ -68,7 +68,7 @@ Full API + option tables: §§ "The Metabox Framework", "Form System", "Options 
 
 ### Field types
 
-- **Metabox:** `text textarea wysiwyg url number range select image files group checkbox color repeater post_select datepicker icon gradient_text hubspot_form link` (`icon` is opt-in — requires `Lucide::enable()`; `link` = URL + text + new tab in one field, taw/core ≥ 1.59)
+- **Metabox:** `text textarea wysiwyg url number range select image files group checkbox color repeater post_select datepicker icon gradient_text hubspot_form link json` (`icon` is opt-in — requires `Lucide::enable()`; `link` = URL + text + new tab in one field, taw/core ≥ 1.59; `json` = JSON text in a code editor, stored compact and never invalid, `validate` gets the decoded value, taw/core ≥ 1.99). Any field: `'on_invalid' => 'keep'` (a `json` field's default) leaves the stored value when `validate` fails and refills the field with the rejected input
 - **Form:** `text email tel url textarea select checkbox date`
 
 ### Fatal mistakes (full list in § "Do NOT" below)

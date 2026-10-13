@@ -938,6 +938,23 @@ sha256 is in `keep_edited`), so a site with it, or with the older unedited one, 
 
 **Check:** none; nothing stored changes. **Undo:** none needed.
 
+### v1.99.0: a `json` field type, and `on_invalid: keep`
+
+**What changed.** A new field type, `json`: a monospace editor with a Format button and parse errors (line and
+column) as you type. It stores compact JSON and never stores invalid JSON. A field's `validate` runs only once the
+JSON parses, with the decoded value and, when it takes a second parameter, the submitted text. A new field option,
+`'on_invalid' => 'keep'` (a `json` field's default; any type can use it): when validation fails, the stored value
+stays and the rejected input comes back in the field on the next load. Metaboxes (posts, terms, users) and options
+pages. Group sub-fields are now validated on their unslashed value, as top-level fields always were. Validation
+error notices now survive the block editor's metabox save (it renders the edit screen unseen, which used to consume
+them): they show on the next reload.
+
+**Why.** A value that's the single source of truth for a page (emelambda's practice previews) must never be replaced
+by a bad edit, and nothing typed should be lost.
+
+**Check:** none; existing fields behave as before (`on_invalid` defaults to `'store'` for every other type). **Undo:**
+none needed. Details: README § "JSON (v1.99.0+)".
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

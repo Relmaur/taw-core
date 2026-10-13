@@ -46,7 +46,8 @@ class FieldsGetCommand extends Command
                 Looks the field up in the live Metabox/OptionsPage field registry (the
                 same one `taw inspect --json` reports) to know its type, then
                 decodes the stored value accordingly — repeaters, post_select,
-                gradient_text and hubspot_form come back as arrays, checkboxes as
+                gradient_text and hubspot_form come back as arrays, json as its decoded
+                value (objects stay objects), checkboxes as
                 booleans, everything else as its raw value.
 
                 Examples:
@@ -148,6 +149,7 @@ class FieldsGetCommand extends Command
             'post_select' => Metabox::get_posts($postId, $fieldId, $prefix),
             'files', 'gradient_text', 'hubspot_form' => json_decode((string) Metabox::get($postId, $fieldId, $prefix), true) ?: [],
             'link' => \TAW\Core\Content\FieldCodec::decode(['type' => 'link'], Metabox::get($postId, $fieldId, $prefix)),
+            'json' => self::decodeJson(Metabox::get($postId, $fieldId, $prefix)),
             'image' => (int) Metabox::get($postId, $fieldId, $prefix),
             default => Metabox::get($postId, $fieldId, $prefix),
         };
@@ -169,8 +171,15 @@ class FieldsGetCommand extends Command
             'post_select' => json_decode((string) $raw, true) ?: (($id = absint($raw)) ? [$id] : []),
             'repeater', 'files', 'gradient_text', 'hubspot_form' => json_decode((string) $raw, true) ?: [],
             'link' => \TAW\Core\Content\FieldCodec::decode(['type' => 'link'], $raw),
+            'json' => self::decodeJson($raw),
             'image' => (int) $raw,
             default => $raw,
         };
+    }
+
+    /** A json field's stored text, decoded with objects kept as objects (so `{}` prints as `{}`). */
+    private static function decodeJson(mixed $raw): mixed
+    {
+        return is_string($raw) && trim($raw) !== '' ? json_decode($raw) : null;
     }
 }

@@ -93,6 +93,12 @@ msgstr ""
 msgid "%1$s must be no more than %2$s."
 msgstr ""
 
+#. translators: 1: field label, 2: the JSON parser's message
+#: src/Core/Metabox/Metabox.php
+#, php-format
+msgid "%1$s: invalid JSON (%2$s)."
+msgstr ""
+
 #: src/Core/Editing/EditingAdminScreen.php
 #, php-format
 msgid "%d block"
@@ -910,6 +916,10 @@ msgstr ""
 msgid "Form ID"
 msgstr ""
 
+#: src/Core/Metabox/Metabox.php
+msgid "Format"
+msgstr ""
+
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "From"
 msgstr ""
@@ -1086,6 +1096,18 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Insert inline"
+msgstr ""
+
+#. translators: 1: line number, 2: column number, 3: the parser's message
+#: src/Core/Metabox/Metabox.php
+#, php-format
+msgid "Invalid JSON at line %1$s, column %2$s: %3$s"
+msgstr ""
+
+#. translators: %s: the parser's message
+#: src/Core/Metabox/Metabox.php
+#, php-format
+msgid "Invalid JSON: %s"
 msgstr ""
 
 #: src/Core/Form/Form.php
@@ -1462,6 +1484,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Not a value this post has:"
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "Not saved:"
 msgstr ""
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
@@ -2360,6 +2386,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "The result must be an image from the media library (an image field, or an image ID). Its alt text comes along."
+msgstr ""
+
+#: src/Core/Metabox/Metabox.php
+msgid "The saved value is unchanged; this is what you entered."
 msgstr ""
 
 #: src/Core/Editing/SiteLayer.php
