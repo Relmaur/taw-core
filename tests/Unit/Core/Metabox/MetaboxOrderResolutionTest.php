@@ -141,6 +141,35 @@ final class MetaboxOrderResolutionTest extends TestCase
         );
     }
 
+    /** Issue #207: lockFromTemplate('role-page') on a custom post type's single template. */
+    public function test_a_custom_post_type_resolves_to_its_single_template(): void
+    {
+        $post = new \WP_Post(['ID' => 60, 'post_type' => 'role-page', 'post_name' => 'frontend']);
+
+        $this->assertSame(['landing_promo', 'statement_hero', 'newsletter_cta'], $this->orderForPost($post));
+    }
+
+    public function test_single_hierarchy_order_slug_then_type_then_single(): void
+    {
+        $backend = new \WP_Post(['ID' => 61, 'post_type' => 'role-page', 'post_name' => 'backend']);
+        $this->assertSame(['florilegium'], $this->orderForPost($backend), 'single-{type}-{slug}.php first');
+
+        $other = new \WP_Post(['ID' => 62, 'post_type' => 'report', 'post_name' => 'q3']);
+        $this->assertSame(['posts_feed'], $this->orderForPost($other), 'then single.php');
+
+        $this->assertSame(
+            ['page-q3.php', 'single-report-q3.php', 'single-report.php', 'single.php'],
+            MetaboxOrder::orderCandidates($other)
+        );
+    }
+
+    public function test_pages_never_fall_back_to_single_templates(): void
+    {
+        // single.php exists in the fixtures; a page with no template convention stays unordered.
+        $this->assertSame([], $this->orderForPost(new \WP_Post(['ID' => 99, 'post_name' => 'contacto'])));
+        $this->assertSame(['page-contacto.php'], MetaboxOrder::orderCandidates(new \WP_Post(['ID' => 99, 'post_name' => 'contacto'])));
+    }
+
     /** @param array<string, array<string, mixed>> $registry */
     private function seedFieldRegistry(array $registry): void
     {
