@@ -81,6 +81,12 @@ final class Value implements \Stringable
             return $values;
         }
 
+        // A json field decodes to PHP arrays here; FieldCodec carries the
+        // JSON text, so exports keep `{}` apart from `[]`.
+        if ($this->type() === 'json') {
+            return is_string($this->raw) && trim($this->raw) !== '' ? json_decode($this->raw, true) : null;
+        }
+
         return $this->config === null
             ? ($this->raw === false || $this->raw === null ? '' : $this->raw)
             : FieldCodec::decode($this->config, $this->raw);
@@ -259,7 +265,7 @@ final class Value implements \Stringable
             'image'       => (new Image($this->ids()[0] ?? 0))->html(),
             'post_select' => empty($this->config['multiple']) ? (new PostRef($this->ids()[0] ?? 0))->html() : '',
             'link'        => $this->link()->html(),
-            'checkbox', 'files', 'repeater', 'group', 'gradient_text', 'hubspot_form' => '',
+            'checkbox', 'files', 'repeater', 'group', 'gradient_text', 'hubspot_form', 'json' => '',
             default       => is_array($this->raw) || is_object($this->raw) ? '' : esc_html($this->text()),
         };
     }

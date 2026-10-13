@@ -28,12 +28,19 @@ final class DescriptorTest extends TestCase
         return new Metabox(array_replace(['id' => 'book_details', 'title' => 'Book details', 'screens' => ['book'], 'fields' => $fields], $extra));
     }
 
-    public function test_every_field_type_is_supported(): void
+    public function test_every_field_type_but_json_is_supported(): void
     {
-        $fields = array_map(static fn (string $type): array => ['id' => "f_{$type}", 'type' => $type], Field::TYPES);
+        $this->assertSame(array_values(array_diff(Field::TYPES, ['json'])), Descriptor::TYPES);
+        $fields = array_map(static fn (string $type): array => ['id' => "f_{$type}", 'type' => $type], Descriptor::TYPES);
 
         $this->assertTrue(Descriptor::supports($this->box($fields)));
-        $this->assertCount(count(Field::TYPES), Descriptor::fieldset($this->box($fields))['fields'] ?? []);
+        $this->assertCount(count(Descriptor::TYPES), Descriptor::fieldset($this->box($fields))['fields'] ?? []);
+    }
+
+    /** #213: json has no panel control yet, so its fieldset stays a metabox. */
+    public function test_a_json_field_keeps_the_fieldset_a_metabox(): void
+    {
+        $this->assertFalse(Descriptor::supports($this->box([['id' => 'a', 'type' => 'text'], ['id' => 'request', 'type' => 'json']])));
     }
 
     public function test_an_unknown_type_anywhere_keeps_the_whole_fieldset_a_metabox(): void

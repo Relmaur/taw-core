@@ -815,3 +815,11 @@ div[id*="taw_"] .postbox-header h2.hndle:has(img) {
   max-width: 50rem;
   margin-bottom: 2em;
 }
+
+/* A field refilled with input its last save rejected (on_invalid: keep, v1.99.0). */
+.taw-rejected-note {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-left: 4px solid #d63638;
+  background: #fcf0f1;
+}

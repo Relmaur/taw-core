@@ -25,7 +25,7 @@ final class AttributeMap
     private const TEXT_TYPES = ['text', 'select', 'number', 'range', 'color', 'icon', 'datepicker'];
 
     /** Types that never bind (a group's sub-field does, through `sub`). */
-    public const UNBINDABLE = ['checkbox', 'files', 'repeater', 'group', 'gradient_text', 'hubspot_form'];
+    public const UNBINDABLE = ['checkbox', 'files', 'repeater', 'group', 'gradient_text', 'hubspot_form', 'json'];
 
     public static function valueFor(Value $value, Target $target, Reference $ref): mixed
     {

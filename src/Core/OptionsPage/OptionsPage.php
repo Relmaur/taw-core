@@ -197,6 +197,19 @@ class OptionsPage
     }
 
     /**
+     * An option's value for the settings form: input the last save rejected
+     * under `'on_invalid' => 'keep'`, else {@see self::current()}.
+     *
+     * @param array<string, mixed> $field
+     */
+    private static function formValue(string $optionName, array $field): mixed
+    {
+        $rejected = Metabox::rejectedInput('option', 0);
+
+        return isset($rejected[$optionName]) ? $rejected[$optionName]['value'] : self::current($optionName, $field);
+    }
+
+    /**
      * Group fields by the group's option name (see {@see self::$groupRegistry}).
      *
      * @return array<string, array<string, mixed>>
@@ -322,6 +335,11 @@ class OptionsPage
                                 $validation,
                                 'error'
                             );
+                        }
+                        // Never stored; with 'on_invalid' => 'keep' (a json
+                        // field's default) the input also comes back in the form.
+                        if (Metabox::keepsInvalid($field)) {
+                            Metabox::rememberRejected('option', 0, [$option_name => ['value' => $value, 'error' => $validation]]);
                         }
                         return get_option($option_name);
                     }
@@ -483,7 +501,7 @@ class OptionsPage
         $values = [];
         foreach ($this->get_all_fields() as $field) {
             $option_name = $this->prefix . $field['id'];
-            $values[$option_name] = self::current($option_name, $field);
+            $values[$option_name] = self::formValue($option_name, $field);
         }
         return $values;
     }
@@ -586,7 +604,7 @@ class OptionsPage
     {
         foreach ($fields as $field) {
             $field_id      = $this->prefix . $field['id'];
-            $value         = self::current($field_id, $field);
+            $value         = self::formValue($field_id, $field);
             $label         = $field['label'] ?? '';
             $desc          = $field['description'] ?? '';
             $has_conditions = !empty($field['conditions']);
@@ -958,6 +976,10 @@ class OptionsPage
                 Metabox::render_link_field($field_id, $value);
                 break;
 
+            case 'json':
+                Metabox::render_json_field($field_id, $value, (int) ($field['rows'] ?? 12));
+                break;
+
             /* ---- Default ---- */
             default:
                 printf(
@@ -978,7 +1000,7 @@ class OptionsPage
         ?><div class="fields-container"><?php
         foreach ($group_fields as $field) {
             $field_id = $field_id_prefix . '_' . $field['id'];
-            $value    = self::current($field_id, $field);
+            $value    = self::formValue($field_id, $field);
         ?>
             <div class="field" style="--span: <?php echo esc_attr($field['width'] ?? '100'); ?>;">
                 <div class="field-and-label">
@@ -1117,8 +1139,17 @@ class OptionsPage
             $value = Metabox::sanitizeLinkValue($value);
         }
 
+        $isJson = ($field['type'] ?? '') === 'json';
+        if ($isJson) {
+            $value = is_string($value) ? trim($value) : Metabox::sanitizeJsonValue($value);
+        }
+
         if (!empty($field['required']) && ($value === '' || $value === null)) {
             return sprintf(__('%s is required.', 'taw-core'), $label);
+        }
+
+        if ($isJson) {
+            return Metabox::validateCustom($field, $value, true);
         }
 
         if (($field['type'] ?? '') === 'url' && $value !== '' && !filter_var($value, FILTER_VALIDATE_URL)) {
@@ -1150,6 +1181,10 @@ class OptionsPage
      */
     private function sanitize_field(array $field, mixed $value): mixed
     {
+        if (($field['type'] ?? '') === 'json') {
+            return Metabox::sanitizeJsonValue($value);
+        }
+
         if (($field['sanitize'] ?? '') === 'code') {
             return current_user_can('unfiltered_html') ? $value : wp_kses_post($value);
         }

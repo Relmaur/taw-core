@@ -132,6 +132,14 @@ class Metabox
     /** @var bool Guards against enqueuing the datepicker script more than once. */
     private static bool $datepicker_script_enqueued = false;
 
+    private static bool $json_script_enqueued = false;
+
+    /** Rejected input to refill, per object, loaded once per request ({@see self::rejectedInput()}). @var array<string, array<string, array{value: mixed, error: string}>> */
+    private static array $rejected = [];
+
+    /** Fields this render refilled with rejected input: meta key => the error. @var array<string, string> */
+    private array $refilled = [];
+
     /** @var bool Guards against enqueuing general admin assets (CSS/JS) more than once. */
     private static bool $assets_enqueued = false;
 
@@ -1126,6 +1134,105 @@ class Metabox
         if (in_array('icon', $all_types, true) && Lucide::isEnabled()) {
             Lucide::enqueuePickerAssets();
         }
+
+        if (in_array('json', $all_types, true)) {
+            self::enqueue_json_script();
+        }
+    }
+
+    /**
+     * The json field's editor behaviour, printed once via `admin_footer`:
+     * parse errors with line and column as you type, and a Format button
+     * (pretty-print). Delegated handlers, so repeater rows added later work.
+     */
+    private static function enqueue_json_script(): void
+    {
+        if (self::$json_script_enqueued) {
+            return;
+        }
+        self::$json_script_enqueued = true;
+
+        add_action('admin_footer', static function () {
+            $i18n = [
+                /* translators: 1: line number, 2: column number, 3: the parser's message */
+                'at'      => __('Invalid JSON at line %1$s, column %2$s: %3$s', 'taw-core'),
+                /* translators: %s: the parser's message */
+                'invalid' => __('Invalid JSON: %s', 'taw-core'),
+            ];
+        ?>
+            <style>
+                .taw-json-input { font-family: Menlo, Consolas, Monaco, monospace; font-size: 12px; line-height: 1.5; tab-size: 4; white-space: pre; }
+                .taw-json-input.is-invalid { border-color: #d63638; box-shadow: 0 0 0 1px #d63638; }
+                .taw-json-actions { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; }
+                .taw-json-error { color: #d63638; }
+            </style>
+            <script>
+                (function () {
+                    var t = <?php echo wp_json_encode($i18n); ?>;
+                    function lineCol(text, pos) {
+                        var lines = text.slice(0, pos).split('\n');
+                        return [lines.length, lines[lines.length - 1].length + 1];
+                    }
+                    // The first character no valid JSON can continue from: a
+                    // prefix that only ends too early isn't an error yet.
+                    function scan(text) {
+                        if (text.length > 20000) { return null; }
+                        for (var i = 1; i <= text.length; i++) {
+                            try { JSON.parse(text.slice(0, i)); } catch (e) {
+                                var p = /position (\d+)/.exec(e.message);
+                                if (!/end of|EOF|unterminated/i.test(e.message) && !(p && +p[1] >= i)) { return i - 1; }
+                            }
+                        }
+                        return null;
+                    }
+                    function locate(text, msg) {
+                        var m = /line (\d+) column (\d+)/i.exec(msg);
+                        if (m) { return [m[1], m[2]]; }
+                        m = /position (\d+)/i.exec(msg);
+                        if (m) { return lineCol(text, +m[1]); }
+                        var at = scan(text);
+                        return at === null ? null : lineCol(text, at);
+                    }
+                    // The parser's words without its own position or quoted text.
+                    function reason(msg) {
+                        return msg.replace(/^JSON\.parse: /, '').replace(/^JSON Parse error: /, '')
+                            .replace(/\s+in JSON at position \d+.*$/s, '').replace(/ at line \d+ column \d+.*$/s, '')
+                            .replace(/, (\.\.\.)?".*$/s, '');
+                    }
+                    function check(ta) {
+                        var box = ta.closest('.taw-json-field');
+                        var out = box ? box.querySelector('.taw-json-error') : null;
+                        var text = ta.value, message = '';
+                        if (text.trim() !== '') {
+                            try { JSON.parse(text); } catch (e) {
+                                var at = locate(text, e.message);
+                                message = at ? t.at.replace('%1$s', at[0]).replace('%2$s', at[1]).replace('%3$s', reason(e.message))
+                                    : t.invalid.replace('%s', reason(e.message));
+                            }
+                        }
+                        if (out) { out.textContent = message; }
+                        ta.classList.toggle('is-invalid', message !== '');
+                        if (message) { ta.setAttribute('aria-invalid', 'true'); } else { ta.removeAttribute('aria-invalid'); }
+                        return message === '';
+                    }
+                    document.addEventListener('input', function (e) {
+                        if (e.target.matches && e.target.matches('textarea.taw-json-input')) { check(e.target); }
+                    });
+                    document.addEventListener('click', function (e) {
+                        var btn = e.target.closest ? e.target.closest('.taw-json-format') : null;
+                        if (!btn) { return; }
+                        e.preventDefault();
+                        var ta = btn.closest('.taw-json-field').querySelector('textarea.taw-json-input');
+                        if (!ta || ta.value.trim() === '' || !check(ta)) { return; }
+                        ta.value = JSON.stringify(JSON.parse(ta.value), null, 4);
+                        ta.dispatchEvent(new Event('change', { bubbles: true }));
+                        check(ta);
+                    });
+                    document.querySelectorAll('textarea.taw-json-input').forEach(check);
+                })();
+            </script>
+        <?php
+        });
     }
 
     /**
@@ -2278,6 +2385,7 @@ class Metabox
                     <?php $this->render_readonly_lock_icon($field); ?>
                 </label>
                 <?php $this->render_field($field, $field_id, $value, $object_id); ?>
+                <?php self::render_rejected_note($this->refilled[$field_id] ?? null); ?>
             </div>
 
             <?php if (!empty($field['description'])): ?>
@@ -2614,6 +2722,10 @@ class Metabox
                 self::render_link_field($field_id, $value);
                 break;
 
+            case 'json':
+                self::render_json_field($field_id, $value, (int) ($field['rows'] ?? 12));
+                break;
+
             /* ---- MARK: Group ---- */
             case 'group':
                 $group_fields = $field['fields'] ?? [];
@@ -2896,6 +3008,10 @@ class Metabox
                     $segments
                 ));
 
+            case 'json':
+                $text = self::jsonForEditing($value);
+                return $text === '' ? $empty : '<pre class="taw-json-readonly">' . esc_html($text) . '</pre>';
+
             case 'link':
                 $link = \TAW\Core\Content\FieldCodec::decode(['type' => 'link'], $value);
                 if (!is_array($link)) {
@@ -3032,6 +3148,107 @@ class Metabox
     <?php
     }
 
+    /**
+     * A json field: a monospace textarea with a Format button and, as you
+     * type, the parse error with its line and column
+     * ({@see self::enqueue_json_script()}). Stored values are compact JSON
+     * and show pretty-printed; text with line breaks (what was typed, e.g.
+     * a rejected input refilled) shows as it is. Used by the options page too.
+     */
+    public static function render_json_field(string $field_id, mixed $value, int $rows = 12): void
+    {
+    ?>
+        <div class="taw-json-field">
+            <textarea id="<?php echo esc_attr($field_id); ?>"
+                name="<?php echo esc_attr($field_id); ?>"
+                class="large-text code taw-json-input"
+                rows="<?php echo esc_attr((string) max(3, $rows)); ?>"
+                spellcheck="false" autocapitalize="off" autocomplete="off"><?php echo esc_textarea(self::jsonForEditing($value)); ?></textarea>
+            <p class="taw-json-actions">
+                <button type="button" class="button button-small taw-json-format"><?php esc_html_e('Format', 'taw-core'); ?></button>
+                <span class="taw-json-error" role="status" aria-live="polite"></span>
+            </p>
+        </div>
+    <?php
+    }
+
+    /** A json field's value as the editor shows it. */
+    public static function jsonForEditing(mixed $value): string
+    {
+        if (!is_string($value)) {
+            return $value === null ? '' : (string) wp_json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
+        $text = trim($value);
+        if ($text === '' || str_contains($text, "\n")) {
+            return $text;
+        }
+        $parsed = self::parseJson($text);
+
+        return $parsed['ok'] ? (string) json_encode(json_decode($text), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : $text;
+    }
+
+    /**
+     * Parse JSON text. `value` is decoded as PHP arrays (an empty object and
+     * an empty list both become []); `error` is the parser's message.
+     *
+     * @return array{ok: bool, value: mixed, error: string}
+     */
+    public static function parseJson(string $text): array
+    {
+        try {
+            return ['ok' => true, 'value' => json_decode($text, true, 512, JSON_THROW_ON_ERROR), 'error' => ''];
+        } catch (\JsonException $e) {
+            return ['ok' => false, 'value' => null, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * A json field's storage form: compact JSON, or '' (empty input, or text
+     * that doesn't parse: validation reports that before any save). Objects
+     * decode as objects, so `{}` stays `{}` and `[]` stays `[]`. A non-string
+     * value (from code, REST or an import) is encoded as it is.
+     */
+    public static function sanitizeJsonValue(mixed $value): string
+    {
+        if (!is_string($value)) {
+            return $value === null ? '' : (string) wp_json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
+        $text = trim($value);
+        if ($text === '' || !self::parseJson($text)['ok']) {
+            return '';
+        }
+
+        return (string) json_encode(json_decode($text), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    /** Whether a callable can take $count arguments (built-ins refuse extra ones). */
+    private static function acceptsArguments(mixed $callable, int $count): bool
+    {
+        if (!is_callable($callable)) {
+            return false;
+        }
+        try {
+            $reflection = new \ReflectionFunction(\Closure::fromCallable($callable));
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return $reflection->isVariadic() || $reflection->getNumberOfParameters() >= $count;
+    }
+
+    /**
+     * Whether a field whose validation fails keeps its stored value
+     * (`'on_invalid' => 'keep'`) instead of storing the sanitized input
+     * (`'store'`, the default). A json field keeps by default: there's no
+     * good value to store for JSON that doesn't parse.
+     *
+     * @param array<string, mixed> $field
+     */
+    public static function keepsInvalid(array $field): bool
+    {
+        return ($field['on_invalid'] ?? (($field['type'] ?? '') === 'json' ? 'keep' : 'store')) === 'keep';
+    }
+
     public static function render_hubspot_form_field(string $field_id, mixed $value): void
     {
         $config = is_string($value) && $value !== '' ? json_decode($value, true) : $value;
@@ -3092,6 +3309,7 @@ class Metabox
                     <?php
                     $value = $post_id ? $this->read_value($post_id, $field_id) : '';
                     $this->render_field($field, $field_id, $value, $post_id);
+                    self::render_rejected_note($this->refilled[$field_id] ?? null);
                     ?>
                 </div>
                 <?php if (!empty($field['description'])): ?>
@@ -3321,6 +3539,7 @@ class Metabox
     private function save_fields(int $post_id): array
     {
         $errors = [];
+        $rejected = [];
 
         foreach ($this->fields as $field) {
 
@@ -3362,12 +3581,15 @@ class Metabox
                     }
 
                     $group_field_id = $field_id . '_' . $group_field['id'];
-                    $raw_value = $_POST[$group_field_id] ?? '';
+                    $raw_value = $this->getPostValue($group_field_id);
 
-                    // Validate before saving
+                    // Validate before saving (a failed sub-field is never stored)
                     $validation = $this->validate_field($group_field, $raw_value);
                     if ($validation !== true) {
                         $errors[] = $validation;
+                        if (self::keepsInvalid($group_field) && isset($_POST[$group_field_id])) {
+                            $rejected[$group_field_id] = ['value' => $raw_value, 'error' => $validation];
+                        }
                         continue;
                     }
 
@@ -3392,6 +3614,15 @@ class Metabox
             $validation = $this->validate_field($field, $raw_value);
             if ($validation !== true) {
                 $errors[] = $validation;
+                // 'on_invalid' => 'keep' (a json field's default): the stored
+                // value stays, and the input comes back in the field on the
+                // next load (self::rejectedInput()).
+                if (self::keepsInvalid($field)) {
+                    if (isset($_POST[$field_id])) {
+                        $rejected[$field_id] = ['value' => $raw_value, 'error' => $validation];
+                    }
+                    continue;
+                }
                 // Still save the raw (sanitized) value so the user's input isn't lost,
                 // but show the error. This is a UX decision — some frameworks
                 // refuse to save entirely, but losing user input is worse.
@@ -3412,15 +3643,144 @@ class Metabox
             $this->store->set($post_id, $field_id, wp_slash($value));
         }
 
+        // Input rejected now waits for the next page load; a field that saved
+        // fine drops what an earlier save rejected.
+        if ($rejected !== [] || $this->hasKeepFields()) {
+            self::rememberRejected($this->store->objectType(), $post_id, $rejected, array_diff($this->keepFieldKeys(), array_keys($rejected)));
+        }
+
         return $errors;
+    }
+
+    /** Whether a field of this metabox (or of one of its groups) keeps its value when validation fails. */
+    private function hasKeepFields(): bool
+    {
+        return $this->keepFieldKeys() !== [];
+    }
+
+    /**
+     * Meta keys of the fields that keep their value when validation fails.
+     *
+     * @return list<string>
+     */
+    private function keepFieldKeys(): array
+    {
+        $keys = [];
+        foreach ($this->fields as $field) {
+            if (self::keepsInvalid($field)) {
+                $keys[] = $this->prefix . $field['id'];
+            }
+            foreach (($field['type'] ?? '') === 'group' ? (array) ($field['fields'] ?? []) : [] as $sub) {
+                if (is_array($sub) && self::keepsInvalid($sub)) {
+                    $keys[] = $this->prefix . $field['id'] . '_' . $sub['id'];
+                }
+            }
+        }
+
+        return $keys;
+    }
+
+    /** The transient holding one user's rejected input for one object. */
+    private static function rejectedKey(string $objectType, int $objectId): string
+    {
+        return 'taw_rejected_' . $objectType . '_' . $objectId . '_' . get_current_user_id();
+    }
+
+    /**
+     * Keep input that failed validation under `'on_invalid' => 'keep'`, with
+     * its error, for the next page load of the object's edit screen (this
+     * user, an hour). Several metaboxes save in one request: they merge.
+     * $cleared are fields that saved fine now: an earlier rejection of
+     * theirs is dropped.
+     *
+     * @param array<string, array{value: mixed, error: string}> $inputs Meta key => input and error.
+     * @param list<string> $cleared
+     */
+    public static function rememberRejected(string $objectType, int $objectId, array $inputs, array $cleared = []): void
+    {
+        $key = self::rejectedKey($objectType, $objectId);
+        $stored = get_transient($key);
+        $all = array_diff_key(array_merge(is_array($stored) ? $stored : [], $inputs), array_flip(array_diff($cleared, array_keys($inputs))));
+        if ($all !== []) {
+            set_transient($key, $all, 3600);
+        } elseif ($stored !== false) {
+            delete_transient($key);
+        }
+        unset(self::$rejected[$key]);
+    }
+
+    /**
+     * The rejected input waiting for an object's edit screen. Taken (deleted)
+     * only by a page load: the block editor saves metaboxes with a fetch that
+     * follows WordPress's redirect and renders the edit screen unseen, and
+     * that render must leave it for the reload the person sees.
+     *
+     * @return array<string, array{value: mixed, error: string}> Meta key => input and error.
+     */
+    public static function rejectedInput(string $objectType, int $objectId): array
+    {
+        $key = self::rejectedKey($objectType, $objectId);
+        if (!array_key_exists($key, self::$rejected)) {
+            $stored = $objectId > 0 || $objectType === 'option' ? get_transient($key) : false;
+            $entries = [];
+            foreach (is_array($stored) ? $stored : [] as $metaKey => $entry) {
+                if (is_array($entry) && array_key_exists('value', $entry)) {
+                    $entries[(string) $metaKey] = ['value' => $entry['value'], 'error' => (string) ($entry['error'] ?? '')];
+                }
+            }
+            self::$rejected[$key] = $entries;
+            if ($stored !== false && self::isPageLoad()) {
+                delete_transient($key);
+            }
+        }
+
+        return self::$rejected[$key];
+    }
+
+    /**
+     * Whether this request is a page the person sees (a document load), not
+     * a script's fetch. Browsers without `Sec-Fetch-Dest` count as a page.
+     */
+    public static function isPageLoad(): bool
+    {
+        return ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? 'document') === 'document';
+    }
+
+    /** Under a field refilled with rejected input: why it wasn't saved. */
+    public static function render_rejected_note(?string $error): void
+    {
+        if ($error === null) {
+            return;
+        }
+        printf(
+            '<p class="taw-rejected-note" role="alert"><strong>%s</strong> %s %s</p>',
+            esc_html__('Not saved:', 'taw-core'),
+            esc_html($error),
+            esc_html__('The saved value is unchanged; this is what you entered.', 'taw-core')
+        );
+    }
+
+    /** @internal Tests only. */
+    public static function forgetRejectedForTests(): void
+    {
+        self::$rejected = [];
     }
 
     /**
      * A stored value through {@see self::$store}; '' when there is no object
-     * yet (a term's Add screen).
+     * yet (a term's Add screen). Input rejected by the last save under
+     * `'on_invalid' => 'keep'` comes first, so nothing typed is lost.
      */
     private function read_value(int $object_id, string $key): mixed
     {
+        if ($this->hasKeepFields()) {
+            $rejected = self::rejectedInput($this->store->objectType(), $object_id);
+            if (isset($rejected[$key])) {
+                $this->refilled[$key] = $rejected[$key]['error'];
+                return $rejected[$key]['value'];
+            }
+        }
+
         $value = $object_id > 0 ? $this->store->get($object_id, $key) : '';
         // An empty post field shows its default, so saving keeps it.
         if ($this->store instanceof PostMetaStore && str_starts_with($key, $this->prefix)) {
@@ -3736,6 +4096,10 @@ class Metabox
      */
     private function sanitize_field(array $field, mixed $value): mixed
     {
+        if (($field['type'] ?? '') === 'json') {
+            return self::sanitizeJsonValue($value);
+        }
+
         // Fields with 'sanitize' => 'code' preserve raw content for trusted users.
         if (($field['sanitize'] ?? '') === 'code') {
             return current_user_can('unfiltered_html') ? $value : wp_kses_post($value);
@@ -4024,6 +4388,10 @@ class Metabox
      */
     public static function sanitizeValue(array $fieldConfig, mixed $value): mixed
     {
+        if (($fieldConfig['type'] ?? '') === 'json') {
+            return self::sanitizeJsonValue($value);
+        }
+
         // Fields with 'sanitize' => 'code' preserve raw content for trusted users
         if (($fieldConfig['sanitize'] ?? '') === 'code') {
             return current_user_can('unfiltered_html') ? $value : wp_kses_post($value);
@@ -4070,15 +4438,48 @@ class Metabox
             $value = self::sanitizeLinkValue($value);
         }
 
+        $isJson = ($field['type'] ?? '') === 'json';
+        if ($isJson) {
+            $value = is_string($value) ? trim($value) : self::sanitizeJsonValue($value);
+        }
+
         // Required check
         if (!empty($field['required']) && ($value === '' || $value === null)) {
             /* translators: %s: field label */
             return sprintf(__('%s is required.', 'taw-core'), $label);
         }
 
+        return self::validateCustom($field, $value, $isJson);
+    }
+
+    /**
+     * The JSON parse check (json fields) and the field's own `validate`
+     * callable. A json field's callable runs only once the JSON parses, with
+     * the decoded value (PHP arrays) and, when it takes a second parameter,
+     * the submitted text (decode that yourself to tell `{}` from `[]`); an
+     * empty json field isn't checked. Shared by options pages.
+     *
+     * @param array<string, mixed> $field
+     */
+    public static function validateCustom(array $field, mixed $value, bool $isJson): true|string
+    {
+        $label = $field['label'] ?? $field['id'];
+        $args = [$value];
+        if ($isJson) {
+            if ($value === '') {
+                return true;
+            }
+            $parsed = self::parseJson((string) $value);
+            if (!$parsed['ok']) {
+                /* translators: 1: field label, 2: the JSON parser's message */
+                return sprintf(__('%1$s: invalid JSON (%2$s).', 'taw-core'), $label, $parsed['error']);
+            }
+            $args = self::acceptsArguments($field['validate'] ?? null, 2) ? [$parsed['value'], $value] : [$parsed['value']];
+        }
+
         // Custom validation callback
         if (isset($field['validate']) && is_callable($field['validate'])) {
-            $result = call_user_func($field['validate'], $value);
+            $result = call_user_func_array($field['validate'], $args);
             if ($result !== true) {
                 /* translators: %s: field label */
                 return is_string($result) ? $result : sprintf(__('%s is invalid.', 'taw-core'), $label);
@@ -4463,6 +4864,7 @@ class Metabox
             'gradient_text' => self::sanitizeGradientTextValue($value),
             'hubspot_form'  => self::sanitizeHubspotFormValue($value),
             'link'          => self::sanitizeLinkValue($value),
+            'json'          => self::sanitizeJsonValue($value),
             default         => self::sanitizeValue($fieldConfig, $value),
         };
     }
@@ -4730,8 +5132,9 @@ class Metabox
      */
     public static function editorConfigOf(array $field): mixed
     {
-        // Default true — opt-out via 'editor' => false
-        $editor = $field['editor'] ?? true;
+        // Default true — opt-out via 'editor' => false. A json field has no
+        // inline editor control, so it's off unless the field asks for it.
+        $editor = $field['editor'] ?? (($field['type'] ?? '') !== 'json');
 
         if ($editor === false || $editor === null) {
             return null;
@@ -4775,6 +5178,12 @@ class Metabox
             // A user screen, after save_user() found errors.
             $key = 'taw_validation_errors_user_' . $userId;
         } else {
+            return;
+        }
+
+        // The block editor's metabox save renders this screen unseen (a fetch
+        // following the redirect): leave the errors for the reload.
+        if (!self::isPageLoad()) {
             return;
         }
 
