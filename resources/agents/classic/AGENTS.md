@@ -911,7 +911,7 @@ Metabox::get_repeater(int $postId, string $fieldId): array // repeater → array
 
 By default WordPress lets any user drag-and-drop reorder metaboxes, saved per-user, so the same edit screen can look different for every editor. `TAW\Core\Metabox\MetaboxOrder` forces a fixed order and disables dragging.
 
-**`MetaboxOrder::lockFromTemplate()` runs automatically** — `Theme::bootstrapFullSite()` (called by `functions.php`) calls it unconditionally, nothing to add. It works via a static scan of each page's template file (never executed in wp-admin), so the edit screen's metabox order always matches the order blocks actually render in on the front end. Boxes not tied to a block on the page (e.g. core WordPress boxes) keep their relative position and render after the ordered ones.
+**`MetaboxOrder::lockFromTemplate()` runs automatically** — `Theme::bootstrapFullSite()` (called by `functions.php`) calls it unconditionally, nothing to add. It works via a static scan of each page's template file (never executed in wp-admin), so the edit screen's metabox order always matches the order blocks actually render in on the front end. Boxes not tied to a block on the page (e.g. core WordPress boxes) keep their relative position and render after the ordered ones. It covers `page` only; for a custom post type whose `single-{type}.php` renders blocks, add `MetaboxOrder::lockFromTemplate('<type>');` to `inc/customizations.php` (taw/core ≥ v1.97.1).
 
 To use an **explicit** order instead of the automatic template-derived one, add this to `inc/customizations.php` (never `functions.php` — that file is framework-owned and never touched by updates):
 
