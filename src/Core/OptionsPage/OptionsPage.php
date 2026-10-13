@@ -794,7 +794,7 @@ class OptionsPage
 
             /* ---- Files (multi-attachment gallery) ---- */
             case 'files':
-                $ids        = $value ? json_decode($value, true) : [];
+                $ids        = is_array($value) ? $value : ($value ? json_decode((string) $value, true) : []);
                 if (!is_array($ids)) $ids = [];
                 $limit      = $field['limit']      ?? 0;
                 $file_types = $field['file_types']  ?? '';
@@ -856,7 +856,7 @@ class OptionsPage
                 $max        = $field['max'] ?? 0;
 
                 if ($multiple) {
-                    $selected_ids = $value ? json_decode($value, true) : [];
+                    $selected_ids = is_array($value) ? $value : ($value ? json_decode((string) $value, true) : []);
                     if (!is_array($selected_ids)) $selected_ids = [];
                 } else {
                     $selected_ids = $value ? [absint($value)] : [];
@@ -908,7 +908,12 @@ class OptionsPage
                 $button_label = $field['button_label']  ?? __('Add Row', 'taw-core');
                 $layout       = $field['layout']        ?? '';
 
-                $rows = $value ? json_decode($value, true) : [];
+                // A repeater inside a repeater row arrives as the row's decoded
+                // array (rows store nested repeaters that way, as Metabox does).
+                if (is_array($value)) {
+                    $value = wp_json_encode($value, JSON_UNESCAPED_UNICODE) ?: '[]';
+                }
+                $rows = $value ? json_decode((string) $value, true) : [];
                 if (!is_array($rows)) $rows = [];
 
                 $tpl_placeholder = '__TAWRPT_' . $field_id . '__';
@@ -1190,7 +1195,7 @@ class OptionsPage
             return $id ? (string) $id : '';
         }
 
-        $ids = json_decode($value, true);
+        $ids = is_array($value) ? $value : json_decode((string) $value, true);
         if (!is_array($ids)) {
             return '[]';
         }
@@ -1210,7 +1215,7 @@ class OptionsPage
      */
     private function sanitize_files(mixed $value): string
     {
-        $ids = json_decode((string) $value, true);
+        $ids = is_array($value) ? $value : json_decode((string) $value, true);
         if (!is_array($ids)) return '[]';
 
         $clean = array_values(array_filter(array_map('absint', $ids)));
@@ -1222,7 +1227,8 @@ class OptionsPage
      */
     private function sanitize_repeater(array $field, mixed $value): string
     {
-        $rows = json_decode($value, true);
+        // A nested repeater's value is already the row's decoded array.
+        $rows = is_array($value) ? $value : json_decode((string) $value, true);
         if (!is_array($rows)) {
             return '[]';
         }
