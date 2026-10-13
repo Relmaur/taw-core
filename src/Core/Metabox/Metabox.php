@@ -3954,7 +3954,8 @@ class Metabox
      */
     private function sanitize_repeater(array $field, mixed $value): string
     {
-        $rows = json_decode($value, true);
+        // A nested repeater's value may already be the row's decoded array.
+        $rows = is_array($value) ? $value : json_decode((string) $value, true);
         if (!is_array($rows)) {
             return '[]';
         }

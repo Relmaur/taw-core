@@ -928,6 +928,16 @@ are unchanged. Snapshots say `"schema": "1.8"`; older taw/core imports them best
 entry with `sha256` matches only a file holding the same bytes, so a file at the same path with other bytes is now
 brought as a new file instead of kept. **Undo:** none needed.
 
+### v1.98.1: a repeater inside a repeater row on an options page
+
+**What changed.** An options page whose repeater has a repeater sub-field crashed with "critical error" (a
+`json_decode()` TypeError): rows keep a nested repeater as an array, as metaboxes do, and the options page only read
+JSON strings. It now renders and saves that shape (also `files` and multiple `post_select` given as arrays), and
+stores it as before. `taw update` also recognises taw-theme v1.12.75's `tests/TestCase.php` as the scaffold's (its
+sha256 is in `keep_edited`), so a site with it, or with the older unedited one, gets the current copy.
+
+**Check:** none; nothing stored changes. **Undo:** none needed.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
