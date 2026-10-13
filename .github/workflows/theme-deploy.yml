@@ -1,0 +1,163 @@
+name: TAW theme deploy (shared)
+
+# Deploys a TAW theme to its host, any host: called by the theme's
+# .github/workflows/deploy.yml stub (taw/core resources/deploy/deploy.yml,
+# written by `taw-fleet deploy setup`) after CI passed on the default branch.
+# The site's settings are repository variables (DEPLOY_*), its key the one
+# secret DEPLOY_SSH_KEY; the stub passes them in. Two methods:
+#
+#   rsync  SSH + rsync into the theme's folder on the server.
+#   git    a commit of the built theme pushed to the host's git remote.
+#
+# By hand, from the theme folder: composer install --no-dev, npm run build,
+# then DEPLOY_METHOD=… DEPLOY_HOST=… bash vendor/taw/core/resources/ci/deploy.sh
+# (DEPLOY_DRY_RUN=1 builds and checks the payload without shipping it).
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: The commit CI verified
+        type: string
+        required: true
+      method:
+        description: rsync or git
+        type: string
+        required: true
+      host:
+        type: string
+        default: ""
+      port:
+        type: string
+        default: "22"
+      user:
+        type: string
+        default: ""
+      path:
+        description: "rsync: the theme's folder on the server (…/themes/<name>)"
+        type: string
+        default: ""
+      git-remote:
+        type: string
+        default: ""
+      git-branch:
+        type: string
+        default: master
+      git-path:
+        description: "git: where the theme sits in the host's repository (default wp-content/themes/<folder>)"
+        type: string
+        default: ""
+      known-hosts:
+        description: The server's SSH host keys, pinned when the deploy was set up
+        type: string
+        default: ""
+      php-version:
+        type: string
+        default: "8.2"
+    secrets:
+      ssh-key:
+        required: true
+
+concurrency:
+  group: taw-deploy-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # The theme is checked out in theme/, taw-core's script beside it, so the script is
+        # never part of what ships.
+        working-directory: theme
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          path: theme
+          persist-credentials: false
+
+      # The script from the taw-core branch the themes call this workflow at.
+      - uses: actions/checkout@v7
+        with:
+          repository: Relmaur/taw-core
+          ref: v1
+          path: .taw-core-ci
+          sparse-checkout: resources/ci
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php-version }}
+          tools: composer:v2
+          coverage: none
+
+      - name: PHP dependencies (production only)
+        env:
+          COMPOSER_AUTH: '{"github-oauth": {"github.com": "${{ github.token }}"}}'
+        run: composer install --no-interaction --prefer-dist --no-progress --no-dev --optimize-autoloader
+
+      - name: Is there a front-end build?
+        id: front
+        run: |
+          if [ -f package.json ] && node -e 'process.exit(require("./package.json").scripts?.build ? 0 : 1)'; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.front.outputs.build == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - if: steps.front.outputs.build == 'true'
+        name: Front-end build
+        run: |
+          npm ci
+          npm run build
+
+      # The key goes to ssh-agent from the environment, never onto a command line or into the
+      # log; the server's host key is the one pinned at setup (no trust on first use).
+      - name: SSH
+        env:
+          SSH_KEY: ${{ secrets.ssh-key }}
+          KNOWN_HOSTS: ${{ inputs.known-hosts }}
+          METHOD: ${{ inputs.method }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          eval "$(ssh-agent -s)" > /dev/null
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          printf '%s\n' "$SSH_KEY" | ssh-add - > /dev/null 2>&1 || { echo "::error::DEPLOY_SSH_KEY isn't a usable private key"; exit 1; }
+          if [ -n "$KNOWN_HOSTS" ]; then
+            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            echo "::error::DEPLOY_KNOWN_HOSTS isn't set: the server's host key is pinned when the deploy is set up (taw-fleet deploy setup), never trusted on first use"
+            exit 1
+          fi
+          chmod 600 ~/.ssh/known_hosts
+          if [ "$METHOD" = "git" ]; then
+            echo "GIT_SSH_COMMAND=ssh -o BatchMode=yes -o StrictHostKeyChecking=yes" >> "$GITHUB_ENV"
+          fi
+
+      - name: Deploy
+        env:
+          DEPLOY_METHOD: ${{ inputs.method }}
+          DEPLOY_HOST: ${{ inputs.host }}
+          DEPLOY_PORT: ${{ inputs.port }}
+          DEPLOY_USER: ${{ inputs.user }}
+          DEPLOY_PATH: ${{ inputs.path }}
+          DEPLOY_GIT_REMOTE: ${{ inputs.git-remote }}
+          DEPLOY_GIT_BRANCH: ${{ inputs.git-branch }}
+          DEPLOY_GIT_PATH: ${{ inputs.git-path }}
+        run: |
+          # The checkout folder isn't the theme's folder name: git needs its path said.
+          if [ "$DEPLOY_METHOD" = "git" ] && [ -z "$DEPLOY_GIT_PATH" ]; then
+            echo "::error::DEPLOY_GIT_PATH isn't set (e.g. wp-content/themes/<the theme's folder>)"
+            exit 1
+          fi
+          bash ../.taw-core-ci/resources/ci/deploy.sh
+
+      - name: Clean up
+        if: always()
+        run: |
+          ssh-add -D > /dev/null 2>&1 || true
+          rm -rf ~/.ssh

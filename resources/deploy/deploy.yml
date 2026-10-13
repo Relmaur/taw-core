@@ -1,0 +1,33 @@
+name: Deploy
+
+# Deploys this theme to its host after CI passes on the default branch, through
+# taw/core's shared theme-deploy.yml (SSH + rsync, or git push; any host).
+# Written by `taw-fleet deploy setup`, which also sets the repository's
+# variables (DEPLOY_METHOD, DEPLOY_HOST, DEPLOY_PORT, DEPLOY_USER, DEPLOY_PATH,
+# DEPLOY_GIT_REMOTE, DEPLOY_GIT_BRANCH, DEPLOY_GIT_PATH, DEPLOY_KNOWN_HOSTS) and
+# its secret DEPLOY_SSH_KEY. Until DEPLOY_METHOD is set, it does nothing.
+# By hand: see the top of taw-core's .github/workflows/theme-deploy.yml.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main, master]
+
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success' && vars.DEPLOY_METHOD != ''
+    uses: Relmaur/taw-core/.github/workflows/theme-deploy.yml@v1
+    with:
+      ref: ${{ github.event.workflow_run.head_sha }}
+      method: ${{ vars.DEPLOY_METHOD }}
+      host: ${{ vars.DEPLOY_HOST }}
+      port: ${{ vars.DEPLOY_PORT || '22' }}
+      user: ${{ vars.DEPLOY_USER }}
+      path: ${{ vars.DEPLOY_PATH }}
+      git-remote: ${{ vars.DEPLOY_GIT_REMOTE }}
+      git-branch: ${{ vars.DEPLOY_GIT_BRANCH || 'master' }}
+      git-path: ${{ vars.DEPLOY_GIT_PATH }}
+      known-hosts: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+    secrets:
+      ssh-key: ${{ secrets.DEPLOY_SSH_KEY }}
