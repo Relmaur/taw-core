@@ -903,6 +903,16 @@ payload check that refuses dumps and credentials. See README § Theme deploy.
 **Check:** none: a theme deploys this way only once its `.github/workflows/deploy.yml` is the stub and its
 variables are set (`taw-fleet deploy setup`). A theme's own deploy workflow is untouched. **Undo:** none needed.
 
+### v1.97.1: metabox order on a custom post type's single template
+
+**What changed.** `MetaboxOrder::lockFromTemplate('<post type>')` now finds the template of a post that isn't a page
+through WordPress's single hierarchy (`single-{type}-{slug}.php`, `single-{type}.php`, `single.php`), after the page
+conventions. Before, it found no file for such a post, and its boxes kept their registration order.
+
+**Check:** none; pages resolve as before, and nothing calls it for other post types unless the theme does. **By
+hand:** to order a custom post type's edit screen by its single template, add
+`MetaboxOrder::lockFromTemplate('<post type>');` to `inc/customizations.php`. **Undo:** remove that line.
+
 ### v1.98.0: publishing content, conflicts, and a review that names each field
 
 **What changed.** Content Interchange 1.8. A plan names every change by its field (*Fieldset › Label*, its type

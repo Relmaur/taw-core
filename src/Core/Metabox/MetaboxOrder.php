@@ -32,7 +32,10 @@ if (!defined('ABSPATH')) {
  * explicitly-selected page template (`_wp_page_template`) wins, then the
  * filename conventions that need no Page Attributes selection —
  * `front-page.php` (static front page), `home.php` (posts page), and
- * `page-{slug}.php`. Posts matching none of these are left unordered.
+ * `page-{slug}.php`; for other post types, then the single hierarchy:
+ * `single-{type}-{slug}.php`, `single-{type}.php`, `single.php` (v1.97.1;
+ * `lockFromTemplate('role-page')` for a custom post type). Posts matching
+ * none of these are left unordered.
  */
 class MetaboxOrder
 {
@@ -89,12 +92,13 @@ class MetaboxOrder
      * real file in the theme. That covers an explicitly-selected page
      * template (`_wp_page_template`) as well as the filename conventions that
      * need no Page Attributes selection: `front-page.php`, `home.php`, and
-     * `page-{slug}.php`.
+     * `page-{slug}.php`; then, for other post types, the single hierarchy
+     * ({@see self::orderCandidates()}).
      */
     private static function orderForPost(\WP_Post $post): array
     {
         $file = false;
-        foreach (Metabox::templateCandidatesForPost($post) as $candidate) {
+        foreach (self::orderCandidates($post) as $candidate) {
             $file = locate_template([$candidate]);
             if ($file) {
                 break;
@@ -107,6 +111,28 @@ class MetaboxOrder
 
         $blockIds = self::blockOrderFromTemplateFile($file);
         return self::metaboxOrderForBlocks($blockIds);
+    }
+
+    /**
+     * The template files that may render a post, most specific first:
+     * Metabox::templateCandidatesForPost() (page conventions), then, for a
+     * post that isn't a page, WordPress's single hierarchy. Only the order
+     * lookup uses the single templates; screen matching doesn't.
+     *
+     * @return list<string>
+     */
+    public static function orderCandidates(\WP_Post $post): array
+    {
+        $candidates = Metabox::templateCandidatesForPost($post);
+        if ($post->post_type !== 'page') {
+            if ($post->post_name !== '') {
+                $candidates[] = "single-{$post->post_type}-{$post->post_name}.php";
+            }
+            $candidates[] = "single-{$post->post_type}.php";
+            $candidates[] = 'single.php';
+        }
+
+        return array_values(array_unique($candidates));
     }
 
     /**

@@ -1,0 +1,2 @@
+<?php
+BlockRegistry::render('florilegium');

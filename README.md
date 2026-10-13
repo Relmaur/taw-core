@@ -838,9 +838,10 @@ Template resolution mirrors WordPress's own hierarchy, not just the raw Page Att
 - `front-page.php` for the site's static front page (Settings → Reading) — no `Template Name:` header or Page Attributes selection required, since `front-page.php` renders whenever `is_front_page()` is true regardless of what's picked in that dropdown.
 - `home.php` for the posts page (Settings → Reading → "Posts page") — same filename convention, no meta written.
 - `page-{slug}.php` for a page whose slug is `{slug}` — WordPress applies it automatically via the template hierarchy, again with no meta written.
+- For any other post type (v1.97.1), then the single hierarchy: `single-{type}-{slug}.php`, `single-{type}.php`, `single.php`. Call `MetaboxOrder::lockFromTemplate('role-page')` for each custom post type whose single template renders blocks (`bootstrapFullSite()` only locks `page`).
 - Posts matching none of these are left unordered.
 
-Both this resolution and the `screens` template matching in `Metabox` share one code path (`Metabox::templateCandidatesForPost()`), so they can't drift apart.
+The page candidates are shared with the `screens` template matching in `Metabox` (`Metabox::templateCandidatesForPost()`), so they can't drift apart; only the order lookup adds the single templates (`MetaboxOrder::orderCandidates()`).
 
 ### Data panel: fields in a block-editor sidebar (v1.51.0+)
 
