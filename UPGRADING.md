@@ -882,6 +882,17 @@ field empty. Rendering every published page of a site that uses defaults (chcapi
 of yours relied on it, add the page to that metabox's `screens`, or declare the default on the metabox that
 applies. **Undo:** none needed.
 
+### v1.96.0: the build-site skill
+
+**What changed.** A third site skill ships with taw/core, `build-site`: it builds a whole site in the theme from a
+brief (design tokens and fonts, header, footer and menus, site options, then each page with its content and
+images), on a branch, ending with the theme's checks and every page answering. Classic themes reuse the theme's own
+`build-page`, `make-metablock`, `figma-to-block` and `populate-content`; block themes get their own steps. taw-fleet's
+new-site skill (taw-fleet 1.25) writes the brief from a link and hands over to it.
+
+**Check:** the migration `1.89.0/site-skills` installs it in `.claude/skills/build-site/` (or `taw skills:sync
+--apply`). **Undo:** delete the folder.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

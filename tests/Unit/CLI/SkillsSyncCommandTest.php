@@ -46,6 +46,7 @@ final class SkillsSyncCommandTest extends TestCase
         $this->assertFileExists($this->theme . '/.claude/skills/resolve-comments/SKILL.md');
         $this->assertFileExists($this->theme . '/.claude/skills/resolve-comments/playbooks/content.md');
         $this->assertFileExists($this->theme . '/.claude/skills/perf-audit/SKILL.md');
+        $this->assertFileExists($this->theme . '/.claude/skills/build-site/SKILL.md');
         $this->assertFileExists($this->theme . '/.claude/skills/publish-news/SKILL.md', 'the site skill stays');
         $this->assertFileExists($this->theme . '/.claude/skills/studio/SKILL.md', 'skills taw/core does not ship are never touched');
 

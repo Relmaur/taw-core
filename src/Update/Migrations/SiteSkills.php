@@ -10,7 +10,7 @@ use TAW\Update\MigrationResult;
 
 /**
  * taw/core 1.89.0: the site skills taw/core ships (resolve-comments,
- * perf-audit…) are installed in the theme's .claude/skills/, where Claude
+ * perf-audit, build-site…) are installed in the theme's .claude/skills/, where Claude
  * Code finds them. Refreshes them when taw/core's copy changed.
  */
 final class SiteSkills implements \TAW\Update\Migration, \TAW\Update\PolicyGated
@@ -39,7 +39,7 @@ final class SiteSkills implements \TAW\Update\Migration, \TAW\Update\PolicyGated
     {
         return <<<'TXT'
             What: copies the site skills taw/core ships (vendor/taw/core/resources/skills/: resolve-comments,
-            perf-audit) into the theme's .claude/skills/, or refreshes them when taw/core's copy changed.
+            perf-audit, build-site) into the theme's .claude/skills/, or refreshes them when taw/core's copy changed.
             A skill of the same name the site wrote itself (owner: site in its SKILL.md) is kept.
 
             Why: Claude Code finds skills in the theme folder; taw-fleet starts it there (X, a).
