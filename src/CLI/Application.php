@@ -78,6 +78,13 @@ final class Application
             new DocsSyncCommand($themeDir),
             new UpgradeCommand($themeDir),
             new UpdateCommand($themeDir),
+            // Content Interchange works in any theme that boots taw/core's data
+            // layer (Boot::data()): block themes pull and publish too (v1.98.0).
+            new ContentExportCommand($themeDir),
+            new ContentImportCommand($themeDir),
+            new ContentDiffCommand($themeDir),
+            new ContentJournalsCommand($themeDir),
+            new ContentDefaultsCommand($themeDir),
         ];
         if (self::isBlockTheme($themeDir)) {
             return $everywhere;
@@ -97,10 +104,6 @@ final class Application
             new WpCliCommand($themeDir),
             new IconsSyncCommand(),
             new LogTailCommand($themeDir),
-            new ContentExportCommand($themeDir),
-            new ContentImportCommand($themeDir),
-            new ContentDiffCommand($themeDir),
-            new ContentDefaultsCommand($themeDir),
             new ContentReindexCommand($themeDir),
             new ContentReindexKbCommand($themeDir),
             new RagUsageCommand($themeDir),

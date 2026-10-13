@@ -39,10 +39,10 @@ final class ApplicationTest extends TestCase
     public function test_a_classic_theme_gets_every_command(): void
     {
         $app = Application::create($this->dir);
-        foreach (['make:block', 'sync', 'skills:sync', 'schema:validate', 'content:import', 'wp', 'log:tail', 'canon-law:install'] as $name) {
+        foreach (['make:block', 'sync', 'skills:sync', 'schema:validate', 'content:import', 'content:journals', 'wp', 'log:tail', 'canon-law:install'] as $name) {
             $this->assertTrue($app->has($name), $name);
         }
-        $this->assertCount(35, Application::coreCommands($this->dir), 'the list the scaffold bin/taw had, plus skills:sync, policy, docs:sync, configs:sync, upgrade and update, and the two hidden hub:* stubs');
+        $this->assertCount(36, Application::coreCommands($this->dir), 'the list the scaffold bin/taw had, plus skills:sync, policy, docs:sync, configs:sync, upgrade, update and content:journals, and the two hidden hub:* stubs');
         $this->assertTrue($app->get('hub:install')->isHidden(), 'retired: hidden, but it says what replaced it');
     }
 
@@ -58,6 +58,9 @@ final class ApplicationTest extends TestCase
         $this->assertTrue($app->has('policy'));
         $this->assertTrue($app->has('docs:sync'));
         $this->assertTrue($app->has('upgrade'));
+        foreach (['content:export', 'content:import', 'content:diff', 'content:journals', 'content:defaults'] as $name) {
+            $this->assertTrue($app->has($name), "{$name}: block themes pull and publish too");
+        }
         $this->assertFalse($app->has('make:block'));
         $this->assertFalse($app->has('sync'));
         $this->assertFalse($app->has('configs:sync'), 'classic configs only');

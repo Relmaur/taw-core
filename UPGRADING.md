@@ -913,6 +913,21 @@ conventions. Before, it found no file for such a post, and its boxes kept their 
 hand:** to order a custom post type's edit screen by its single template, add
 `MetaboxOrder::lockFromTemplate('<post type>');` to `inc/customizations.php`. **Undo:** remove that line.
 
+### v1.98.0: publishing content, conflicts, and a review that names each field
+
+**What changed.** Content Interchange 1.8. A plan names every change by its field (*Fieldset › Label*, its type
+and block), and a change-set made with a base says what the target changed since (`conflict`). `keep` leaves values
+as the target has them. Media can say what its file holds (`sha256`), and an import can take files from disk instead
+of downloading them. Block themes get the `content:*` commands too (export, import, diff, journals, defaults).
+`TAW\Core\Content\Publish` does a reviewed publish in steps (plan, upload the files, apply with a
+one-time token, undo); the TAW companion 0.5 exposes it to taw-fleet. Tools → TAW Data shows the labels, conflicts
+and a checkbox per record; `content:journals` lists imports. See README § Plan details, conflicts and publishing.
+
+**Check:** none. A plan's records and changes gained keys (`record_key`, `hash`, `title`, `label`…); existing ones
+are unchanged. Snapshots say `"schema": "1.8"`; older taw/core imports them best-effort, with a warning. A media
+entry with `sha256` matches only a file holding the same bytes, so a file at the same path with other bytes is now
+brought as a new file instead of kept. **Undo:** none needed.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

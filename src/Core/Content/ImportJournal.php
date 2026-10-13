@@ -110,30 +110,83 @@ final class ImportJournal
      */
     public static function undo(array $entries, RecordStore $store): array
     {
+        return self::reverse($entries, $store, false);
+    }
+
+    /**
+     * What {@see self::undo()} would do now, writing nothing: the values it
+     * would put back, the records it would delete and recreate, and what it
+     * would keep because it was edited since.
+     *
+     * @param list<array<string, mixed>> $entries
+     * @return array{restored: int, deleted: int, recreated: int, kept: list<string>}
+     */
+    public static function preview(array $entries, RecordStore $store): array
+    {
+        return self::reverse($entries, $store, true);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $entries
+     * @return array{restored: int, deleted: int, recreated: int, kept: list<string>}
+     */
+    private static function reverse(array $entries, RecordStore $store, bool $dry): array
+    {
         $result = ['restored' => 0, 'deleted' => 0, 'recreated' => 0, 'kept' => []];
         $isCreate = static fn (array $e): bool => ($e['action'] ?? '') === 'created';
         // Updates and deletes first, then what the import created, newest
         // first (a comment before its post).
         foreach (array_reverse(array_values(array_filter($entries, static fn (array $e): bool => !$isCreate($e)))) as $entry) {
-            self::undoOne($entry, $store, $result);
+            self::undoOne($entry, $store, $result, $dry);
         }
         foreach (array_reverse(array_values(array_filter($entries, $isCreate))) as $entry) {
-            self::undoOne($entry, $store, $result);
+            self::undoOne($entry, $store, $result, $dry);
         }
 
         return $result;
     }
 
     /**
+     * A record as people know it: its title (and type), else kind and id.
+     *
+     * @param array<string, mixed>|null $capture
+     */
+    private static function label(string $kind, int|string $id, ?array $capture): string
+    {
+        $fields = is_array($capture['fields'] ?? null) ? $capture['fields'] : [];
+        $name = match ($kind) {
+            'post'  => $fields['post_title'] ?? null,
+            'term'  => $fields['name'] ?? null,
+            'user'  => $fields['display_name'] ?? $fields['user_login'] ?? null,
+            default => null,
+        };
+        if ($kind === 'option') {
+            return 'option ' . $id;
+        }
+        if (!is_string($name) || $name === '') {
+            return $kind . ':' . $id;
+        }
+        $type = $fields['post_type'] ?? $fields['taxonomy'] ?? null;
+
+        return (is_string($type) && $type !== '' ? $type . ' ' : '') . '“' . $name . '”';
+    }
+
+    /** A captured path without its storage prefix: "fields.post_content" → "post_content", "meta._taw_hero" → "hero". */
+    private static function pathLabel(string $path): string
+    {
+        return (string) preg_replace(['/^fields\./', '/^meta\._taw_/', '/^meta\./'], '', $path);
+    }
+
+    /**
      * @param array<string, mixed>                                                           $entry
      * @param array{restored: int, deleted: int, recreated: int, kept: list<string>} $result
      */
-    private static function undoOne(array $entry, RecordStore $store, array &$result): void
+    private static function undoOne(array $entry, RecordStore $store, array &$result, bool $dry = false): void
     {
         $kind = (string) ($entry['kind'] ?? '');
         $id = $entry['id'] ?? 0;
-        $label = $kind . ':' . $id;
         $current = $store->capture($kind, $id, false);
+        $label = self::label($kind, $id, $current);
 
         switch ($entry['action'] ?? '') {
             case 'created':
@@ -144,7 +197,9 @@ final class ImportJournal
                     $result['kept'][] = "{$label} (created by the import, edited since)";
                     return;
                 }
-                $store->delete($kind, $id);
+                if (!$dry) {
+                    $store->delete($kind, $id);
+                }
                 $result['deleted']++;
                 return;
 
@@ -152,7 +207,7 @@ final class ImportJournal
                 if ($current !== null) {
                     return; // back already
                 }
-                if ($store->recreate($kind, is_array($entry['before'] ?? null) ? $entry['before'] : [])) {
+                if ($dry || $store->recreate($kind, is_array($entry['before'] ?? null) ? $entry['before'] : [])) {
                     $result['recreated']++;
                 }
                 return;
@@ -169,11 +224,13 @@ final class ImportJournal
                     if (self::same($now, $change['after'] ?? null)) {
                         $restore[(string) $path] = $change['before'] ?? null;
                     } elseif (!self::same($now, $change['before'] ?? null)) {
-                        $result['kept'][] = "{$label} {$path} (edited since)";
+                        $result['kept'][] = "{$label} › " . self::pathLabel((string) $path) . ' (edited since)';
                     }
                 }
                 if ($restore !== []) {
-                    $store->restore($kind, $id, $restore);
+                    if (!$dry) {
+                        $store->restore($kind, $id, $restore);
+                    }
                     $result['restored'] += count($restore);
                 }
                 return;

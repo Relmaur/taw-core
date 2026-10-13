@@ -22,11 +22,51 @@ namespace TAW\Core\Content;
 final class ChangeSet
 {
     /**
+     * `$options['with_base']` (1.8) puts on each update and delete operation
+     * the record as $base has it (`base`), and `base_fingerprint` on the
+     * change-set: when $base is the target site's own state, the import can
+     * tell, per value, what the target changed since ({@see Importer::plan()}
+     * `conflict`), which is what a publish needs.
+     *
      * @param array<string, mixed> $base   The "from" snapshot.
      * @param array<string, mixed> $target The "to" snapshot.
-     * @return array{taw_changeset: array{schema: string, base: mixed, target: mixed}, operations: list<array<string, mixed>>}
+     * @param array{with_base?: bool} $options
+     * @return array{taw_changeset: array{schema: string, base: mixed, target: mixed, base_fingerprint?: string}, operations: list<array<string, mixed>>}
      */
-    public static function between(array $base, array $target): array
+    public static function between(array $base, array $target, array $options = []): array
+    {
+        self::$withBase = !empty($options['with_base']);
+        try {
+            return self::build($base, $target);
+        } finally {
+            self::$withBase = false;
+        }
+    }
+
+    /** Whether operations carry their base record (see {@see self::between()}). */
+    private static bool $withBase = false;
+
+    /**
+     * $op with the base's $record, when asked for.
+     *
+     * @param array<string, mixed> $op
+     * @return array<string, mixed>
+     */
+    private static function withBase(array $op, mixed $record): array
+    {
+        if (self::$withBase && is_array($record)) {
+            $op['base'] = $record;
+        }
+
+        return $op;
+    }
+
+    /**
+     * @param array<string, mixed> $base
+     * @param array<string, mixed> $target
+     * @return array{taw_changeset: array{schema: string, base: mixed, target: mixed, base_fingerprint?: string}, operations: list<array<string, mixed>>}
+     */
+    private static function build(array $base, array $target): array
     {
         $operations = [];
 
@@ -49,6 +89,9 @@ final class ChangeSet
                 'target' => $target['meta']['source'] ?? null,
             ],
         ];
+        if (self::$withBase) {
+            $changeSet['taw_changeset']['base_fingerprint'] = hash('sha256', self::normalize($base));
+        }
         // What the import needs to land these operations on another site
         // (1.6): the source (URLs rewrite), `refs` (IDs map), and the media
         // the operations reference (files sideload, attachment IDs map).
@@ -220,16 +263,16 @@ final class ChangeSet
                 continue;
             }
             if (self::normalize($baseMap[$key]) !== self::normalize($record)) {
-                $ops[] = ['op' => 'update', 'target' => $t, 'post' => $record];
+                $ops[] = self::withBase(['op' => 'update', 'target' => $t, 'post' => $record], $baseMap[$key]);
             }
         }
 
         foreach ($deletes ? $baseMap : [] as $key => $record) {
             if (!isset($targetMap[$key])) {
-                $ops[] = [
+                $ops[] = self::withBase([
                     'op'     => 'delete',
                     'target' => Importer::postTarget($record),
-                ];
+                ], $record);
             }
         }
 
@@ -256,12 +299,12 @@ final class ChangeSet
             if (!isset($baseMap[$key])) {
                 $ops[] = ['op' => 'create', 'target' => $t, 'fields' => $record];
             } elseif (self::normalize($baseMap[$key]) !== self::normalize($record)) {
-                $ops[] = ['op' => 'update', 'target' => $t, 'fields' => $record];
+                $ops[] = self::withBase(['op' => 'update', 'target' => $t, 'fields' => $record], $baseMap[$key]);
             }
         }
         foreach ($deletes ? $baseMap : [] as $key => $record) {
             if ($key !== '' && !isset($targetMap[$key])) {
-                $ops[] = ['op' => 'delete', 'target' => ['kind' => 'user', 'key' => $key]];
+                $ops[] = self::withBase(['op' => 'delete', 'target' => ['kind' => 'user', 'key' => $key]], $record);
             }
         }
         return $ops;
@@ -316,12 +359,12 @@ final class ChangeSet
             if (!isset($baseMap[$key])) {
                 $ops[] = ['op' => 'create', 'target' => $t, 'fields' => $record];
             } elseif (self::normalize($baseMap[$key]) !== self::normalize($record)) {
-                $ops[] = ['op' => 'update', 'target' => $t, 'fields' => $record];
+                $ops[] = self::withBase(['op' => 'update', 'target' => $t, 'fields' => $record], $baseMap[$key]);
             }
         }
         foreach ($deletes ? $baseMap : [] as $key => $record) {
             if ($key !== '' && !isset($targetMap[$key])) {
-                $ops[] = ['op' => 'delete', 'target' => ['kind' => 'menu', 'key' => $key]];
+                $ops[] = self::withBase(['op' => 'delete', 'target' => ['kind' => 'menu', 'key' => $key]], $record);
             }
         }
         return $ops;
@@ -339,7 +382,8 @@ final class ChangeSet
         $ops = [];
         foreach (is_array($target) ? $target : [] as $key => $value) {
             if (!array_key_exists($key, $base) || self::normalize($base[$key]) !== self::normalize($value)) {
-                $ops[] = ['op' => 'update', 'target' => ['kind' => $kind, 'key' => (string) $key], 'fields' => ['value' => $value]];
+                $op = ['op' => 'update', 'target' => ['kind' => $kind, 'key' => (string) $key], 'fields' => ['value' => $value]];
+                $ops[] = array_key_exists($key, $base) ? self::withBase($op, ['value' => $base[$key]]) : $op;
             }
         }
         return $ops;
@@ -360,13 +404,13 @@ final class ChangeSet
             if (!array_key_exists($key, $base)) {
                 $ops[] = ['op' => 'create', 'target' => ['kind' => 'option', 'key' => $key], 'fields' => ['value' => $value]];
             } elseif (self::normalize($base[$key]) !== self::normalize($value)) {
-                $ops[] = ['op' => 'update', 'target' => ['kind' => 'option', 'key' => $key], 'fields' => ['value' => $value]];
+                $ops[] = self::withBase(['op' => 'update', 'target' => ['kind' => 'option', 'key' => $key], 'fields' => ['value' => $value]], ['value' => $base[$key]]);
             }
         }
 
         foreach ($deletes ? $base : [] as $key => $value) {
             if (!array_key_exists($key, $target)) {
-                $ops[] = ['op' => 'delete', 'target' => ['kind' => 'option', 'key' => $key]];
+                $ops[] = self::withBase(['op' => 'delete', 'target' => ['kind' => 'option', 'key' => $key]], ['value' => $value]);
             }
         }
 
@@ -401,13 +445,13 @@ final class ChangeSet
             if (!isset($baseMap[$key])) {
                 $ops[] = ['op' => 'create', 'target' => $t, 'fields' => $entry['row']];
             } elseif (self::normalize($baseMap[$key]['row']) !== self::normalize($entry['row'])) {
-                $ops[] = ['op' => 'update', 'target' => $t, 'fields' => $entry['row']];
+                $ops[] = self::withBase(['op' => 'update', 'target' => $t, 'fields' => $entry['row']], $baseMap[$key]['row']);
             }
         }
 
         foreach ($deletes ? $baseMap : [] as $key => $entry) {
             if (!isset($targetMap[$key])) {
-                $ops[] = ['op' => 'delete', 'target' => ['kind' => 'term', 'type' => $entry['taxonomy'], 'slug' => $entry['row']['slug']]];
+                $ops[] = self::withBase(['op' => 'delete', 'target' => ['kind' => 'term', 'type' => $entry['taxonomy'], 'slug' => $entry['row']['slug']]], $entry['row']);
             }
         }
 

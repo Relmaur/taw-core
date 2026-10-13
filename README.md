@@ -2295,6 +2295,11 @@ taw content:import /tmp/site.json --yes             # apply (rollback snapshot w
 taw content:import /tmp/site.json --yes --with-settings   # also apply environment settings
 taw content:import /tmp/site.json --yes --user=marco      # as this user (default: the first administrator)
 taw content:diff before.json after.json --out=changes.json
+taw content:diff prod.json local.json --with-base --out=changes.json   # each change carries prod's record (conflicts)
+taw content:import local.json --base=prod.json      # only what changed since prod.json, and what this site changed since
+taw content:import changes.json --keep=post:page:about:fields.hero_heading --yes   # leave that value as this site has it
+taw content:import changes.json --staged=files/ --yes   # media files from a folder (by uploads path), never downloaded
+taw content:journals                                # every import and publish this site received; undo with --undo=<file>
 taw content:defaults [--apply | --undo=<journal>]   # save fields' defaults as records (see Metabox → Defaults)
 ```
 
@@ -2302,7 +2307,9 @@ Also, in wp-admin: **Tools → TAW Data** (Export with option checkboxes + Impor
 
 ### The snapshot
 
-`TAW\Core\Content\Exporter::snapshot($scope)` — a plain array, `json_encode`-ready. Schema: [`resources/schema/content-interchange-1.7.json`](resources/schema/content-interchange-1.7.json) (`schema` is `"1.7"`; the importer also accepts `"1.0"`–`"1.6"`, and warns when a file's minor version is newer than its own).
+`TAW\Core\Content\Exporter::snapshot($scope)` — a plain array, `json_encode`-ready. Schema: [`resources/schema/content-interchange-1.8.json`](resources/schema/content-interchange-1.8.json) (`schema` is `"1.8"`; the importer also accepts `"1.0"`–`"1.7"`, and warns when a file's minor version is newer than its own).
+
+**1.8** (v1.98.0) is what publishing needs. A media entry can say what its file holds: `file` (the original's path under uploads, not WordPress's `-scaled` copy), `sha256` and `bytes` (scope `media_hashes`, `content:export --media-hashes`). An entry that says so matches only a file holding the same bytes: the same name with other bytes is a new file. A change-set made with a base (`ChangeSet::between($base, $target, ['with_base' => true])`, `content:diff --with-base`) carries `taw_changeset.base_fingerprint`, and each update and delete carries its `base` record, so the target can tell what it changed since.
 
 **1.7** draws the boundary of what a site's state includes:
 - **Carried:** the site icon (`site_icon`) and logo (`theme_mods.custom_logo`), mapped through the media match. `theme_mods.nav_menu_locations` (location → menu slug). `menus`: classic menus built in wp-admin, with each item linking by natural key (a page by type and path, a term by taxonomy and slug, custom links URL-mapped) and keyed by position. A menu is compared, and rebuilt when it differs, as a whole. Reusable blocks (`wp_block`) and block navigation menus (`wp_navigation`) as posts, with `core/block` / `core/navigation` `ref` attributes mapped. Core's `footnotes` post meta in a post's `meta`.
@@ -2355,6 +2362,27 @@ Scope options: `--meta=<prefix>[,…]` (also carry post meta with these key pref
 - **Links to what the import creates (v1.88.0):** a record already here whose only change is a link to a post this import creates shows `links` in the dry run and is written, then linked on the run's second pass (terms too, though they're imported before posts); so is a front page, posts page or sticky post the import brings. Before, the link arrived only on the next import.
 - **Downloaded files keep their place (v1.88.0):** a file goes into the source's month folder (`2024/05/hero.jpg` stays there, so a second `hero.jpg` from 2025/01 stays a second file), a `-scaled` file is downloaded as its original (WordPress makes the same scaled copy), and the filename fallback never takes a file downloaded from another URL. A download is tried three times (v1.87.2).
 - **Fidelity suite:** `composer run fidelity` (CI job `fidelity`) runs a real two-site round trip: see [Fidelity suite](#fidelity-suite).
+
+### Plan details, conflicts and publishing (v1.98.0)
+
+**Every plan record** carries a `record_key` (`post:page:about`, `term:category:news`, `option:_taw_phone`, `media:2026/10/hero.jpg`; `Importer::keyOf()`), a `hash` of its changes (op, status, old and new values: `Importer::changesHash()`), a `title`, and for a post already here its `edit_url`. **Every change** carries a `label`; a TAW field's also its `type`, `metabox_id`, `metabox_title`, `block_id` and `parent_group`; an options-page field its `option_page_title`. An image, files or featured-image change carries `media: {old: [{id, file, url}], new: […]}`, a file the import brings marked `incoming` (its id is then the source's). `content:import`'s table and Tools → TAW Data show fields as *Fieldset › Label*.
+
+**Conflicts.** For a change-set made with a base, each change also says whether **this site's value moved away from the base** since (`conflict`; `null` when the base doesn't carry it) and whether **the incoming one did** (`local_changed`), with the `base` value; a record says `conflict` when any of its changes does. A record this site hasn't got conflicts with nothing. Without a base nothing is said.
+
+**Keep-list.** `plan()` and `apply()` take `keep: {record key: [change key, …]}`: those values stay as this site has them (not listed, not written; a post's own values are left out of the `wp_update_post()` call, a field's write is skipped, a term keeps its name/description/parent, an option, theme mod or menu is skipped). A record whose every change is kept is skipped. CLI `--keep=<record key>:<change key>`; Tools → TAW Data offers *Keep this site's* / *Use the file's* on each conflicting value, and a checkbox per record (unticked records are left out).
+
+**Media without downloading.** `apply()` takes `media: {uploads path: file on disk}` (`MediaResolver::withStaged()`): a file there is copied into the media library under its original name and month folder; with any given, nothing is downloaded, and an entry not among them is missing (its references cleared). CLI `--staged=<dir>`.
+
+**Undo preview.** `Importer::undoPreview()` (and `content:import --undo` without `--yes`) says what an undo would put back, delete and recreate, and what it would keep because it was edited since, writing nothing (`ImportJournal::preview()`). `Importer::journals()` / `content:journals` list every import, undone ones too.
+
+**Publishing (`TAW\Core\Content\Publish`).** Publishing content to this site from another (taw-fleet's Local → production, through the TAW companion's signed routes) in steps a person reviews:
+
+1. `plan($changeSet)`: a change-set made with a base only (`publish_invalid` otherwise). Users, comments and environment settings are left out, always. Answers `{publish_id, token, expires_at, plan, media: {needed: [{file, sha256, bytes, mime}]}, limits}`: the plan's records that change something, the files this site hasn't got, and a one-time token (only its sha256 is stored).
+2. `stage($id, $bytes)`: a file is accepted only when its sha256 is one the plan asked for, and stored under it; the path it goes to comes from the plan, never the caller.
+3. `apply($id, $token, $approved, $keep, $take)`: `$approved` lists the records to publish with the `hash` each had in the plan. The approved records are planned again: any whose hash moved refuses the whole apply (`publish_moved`, with the records). A value both sides changed (or that the base can't tell about) must be in `$keep` (this site's) or `$take` (the incoming); one only this site changed stays this site's unless taken (`publish_conflicts_unresolved` otherwise). Every file must be staged (`publish_media_missing`). Then the token is spent and the records imported (rollback snapshot and journal first), files from the staged copies.
+4. `journals()`, `undo($journal, $dryRun)`.
+
+The pending folder is `uploads/taw-private/publish-<id>/` (`input.json`, `plan.json`, `media/<sha256>`), renamed `published-<id>/` with `report.json` once applied; pending ones expire after the TTL (an hour) and are removed by the next plan. One apply at a time (`publish_busy`). Limits (`Publish::LIMITS`, a caller may set its own): 32 MB per file, 512 MB and 500 files per publish. Refusals are `PublishError`s with a stable `errorCode`, an HTTP `status` and `data`. Every step is logged: `content.publish.planned`, `media_staged`, `refused`, `applied`, `failed`, `undone`, `swept`.
 
 ### REST-registered field meta
 

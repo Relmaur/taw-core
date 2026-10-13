@@ -99,6 +99,21 @@ roundtrip() {
     wpb eval-file "$HERE/keys.php" "$WORK/keys-b-undone.txt" >/dev/null
     check "undo returns B to where it was" diff -u "$WORK/keys-b-before.txt" "$WORK/keys-b-undone.txt"
 
+    say "Publish: A's edits go to B, B's own edits stay (1.98)"
+    wpa eval-file "$HERE/publish.php" baseline
+    wpa eval-file "$HERE/interchange.php" export "$WORK/a2.json" >/dev/null
+    wpb eval-file "$HERE/interchange.php" apply "$WORK/a2.json" >/dev/null  # B in step with A
+    wpb eval-file "$HERE/publish.php" export "$WORK/base.json" >/dev/null   # what B is: the base
+    wpa eval-file "$HERE/publish.php" local-edits
+    wpb eval-file "$HERE/publish.php" production-edits
+    wpa eval-file "$HERE/publish.php" export "$WORK/local.json"
+    wpa eval-file "$HERE/publish.php" diff "$WORK/base.json" "$WORK/local.json" "$WORK/changes.json"
+    kill "$SERVER" 2>/dev/null || true # A's files can't be downloaded now: they must travel as bytes
+    check "the plan says who changed what" wpb eval-file "$HERE/publish.php" plan "$WORK/changes.json" "$WORK/publish.json"
+    check "the files go up by their bytes" wpb eval-file "$HERE/publish.php" stage "$WORK/publish.json" "$WORK/wp-a/wp-content/uploads"
+    check "publish writes Local's edits and keeps B's" wpb eval-file "$HERE/publish.php" apply "$WORK/publish.json"
+    check "undo puts B back, B's own edit kept" wpb eval-file "$HERE/publish.php" undo
+
     if [ "$FAILED" -ne 0 ]; then
         say "Fidelity: FAILED (files in $WORK)"
         exit 1

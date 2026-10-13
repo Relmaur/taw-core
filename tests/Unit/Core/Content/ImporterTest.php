@@ -364,7 +364,8 @@ final class ImporterTest extends TestCase
         ]]];
 
         $changes = (new Importer())->plan($input)['records'][0]['changes'];
-        $this->assertSame(['fields.genre_tagline' => ['status' => 'changed', 'old' => 'Old', 'new' => 'New']], $changes, '3 ↔ "3" is unchanged');
+        $this->assertSame(['fields.genre_tagline' => ['status' => 'changed', 'old' => 'Old', 'new' => 'New',
+            'label' => 'genre_tagline', 'type' => 'text', 'metabox_id' => 'genre_details', 'metabox_title' => 'Genre']], $changes, '3 ↔ "3" is unchanged; the field says what it is');
 
         Functions\when('taxonomy_exists')->justReturn(true);
         Functions\when('wp_update_term')->justReturn(['term_id' => 5]);
@@ -397,7 +398,8 @@ final class ImporterTest extends TestCase
         ]];
 
         $changes = (new Importer())->plan($input)['records'][0]['changes'];
-        $this->assertSame(['fields.author_twitter' => ['status' => 'changed', 'old' => 'old', 'new' => 'new']], $changes, '2 ↔ "2" is unchanged');
+        $this->assertSame(['fields.author_twitter' => ['status' => 'changed', 'old' => 'old', 'new' => 'new',
+            'label' => 'author_twitter', 'type' => 'text', 'metabox_id' => 'author_details', 'metabox_title' => 'Author']], $changes, '2 ↔ "2" is unchanged; the field says what it is');
 
         Functions\when('wp_roles')->justReturn(new class {
             /** @return array<string, string> */

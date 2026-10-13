@@ -120,4 +120,43 @@ final class MediaResolverTest extends TestCase
         $this->assertSame(32, MediaResolver::findByFilename('hero.jpg', [31], 'https://src.test/wp-content/uploads/2024/05/hero.jpg'));
         $this->assertSame(30, MediaResolver::findByFilename('hero.jpg'), 'without a URL or taken list: the first of that name, as before');
     }
+
+    public function test_an_entry_that_says_its_bytes_matches_only_the_same_bytes(): void
+    {
+        $dir = sys_get_temp_dir() . '/taw-media-' . bin2hex(random_bytes(4));
+        mkdir($dir);
+        file_put_contents($dir . '/hero.jpg', 'production bytes');
+        // One attachment at 2026/10/hero.jpg, holding "production bytes".
+        \Brain\Monkey\Functions\when('get_posts')->alias(static fn (array $q): array => ($q['meta_query'][0]['value'] ?? '') === '2026/10/hero.jpg' ? [21] : []);
+        \Brain\Monkey\Functions\when('get_post_meta')->justReturn('');
+        \Brain\Monkey\Functions\when('wp_get_original_image_path')->justReturn($dir . '/hero.jpg');
+        $entry = static fn (string $bytes): array => ['id' => 4, 'filename' => 'hero.jpg', 'url' => 'http://acme.local/wp-content/uploads/2026/10/hero.jpg',
+            'file' => '2026/10/hero.jpg', 'sha256' => hash('sha256', $bytes)];
+
+        $same = new MediaResolver();
+        $same->build([$entry('production bytes')], false);
+        $other = new MediaResolver();
+        $other->build([$entry('Local bytes')], false);
+
+        $this->assertSame('matched', $same->outcomes()[0]['status']);
+        $this->assertSame([4 => 21], $same->idMap());
+        $this->assertSame('would-sideload', $other->outcomes()[0]['status'], 'same name, other bytes: a new file');
+        $this->assertSame([], $other->idMap());
+        unlink($dir . '/hero.jpg');
+        rmdir($dir);
+    }
+
+    public function test_with_staged_files_nothing_is_downloaded(): void
+    {
+        \Brain\Monkey\Functions\when('get_posts')->justReturn([]);
+        \Brain\Monkey\Functions\expect('download_url')->never();
+        \Brain\Monkey\Functions\when('wp_basename')->alias(static fn (string $p): string => basename($p));
+        $resolver = (new MediaResolver())->withStaged(['2026/10/other.jpg' => '/tmp/x']);
+        $resolver->build([['id' => 4, 'filename' => 'hero.jpg', 'url' => 'http://acme.local/wp-content/uploads/2026/10/hero.jpg',
+            'file' => '2026/10/hero.jpg', 'sha256' => str_repeat('a', 64)]], true);
+
+        $this->assertSame('missing', $resolver->outcomes()[0]['status'], "a file that wasn't uploaded isn't fetched from Local");
+        $this->assertSame([4], $resolver->missingIds());
+        $this->assertStringContainsString("wasn't uploaded", $resolver->warnings()[0]);
+    }
 }

@@ -122,6 +122,11 @@ msgstr ""
 msgid "%s (image ID)"
 msgstr ""
 
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "%s (to upload)"
+msgstr ""
+
 #. translators: %s: a time span, e.g. "3 days"
 #: src/Core/Bindings/Expression/Library.php
 #, php-format
@@ -517,6 +522,11 @@ msgstr ""
 msgid "Change"
 msgstr ""
 
+#: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Changed on this site too (it was “%s”)."
+msgstr ""
+
 #: src/Core/Rag/Usage/UsageAdminScreen.php
 msgid "Chat"
 msgstr ""
@@ -868,10 +878,6 @@ msgstr ""
 msgid "Field text"
 msgstr ""
 
-#: src/Core/Content/ContentAdminScreen.php
-msgid "Field-level changes"
-msgstr ""
-
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Fields"
 msgstr ""
@@ -1007,11 +1013,20 @@ msgid "Import"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
+#, php-format
+msgid "Import %s"
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
 msgid "Import applied in part."
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Import applied."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Import every record"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -1139,6 +1154,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Joins text together."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Keep this site's"
 msgstr ""
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
@@ -2432,6 +2451,10 @@ msgstr ""
 msgid "This site allows palette colors only, so it’s ignored."
 msgstr ""
 
+#: src/Core/Content/ContentAdminScreen.php
+msgid "This site has its own value, and there is no telling which is newer."
+msgstr ""
+
 #: resources/data-panel/src/bindings/tags.ts
 msgid "This value isn’t a date."
 msgstr ""
@@ -2586,6 +2609,10 @@ msgstr ""
 msgid "Use lowercase letters, numbers and single dashes."
 msgstr ""
 
+#: src/Core/Content/ContentAdminScreen.php
+msgid "Use the file's"
+msgstr ""
+
 #: src/Core/Metabox/Metabox.php
 msgid "Use this image"
 msgstr ""
@@ -2616,6 +2643,10 @@ msgstr ""
 
 #: src/Core/Form/Form.php
 msgid "We could not verify you are human. Please try again."
+msgstr ""
+
+#: src/Core/Content/ContentAdminScreen.php
+msgid "What changes"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -2890,7 +2921,7 @@ msgstr ""
 msgid "lower case."
 msgstr ""
 
-#: src/Core/Editing/EditingAdminScreen.php
+#: src/Core/Content/ContentAdminScreen.php src/Core/Editing/EditingAdminScreen.php
 msgid "none"
 msgstr ""
 

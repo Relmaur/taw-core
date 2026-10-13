@@ -125,7 +125,7 @@ final class ExporterTest extends TestCase
     {
         $snapshot = (new Exporter())->snapshot();
 
-        $this->assertSame('1.7', $snapshot['meta']['schema']);
+        $this->assertSame('1.8', $snapshot['meta']['schema']);
         $this->assertSame('https://example.test', $snapshot['meta']['source']['url']);
 
         $post = $snapshot['posts'][0];

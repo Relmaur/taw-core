@@ -269,10 +269,20 @@ final class ContentAdminScreen
         }
 
         $policy = sanitize_text_field((string) ($_POST['policy'] ?? 'update'));
+        $included = array_map('sanitize_text_field', array_map('strval', (array) wp_unslash($_POST['include'] ?? []))); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $keep = [];
+        foreach ((array) wp_unslash($_POST['decide'] ?? []) as $record => $values) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+            foreach ((array) $values as $change => $side) {
+                if ($side === 'keep') {
+                    $keep[sanitize_text_field((string) $record)][] = sanitize_text_field((string) $change);
+                }
+            }
+        }
 
-        $report = (new Importer())->apply($pending['data'], [
+        $report = (new Importer())->apply(self::only($pending['data'], $included), [
             'policy'           => $policy,
             'include_settings' => !empty($_POST['with_settings']),
+            'keep'             => $keep,
         ]);
 
         @unlink($this->pendingPath());
@@ -352,11 +362,13 @@ final class ContentAdminScreen
         ?>
         <p><?php printf(esc_html__('%d of %d records would change. Nothing has been written.', 'taw-core'), (int) $changeCount, count($records)); ?></p>
 
-        <table class="widefat striped">
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-top:1em">
+        <table class="widefat striped taw-review">
             <thead><tr>
+                <td class="check-column"><input type="checkbox" checked onclick="document.querySelectorAll('.taw-review input[name^=include]').forEach((b)=>{b.checked=this.checked})" aria-label="<?php esc_attr_e('Import every record', 'taw-core'); ?>"></td>
                 <th><?php esc_html_e('Record', 'taw-core'); ?></th>
                 <th><?php esc_html_e('Op', 'taw-core'); ?></th>
-                <th><?php esc_html_e('Field-level changes', 'taw-core'); ?></th>
+                <th><?php esc_html_e('What changes', 'taw-core'); ?></th>
             </tr></thead>
             <tbody>
             <?php foreach ($records as $record): ?>
@@ -365,18 +377,46 @@ final class ContentAdminScreen
                 if ($changes === [] && ($record['op'] ?? '') !== 'would-delete') {
                     continue;
                 }
+                $key = (string) ($record['record_key'] ?? Importer::keyOf($record));
                 $label = ($record['kind'] ?? '') . ' · ' . ($record['type'] ?? $record['key'] ?? '') . ' · ' . ($record['slug'] ?? '');
                 ?>
                 <tr>
-                    <td><code><?php echo esc_html($label); ?></code></td>
+                    <th scope="row" class="check-column">
+                        <?php if (($record['kind'] ?? '') !== 'media'): ?>
+                            <input type="checkbox" name="include[]" value="<?php echo esc_attr($key); ?>" checked aria-label="<?php echo esc_attr(sprintf(__('Import %s', 'taw-core'), $key)); ?>">
+                        <?php endif; ?>
+                    </th>
+                    <td>
+                        <?php if (($record['title'] ?? '') !== ''): ?><strong><?php echo esc_html((string) $record['title']); ?></strong><br><?php endif; ?>
+                        <code><?php echo esc_html($label); ?></code>
+                    </td>
                     <td><?php echo esc_html((string) ($record['op'] ?? '')); ?></td>
                     <td>
                         <?php foreach ($changes as $field => $delta): ?>
-                            <div><strong><?php echo esc_html((string) $field); ?></strong>:
+                            <?php
+                            $name = (string) ($delta['label'] ?? $field);
+                            if (($delta['metabox_title'] ?? '') !== '') {
+                                $name = $delta['metabox_title'] . ' › ' . $name;
+                            }
+                            $conflict = ($delta['conflict'] ?? false) !== false;
+                            ?>
+                            <div class="taw-change<?php echo $conflict ? ' is-conflict' : ''; ?>" style="margin:0 0 6px">
+                                <strong title="<?php echo esc_attr((string) $field); ?>"><?php echo esc_html($name); ?></strong>:
                                 <?php echo esc_html((string) ($delta['status'] ?? '')); ?>
-                                <?php if (($delta['status'] ?? '') === 'changed'): ?>
+                                <?php if (is_array($delta['media'] ?? null)): ?>
+                                    — <?php echo esc_html(self::files($delta['media']['old'] ?? [])); ?>
+                                    → <?php echo esc_html(self::files($delta['media']['new'] ?? [])); ?>
+                                <?php elseif (($delta['status'] ?? '') === 'changed'): ?>
                                     — <?php echo esc_html($this->truncate($delta['old'] ?? null)); ?>
                                     → <?php echo esc_html($this->truncate($delta['new'] ?? null)); ?>
+                                <?php endif; ?>
+                                <?php if ($conflict): ?>
+                                    <?php $keepFirst = ($delta['local_changed'] ?? true) === false; ?>
+                                    <br><span style="color:#b32d2e"><?php echo esc_html($delta['conflict'] === true
+                                        ? sprintf(__('Changed on this site too (it was “%s”).', 'taw-core'), $this->truncate($delta['base'] ?? null))
+                                        : __('This site has its own value, and there is no telling which is newer.', 'taw-core')); ?></span>
+                                    <br><label><input type="radio" name="decide[<?php echo esc_attr($key); ?>][<?php echo esc_attr((string) $field); ?>]" value="keep" required <?php checked($keepFirst); ?>> <?php esc_html_e("Keep this site's", 'taw-core'); ?></label>
+                                    &nbsp;<label><input type="radio" name="decide[<?php echo esc_attr($key); ?>][<?php echo esc_attr((string) $field); ?>]" value="take"> <?php esc_html_e("Use the file's", 'taw-core'); ?></label>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
@@ -386,7 +426,6 @@ final class ContentAdminScreen
             </tbody>
         </table>
 
-        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-top:1em">
             <?php wp_nonce_field('taw_content_import_apply'); ?>
             <input type="hidden" name="action" value="taw_content_import_apply">
             <p>
@@ -488,6 +527,35 @@ final class ContentAdminScreen
     /**
      * @return array{data: array<string, mixed>, plan: array<string, mixed>}|null
      */
+    /**
+     * The file's records narrowed to those ticked (by record key), as a
+     * change-set; the file as it is when every record stays.
+     *
+     * @param array<string, mixed> $data
+     * @param list<string>         $included
+     * @return array<string, mixed>
+     */
+    public static function only(array $data, array $included): array
+    {
+        $ops = Importer::operationsFrom($data);
+        $wanted = array_flip($included);
+        $kept = array_values(array_filter($ops, static fn (array $op): bool => isset($wanted[Importer::keyOf($op)])));
+        if (count($kept) === count($ops)) {
+            return $data;
+        }
+        $set = ['taw_changeset' => is_array($data['taw_changeset'] ?? null)
+            ? $data['taw_changeset']
+            : ['schema' => (string) ($data['meta']['schema'] ?? Exporter::SCHEMA_VERSION), 'base' => null, 'target' => $data['meta']['source'] ?? null]];
+        foreach (['meta', 'refs', 'media'] as $section) {
+            if (isset($data[$section])) {
+                $set[$section] = $data[$section];
+            }
+        }
+        $set['operations'] = $kept;
+
+        return $set;
+    }
+
     private function readPending(): ?array
     {
         $path = $this->pendingPath();
@@ -520,6 +588,24 @@ final class ContentAdminScreen
     {
         wp_safe_redirect(add_query_arg($args, admin_url('tools.php?page=taw-data')));
         exit;
+    }
+
+    /**
+     * Files by name: `hero.jpg, team.jpg (to upload)`; "none" for none.
+     *
+     * @param mixed $files the plan's `media.old` / `media.new`
+     */
+    private static function files(mixed $files): string
+    {
+        $names = [];
+        foreach (is_array($files) ? $files : [] as $file) {
+            if (is_array($file)) {
+                $name = basename((string) ($file['file'] ?? $file['url'] ?? ''));
+                $names[] = !empty($file['incoming']) ? sprintf(__('%s (to upload)', 'taw-core'), $name) : $name;
+            }
+        }
+
+        return $names === [] ? __('none', 'taw-core') : implode(', ', $names);
     }
 
     private function truncate(mixed $value): string

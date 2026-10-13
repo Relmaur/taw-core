@@ -1974,9 +1974,10 @@ After adding new block classes, run `composer dump-autoload`.
 
 **Not in this scaffold, by design:** the key a site trusts belongs to whoever runs the fleet, and `taw/theme` is public. Add it per client project:
 
-- `composer.json`: the VCS repository `https://github.com/Relmaur/taw-hub-companion`, `"taw/hub-companion": "^0.3"`, and the fleet key in `"extra": {"taw-companion": {"keys": {"taw-fleet": "<taw-fleet live key show>"}}}`.
+- `composer.json`: the VCS repository `https://github.com/Relmaur/taw-hub-companion`, `"taw/hub-companion": "^0.4"` (`^0.5` to publish), and the fleet key in `"extra": {"taw-companion": {"keys": {"taw-fleet": "<taw-fleet live key show>"}}}`.
 - The deploy copies `vendor/taw/hub-companion/mu-loader/taw-companion.php` to `wp-content/mu-plugins/` (see a client theme's `.github/workflows/deploy.yml`, step "Install the TAW companion loader"). The companion then runs as an mu-plugin and updates with `composer.lock`.
 - Check with `taw-fleet live <site>`, then pin the site's key once with `taw-fleet live trust <site>`.
+- **Publishing content from Local** (companion 0.5 + taw/core 1.98): off unless the theme's `composer.json` says `"extra": {"taw-companion": {"publish": true}}` (and requires `"taw/hub-companion": "^0.5"`). Then taw-fleet's `p` (or `taw-fleet publish <site>`) shows a field-by-field review in the browser, the owner picks a side for every value production changed too, and nothing is written until they press Publish; `x` undoes it. Never publish by hand or from an agent without the person's review: the MCP tool `publish_content` asks first.
 
 ---
 

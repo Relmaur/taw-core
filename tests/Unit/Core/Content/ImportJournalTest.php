@@ -84,7 +84,21 @@ final class ImportJournalTest extends TestCase
         $this->assertSame('Edited by hand', $this->store->get('post:5')['fields']['post_content'], 'the edit stays');
         $this->assertSame([12], $this->store->get('post:5')['meta']['_taw_hero'], 'the values not edited since go back');
         $this->assertNotNull($this->store->get('post:7'), 'a created page edited since stays');
-        $this->assertSame(['post:5 fields.post_content (edited since)', 'post:7 (created by the import, edited since)'], $result['kept']);
+        $this->assertSame(['“Home” › post_content (edited since)', '“New page, edited” (created by the import, edited since)'], $result['kept']);
+    }
+
+    public function test_a_preview_says_what_undo_would_do_and_writes_nothing(): void
+    {
+        $entries = $this->import();
+        $this->store->set('post:7', ['fields' => ['post_title' => 'New page, edited'], 'meta' => []]);
+        $before = $this->store->all();
+
+        $preview = ImportJournal::preview($entries, $this->store);
+
+        $this->assertSame($before, $this->store->all(), 'nothing written');
+        $this->assertSame([], $this->store->recreated);
+        $this->assertSame(['restored' => 5, 'deleted' => 0, 'recreated' => 1, 'kept' => ['“New page, edited” (created by the import, edited since)']], $preview);
+        $this->assertSame($preview, ImportJournal::undo($entries, $this->store), 'the preview is what undo then does');
     }
 
     public function test_undoing_twice_changes_nothing_more(): void
