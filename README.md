@@ -2096,6 +2096,22 @@ clone's `.git/hooks/pre-commit` still runs). The CI job stays: `--no-verify` ski
 `theme-framework-sync.yml` is the weekly update: bump taw/core, apply Tier 1, run the checks, open one
 pull request. Each workflow's header lists the same steps as commands, for running them by hand.
 
+### Theme deploy (v1.97.0)
+
+Any host, two ways in: `theme-deploy.yml` (shared, `@v1`) ships the built theme after CI passes on the
+default branch, by **SSH + rsync** into the theme's folder on the server (WPMUDev, WP Engine's SSH gateway,
+Kinsta, SiteGround, Cloudways, a VPS…) or by **git push** to the host's remote (WP Engine's git push and other
+git-deploy hosts). A theme opts in with the stub `resources/deploy/deploy.yml` (taw-fleet's `deploy setup` writes
+it) and the repository's variables `DEPLOY_METHOD` (`rsync`|`git`), `DEPLOY_HOST`, `DEPLOY_PORT`, `DEPLOY_USER`,
+`DEPLOY_PATH` (must end in `/themes/<name>`: rsync `--delete` stays inside the theme), `DEPLOY_GIT_REMOTE`,
+`DEPLOY_GIT_BRANCH`, `DEPLOY_GIT_PATH`, `DEPLOY_KNOWN_HOSTS` (the server's host keys, pinned at setup: never
+trusted on first use), and one secret, `DEPLOY_SSH_KEY` (loaded into ssh-agent, never on a command line). No
+`DEPLOY_METHOD`, no deploy. The work is `resources/ci/deploy.sh`: it builds the payload (the theme minus `.git`,
+`node_modules`, tests, `.claude`, `.taw`, `.sync`, `.env*`, `*.md`, dev configs, and the theme's own
+`.deployignore` patterns), **refuses** it when it holds a dump, a snapshot, `.env`, `wp-config.php` or a private
+key (the `check-committed-files.sh` rules), then ships it. `DEPLOY_DRY_RUN=1` builds and checks without shipping.
+Themes with their own deploy workflow keep it.
+
 ```bash
 taw make:block HeroSection --type=meta --group=sections
 taw import:block path/to/block
