@@ -5,13 +5,15 @@
  * the base. `wp --user=admin eval-file publish.php <command> …`:
  *
  *   baseline                        on A: the about page gets a text, a URL and a textarea (then B gets them too)
- *   local-edits                     on A: the about page's text and textarea change, a new image in f_image
+ *   local-edits                     on A: the about page's text and textarea change, a new image in f_image,
+ *                                   f_files → 2025/01/hero.jpg, whose alt text changes too (not approved)
  *   production-edits                on B: the about page's URL (only B) and textarea (both) change
  *   export <file>                   a snapshot with media hashes
  *   diff <base> <local> <out>       the change-set, with the base
  *   plan <change-set> <state>       Publish::plan(); checks the conflicts; keeps id + token in <state>
  *   stage <state> <uploads dir>     uploads every file the plan asks for, from A's uploads
- *   apply <state>                   approves every record, Local wins where both changed; checks B
+ *   apply <state>                   approves every record but the media, Local wins where both changed;
+ *                                   checks B (hero.jpg's alt text, never approved, stays B's)
  *   undo                            undoes the publish; checks B is back, B's own edit kept
  *
  * A's media can't be downloaded by then (the run stops serving A): the
@@ -60,6 +62,16 @@ function pub_set(string $field, mixed $value): void
     Metabox::writeMeta(pub_about(), $config, $value);
 }
 
+/** An attachment by its file under uploads (`2025/01/hero.jpg`). */
+function pub_attachment(string $path): int
+{
+    $ids = get_posts(['post_type' => 'attachment', 'post_status' => 'inherit', 'fields' => 'ids', 'numberposts' => 1,
+        'meta_key' => '_wp_attached_file', 'meta_value' => $path]);
+    $ids !== [] || pub_fail("no attachment {$path}");
+
+    return (int) $ids[0];
+}
+
 function pub_get(string $field): mixed
 {
     $config = Metabox::fieldFor('post', 'page', $field) ?? pub_fail("no field {$field}");
@@ -100,7 +112,10 @@ switch ($command) {
         $id = wp_insert_attachment(['post_mime_type' => $file['type'], 'post_title' => 'Fresh', 'post_status' => 'inherit'], $file['file']);
         wp_update_attachment_metadata($id, wp_generate_attachment_metadata($id, $file['file']));
         pub_set('f_image', $id);
-        echo "local edits: f_text, f_textarea, f_image → fresh.jpg ({$id})\n";
+        $hero = pub_attachment('2025/01/hero.jpg');
+        pub_set('f_files', [$hero]);
+        update_post_meta($hero, '_wp_attachment_image_alt', 'Alt edited in Local');
+        echo "local edits: f_text, f_textarea, f_image → fresh.jpg ({$id}), f_files → hero.jpg ({$hero}, alt edited)\n";
         break;
 
     case 'production-edits':
@@ -200,6 +215,10 @@ switch ($command) {
         $path = $image > 0 ? (string) wp_get_original_image_path($image) : '';
         $fresh = array_values(array_filter($state['media']['needed'], static fn (array $f): bool => $f['file'] === '2026/09/fresh.jpg'))[0] ?? [];
         pub_expect('f_image is fresh.jpg, copied byte for byte', $fresh['sha256'] ?? '?', $path !== '' && is_file($path) ? hash_file('sha256', $path) : '');
+        $hero = pub_attachment('2025/01/hero.jpg');
+        pub_expect("f_files points at B's hero.jpg", [$hero], array_map('intval', (array) json_decode((string) pub_get('f_files'), true)));
+        pub_expect("hero.jpg's alt text, never approved, stays B's (#215)", 'A new hero', (string) get_post_meta($hero, '_wp_attachment_image_alt', true));
+        in_array('media:2025/01/hero.jpg', $result['applied'], true) && pub_fail('hero.jpg is listed as applied');
         try {
             (new Publish())->apply($state['publish_id'], $state['token'], $approved, [], $take);
             pub_fail('the same publish applied twice');
