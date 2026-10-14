@@ -955,6 +955,17 @@ by a bad edit, and nothing typed should be lost.
 **Check:** none; existing fields behave as before (`on_invalid` defaults to `'store'` for every other type). **Undo:**
 none needed. Details: README § "JSON (v1.99.0+)".
 
+### v1.99.1: a publish writes only the media it was asked for
+
+**What changed.** `Content\Publish::apply()` used to filter the change-set's operations by the approved records
+but pass every media entry along, so publishing one page also updated the alt text and titles of other attachments
+and uploaded files only unapproved records used (e.g. the site icon's). Now an approved record brings only the media
+it references; a media record's metadata changes only when that `media:<path>` record is approved; only the files
+written must be uploaded; and `applied` lists the media written.
+
+**Check:** none. A publish that relied on the extra media changes must now approve their `media:` records (taw-fleet's
+review lists them). **Undo:** none needed.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:

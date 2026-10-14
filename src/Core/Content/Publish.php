@@ -273,6 +273,7 @@ final class Publish
                 is_array($input['operations'] ?? null) ? $input['operations'] : [],
                 static fn (mixed $op): bool => is_array($op) && isset($wanted[Importer::keyOf($op)])
             ));
+            $input['media'] = self::mediaFor($input, $wanted);
 
             // What the review saw must be what's written.
             $replan = ($this->importer)()->plan($input);
@@ -292,10 +293,33 @@ final class Publish
                 throw new PublishError('publish_moved', count($moved) . ' of the records changed since the review: plan the publish again.', 409, ['moved' => $moved]);
             }
 
+            // A media record nobody approved keeps this site's metadata: an
+            // approved record only brings the file it references.
+            $mediaApplied = [];
+            foreach ($replan['records'] as $record) {
+                if (($record['kind'] ?? '') !== 'media' || !self::matters($record)) {
+                    continue;
+                }
+                $key = (string) ($record['record_key'] ?? '');
+                if (isset($wanted[$key]) || ($record['op'] ?? '') === 'create') {
+                    $mediaApplied[] = $key;
+                } elseif (($record['op'] ?? '') === 'update') {
+                    $keep[$key] = array_values(array_unique(array_merge($keep[$key] ?? [], array_map('strval', array_keys((array) ($record['changes'] ?? []))))));
+                }
+            }
+
             [$keep, $unresolved] = self::decide($replan['records'], $keep, $take);
             if ($unresolved !== []) {
                 throw new PublishError('publish_conflicts_unresolved', count($unresolved) . ' changed on this site too: say which side wins for each.', 409, ['conflicts' => $unresolved]);
             }
+            // Only the files this publish writes must be uploaded.
+            $writes = [];
+            foreach ($replan['records'] as $record) {
+                if (($record['kind'] ?? '') === 'media' && ($record['op'] ?? '') === 'create' && ($record['sha256'] ?? '') !== '') {
+                    $writes[(string) $record['sha256']] = true;
+                }
+            }
+            $state['needed'] = array_intersect_key((array) $state['needed'], $writes);
             $missing = $this->missingFiles($id, $state);
             if ($missing !== []) {
                 throw new PublishError('publish_media_missing', count($missing) . ' files still have to be uploaded.', 409, ['missing' => $missing]);
@@ -318,7 +342,8 @@ final class Publish
             $report = ($this->importer)()->apply($input, ['policy' => 'update', 'keep' => $keep, 'media' => $staged]);
 
             $done = $this->dir . '/' . self::DONE . $id;
-            self::writeJson($this->folder($id) . '/report.json', $report + ['applied' => array_keys($wanted), 'keep' => $keep]);
+            $applied = array_values(array_unique(array_merge(array_keys($wanted), $mediaApplied)));
+            self::writeJson($this->folder($id) . '/report.json', $report + ['applied' => $applied, 'keep' => $keep]);
             foreach (glob($this->folder($id) . '/media/*') ?: [] as $file) {
                 @unlink($file); // in the media library now
             }
@@ -332,7 +357,7 @@ final class Publish
                 'journal' => isset($report['journal']) ? basename((string) $report['journal']) : null, 'error' => $report['error'] ?? null,
             ]);
 
-            return ['report' => $report, 'applied' => array_keys($wanted)];
+            return ['report' => $report, 'applied' => $applied];
         } finally {
             $this->unlock($lock);
         }
@@ -373,6 +398,29 @@ final class Publish
         }
 
         return [$keep, $unresolved];
+    }
+
+    /**
+     * The media entries an apply carries: those the approved operations
+     * reference (their IDs map through them, and a new file they use is
+     * written), and those whose own `media:<path>` record was approved.
+     *
+     * @param array<string, mixed>  $input
+     * @param array<string, string> $wanted record key => hash
+     * @return list<array<string, mixed>>
+     */
+    public static function mediaFor(array $input, array $wanted): array
+    {
+        $media = array_values(array_filter(is_array($input['media'] ?? null) ? $input['media'] : [], 'is_array'));
+        $operations = array_values(array_filter(is_array($input['operations'] ?? null) ? $input['operations'] : [], 'is_array'));
+        $referenced = ChangeSet::referencedMedia($media, $operations);
+
+        return array_values(array_filter($media, static function (array $entry) use ($referenced, $wanted): bool {
+            $path = MediaResolver::uploadsPath((string) ($entry['url'] ?? ''));
+            $path = $path !== '' ? $path : (string) ($entry['filename'] ?? $entry['ref'] ?? '');
+
+            return isset($wanted['media:' . $path]) || in_array($entry, $referenced, true);
+        }));
     }
 
     /* -----------------------------------------------------------------
