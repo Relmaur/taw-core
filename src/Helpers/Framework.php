@@ -271,8 +271,8 @@ class Framework
     /**
      * Get the core framework version.
      *
-     * Reads from the package's composer.json. Useful for
-     * cache-busting, admin footers, and compatibility checks.
+     * Useful for cache-busting, admin footers, and compatibility checks.
+     * Never throws: '0.0.0' when the version can't be read.
      *
      * @return string  Version string (e.g., '1.0.0')
      */
@@ -281,11 +281,59 @@ class Framework
         static $version = null;
 
         if ($version === null) {
-            // Composer resolves this from git tags automatically —
-            // no "version" field needed in composer.json
-            $version = \Composer\InstalledVersions::getPrettyVersion('taw/core') ?? '0.0.0';
+            $version = self::installedVersion() ?? '0.0.0';
         }
 
         return $version;
+    }
+
+    /**
+     * taw/core's installed version, or null when it can't be told.
+     *
+     * Composer\InstalledVersions is one global class, and a plugin that
+     * bundles Composer (Wordfence does) can be the copy that's loaded. That
+     * copy may not know taw/core, and its getPrettyVersion() then throws
+     * OutOfBoundsException — a fatal on every request that asks (v1.99.2).
+     * So this reads the installed.php of the vendor directory this package
+     * sits in (vendor/taw/core/src/Helpers → vendor/composer/installed.php),
+     * and asks InstalledVersions only when that file isn't there (taw-core's
+     * own checkout, a symlinked path repository), guarded. Never throws.
+     */
+    public static function installedVersion(): ?string
+    {
+        return self::readInstalledVersion(
+            dirname(__DIR__, 4) . '/composer/installed.php',
+            \Composer\InstalledVersions::class,
+        );
+    }
+
+    /**
+     * @internal Tests pass their own installed.php and InstalledVersions class.
+     *
+     * @param string $installedFile      A Composer vendor/composer/installed.php.
+     * @param string $installedVersions  Class with Composer\InstalledVersions' static API.
+     */
+    public static function readInstalledVersion(string $installedFile, string $installedVersions): ?string
+    {
+        if (is_file($installedFile) && is_readable($installedFile)) {
+            $data = include $installedFile;
+            $version = is_array($data) ? ($data['versions']['taw/core']['pretty_version'] ?? null) : null;
+
+            if (is_string($version) && $version !== '') {
+                return $version;
+            }
+        }
+
+        try {
+            if (!class_exists($installedVersions) || !$installedVersions::isInstalled('taw/core')) {
+                return null;
+            }
+
+            $version = $installedVersions::getPrettyVersion('taw/core');
+
+            return is_string($version) && $version !== '' ? $version : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

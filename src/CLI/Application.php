@@ -148,10 +148,6 @@ final class Application
 
     private static function version(): string
     {
-        if (class_exists(\Composer\InstalledVersions::class) && \Composer\InstalledVersions::isInstalled('taw/core')) {
-            return (string) \Composer\InstalledVersions::getPrettyVersion('taw/core');
-        }
-
-        return 'dev';
+        return Framework::installedVersion() ?? 'dev';
     }
 }

@@ -10,9 +10,9 @@ namespace TAW\Core\Content;
 // pure class definitions with no include-time side effects — like
 // TAW\Helpers\Framework and TAW\CLI\WpLoader, which omit it too.
 
-use Composer\InstalledVersions;
 use TAW\Core\Metabox\Metabox;
 use TAW\Core\OptionsPage\OptionsPage;
+use TAW\Helpers\Framework;
 
 /**
  * Builds a portable, human-reviewable snapshot of a TAW site's content —
@@ -173,9 +173,7 @@ class Exporter
                 'generated_at' => gmdate('c'),
                 'source'       => [
                     'url'              => home_url(),
-                    'taw_core_version' => InstalledVersions::isInstalled('taw/core')
-                        ? InstalledVersions::getPrettyVersion('taw/core')
-                        : null,
+                    'taw_core_version' => Framework::installedVersion(),
                     'theme'            => get_stylesheet(),
                     'uploads_url'      => $uploadsUrl,
                 ],
