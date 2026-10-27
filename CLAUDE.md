@@ -108,3 +108,4 @@ changes with `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7`.
 - **Don't use raw WP meta/option functions** for framework fields — `get_post_meta` / `get_option` bypass the framework's type coercion.
 - **Don't add `'editor' => true` to fields** — that was the old opt-in model. The default is now opt-out; only add `'editor' => false` to exclude a field.
 - **Don't forget to update README.md** when changing the public API, adding field types, or changing boot behavior.
+- **Don't ask `Composer\InstalledVersions` for taw/core's version.** It's one global class and a plugin's bundled copy (Wordfence) can be the loaded one, which throws for taw/core (v1.99.2). Use `Framework::version()` (never throws, `'0.0.0'` fallback) or `Framework::installedVersion()` (`null` when unknown); both read the package's own `vendor/composer/installed.php` first.

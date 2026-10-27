@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace TAW\CLI;
 
-use Composer\InstalledVersions;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use TAW\Helpers\Framework;
 use TAW\Update\AgentDocs;
 use TAW\Update\ConfigFiles;
 
@@ -205,9 +205,7 @@ class SyncCommand extends Command
      */
     private function checkTawCoreVersion(): array
     {
-        $installed = InstalledVersions::isInstalled('taw/core')
-            ? InstalledVersions::getPrettyVersion('taw/core')
-            : null;
+        $installed = Framework::installedVersion();
 
         $latest = null;
         $error = null;

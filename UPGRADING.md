@@ -79,6 +79,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.76.1 | Options-page and metabox tabs have a new look; check theme CSS that restyles `.taw-tabbed` |
 | < v1.81 | Per-IP limits stop trusting `X-Forwarded-For` (sites behind Cloudflare: set `TAW_TRUSTED_PROXIES`); an enabled chatbot needs Turnstile keys and an updated widget |
 | < v1.93 | Theme CI fails when a database dump, snapshot or credentials file is committed |
+| < v1.99.2 | Sites with Wordfence (or another plugin that bundles Composer) can hit a random "critical error": update |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -965,6 +966,21 @@ written must be uploaded; and `applied` lists the media written.
 
 **Check:** none. A publish that relied on the extra media changes must now approve their `media:` records (taw-fleet's
 review lists them). **Undo:** none needed.
+
+### v1.99.2: no fatal error when a plugin bundles Composer
+
+**What changed.** `Framework::version()` (asked on every request by the Loop blocks, Block Bindings, metaboxes,
+options pages, forms and schema) called `Composer\InstalledVersions::getPrettyVersion('taw/core')` unguarded. That
+class is one global class, and a plugin that bundles its own Composer (Wordfence does) can be the copy that's
+loaded; when that copy doesn't know taw/core it throws `OutOfBoundsException`, and the request ends on WordPress's
+"critical error" page. Seen on a WP Engine install with Wordfence: about 1 request in 150, fine on reload. Now the
+version is read from the `vendor/composer/installed.php` taw/core itself sits in, `InstalledVersions` is only a
+guarded fallback, and the answer is `'0.0.0'` when neither knows; it never throws. The CLI's version (`taw
+--version`, `taw sync`, `taw inspect`) and content snapshots' `taw_core_version` use the same reader
+(`Framework::installedVersion()`), so they report the right version on such sites too.
+
+**Check:** none. Sites running Wordfence (or any plugin with a `vendor/composer/InstalledVersions.php`) should take
+this release. **Undo:** none needed.
 
 ## Opt-in features you may want
 

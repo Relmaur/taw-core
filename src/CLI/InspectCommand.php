@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace TAW\CLI;
 
-use Composer\InstalledVersions;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -13,6 +12,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use TAW\Core\Block\BlockRegistry;
 use TAW\Core\Form\Form;
 use TAW\Core\Metabox\Metabox;
+use TAW\Helpers\Framework;
 
 /**
  * Live introspection of the current TAW site: registered blocks and their
@@ -81,9 +81,7 @@ class InspectCommand extends Command
         require $wpLoad;
 
         $report = [
-            'taw_core_version' => InstalledVersions::isInstalled('taw/core')
-                ? InstalledVersions::getPrettyVersion('taw/core')
-                : null,
+            'taw_core_version' => Framework::installedVersion(),
             'theme_dir' => $this->themeDir,
             'metabox_order_locked' => $this->detectMetaboxOrderLock(),
             'blocks' => $this->collectBlocks(),
