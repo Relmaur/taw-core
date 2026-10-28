@@ -24,13 +24,13 @@ use TAW\Helpers\Framework;
  * transients, non-allowlisted core/plugin options, and
  * `nav_menu` / `nav_menu_item` (code-owned in TAW themes).
  *
- * Schema: see `resources/schema/content-interchange-1.4.json`.
+ * Schema: see `resources/schema/content-interchange-1.9.json`.
  *
  * @phpstan-type Scope array{types?: list<string>, since?: string, posts?: list<int|string>, include_media?: bool, all_media?: bool, include_drafts?: bool, include_users?: bool, include_user_passwords?: bool, include_comments?: bool, include_settings?: bool, include_options?: bool, include_terms?: bool, meta_prefixes?: list<string>, media_hashes?: bool}
  */
 class Exporter
 {
-    public const SCHEMA_VERSION = '1.8';
+    public const SCHEMA_VERSION = '1.9';
 
     /**
      * Core (non-`_taw_`) options included in every export. `page_on_front`
@@ -388,7 +388,8 @@ class Exporter
         $featured = null;
         if ($thumbId > 0) {
             $this->referencedAttachments[$thumbId] = true;
-            $featured = $this->attachmentFilename($thumbId);
+            // By its path under uploads (1.9): two files can share a name.
+            $featured = MediaResolver::attachmentPath($thumbId);
         }
 
         $this->exportedPosts[(int) $post->ID] = ['type' => (string) $post->post_type, 'slug' => (string) $post->post_name];

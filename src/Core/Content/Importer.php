@@ -260,7 +260,7 @@ class Importer
                 $this->incomingMedia[$outcome['id']] = $outcome['entry'] + ['path' => $outcome['path']];
             }
         }
-        $this->featuredIds = self::featuredIds($input, $media->idMap());
+        $this->rememberFeatured($input, $media->idMap());
         $this->refs = $this->buildRefMap($input, $media->idMap(), $media->missingIds());
 
         // Media first, as apply runs it: files to download, files missing,
@@ -561,7 +561,7 @@ class Importer
         $unchanged = $this->unchangedRecordKeys($input);
         $this->warnings = $mediaWarnings;
         $this->refs = $this->buildRefMap($input, $idMap, $resolver->missingIds());
-        $this->featuredIds = self::featuredIds($input, $idMap);
+        $this->rememberFeatured($input, $idMap);
         if ($policy === 'update') {
             foreach ($this->planMedia($resolver->outcomes()) as $record) {
                 $changes = array_diff_key(is_array($record['changes'] ?? null) ? $record['changes'] : [], $this->keep[self::keyOf($record)] ?? []);
@@ -626,29 +626,81 @@ class Importer
         $report['warnings'] = $this->warnings;
     }
 
-    /** @var array<string, int> media filename in the input => the local attachment it matched or became */
+    /**
+     * @var array<string, int> a media entry's path under uploads (and its
+     * filename, when no other entry has it) => the local attachment it
+     * matched or became
+     */
     private array $featuredIds = [];
 
+    /** @var array<string, true> filenames two or more of the input's media entries share */
+    private array $ambiguousNames = [];
+
     /**
-     * Featured images are referenced by filename: through the media entries
-     * to the local attachment (a downloaded copy may have another name).
+     * Featured images are referenced by their path under uploads (1.9; a
+     * bare filename before): through the media entries to the local
+     * attachment (a downloaded copy may have another name). A filename only
+     * counts when one entry has it: two `hero.jpg` in different month
+     * folders are two files.
      *
      * @param array<string, mixed> $input
      * @param array<int, int>      $idMap
-     * @return array<string, int>
      */
-    private static function featuredIds(array $input, array $idMap): array
+    private function rememberFeatured(array $input, array $idMap): void
     {
-        $out = [];
+        $this->featuredIds = $this->ambiguousNames = [];
+        $byName = [];
         foreach (is_array($input['media'] ?? null) ? $input['media'] : [] as $entry) {
-            $local = is_array($entry) ? ($idMap[(int) ($entry['id'] ?? 0)] ?? 0) : 0;
-            $name = is_array($entry) ? (string) ($entry['filename'] ?? $entry['ref'] ?? '') : '';
-            if ($local > 0 && $name !== '') {
-                $out[$name] = $local;
+            if (!is_array($entry)) {
+                continue;
+            }
+            $name = (string) ($entry['filename'] ?? $entry['ref'] ?? '');
+            $local = $idMap[(int) ($entry['id'] ?? 0)] ?? 0;
+            if ($name !== '') {
+                $byName[$name][(string) (MediaResolver::entryPaths($entry)[0] ?? $name)] = $local;
+            }
+            foreach ($local > 0 ? MediaResolver::entryPaths($entry) : [] as $path) {
+                $this->featuredIds[$path] = $local;
             }
         }
+        foreach ($byName as $name => $files) {
+            if (count($files) > 1) {
+                $this->ambiguousNames[$name] = true;
+            } elseif (($local = (int) reset($files)) > 0) {
+                $this->featuredIds[$name] ??= $local;
+            }
+        }
+    }
 
-        return $out;
+    /**
+     * The local attachment a featured-image reference names, 0 when none:
+     * a path through the media entries, then this site's attachment at that
+     * path, then the one file here with its name; a bare filename (older
+     * snapshots) only when it names one file. $ambiguous: the name names
+     * several, so nothing is picked.
+     */
+    private function featuredLocal(string $ref, bool &$ambiguous = false): int
+    {
+        $ambiguous = false;
+        if ($ref === '') {
+            return 0;
+        }
+        if (isset($this->featuredIds[$ref])) {
+            return $this->featuredIds[$ref];
+        }
+        if (str_contains($ref, '/') && ($found = MediaResolver::findByPath($ref)) !== null) {
+            return $found;
+        }
+        $bare = !str_contains($ref, '/');
+        if (isset($this->ambiguousNames[basename($ref)])) {
+            $ambiguous = $bare;
+            return 0;
+        }
+        $several = false;
+        $found = MediaResolver::findUniqueByFilename(basename($ref), $several);
+        $ambiguous = $several && $bare;
+
+        return $found ?? 0;
     }
 
     /** @var array<string, true> "type:slug" of every post in the input */
@@ -1153,14 +1205,15 @@ class Importer
             $changes['author'] = ['status' => 'new', 'new' => $incoming['author']];
         }
 
-        // featured_media — the exporter renders it as a filename; compare
-        // against the current thumbnail's filename, not its numeric ID.
+        // featured_media — the exporter renders it as the file's path under
+        // uploads (a filename before 1.9): the attachment it resolves to here
+        // is compared with the current thumbnail, else the two names.
         if (array_key_exists('featured_media', $incoming)) {
             $newRef = $incoming['featured_media'];
             $currentThumb = $existing ? (int) get_post_thumbnail_id($existing) : 0;
-            $currentRef = $currentThumb > 0 ? MediaResolver::attachmentFilename($currentThumb) : null;
-            $newLocal = is_string($newRef) ? ($this->featuredIds[$newRef] ?? 0) : 0;
-            if ($newLocal > 0 ? $newLocal !== $currentThumb : (string) $currentRef !== (string) $newRef) {
+            $currentRef = $currentThumb > 0 ? MediaResolver::attachmentPath($currentThumb) : null;
+            $newLocal = is_string($newRef) ? $this->featuredLocal($newRef) : 0;
+            if ($newLocal > 0 ? $newLocal !== $currentThumb : !MediaResolver::sameFile((string) $currentRef, (string) $newRef)) {
                 $changes['featured_media'] = ($existing && $currentRef !== null)
                     ? ['status' => 'changed', 'old' => $currentRef, 'new' => $newRef]
                     : ['status' => 'new', 'new' => $newRef];
@@ -1331,20 +1384,23 @@ class Importer
      * @param array<string, mixed> $change
      * @return array{old: list<array<string, mixed>>, new: list<array<string, mixed>>}
      */
-    private function mediaFacts(array $change, bool $byFilename): array
+    private function mediaFacts(array $change, bool $featured): array
     {
-        $side = function (mixed $value, bool $incoming) use ($byFilename): array {
+        $side = function (mixed $value, bool $incoming) use ($featured): array {
             $out = [];
             foreach (is_array($value) ? $value : [$value] as $ref) {
-                if ($byFilename) {
+                if ($featured) {
+                    // A path under uploads (1.9), or a bare filename.
                     $name = (string) $ref;
                     if ($name === '') {
                         continue;
                     }
-                    $local = $incoming ? ($this->featuredIds[$name] ?? 0) : 0;
+                    $bare = !str_contains($name, '/');
+                    $local = $incoming ? $this->featuredLocal($name) : ($bare ? 0 : (MediaResolver::findByPath($name) ?? 0));
                     $entry = null;
                     foreach ($incoming ? $this->incomingMedia : [] as $candidate) {
-                        if ((string) ($candidate['filename'] ?? '') === $name) {
+                        if (in_array($name, MediaResolver::entryPaths($candidate), true)
+                            || ($bare && !isset($this->ambiguousNames[$name]) && (string) ($candidate['filename'] ?? '') === $name)) {
                             $entry = $candidate;
                         }
                     }
@@ -1414,10 +1470,15 @@ class Importer
                 : null;
         }
         if ($key === 'featured_media') {
+            if (!array_key_exists('featured_media', $base)) {
+                return null;
+            }
             $thumb = (int) get_post_thumbnail_id($existing);
-            return array_key_exists('featured_media', $base)
-                ? ['now' => $thumb > 0 ? MediaResolver::attachmentFilename($thumb) : '', 'base' => $base['featured_media'] ?? '', 'new' => $new]
-                : null;
+            $sides = ['now' => $thumb > 0 ? MediaResolver::attachmentPath($thumb) : '', 'base' => (string) ($base['featured_media'] ?? ''), 'new' => (string) $new];
+            // A base or change from before 1.9 names the file only: compare names.
+            $bare = array_filter($sides, static fn (string $ref): bool => $ref !== '' && !str_contains($ref, '/'));
+
+            return $bare === [] ? $sides : array_map('basename', $sides);
         }
         if (str_starts_with($key, 'terms.')) {
             $taxonomy = substr($key, 6);
@@ -2150,23 +2211,27 @@ class Importer
             $postArr['post_password'] = (string) $incoming['password'];
         }
 
-        // Author — resolve the portable {login,email} ref to a local user;
-        // fall back to the importing user with a warning when it's absent.
-        // A post with no author at the source (WordPress's own, like a
-        // navigation menu) is created with none.
+        // Author — resolve the portable {login,email} ref to a local user.
+        // When it's absent, a post already here keeps its author (the plan
+        // reports no change for it either: a later publish would otherwise
+        // hand production's posts to whoever pulled them); a new post gets
+        // the importing user, with a warning. A post with no author at the
+        // source (WordPress's own, like a navigation menu) is created with none.
         if (!$existing && array_key_exists('author', $incoming) && $incoming['author'] === null) {
             $postArr['post_author'] = 0;
         }
         if (array_key_exists('author', $incoming) && $incoming['author'] !== null) {
             $authorId = $this->resolveLocalUserId($incoming['author']);
+            $ref = is_array($incoming['author']) ? (string) ($incoming['author']['login'] ?? $incoming['author']['email'] ?? '?') : '?';
             if ($authorId > 0) {
                 $postArr['post_author'] = $authorId;
+            } elseif ($existing) {
+                $this->warnings[] = "{$label}: author '{$ref}' not found on this site — the post keeps its author.";
             } else {
                 $fallback = (int) get_current_user_id();
                 if ($fallback > 0) {
                     $postArr['post_author'] = $fallback;
                 }
-                $ref = is_array($incoming['author']) ? (string) ($incoming['author']['login'] ?? $incoming['author']['email'] ?? '?') : '?';
                 $this->warnings[] = "{$label}: author '{$ref}' not found on this site — assigned to the importing user.";
             }
         }
@@ -2327,15 +2392,34 @@ class Importer
         }
         if (is_numeric($ref)) {
             $id = $idMap[(int) $ref] ?? (int) $ref;
-            set_post_thumbnail($postId, $id);
+            self::setThumbnail($postId, $id);
             return;
         }
-        $found = ($this->featuredIds[(string) $ref] ?? 0) ?: MediaResolver::findByFilename((string) $ref);
-        if ($found !== null) {
-            set_post_thumbnail($postId, $found);
+        $ambiguous = false;
+        $found = $this->featuredLocal((string) $ref, $ambiguous);
+        if ($found > 0) {
+            self::setThumbnail($postId, $found);
+        } elseif ($ambiguous) {
+            $current = (int) get_post_thumbnail_id($postId);
+            if ($current <= 0 || !MediaResolver::sameFile(MediaResolver::attachmentPath($current), (string) $ref)) {
+                $this->warnings[] = "Featured image '{$ref}' names more than one file on this site — the featured image is left as it is.";
+            }
         } else {
             $this->warnings[] = "Featured image '{$ref}' not found on the target site.";
         }
+    }
+
+    /**
+     * Set a post's featured image, leaving one `_thumbnail_id` row: a site
+     * can carry several from an old migration, and update_post_meta()
+     * rewrites them all rather than collapsing them.
+     */
+    private static function setThumbnail(int $postId, int $attachmentId): void
+    {
+        if (count((array) get_post_meta($postId, '_thumbnail_id', false)) > 1) {
+            delete_post_meta($postId, '_thumbnail_id');
+        }
+        set_post_thumbnail($postId, $attachmentId);
     }
 
     /**

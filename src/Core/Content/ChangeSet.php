@@ -134,7 +134,7 @@ final class ChangeSet
     /**
      * The media entries the operations reference: by attachment ID (in
      * fields, option values and block attributes, `wp-image-N`), by a
-     * featured image's filename, or by URL (a file's URL, its size variants
+     * featured image's path under uploads (or filename, before 1.9), or by URL (a file's URL, its size variants
      * and the original of a `-scaled` upload). Pure, so `content:diff`
      * needs no WordPress; an ID that merely looks like one carries an
      * extra entry, which only costs a lookup.
@@ -181,7 +181,9 @@ final class ChangeSet
             $id = (int) ($entry['id'] ?? 0);
             $filename = (string) ($entry['filename'] ?? $entry['ref'] ?? '');
             $url = (string) ($entry['url'] ?? '');
-            if (($id > 0 && isset($ids[$id])) || ($filename !== '' && isset($names[$filename])) || self::urlIn($url, $text)) {
+            $byName = ($filename !== '' && isset($names[$filename]))
+                || array_intersect_key(array_flip(MediaResolver::entryPaths($entry)), $names) !== [];
+            if (($id > 0 && isset($ids[$id])) || $byName || self::urlIn($url, $text)) {
                 $out[] = $entry;
             }
         }
