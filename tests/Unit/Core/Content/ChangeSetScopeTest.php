@@ -51,6 +51,16 @@ final class ChangeSetScopeTest extends TestCase
         $this->assertSame([77, 78, 79, 80, 81], $ids, 'field ID, block ID, featured filename, linked file, size variant of a -scaled upload; not a number inside text, not a delete');
     }
 
+    public function test_a_featured_image_brings_the_file_at_its_path_not_another_of_that_name(): void
+    {
+        $media = [...$this->media(), [
+            'id' => 101, 'ref' => 'hero.jpg', 'filename' => 'hero.jpg', 'url' => self::SRC . '/2026/08/hero.jpg', 'alt' => '',
+        ]];
+        $ops = [['op' => 'update', 'target' => ['kind' => 'post'], 'post' => ['type' => 'post', 'slug' => 'a', 'featured_media' => '2026/08/hero.jpg']]];
+
+        $this->assertSame([101], array_column(ChangeSet::referencedMedia($media, $ops), 'id'));
+    }
+
     public function test_a_change_set_carries_source_refs_and_media(): void
     {
         $base = ['meta' => ['schema' => '1.6'], 'posts' => [['type' => 'page', 'slug' => 'home', 'title' => 'Old']]];
