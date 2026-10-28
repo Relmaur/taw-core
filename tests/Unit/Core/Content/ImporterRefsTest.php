@@ -426,4 +426,149 @@ final class ImporterRefsTest extends TestCase
         $this->assertSame([], $report['created']);
         $this->assertNull($report['journal']);
     }
+
+    // ── Two files with one name (1.9): a featured image goes by its path ───────
+
+    /**
+     * Production's two `chc.webp`, in the order that once picked the wrong
+     * one: a bare-name lookup took whichever entry came last.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function twoFilesNamedAlike(): array
+    {
+        return [
+            ['id' => 5716, 'filename' => 'chc.webp', 'url' => 'https://prod.test/wp-content/uploads/2026/06/chc.webp'],
+            ['id' => 5888, 'filename' => 'chc.webp', 'url' => 'https://prod.test/wp-content/uploads/2026/08/chc.webp'],
+        ];
+    }
+
+    private function recordThumbnails(): void
+    {
+        Functions\when('set_post_thumbnail')->alias(function (int $post, int $att): bool {
+            $this->meta["{$post}|_thumbnail_id"] = $att;
+            return true;
+        });
+    }
+
+    public function test_a_featured_image_resolves_by_its_path_when_two_files_share_its_name(): void
+    {
+        $this->sitePost(5, 'page', 'home');
+        $this->siteAttachment(61, '2026/06/chc.webp');
+        $this->siteAttachment(62, '2026/08/chc.webp');
+        $this->recordThumbnails();
+        foreach (['2026/06/chc.webp' => 61, '2026/08/chc.webp' => 62] as $path => $expected) {
+            $input = $this->production([['type' => 'page', 'slug' => 'home', 'title' => 'Home', 'featured_media' => $path]])
+                + ['media' => self::twoFilesNamedAlike()];
+
+            $report = (new Importer())->apply($input, ['rollback' => false]);
+
+            $this->assertSame($expected, $this->meta['5|_thumbnail_id'], "{$path} is attachment {$expected}, whatever the entries' order");
+            $this->assertSame([], $report['warnings']);
+            $this->assertSame([], (new Importer())->plan($input)['records'][0]['changes'] ?? [], 'and the next preview has nothing to change');
+        }
+    }
+
+    public function test_the_same_featured_image_on_both_sides_is_no_change(): void
+    {
+        $this->sitePost(5, 'page', 'home');
+        $this->siteAttachment(61, '2026/06/chc.webp');
+        $this->siteAttachment(62, '2026/08/chc.webp');
+        $this->meta['5|_thumbnail_id'] = 61;
+
+        $plan = (new Importer())->plan($this->production([['type' => 'page', 'slug' => 'home', 'title' => 'Home', 'featured_media' => '2026/06/chc.webp']])
+            + ['media' => self::twoFilesNamedAlike()]);
+        $this->assertArrayNotHasKey('featured_media', $plan['records'][0]['changes'] ?? []);
+
+        $plan = (new Importer())->plan($this->production([['type' => 'page', 'slug' => 'home', 'title' => 'Home', 'featured_media' => '2026/08/chc.webp']])
+            + ['media' => self::twoFilesNamedAlike()]);
+        $this->assertSame(['status' => 'changed', 'old' => '2026/06/chc.webp', 'new' => '2026/08/chc.webp'],
+            array_intersect_key($plan['records'][0]['changes']['featured_media'], array_flip(['status', 'old', 'new'])),
+            'the other file of that name is a change, shown by path');
+    }
+
+    public function test_a_bare_name_that_names_two_files_warns_and_picks_neither(): void
+    {
+        $this->sitePost(5, 'page', 'home');
+        $this->siteAttachment(61, '2026/06/chc.webp');
+        $this->siteAttachment(62, '2026/08/chc.webp');
+        $this->recordThumbnails();
+        // A snapshot from before 1.9 names the file only.
+        $input = $this->production([['type' => 'page', 'slug' => 'home', 'title' => 'Home', 'featured_media' => 'chc.webp']])
+            + ['media' => self::twoFilesNamedAlike()];
+
+        $report = (new Importer())->apply($input, ['rollback' => false]);
+
+        $this->assertArrayNotHasKey('5|_thumbnail_id', $this->meta, 'no silent pick');
+        $this->assertStringContainsString("Featured image 'chc.webp' names more than one file", implode("\n", $report['warnings']));
+
+        $this->meta['5|_thumbnail_id'] = 61;
+        $this->assertArrayNotHasKey('featured_media', (new Importer())->plan($input)['records'][0]['changes'] ?? [],
+            'a post already showing a file of that name has nothing to change');
+        $report = (new Importer())->apply($input, ['rollback' => false]);
+        $this->assertSame(61, $this->meta['5|_thumbnail_id']);
+        $this->assertSame([], $report['warnings'], 'and nothing to warn about');
+    }
+
+    public function test_a_bare_name_that_names_one_file_still_resolves(): void
+    {
+        $this->sitePost(5, 'page', 'home');
+        $this->siteAttachment(61, '2026/06/chc.webp');
+        $this->recordThumbnails();
+
+        $report = (new Importer())->apply($this->production([['type' => 'page', 'slug' => 'home', 'title' => 'Home', 'featured_media' => 'chc.webp']]),
+            ['rollback' => false]);
+
+        $this->assertSame(61, $this->meta['5|_thumbnail_id']);
+        $this->assertSame([], $report['warnings']);
+    }
+
+    public function test_setting_a_featured_image_leaves_one_thumbnail_row(): void
+    {
+        $this->sitePost(5, 'page', 'home');
+        $this->siteAttachment(61, '2026/06/chc.webp');
+        $this->siteAttachment(62, '2026/08/chc.webp');
+        // An old migration left four rows; update_post_meta() alone rewrites all four.
+        $rows = [62, 62, 62, 62];
+        Functions\when('get_post_meta')->alias(function (int $id, string $key = '', bool $single = false) use (&$rows) {
+            if ($id === 5 && $key === '_thumbnail_id') {
+                return $single ? ($rows[0] ?? '') : $rows;
+            }
+            return $this->meta["{$id}|{$key}"] ?? '';
+        });
+        Functions\when('get_post_thumbnail_id')->alias(static fn () => $rows[0] ?? 0);
+        Functions\when('delete_post_meta')->alias(static function (int $id, string $key) use (&$rows): bool {
+            if ($id === 5 && $key === '_thumbnail_id') {
+                $rows = [];
+            }
+            return true;
+        });
+        Functions\when('set_post_thumbnail')->alias(static function (int $post, int $att) use (&$rows): bool {
+            $rows = $rows === [] ? [$att] : array_fill(0, count($rows), $att);
+            return true;
+        });
+
+        (new Importer())->apply($this->production([['type' => 'page', 'slug' => 'home', 'title' => 'Home', 'featured_media' => '2026/06/chc.webp']])
+            + ['media' => self::twoFilesNamedAlike()], ['rollback' => false]);
+
+        $this->assertSame([61], $rows);
+    }
+
+    public function test_an_author_this_site_lacks_leaves_an_existing_posts_author(): void
+    {
+        $this->sitePost(5, 'page', 'home');
+        Functions\when('get_user_by')->justReturn(false);
+        $written = [];
+        Functions\when('wp_update_post')->alias(static function (array $a) use (&$written): int {
+            $written = $a;
+            return (int) $a['ID'];
+        });
+
+        $report = (new Importer())->apply($this->production([['type' => 'page', 'slug' => 'home', 'title' => 'Home', 'content' => 'New',
+            'author' => ['login' => 'ch-capital', 'email' => 'ch@prod.test']]]), ['rollback' => false]);
+
+        $this->assertArrayNotHasKey('post_author', $written, 'not handed to whoever ran the import');
+        $this->assertStringContainsString("author 'ch-capital' not found on this site — the post keeps its author", implode("\n", $report['warnings']));
+    }
 }
+

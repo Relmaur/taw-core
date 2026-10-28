@@ -192,7 +192,7 @@ final class RefMap
     /**
      * Each media URL as a pattern that also matches its size variants
      * (`-300x200`) and the original of a `-scaled` upload, in plain and
-     * JSON-escaped (`\/`) form; then the origin, as http or https, not as a
+     * JSON-escaped (`\/`) form; then the origin, each scheme to its counterpart, not as a
      * prefix of a longer host (a sentence's closing `.` is no host), and not for files in the source's uploads
      * folder: a file this site has is mapped by its media rule above, and
      * one it doesn't have keeps loading from the source.
@@ -230,11 +230,21 @@ final class RefMap
         $fromOrigin = rtrim($fromOrigin, '/');
         $toOrigin = rtrim($toOrigin, '/');
         $host = (string) preg_replace('#^https?://#', '', $fromOrigin);
-        if ($host !== '' && $toOrigin !== '' && preg_replace('#^https?://#', '', $toOrigin) !== $host) {
+        $toHost = (string) preg_replace('#^https?://#', '', $toOrigin);
+        if ($host !== '' && $toOrigin !== '' && $toHost !== $host) {
             $uploads = (string) preg_replace('#^https?://' . preg_quote($host, '#') . '#', '', rtrim($fromUploads, '/'));
             $uploads = $uploads !== '' && str_starts_with($uploads, '/') ? $uploads : '/wp-content/uploads';
-            $rules[] = ['#https?://' . preg_quote($host, '#') . '(?![\w-]|\.[\w-])(?!' . preg_quote($uploads . '/', '#') . ')#', self::escapeReplacement($toOrigin)];
-            $rules[] = ['#https?:\\\\/\\\\/' . preg_quote(str_replace('/', '\/', $host), '#') . '(?![\w-]|\.[\w-])(?!' . preg_quote(str_replace('/', '\/', $uploads . '/'), '#') . ')#', self::escapeReplacement(str_replace('/', '\/', $toOrigin))];
+            // The scheme maps both ways (1.100): the source's own scheme to the
+            // target's, the other one to the other. Same schemes on both
+            // sites keep every link's as written, and a round trip gives back
+            // what it started from, an `http://` link on an https site too.
+            $fromScheme = str_starts_with($fromOrigin, 'http://') ? 'http' : 'https';
+            $toScheme = str_starts_with($toOrigin, 'http://') ? 'http' : 'https';
+            $other = static fn (string $scheme): string => $scheme === 'http' ? 'https' : 'http';
+            foreach ([[$fromScheme, $toScheme], [$other($fromScheme), $other($toScheme)]] as [$from, $to]) {
+                $rules[] = ['#' . $from . '://' . preg_quote($host, '#') . '(?![\w-]|\.[\w-])(?!' . preg_quote($uploads . '/', '#') . ')#', self::escapeReplacement($to . '://' . $toHost)];
+                $rules[] = ['#' . $from . ':\\\\/\\\\/' . preg_quote(str_replace('/', '\/', $host), '#') . '(?![\w-]|\.[\w-])(?!' . preg_quote(str_replace('/', '\/', $uploads . '/'), '#') . ')#', self::escapeReplacement(str_replace('/', '\/', $to . '://' . $toHost))];
+            }
         }
 
         return $rules;

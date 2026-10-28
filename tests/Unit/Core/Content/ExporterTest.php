@@ -125,13 +125,22 @@ final class ExporterTest extends TestCase
     {
         $snapshot = (new Exporter())->snapshot();
 
-        $this->assertSame('1.8', $snapshot['meta']['schema']);
+        $this->assertSame('1.9', $snapshot['meta']['schema']);
         $this->assertSame('https://example.test', $snapshot['meta']['source']['url']);
 
         $post = $snapshot['posts'][0];
         $this->assertSame('home', $post['slug']);
         $this->assertSame([['name' => 'Ada']], $post['fields']['team']);
         $this->assertSame(77, $post['fields']['hero']);
+    }
+
+    public function test_the_featured_image_is_named_by_its_path_under_uploads(): void
+    {
+        Functions\when('get_post_thumbnail_id')->justReturn(77);
+
+        $post = (new Exporter())->snapshot()['posts'][0];
+
+        $this->assertSame('2026/01/hero.jpg', $post['featured_media'], 'its month folder too (1.9): another hero.jpg may live in another');
     }
 
     public function test_pages_carry_their_path_and_name_their_parent_by_path(): void

@@ -69,6 +69,10 @@ function fid_text(string $text): string
         uksort($replace, static fn (string $a, string $b): int => strlen($b) <=> strlen($a)); // hero-1 before hero
         $replace[untrailingslashit(home_url())] = '{home}';
         $replace[str_replace('/', '\/', untrailingslashit(home_url()))] = '{home}';
+        // This site in the other scheme: a link written that way stays that way.
+        $other = (string) preg_replace_callback('#^https?#', static fn (array $m): string => $m[0] === 'http' ? 'https' : 'http', untrailingslashit(home_url()));
+        $replace[$other] = '{home:other}';
+        $replace[str_replace('/', '\/', $other)] = '{home:other}';
     }
     $text = strtr($text, $replace);
 

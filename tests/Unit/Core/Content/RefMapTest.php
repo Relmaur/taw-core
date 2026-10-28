@@ -71,12 +71,13 @@ final class RefMapTest extends TestCase
 
         $this->assertSame(
             '<img src="http://site.local/wp-content/uploads/2026/10/hero-1024x683.jpg" srcset="http://site.local/wp-content/uploads/2026/10/hero.jpg 2048w">'
-            . '<a href="http://site.local/wp-content/uploads/2026/10/guide.pdf">PDF</a> <a href="http://site.local/contacto/">Contact</a>'
+            . '<a href="http://site.local/wp-content/uploads/2026/10/guide.pdf">PDF</a> <a href="https://site.local/contacto/">Contact</a>'
             . ' https://prod.test.evil.example/ https://prod.testing.example/'
             . ' <img src="https://prod.test/wp-content/uploads/2026/09/logo.webp">',
             $map->urls($html),
             'size variants and the original of a -scaled upload land in the new folder; another host is left alone;'
-            . ' an uploaded file this site lacks keeps loading from the source'
+            . ' an uploaded file this site lacks keeps loading from the source; an http link on the https source takes'
+            . " the http target's other scheme"
         );
         $this->assertSame(
             '{"url":"http:\/\/site.local\/wp-content\/uploads\/2026\/10\/guide.pdf","home":"http:\/\/site.local\/"}',
@@ -209,5 +210,40 @@ final class RefMapTest extends TestCase
             ['blockName' => 'core/navigation', 'attrs' => ['ref' => 135], 'innerBlocks' => []],
             ['blockName' => 'core/block', 'attrs' => ['ref' => 140], 'innerBlocks' => []],
         ])['posts'], 'and the export collects both for refs');
+    }
+
+    /** A RefMap from $from to $to with only the origin to map. */
+    private static function origins(string $from, string $to): RefMap
+    {
+        $none = static fn (): int => 0;
+
+        return new RefMap([], [], [], [], $none, $none, $none, [], $from, $to);
+    }
+
+    public function test_a_link_keeps_its_scheme_when_both_sites_use_the_same(): void
+    {
+        $pull = self::origins('https://chcapital.mx', 'https://chcapital.local');
+        $publish = self::origins('https://chcapital.local', 'https://chcapital.mx');
+        $html = '<a href="http://chcapital.mx/">Home</a> <a href="https://chcapital.mx/contacto/">Contact</a>'
+            . ' {"url":"http:\\/\\/chcapital.mx\\/"}';
+
+        $local = $pull->urls($html);
+
+        $this->assertSame('<a href="http://chcapital.local/">Home</a> <a href="https://chcapital.local/contacto/">Contact</a>'
+            . ' {"url":"http:\\/\\/chcapital.local\\/"}', $local, 'http stays http, plain and JSON-escaped');
+        $this->assertSame($html, $publish->urls($local), 'a pull then a publish gives back what production had');
+    }
+
+    public function test_a_round_trip_between_an_http_and_an_https_site_is_lossless(): void
+    {
+        $pull = self::origins('https://prod.test', 'http://site.local');
+        $publish = self::origins('http://site.local', 'https://prod.test');
+        $html = '<a href="https://prod.test/a/">A</a> <a href="http://prod.test/b/">B</a>';
+
+        $local = $pull->urls($html);
+
+        $this->assertSame('<a href="http://site.local/a/">A</a> <a href="https://site.local/b/">B</a>', $local,
+            "the source's own scheme becomes the target's; the other one, the other");
+        $this->assertSame($html, $publish->urls($local));
     }
 }

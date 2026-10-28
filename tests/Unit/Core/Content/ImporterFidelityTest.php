@@ -211,8 +211,8 @@ final class ImporterFidelityTest extends TestCase
 
     public function test_a_newer_minor_schema_is_flagged(): void
     {
-        $plan = (new Importer())->plan(['meta' => ['schema' => '1.9'], 'posts' => []]);
+        $plan = (new Importer())->plan(['meta' => ['schema' => '1.10'], 'posts' => []]);
 
-        $this->assertStringContainsString("schema '1.9' is newer", implode("\n", $plan['warnings']));
+        $this->assertStringContainsString("schema '1.10' is newer", implode("\n", $plan['warnings']));
     }
 }

@@ -228,9 +228,9 @@ final class MediaResolver
     }
 
     /**
-     * The basename of an attachment's file — the stable, portable key used
-     * throughout the interchange format for `featured_media` and media
-     * references. Falls back to the URL basename, then the ID.
+     * The basename of an attachment's file: a media entry's `filename`, and
+     * `featured_media` before 1.9 ({@see self::attachmentPath()} since).
+     * Falls back to the URL basename, then the ID.
      */
     public static function attachmentFilename(int $attachmentId): string
     {
@@ -240,6 +240,54 @@ final class MediaResolver
         }
         $url = wp_get_attachment_url($attachmentId);
         return is_string($url) && $url !== '' ? wp_basename($url) : (string) $attachmentId;
+    }
+
+    /**
+     * An attachment's path under uploads (`2024/05/photo.jpg`, its
+     * `_wp_attached_file`): how a snapshot names a featured image since 1.9,
+     * since two files can share a name in different month folders. Falls
+     * back to the URL's path under uploads, then {@see self::attachmentFilename()}.
+     */
+    public static function attachmentPath(int $attachmentId): string
+    {
+        $file = get_post_meta($attachmentId, '_wp_attached_file', true);
+        if (is_string($file) && $file !== '') {
+            return ltrim($file, '/');
+        }
+        $url = wp_get_attachment_url($attachmentId);
+        $path = is_string($url) ? self::uploadsPath($url) : '';
+
+        return $path !== '' ? $path : self::attachmentFilename($attachmentId);
+    }
+
+    /**
+     * Whether two featured-image references name the same file: by path
+     * when both are paths, by filename when either is a bare name (a
+     * snapshot before 1.9, or a file at the uploads root).
+     */
+    public static function sameFile(string $a, string $b): bool
+    {
+        if ($a === '' || $b === '') {
+            return $a === $b;
+        }
+
+        return str_contains($a, '/') && str_contains($b, '/') ? $a === $b : basename($a) === basename($b);
+    }
+
+    /**
+     * The paths a media entry's file goes by: its URL's path under uploads
+     * (what `_wp_attached_file` holds: `-scaled` for a large image) and its
+     * original's (`file`, 1.8). Pure.
+     *
+     * @param array<string, mixed> $entry
+     * @return list<string>
+     */
+    public static function entryPaths(array $entry): array
+    {
+        return array_values(array_unique(array_filter([
+            self::uploadsPath((string) ($entry['url'] ?? '')),
+            ltrim((string) ($entry['file'] ?? ''), '/'),
+        ], static fn (string $p): bool => $p !== '')));
     }
 
     /** A media URL's path under the uploads folder, or '' when it isn't there. */
@@ -292,6 +340,42 @@ final class MediaResolver
     {
         $filename = wp_basename($filename);
 
+        foreach (self::filenameMatches($filename) as $id) {
+            if (in_array($id, $taken, true)) {
+                continue;
+            }
+            $source = $url !== '' ? (string) get_post_meta($id, self::SOURCE_META, true) : '';
+            if ($source !== '' && $source !== $url) {
+                continue;
+            }
+
+            return $id;
+        }
+
+        return null;
+    }
+
+    /**
+     * The one attachment whose file is named $filename; null when there is
+     * none, or when there are several ($ambiguous): a bare name can't tell
+     * `2024/05/hero.jpg` from `2025/01/hero.jpg`, and guessing points a
+     * post at another post's picture.
+     */
+    public static function findUniqueByFilename(string $filename, bool &$ambiguous = false): ?int
+    {
+        $matches = self::filenameMatches(wp_basename($filename));
+        $ambiguous = count($matches) > 1;
+
+        return count($matches) === 1 ? $matches[0] : null;
+    }
+
+    /**
+     * Attachments whose `_wp_attached_file` has the basename $filename.
+     *
+     * @return list<int>
+     */
+    private static function filenameMatches(string $filename): array
+    {
         $matches = get_posts([
             'post_type'      => 'attachment',
             'post_status'    => 'inherit',
@@ -324,21 +408,15 @@ final class MediaResolver
             ]);
         }
 
+        $out = [];
         foreach ($matches as $id) {
-            if (in_array((int) $id, $taken, true)) {
-                continue;
-            }
-            $source = $url !== '' ? (string) get_post_meta((int) $id, self::SOURCE_META, true) : '';
-            if ($source !== '' && $source !== $url) {
-                continue;
-            }
             $file = get_post_meta((int) $id, '_wp_attached_file', true);
             if (is_string($file) && wp_basename($file) === $filename) {
-                return (int) $id;
+                $out[] = (int) $id;
             }
         }
 
-        return null;
+        return $out;
     }
 
     /**

@@ -5,8 +5,9 @@
  *
  * Everything an import has to carry by natural key rather than by ID:
  * pages three levels deep (and two pages named `team` under different
- * parents), two `hero.jpg` in different month folders and a `-scaled`
- * upload, blocks holding attachment, post, term and reusable-block IDs,
+ * parents), two `hero.jpg` in different month folders (each another post's
+ * featured image) and a `-scaled` upload, blocks holding attachment, post,
+ * term and reusable-block IDs,
  * every TAW field type (IDs inside groups, repeater rows and nested rows),
  * term fields, options-page fields, a wp-admin menu in a location, block
  * navigation, footnotes, the site icon and logo, front and posts pages,
@@ -171,8 +172,14 @@ update_post_meta($story, 'footnotes', wp_slash((string) wp_json_encode([['id' =>
 set_post_thumbnail($story, $wide);
 wp_set_object_terms($story, [$mystery], 'fid_genre');
 
-$sticky = fid_post('post', 'pinned', 'Pinned', ['post_content' => "<!-- wp:paragraph -->\n<p>Pinned.</p>\n<!-- /wp:paragraph -->", 'post_category' => [$news]]);
+// A link to this site in the other scheme (an http link on an https site):
+// a round trip keeps it as written (taw/core 1.100).
+$otherScheme = (string) preg_replace_callback('#^https?#', static fn (array $m): string => $m[0] === 'http' ? 'https' : 'http', home_url('/'));
+$sticky = fid_post('post', 'pinned', 'Pinned', ['post_content' => "<!-- wp:paragraph -->\n<p>Pinned. <a href=\"{$otherScheme}\">Home</a></p>\n<!-- /wp:paragraph -->", 'post_category' => [$news]]);
 stick_post($sticky);
+// The other hero.jpg than the book's: by name alone, one of the two would
+// get the wrong file (taw/core 1.100).
+set_post_thumbnail($sticky, $heroNew);
 
 fid_post('post', '', 'A draft without a slug', ['post_status' => 'draft', 'post_content' => fid_image_block($photo)]);
 

@@ -80,6 +80,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.81 | Per-IP limits stop trusting `X-Forwarded-For` (sites behind Cloudflare: set `TAW_TRUSTED_PROXIES`); an enabled chatbot needs Turnstile keys and an updated widget |
 | < v1.93 | Theme CI fails when a database dump, snapshot or credentials file is committed |
 | < v1.99.2 | Sites with Wordfence (or another plugin that bundles Composer) can hit a random "critical error": update |
+| < v1.100 | Content snapshots name featured images by path (schema 1.9); update Local and production together before publishing |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -981,6 +982,27 @@ guarded fallback, and the answer is `'0.0.0'` when neither knows; it never throw
 
 **Check:** none. Sites running Wordfence (or any plugin with a `vendor/composer/InstalledVersions.php`) should take
 this release. **Undo:** none needed.
+
+### v1.100.0: a pull then a publish is lossless (schema 1.9)
+
+**What changed.** Three fixes to content interchange, found on a real pull → publish round trip:
+- **Featured images go by path.** Snapshots name a post's featured image by its path under uploads
+  (`2026/06/hero.webp`; schema 1.9), and the import finds it by that path. It used to be the bare file name, so with
+  two `hero.webp` in different month folders a pull could set a post's featured image to the other one (downloading
+  it as a new attachment), and a publish review listed the same picture as a change. An older snapshot's bare name
+  still works, but only when it names one file; otherwise the post keeps its featured image and the import warns.
+  Setting a featured image now leaves one `_thumbnail_id` row (an old migration can leave several).
+- **Links keep their scheme.** The source site's own scheme maps to the target's, the other scheme to the other
+  one. An `http://` link to an https site's own domain used to become `https://` on the way in, so a clean publish
+  listed it as changed.
+- **An author the target lacks leaves an existing post's author alone.** It used to go to the importing user, which
+  a later publish then offered to write to production on every such post. New posts still get the importing user.
+
+**Check:** after updating Local, pull again (taw-fleet `C`, or `content:import`). Featured images an earlier pull set
+to the wrong file of the same name now show as changes, and the pull puts them right. Posts an earlier pull gave to
+the importing user keep that author: re-pull `--with-users`, or set them by hand, before publishing. **Publishing
+needs production on v1.100.0 too:** an older production looks a featured image's path up by its name (taw-fleet
+1.34.1+ refuses to publish to it). Update it with the same release (`u`, then merge and deploy). **Undo:** none needed.
 
 ## Opt-in features you may want
 
