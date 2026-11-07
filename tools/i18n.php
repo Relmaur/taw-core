@@ -6,7 +6,7 @@ declare(strict_types=1);
  * taw-core's translation tooling, with no dependencies (no wp-cli, no gettext).
  *
  *   php tools/i18n.php pot       write languages/taw-core.pot from src/ (PHP) and
- *                                resources/data-panel/src/ (TS/TSX)
+ *                                resources/data-panel/src/ and resources/lens/src/ (TS/TSX)
  *   php tools/i18n.php po        merge each languages/taw-core-<locale>.po with the
  *                                .pot (keeps translations, drops strings no longer used)
  *   php tools/i18n.php compile   languages/taw-core-<locale>.po → .l10n.php (the
@@ -246,7 +246,7 @@ function scan(string $root): array
         $sources[] = [$file, phpCalls((string) file_get_contents("$root/$file")), SPECS];
     }
     $jsSpecs = ['__' => ['text', 'domain'], '_x' => ['text', 'context', 'domain'], '_n' => ['text', 'plural', 'number', 'domain'], '_nx' => ['text', 'plural', 'number', 'context', 'domain']];
-    foreach (files($root, 'resources/data-panel/src', ['ts', 'tsx']) as $file) {
+    foreach ([...files($root, 'resources/data-panel/src', ['ts', 'tsx']), ...files($root, 'resources/lens/src', ['ts', 'tsx'])] as $file) {
         if (str_contains($file, '.test.')) {
             continue;
         }

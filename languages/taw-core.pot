@@ -609,6 +609,14 @@ msgstr ""
 msgid "Clear"
 msgstr ""
 
+#: resources/lens/src/Panel.tsx
+msgid "Click"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Click an element to see what TAW knows about it, or open the structure tree. Then tell Claude what to change."
+msgstr ""
+
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Click into the text where the value should go, then open this again."
 msgstr ""
@@ -771,6 +779,10 @@ msgstr ""
 msgid "Division by zero."
 msgstr ""
 
+#: resources/lens/src/Panel.tsx
+msgid "Dock as Inspector"
+msgstr ""
+
 #: resources/data-panel/src/bindings/DynamicSettings.tsx
 msgid "Done"
 msgstr ""
@@ -809,6 +821,10 @@ msgstr ""
 
 #: src/Core/Auth/PagePassword.php
 msgid "Enter"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Esc"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -942,6 +958,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Hidden for this post"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Hide Lens"
 msgstr ""
 
 #: src/Core/Media/MediaFolders.php
@@ -1213,6 +1233,22 @@ msgstr ""
 msgid "Leave out this post"
 msgstr ""
 
+#: resources/lens/src/Panel.tsx
+msgid "Lens"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens docked on the left"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens docked on the right"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens undocked into a sheet"
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/targets.ts
 msgid "Link"
 msgstr ""
@@ -1300,6 +1336,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Menu order"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Message"
 msgstr ""
 
 #: src/Core/Seo/SeoMeta.php
@@ -1658,6 +1698,14 @@ msgstr ""
 msgid "Pick a value…"
 msgstr ""
 
+#: resources/lens/src/Panel.tsx
+msgid "Pick an element"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Point at anything on the page"
+msgstr ""
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Portable content interchange — export a reviewable snapshot of this site's posts, TAW fields, options, terms and referenced media, or import one into it."
 msgstr ""
@@ -1774,6 +1822,14 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Related posts"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Release to dock left"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Release to dock right"
 msgstr ""
 
 #: resources/data-panel/src/bindings/chips.tsx resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
@@ -2007,6 +2063,10 @@ msgstr ""
 msgid "Select or Upload Image"
 msgstr ""
 
+#: resources/lens/src/Panel.tsx
+msgid "Send"
+msgstr ""
+
 #: src/Core/Form/Form.php
 msgid "Send Message"
 msgstr ""
@@ -2034,6 +2094,10 @@ msgstr ""
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 #, php-format
 msgid "Show %s when"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Show Lens"
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
@@ -2158,6 +2222,10 @@ msgstr ""
 msgid "Spent today"
 msgstr ""
 
+#: resources/lens/src/Panel.tsx
+msgid "Start Lens to chat"
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Start blank"
 msgstr ""
@@ -2172,6 +2240,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Sticky posts"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Structure tree"
 msgstr ""
 
 #: src/Core/Form/Form.php
@@ -2192,6 +2264,10 @@ msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "TAW Editing"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "TAW Lens"
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
@@ -2432,6 +2508,18 @@ msgstr ""
 msgid "Theme blocks"
 msgstr ""
 
+#: resources/lens/src/Panel.tsx
+msgid "Theme: dark. Follow the system"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Theme: follows the system. Switch to light"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Theme: light. Switch to dark"
+msgstr ""
+
 #. translators: 1: comma-separated block names, 2: post type.
 #: src/Core/Editing/ContentLayer.php
 #, php-format
@@ -2583,6 +2671,10 @@ msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Undo this import"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Undock into a sheet"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -2777,6 +2869,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/DynamicSettings.tsx
 msgid "accent, #c0392b or @genre_color"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "add to selection"
 msgstr ""
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx src/Core/Editing/EditingAdminScreen.php
@@ -2975,6 +3071,10 @@ msgstr ""
 msgid "rule"
 msgstr ""
 
+#: resources/lens/src/Panel.tsx
+msgid "select"
+msgstr ""
+
 #: src/Core/Media/MediaFolders.php src/Core/Metabox/Metabox.php
 msgid "selected"
 msgstr ""
@@ -2989,6 +3089,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "starts with"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "stop picking"
 msgstr ""
 
 #: resources/data-panel/src/bindings/visibility.tsx
@@ -3035,6 +3139,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/loop/parts.tsx
 msgid "“Previous” text"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "⇧ Click"
 msgstr ""
 
 #: resources/blocks/loop-pagination/block.json

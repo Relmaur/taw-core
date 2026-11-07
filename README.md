@@ -1744,6 +1744,32 @@ Annotations give the editor a direct DOM reference, making live updates exact an
 
 ---
 
+## TAW Lens (in development)
+
+A dev-only tool for classic TAW themes: point at anything on the site's frontend and tell Claude what to
+change (umbrella ADR-0006, taw-core ADR-0020; issue #221). It's being built in steps on the `feature/lens`
+branch. So far: the panel (docked on either edge and pushing the page, or a floating sheet you drag by its
+header and drop on an edge to dock it, or hidden behind a small tab), light and dark themes that follow the
+system unless you pick one, and the gate. Picking, the inspect card, the structure tree and the chat come
+next.
+
+**The gate.** `TAW\Core\Lens\Lens` (wired by `Theme::boot()`, never by `Boot::data()`) prints nothing unless
+all of these hold, so Lens never reaches production and the page is byte-identical with it off:
+- the theme's Vite dev server is running (`ViteLoader::isDevServerRunning()`, the same check as CSS Studio);
+- **TAW Settings → Developer Tools → Enable Lens** is ticked (option `lens_enabled`, in the theme's
+  `inc/options.php`; the `1.101.0/lens-toggle` migration adds it to existing sites);
+- the user is logged in and can `edit_theme_options`;
+- it's a frontend request (not wp-admin, admin-ajax or the Customizer preview).
+
+**What it adds to the page.** One `<taw-lens>` element at the end of `<html>` whose shadow root holds the
+whole panel (its own Preact, its own styles; the site's CSS doesn't reach it and its CSS doesn't reach the
+site), and, while docked, one `<style id="taw-lens-push">` that gives `<html>` a 400px margin on that side.
+Layout, side, sheet position and theme are remembered per browser (`localStorage`, key `taw-lens:prefs`).
+
+**Building it.** The page script is `resources/lens/` (Preact + TypeScript, `npm run check`), built into the
+committed `assets/lens/` like the data panel. `npm run dev` there (port 5176) takes over through
+`assets/lens/hot`.
+
 ## REST Endpoints
 
 | Method | Endpoint | Purpose |

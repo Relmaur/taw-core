@@ -54,7 +54,8 @@ Facts that shape the build:
 
 ## Consequences
 
-- New: `resources/lens/`, `assets/lens/` (committed build), CI job `lens`.
+- New: `resources/lens/`, `assets/lens/` (committed build), CI job `lens`; `TAW\Core\Lens\Lens` loads the build
+  under the gate (build step 2).
 - Any change under `resources/lens/src/` is rebuilt and committed with it, or CI fails.
 - Accessibility checks live next to the code: the token tests assert WCAG 2.2 AA contrast for every text
   and UI pair in both themes.

@@ -10,6 +10,7 @@ use TAW\Core\Block\BlockRegistry;
 use TAW\Core\Editor\VisualEditor;
 use TAW\Core\Form\SubmissionsHandler;
 use TAW\Core\Icons\Lucide;
+use TAW\Core\Lens\Lens;
 use TAW\Core\Media\MediaFolders;
 use TAW\Core\Metabox\MetaboxOrder;
 use TAW\Core\OptionsPage\OptionsPage;
@@ -87,6 +88,9 @@ class Theme
      *      save_post/before_delete_post ingestion, POST taw/v1/chat)
      *  15. Bible reader corpus (opt-in — no-op unless BibleEndpoint::enable()
      *      was called; GET taw/v1/bible/*)
+     *  16–17. Catechism and Canon Law corpora (opt-in, like 15)
+     *  18. TAW Lens (dev-only — loads nothing unless the Vite dev server runs,
+     *      the theme's "Enable Lens" toggle is on and the user can edit_theme_options)
      */
     public static function boot(): void
     {
@@ -244,6 +248,12 @@ class Theme
         if (CanonLawEndpoint::isEnabled()) {
             new CanonLawEndpoint();
         }
+
+        // ── 18. TAW Lens ──────────────────────────────────────────────────────
+        // Dev-only (umbrella ADR-0006): one wp_enqueue_scripts callback that
+        // prints nothing unless the Vite dev server is running, the theme's
+        // "Enable Lens" toggle is on and the user can edit_theme_options.
+        Lens::register();
     }
 
     /**
