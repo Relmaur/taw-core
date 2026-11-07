@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { clampSheet, defaultSheet, dockZone, nearestSide, pushCss, sheetHeight, type Viewport } from './layout';
+import {
+    clampSheet,
+    defaultSheet,
+    dockZone,
+    nearestSide,
+    pageArea,
+    pushCss,
+    ringBox,
+    sheetHeight,
+    type Viewport,
+} from './layout';
 
 const desktop: Viewport = { width: 1440, height: 900, top: 32 };
 
@@ -69,4 +79,26 @@ it('docks to the nearer side', () => {
 it('pushes the page on the docked side only', () => {
     expect(pushCss('right')).toBe('html { margin-right: 400px !important; }');
     expect(pushCss('left')).toBe('html { margin-left: 400px !important; }');
+});
+
+it('knows where the page shows beside a docked panel', () => {
+    expect(pageArea(desktop, 'right')).toEqual({ left: 0, top: 32, right: 1040, bottom: 900 });
+    expect(pageArea(desktop, 'left')).toEqual({ left: 400, top: 32, right: 1440, bottom: 900 });
+    expect(pageArea(desktop, null)).toEqual({ left: 0, top: 32, right: 1440, bottom: 900 });
+});
+
+it('keeps a ring inside the page area, all four sides showing', () => {
+    const area = pageArea(desktop, 'right');
+    expect(ringBox({ left: 100, top: 100, width: 200, height: 50 }, 7, area)).toEqual({
+        left: 93,
+        top: 93,
+        width: 214,
+        height: 64,
+    });
+    expect(ringBox({ left: 0, top: 20, width: 1040, height: 300 }, 7, area)).toEqual({
+        left: 1,
+        top: 33,
+        width: 1038,
+        height: 294,
+    });
 });

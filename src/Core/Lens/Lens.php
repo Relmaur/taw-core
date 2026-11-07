@@ -24,6 +24,9 @@ if (!defined('ABSPATH')) {
  * logged-in user who can edit the theme (`edit_theme_options`). Nothing is printed otherwise: Lens never
  * reaches production, and the page is byte-identical with Lens off.
  *
+ * Under the same gate it starts the source map (SourceMap, ClassicAdapter): markers around blocks and template
+ * parts plus one JSON manifest of what rendered them, which the page script reads.
+ *
  * Wired by Theme::boot() (classic themes), never by Boot::data(): it injects frontend output.
  */
 final class Lens
@@ -41,6 +44,9 @@ final class Lens
     /** WordPress scripts the page script uses: translations only. */
     public const SCRIPT_DEPS = ['wp-i18n'];
 
+    /** "Open in editor" by default: VS Code's URL handler. */
+    public const EDITOR_URL = 'vscode://file/{path}:{line}';
+
     private static bool $registered = false;
 
     private static ?Vite $vite = null;
@@ -56,6 +62,18 @@ final class Lens
         self::$registered = true;
 
         add_action('wp_enqueue_scripts', [self::class, 'enqueue']);
+        add_action('template_redirect', [self::class, 'startSourceMap'], PHP_INT_MAX);
+    }
+
+    /**
+     * template_redirect: under the gate, start the source map (SourceMap, via the classic adapter) so this
+     * page's blocks, template parts and reads are recorded before the template renders.
+     */
+    public static function startSourceMap(): void
+    {
+        if (self::active()) {
+            ClassicAdapter::start();
+        }
     }
 
     /**
@@ -99,16 +117,22 @@ final class Lens
      * What the page script needs to know about the site. No secrets: the bridge token arrives with the chat
      * (build step 4), and the page itself is only ever served to this logged-in developer.
      *
-     * @return array{host: string, version: string}
+     * `editor` is the link "Open in editor" follows, with `{path}` (the file's absolute path) and `{line}`;
+     * VS Code's by default. A theme or a developer's mu-plugin changes it with the `taw_lens_editor_url`
+     * filter, e.g. `cursor://file/{path}:{line}` or `phpstorm://open?file={path}&line={line}`.
+     *
+     * @return array{host: string, version: string, editor: string}
      */
     public static function config(): array
     {
         $host = wp_parse_url(home_url(), PHP_URL_HOST);
         $port = wp_parse_url(home_url(), PHP_URL_PORT);
+        $editor = apply_filters('taw_lens_editor_url', self::EDITOR_URL);
 
         return [
             'host'    => is_string($host) ? $host . (is_int($port) ? ':' . $port : '') : '',
             'version' => Framework::version(),
+            'editor'  => is_string($editor) && $editor !== '' ? $editor : self::EDITOR_URL,
         ];
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TAW\Core\Block;
 
 use TAW\Core\Block\BaseBlock;
+use TAW\Core\Lens\SourceMap;
 
 
 if (!defined('ABSPATH')) {
@@ -26,6 +27,12 @@ abstract class Block extends BaseBlock
     {
         // Merge passed props over defaults - so you always have safe fallbacks
         $data = array_merge($this->defaults(), $props);
-        $this->renderTemplate($data);
+        // TAW Lens (dev only): a source-map node around the block.
+        $lens = SourceMap::openBlock($this);
+        try {
+            $this->renderTemplate($data);
+        } finally {
+            SourceMap::close($lens);
+        }
     }
 }

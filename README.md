@@ -1748,10 +1748,21 @@ Annotations give the editor a direct DOM reference, making live updates exact an
 
 A dev-only tool for classic TAW themes: point at anything on the site's frontend and tell Claude what to
 change (umbrella ADR-0006, taw-core ADR-0020; issue #221). It's being built in steps on the `feature/lens`
-branch. So far: the panel (docked on either edge and pushing the page, or a floating sheet you drag by its
-header and drop on an edge to dock it, or hidden behind a small tab), light and dark themes that follow the
-system unless you pick one, and the gate. Picking, the inspect card, the structure tree and the chat come
-next.
+branch. So far:
+- **the panel:** docked on either edge and pushing the page, or a floating sheet you drag by its header and
+  drop on an edge to dock it, or hidden behind a small tab; light and dark themes that follow the system
+  unless you pick one;
+- **picking:** the Pick button (Esc stops), then click an element to select it, shift-click to add more.
+  Links and buttons don't fire while picking;
+- **the inspect card:** what TAW knows about the selection and how to change it by hand. A field's value and
+  its wp-admin screen; template text with its lines and "Open in editor" at that line; a block's files and
+  fields;
+- **the structure tree:** the page → template parts and blocks → the fields and template text each put on the
+  page. Hover a row to ring its element, click to select, arrow keys to move;
+- **the rings:** drawn over the page, never on the element. Ink or white, whichever contrasts more with what's
+  actually behind the element (its background colour, gradient or image pixels), with a halo of the other.
+
+The chat comes next.
 
 **The gate.** `TAW\Core\Lens\Lens` (wired by `Theme::boot()`, never by `Boot::data()`) prints nothing unless
 all of these hold, so Lens never reaches production and the page is byte-identical with it off:
@@ -1761,9 +1772,26 @@ all of these hold, so Lens never reaches production and the page is byte-identic
 - the user is logged in and can `edit_theme_options`;
 - it's a frontend request (not wp-admin, admin-ajax or the Customizer preview).
 
+**The source map** (`TAW\Core\Lens\SourceMap`, fed by `ClassicAdapter`; under the same gate) tells Lens,
+and later Claude, what rendered each element, with no template changes:
+- `<!--taw-lens:N-->` … `<!--/taw-lens:N-->` comments around every block render (`MetaBlock`/`Block::render()`)
+  and template part (`wp_before_load_template`);
+- every value read while each one rendered: TAW fields (with the field's default when nothing is saved), TAW
+  options, the site title and tagline, post titles, menu items;
+- each template's own text with its line numbers;
+- one `<script type="application/json" id="taw-lens-map">` in the footer with all of it.
+
+The page script matches an element's text against its block's reads and text first, then its parents'. Equal
+candidates in one block are shown as **ambiguous**, all of them: Lens never guesses. Text made of template text
+around values is **mixed**, with its pieces.
+
+**Open in editor** follows `vscode://file/{path}:{line}` by default. To use another editor, set the
+`taw_lens_editor_url` filter, e.g. `cursor://file/{path}:{line}` or `phpstorm://open?file={path}&line={line}`.
+
 **What it adds to the page.** One `<taw-lens>` element at the end of `<html>` whose shadow root holds the
 whole panel (its own Preact, its own styles; the site's CSS doesn't reach it and its CSS doesn't reach the
 site), and, while docked, one `<style id="taw-lens-push">` that gives `<html>` a 400px margin on that side.
+While picking, one `<style id="taw-lens-pick">` sets the crosshair cursor.
 Layout, side, sheet position and theme are remembered per browser (`localStorage`, key `taw-lens:prefs`).
 
 **Building it.** The page script is `resources/lens/` (Preact + TypeScript, `npm run check`), built into the

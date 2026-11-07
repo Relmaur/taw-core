@@ -8,8 +8,9 @@
  * itself is the margin that makes room for the docked panel (one <style> element, removed when it undocks).
  */
 import { render } from 'preact';
-import { Panel, type PanelEnv } from './Panel';
+import { Panel, type PageEnv, type PanelEnv } from './Panel';
 import { pushCss } from './layout';
+import { pageMap, pageSampler, startPicking } from './page';
 import { loadPrefs, savePrefs } from './prefs';
 import { panelCss } from './styles';
 
@@ -17,12 +18,42 @@ export { tokensCss } from './tokens';
 
 declare global {
     interface Window {
-        tawLens?: { host?: string; version?: string };
+        tawLens?: { host?: string; version?: string; editor?: string };
     }
 }
 
 export const HOST_TAG = 'taw-lens';
 const PUSH_ID = 'taw-lens-push';
+const EDITOR_URL = 'vscode://file/{path}:{line}';
+
+/** The page under the panel: its source map, the picker and the contrast engine. */
+export function pageAccess(doc: Document, host: HTMLElement, editor = EDITOR_URL): PageEnv {
+    const win = doc.defaultView ?? window;
+    const assetListeners = new Set<() => void>();
+    let map: ReturnType<typeof pageMap> | undefined;
+
+    return {
+        map(fresh = false) {
+            if (fresh || map === undefined) {
+                map = pageMap(doc, host);
+            }
+            return map;
+        },
+        pick: (handlers) => startPicking(doc, host, handlers),
+        sampler: pageSampler(doc, host, () => assetListeners.forEach((listener) => listener())),
+        onAsset(callback) {
+            assetListeners.add(callback);
+            return () => assetListeners.delete(callback);
+        },
+        reveal(el) {
+            const rect = el.getBoundingClientRect();
+            if (rect.bottom < 0 || rect.top > win.innerHeight) {
+                el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+        },
+        editor,
+    };
+}
 
 /** The page around the panel: the real document. */
 export function pageEnv(doc: Document, host: HTMLElement): PanelEnv {
@@ -66,6 +97,7 @@ export function pageEnv(doc: Document, host: HTMLElement): PanelEnv {
 
             return () => win.removeEventListener('resize', callback);
         },
+        page: pageAccess(doc, host, window.tawLens?.editor || EDITOR_URL),
     };
 }
 

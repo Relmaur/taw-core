@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace TAW\Tests\Unit\Core\Lens;
 
+use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use TAW\Core\Assets\Vite;
+use TAW\Core\Lens\ClassicAdapter;
 use TAW\Core\Lens\Lens;
+use TAW\Core\Lens\SourceMap;
 use TAW\Tests\TestCase;
 
 final class LensTest extends TestCase
@@ -72,6 +75,8 @@ final class LensTest extends TestCase
     protected function tearDown(): void
     {
         Lens::resetForTests();
+        SourceMap::resetForTests();
+        ClassicAdapter::resetForTests();
         exec('rm -rf ' . escapeshellarg($this->root));
         parent::tearDown();
     }
@@ -82,6 +87,30 @@ final class LensTest extends TestCase
         Lens::register();
 
         $this->assertSame(10, has_action('wp_enqueue_scripts', [Lens::class, 'enqueue']));
+        $this->assertSame(PHP_INT_MAX, has_action('template_redirect', [Lens::class, 'startSourceMap']));
+    }
+
+    public function test_the_source_map_starts_only_under_the_gate(): void
+    {
+        foreach (['is_feed', 'is_embed', 'is_robots', 'is_trackback'] as $fn) {
+            Functions\when($fn)->justReturn(false);
+        }
+        $this->site['dev'] = false;
+        Lens::startSourceMap();
+        $this->assertFalse(SourceMap::on());
+
+        $this->site['dev'] = true;
+        Lens::startSourceMap();
+        $this->assertTrue(SourceMap::on());
+        $this->assertSame(10, has_action('wp_before_load_template', [ClassicAdapter::class, 'openPart']));
+    }
+
+    public function test_open_in_editor_defaults_to_vs_code_and_can_be_changed(): void
+    {
+        $this->assertSame('vscode://file/{path}:{line}', Lens::config()['editor']);
+
+        Filters\expectApplied('taw_lens_editor_url')->andReturn('cursor://file/{path}:{line}');
+        $this->assertSame('cursor://file/{path}:{line}', Lens::config()['editor']);
     }
 
     public function test_it_loads_the_committed_build_with_its_config_when_every_gate_is_open(): void

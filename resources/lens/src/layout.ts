@@ -71,3 +71,38 @@ export const nearestSide = (sheet: Point, viewport: Viewport, width = PANEL_WIDT
 export function pushCss(side: Side, width = PANEL_WIDTH): string {
     return `html { margin-${side}: ${width}px !important; }`;
 }
+
+/** The part of the viewport the page shows: the docked panel and the admin bar left out. */
+export interface Area {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+}
+
+/** The page area beside a docked panel (or the whole viewport below the admin bar). */
+export function pageArea(viewport: Viewport, docked: Side | null, width = PANEL_WIDTH): Area {
+    return {
+        left: docked === 'left' ? width : 0,
+        top: viewport.top,
+        right: docked === 'right' ? viewport.width - width : viewport.width,
+        bottom: viewport.height,
+    };
+}
+
+/**
+ * A ring's box: the element's rect grown by `outset`, then kept 1px inside the page area, so a full-width or
+ * partly scrolled-away element still shows all four sides of its ring.
+ */
+export function ringBox(
+    rect: { left: number; top: number; width: number; height: number },
+    outset: number,
+    area: Area,
+): { left: number; top: number; width: number; height: number } {
+    const left = Math.max(area.left + 1, rect.left - outset);
+    const top = Math.max(area.top + 1, rect.top - outset);
+    const right = Math.min(area.right - 1, rect.left + rect.width + outset);
+    const bottom = Math.min(area.bottom - 1, rect.top + rect.height + outset);
+
+    return { left, top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
+}

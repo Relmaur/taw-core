@@ -122,6 +122,11 @@ msgstr ""
 msgid "%d of %d records would change. Nothing has been written."
 msgstr ""
 
+#: resources/lens/src/InspectCard.tsx
+#, php-format
+msgid "%d rows"
+msgstr ""
+
 #. translators: %s: a field label. The numeric entry binds core/image's attachment ID.
 #: src/Core/Bindings/EditorFields.php
 #, php-format
@@ -205,6 +210,10 @@ msgstr ""
 msgid "(empty for this post)"
 msgstr ""
 
+#: resources/lens/src/InspectCard.tsx
+msgid "(empty)"
+msgstr ""
+
 #: src/Core/Metabox/Metabox.php
 msgid "(new tab)"
 msgstr ""
@@ -233,6 +242,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "0.25 as 25%."
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "1 row"
 msgstr ""
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
@@ -427,6 +440,10 @@ msgstr ""
 msgid "Always on — ignore detection, always use TAW's own SEO output"
 msgstr ""
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Ambiguous"
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "An empty item to design yourself."
 msgstr ""
@@ -480,8 +497,16 @@ msgstr ""
 msgid "Back"
 msgstr ""
 
+#: resources/lens/src/Tree.tsx
+msgid "Back to chat"
+msgstr ""
+
 #: resources/data-panel/src/bindings/DynamicSettings.tsx
 msgid "Background"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Block"
 msgstr ""
 
 #: resources/data-panel/src/bindings/popup.tsx
@@ -607,6 +632,10 @@ msgstr ""
 
 #: resources/data-panel/src/controls/PickerControls.tsx src/Core/Media/MediaFolders.php
 msgid "Clear"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Clear selection"
 msgstr ""
 
 #: resources/lens/src/Panel.tsx
@@ -807,8 +836,20 @@ msgstr ""
 msgid "Edit Visually"
 msgstr ""
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Edit here"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Editing in place is coming in a later build"
+msgstr ""
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Editor features"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Element"
 msgstr ""
 
 #: src/Core/Metabox/Metabox.php
@@ -872,7 +913,7 @@ msgstr ""
 msgid "Feeds the \"sameAs\" entity signal — link every profile that represents this same organization/brand (LinkedIn, Instagram, etc.)."
 msgstr ""
 
-#: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Content/ContentAdminScreen.php
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/lens/src/InspectCard.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Field"
 msgstr ""
 
@@ -904,6 +945,10 @@ msgstr ""
 msgid "Fields"
 msgstr ""
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Fields:"
+msgstr ""
+
 #. translators: %d: attachment ID.
 #: resources/data-panel/src/controls/MediaControls.tsx
 #, php-format
@@ -916,8 +961,12 @@ msgstr ""
 msgid "Fill in the required data before saving: %s."
 msgstr ""
 
-#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/lens/src/Tree.tsx
 msgid "Filter"
+msgstr ""
+
+#: resources/lens/src/Tree.tsx
+msgid "Filter blocks, fields, files…"
 msgstr ""
 
 #: src/Core/Media/MediaFolders.php
@@ -986,6 +1035,10 @@ msgstr ""
 
 #: src/Core/Seo/Schema.php
 msgid "Home"
+msgstr ""
+
+#: resources/lens/src/Tree.tsx
+msgid "Hover a row to ring it on the page. Click to select; shift-click to add it to the chat."
 msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
@@ -1118,6 +1171,10 @@ msgstr ""
 msgid "Insert inline"
 msgstr ""
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Inspect"
+msgstr ""
+
 #. translators: 1: line number, 2: column number, 3: the parser's message
 #: src/Core/Metabox/Metabox.php
 #, php-format
@@ -1194,6 +1251,10 @@ msgstr ""
 msgid "Items, separated by commas"
 msgstr ""
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Its text isn’t a TAW field or template text: it may be computed in the template, or added by JavaScript."
+msgstr ""
+
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Joins text together."
 msgstr ""
@@ -1243,6 +1304,10 @@ msgstr ""
 
 #: resources/lens/src/Panel.tsx
 msgid "Lens docked on the right"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens maps what TAW renders. Reload the page; if it stays empty, check that the theme calls wp_footer()."
 msgstr ""
 
 #: resources/lens/src/Panel.tsx
@@ -1334,6 +1399,10 @@ msgstr ""
 msgid "Media sideloaded"
 msgstr ""
 
+#: resources/lens/src/describe.ts
+msgid "Menu item"
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Menu order"
 msgstr ""
@@ -1350,6 +1419,10 @@ msgstr ""
 msgid "Meta Title"
 msgstr ""
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Mixed"
+msgstr ""
+
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Modified date"
 msgstr ""
@@ -1360,6 +1433,10 @@ msgstr ""
 
 #: src/Core/Form/Form.php
 msgid "More information"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "More than one source holds this exact text, so Lens can’t tell which one rendered it. It doesn’t guess:"
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
@@ -1442,6 +1519,10 @@ msgstr ""
 msgid "No content yet"
 msgstr ""
 
+#: resources/lens/src/Panel.tsx
+msgid "No conversation yet. Select something on the page, or tell Claude what to change."
+msgstr ""
+
 #: resources/data-panel/src/DataPanel.tsx
 msgid "No data fields apply to this template."
 msgstr ""
@@ -1510,6 +1591,14 @@ msgstr ""
 msgid "No source"
 msgstr ""
 
+#: resources/lens/src/Panel.tsx
+msgid "No source map on this page"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "No text of its own. Its template rendered it."
+msgstr ""
+
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "No values match your search."
 msgstr ""
@@ -1536,6 +1625,10 @@ msgstr ""
 
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Nothing found."
+msgstr ""
+
+#: resources/lens/src/Tree.tsx
+msgid "Nothing matches."
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -1610,8 +1703,16 @@ msgstr ""
 msgid "Open in a new tab"
 msgstr ""
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Open in editor"
+msgstr ""
+
 #: resources/data-panel/src/bindings/targets.ts
 msgid "Open in new tab"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Open in wp-admin"
 msgstr ""
 
 #: src/Core/Editor/VisualEditor.php
@@ -1658,12 +1759,20 @@ msgstr ""
 msgid "Output tokens"
 msgstr ""
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Page"
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/parts.tsx
 msgid "Page links"
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/parts.tsx src/Core/Loop/Loop.php
 msgid "Pagination"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Part of this rich-text field."
 msgstr ""
 
 #: src/Core/Auth/PagePassword.php
@@ -1734,6 +1843,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Post fields"
+msgstr ""
+
+#: resources/lens/src/describe.ts
+msgid "Post title"
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Editing/EditingAdminScreen.php
@@ -1877,6 +1990,10 @@ msgstr ""
 
 #: src/Core/Media/MediaFolders.php
 msgid "Rename"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Rendered by"
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
@@ -2064,6 +2181,18 @@ msgid "Select or Upload Image"
 msgstr ""
 
 #: resources/lens/src/Panel.tsx
+msgid "Selected"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Selection"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Selection cleared"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
 msgid "Send"
 msgstr ""
 
@@ -2087,6 +2216,10 @@ msgstr ""
 msgid "Set this block’s classes, colors and HTML attributes from values, e.g. a background from the genre’s color. They apply on the site; the canvas previews them."
 msgstr ""
 
+#: resources/lens/src/Panel.tsx
+msgid "Shift-click to add more"
+msgstr ""
+
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Shortens to a number of characters, with “…”."
 msgstr ""
@@ -2102,6 +2235,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Show at most"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Show in tree"
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
@@ -2243,6 +2380,14 @@ msgid "Sticky posts"
 msgstr ""
 
 #: resources/lens/src/Panel.tsx
+msgid "Stop picking (Esc)"
+msgstr ""
+
+#: resources/lens/src/Tree.tsx
+msgid "Structure"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
 msgid "Structure tree"
 msgstr ""
 
@@ -2318,6 +2463,22 @@ msgstr ""
 
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Tells the chatbot when to use this knowledge base — be specific about what it contains."
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Template part"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Template text"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Template text around values. Made of:"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Template text · translatable"
 msgstr ""
 
 #: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
@@ -2402,6 +2563,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "The expression is too long (1,000 characters at most)."
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "The field’s default: nothing is saved yet."
 msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
@@ -2815,6 +2980,10 @@ msgstr ""
 msgid "Without spaces at either end."
 msgstr ""
 
+#: resources/lens/src/InspectCard.tsx resources/lens/src/treeModel.ts
+msgid "WordPress"
+msgstr ""
+
 #: src/Core/Rag/Usage/UsageAdminScreen.php
 msgid "Worst case per message"
 msgstr ""
@@ -2883,6 +3052,10 @@ msgstr ""
 msgid "allowed"
 msgstr ""
 
+#: resources/lens/src/describe.ts
+msgid "ambiguous"
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "an item"
 msgstr ""
@@ -2901,6 +3074,10 @@ msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "are locked like everyone else"
+msgstr ""
+
+#: resources/lens/src/describe.ts
+msgid "choice"
 msgstr ""
 
 #: resources/data-panel/src/bindings/conditions.ts
@@ -2931,6 +3108,10 @@ msgstr ""
 msgid "fiction, poetry"
 msgstr ""
 
+#: resources/lens/src/treeModel.ts
+msgid "field"
+msgstr ""
+
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "fill in what to compare with."
 msgstr ""
@@ -2949,6 +3130,10 @@ msgstr ""
 
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "https:// or /path"
+msgstr ""
+
+#: resources/lens/src/describe.ts
+msgid "image"
 msgstr ""
 
 #. translators: %s: a time span, e.g. "2 weeks"
@@ -3039,16 +3224,32 @@ msgstr ""
 msgid "last %1$d turns, %2$d characters each"
 msgstr ""
 
+#: resources/lens/src/describe.ts
+msgid "link"
+msgstr ""
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "locked"
+msgstr ""
+
+#: resources/lens/src/describe.ts
+msgid "long text"
 msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "lower case."
 msgstr ""
 
+#: resources/lens/src/describe.ts
+msgid "mixed"
+msgstr ""
+
 #: src/Core/Content/ContentAdminScreen.php src/Core/Editing/EditingAdminScreen.php
 msgid "none"
+msgstr ""
+
+#: resources/lens/src/describe.ts
+msgid "number"
 msgstr ""
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
@@ -3059,12 +3260,24 @@ msgstr ""
 msgid "of these:"
 msgstr ""
 
+#: resources/lens/src/Tree.tsx
+msgid "on page"
+msgstr ""
+
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "pick a comparison."
 msgstr ""
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "pick a value, or write one value like @book_year."
+msgstr ""
+
+#: resources/lens/src/describe.ts
+msgid "repeater"
+msgstr ""
+
+#: resources/lens/src/describe.ts
+msgid "rich text"
 msgstr ""
 
 #: resources/data-panel/src/bindings/conditions.ts
@@ -3093,6 +3306,10 @@ msgstr ""
 
 #: resources/lens/src/Panel.tsx
 msgid "stop picking"
+msgstr ""
+
+#: resources/lens/src/describe.ts
+msgid "text"
 msgstr ""
 
 #: resources/data-panel/src/bindings/visibility.tsx

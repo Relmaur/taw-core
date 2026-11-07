@@ -112,3 +112,57 @@ export const GripIcon = ({ size = 14 }: Props) => (
         <circle cx="15" cy="18" r="1.6" />
     </svg>
 );
+
+/** Inspect card: clear the selection (screen 06). */
+export const CloseIcon = ({ size = 14 }: Props) => (
+    <Stroke size={size} width={2}>
+        <path d="M6 6l12 12M18 6L6 18" />
+    </Stroke>
+);
+
+/* Structure tree (screen 04). */
+export const ChevronDownIcon = ({ size = 12 }: Props) => (
+    <Stroke size={size} width={2}>
+        <path d="M6 9l6 6 6-6" />
+    </Stroke>
+);
+
+export const ChevronRightIcon = ({ size = 12 }: Props) => (
+    <Stroke size={size} width={2}>
+        <path d="M9 6l6 6-6 6" />
+    </Stroke>
+);
+
+export const PageIcon = ({ size = 14 }: Props) => (
+    <Stroke size={size}>
+        <rect x="5" y="3" width="14" height="18" rx="2" />
+        <path d="M9 8h6M9 12h6" />
+    </Stroke>
+);
+
+export const PartIcon = ({ size = 14 }: Props) => (
+    <Stroke size={size}>
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M4 9h16" />
+    </Stroke>
+);
+
+export const BlockIcon = ({ size = 14 }: Props) => (
+    <Stroke size={size}>
+        <rect x="4" y="4" width="7" height="7" rx="1" />
+        <rect x="13" y="4" width="7" height="7" rx="1" />
+        <rect x="4" y="13" width="16" height="7" rx="1" />
+    </Stroke>
+);
+
+export const FieldIcon = ({ size = 14 }: Props) => (
+    <Stroke size={size}>
+        <path d="M5 7h14M5 12h10M5 17h7" />
+    </Stroke>
+);
+
+export const TextIcon = ({ size = 14 }: Props) => (
+    <Stroke size={size}>
+        <path d="M6 6h12M12 6v12" />
+    </Stroke>
+);

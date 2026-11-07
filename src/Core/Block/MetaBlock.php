@@ -6,6 +6,7 @@ namespace TAW\Core\Block;
 
 use TAW\Core\Editor\VisualEditor;
 use TAW\Core\Fields\PostFields;
+use TAW\Core\Lens\SourceMap;
 use TAW\Core\Metabox\Metabox;
 use TAW\Taw;
 
@@ -90,14 +91,20 @@ abstract class MetaBlock extends BaseBlock
         $postId = $postId !== null ? $postId : get_the_ID();
         if (!$postId) return;
 
-        $data = $this->getData($postId);
+        // TAW Lens (dev only): a source-map node around the block, opened before getData() so its reads count.
+        $lens = SourceMap::openBlock($this, (int) $postId);
+        try {
+            $data = $this->getData($postId);
 
-        if (VisualEditor::isActive()) {
-            echo '<div data-taw-block-section="' . esc_attr($this->id) . '">';
-            $this->renderTemplate($data);
-            echo '</div>';
-        } else {
-            $this->renderTemplate($data);
+            if (VisualEditor::isActive()) {
+                echo '<div data-taw-block-section="' . esc_attr($this->id) . '">';
+                $this->renderTemplate($data);
+                echo '</div>';
+            } else {
+                $this->renderTemplate($data);
+            }
+        } finally {
+            SourceMap::close($lens);
         }
     }
 

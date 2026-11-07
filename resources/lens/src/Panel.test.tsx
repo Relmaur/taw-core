@@ -1,7 +1,11 @@
 import { act, fireEvent, render, screen } from '@testing-library/preact';
 import { describe, expect, it, vi } from 'vitest';
-import { Panel, type PanelEnv } from './Panel';
+import { readManifest } from './manifest';
+import type { PickHandlers } from './page';
+import { Panel, type PageEnv, type PanelEnv } from './Panel';
 import { DEFAULTS, type Prefs } from './prefs';
+import { PageMap } from './sourcemap';
+import { $, mountFixture } from './testing';
 
 function fakeEnv(viewport = { width: 1440, height: 900, top: 0 }) {
     const env = {
@@ -45,7 +49,7 @@ describe('docked (default)', () => {
         expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
     });
 
-    it('marks picking and the tree as not available yet', () => {
+    it('marks picking and the tree as unavailable without a page under it', () => {
         setup();
         expect(screen.getByRole('button', { name: 'Pick an element' })).toHaveAttribute('aria-disabled', 'true');
         expect(screen.getByRole('button', { name: 'Structure tree' })).toHaveAttribute('aria-pressed', 'false');
@@ -163,4 +167,109 @@ it('re-reads the viewport on resize', () => {
     size = { width: 800, height: 600, top: 0 };
     act(() => resize());
     expect(screen.getByRole('complementary').style.height).toBe('576px');
+});
+
+describe('picking and inspecting (build step 3)', () => {
+    function withPage(initial: Partial<Prefs> = {}) {
+        mountFixture();
+        let handlers: PickHandlers | null = null;
+        const stop = vi.fn();
+        const page: PageEnv = {
+            map: vi.fn(() => new PageMap(document, readManifest(document)!)),
+            pick: vi.fn((h: PickHandlers) => {
+                handlers = h;
+                return stop;
+            }),
+            sampler: null,
+            onAsset: () => () => {},
+            reveal: vi.fn(),
+            editor: 'vscode://file/{path}:{line}',
+        };
+        const env = { ...fakeEnv(), page };
+        setup(initial, env);
+        const picker = () => {
+            if (!handlers) {
+                throw new Error('not picking');
+            }
+            return handlers;
+        };
+        return { page, stop, picker };
+    }
+
+    const chips = () => [...document.querySelectorAll('.chip')].map((chip) => chip.textContent);
+
+    it('picks on the page until Esc: a click shows the inspect card, shift-click adds', () => {
+        const { page, stop, picker } = withPage();
+        const pick = screen.getByRole('button', { name: 'Pick an element' });
+        fireEvent.click(pick);
+        expect(pick).toHaveAttribute('aria-pressed', 'true');
+        expect(page.pick).toHaveBeenCalledTimes(1);
+
+        act(() => picker().hover($('h1')));
+        act(() => picker().pick($('h1'), false));
+        expect(screen.getByRole('region', { name: 'Inspect' })).toHaveTextContent('hero_heading');
+        expect(chips()).toEqual([]);
+
+        act(() => picker().pick($('h2'), true));
+        expect(chips()).toEqual(['hero_heading', '“Why TAW Lens”']);
+        expect(screen.getByRole('region', { name: 'Inspect' })).toHaveTextContent('Template text');
+
+        act(() => picker().pick($('h2'), true));
+        expect(chips()).toEqual([]);
+
+        act(() => picker().stop());
+        expect(pick).toHaveAttribute('aria-pressed', 'false');
+        expect(stop).toHaveBeenCalled();
+    });
+
+    it('stops picking when Lens hides', () => {
+        const { stop } = withPage();
+        fireEvent.click(screen.getByRole('button', { name: 'Pick an element' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Hide Lens' }));
+        expect(stop).toHaveBeenCalled();
+    });
+
+    it('clears the selection from the card', () => {
+        const { picker } = withPage();
+        fireEvent.click(screen.getByRole('button', { name: 'Pick an element' }));
+        act(() => picker().pick($('h1'), false));
+        fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+        expect(screen.queryByRole('region', { name: 'Inspect' })).toBeNull();
+        expect(screen.getByText('Point at anything on the page')).toBeInTheDocument();
+    });
+
+    it('browses the structure tree: select a row, back to chat for its card, "Show in tree" finds it again', () => {
+        const { page } = withPage();
+        fireEvent.click(screen.getByRole('button', { name: 'Structure tree' }));
+        expect(screen.getByRole('button', { name: 'Structure tree' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('tree', { name: 'Structure' })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('treeitem', { name: /^Hero/ }));
+        expect(chips()).toEqual(['Hero']);
+        expect(screen.getByText('Shift-click to add more')).toBeInTheDocument();
+        expect(page.reveal).toHaveBeenCalledWith($('section.hero'));
+        expect(screen.getByRole('treeitem', { name: /^Hero/ })).toHaveAttribute('aria-selected', 'true');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Back to chat' }));
+        expect(screen.getByRole('region', { name: 'Inspect' })).toHaveTextContent('Block · hero');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Show in tree' }));
+        expect(screen.getByRole('treeitem', { name: /^Hero/ })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('treeitem', { name: /^hero_heading/ })).toBeInTheDocument();
+    });
+
+    it('opens the rows above a selection made on the page', () => {
+        const { picker } = withPage();
+        fireEvent.click(screen.getByRole('button', { name: 'Pick an element' }));
+        act(() => picker().pick($('.faq h3'), false));
+        fireEvent.click(screen.getByRole('button', { name: 'Structure tree' }));
+        expect(screen.getByRole('treeitem', { name: /^faq_items/ })).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('says so on a page without a source map', () => {
+        const { page } = withPage();
+        vi.mocked(page.map).mockReturnValue(null);
+        fireEvent.click(screen.getByRole('button', { name: 'Structure tree' }));
+        expect(screen.getByText('No source map on this page')).toBeInTheDocument();
+    });
 });
