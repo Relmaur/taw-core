@@ -42,7 +42,8 @@ final class ApplicationTest extends TestCase
         foreach (['make:block', 'sync', 'skills:sync', 'schema:validate', 'content:import', 'content:journals', 'wp', 'log:tail', 'canon-law:install'] as $name) {
             $this->assertTrue($app->has($name), $name);
         }
-        $this->assertCount(36, Application::coreCommands($this->dir), 'the list the scaffold bin/taw had, plus skills:sync, policy, docs:sync, configs:sync, upgrade, update and content:journals, and the two hidden hub:* stubs');
+        $this->assertCount(37, Application::coreCommands($this->dir), 'the list the scaffold bin/taw had, plus skills:sync, policy, docs:sync, configs:sync, upgrade, update, content:journals and lens, and the two hidden hub:* stubs');
+        $this->assertTrue($app->has('lens'));
         $this->assertTrue($app->get('hub:install')->isHidden(), 'retired: hidden, but it says what replaced it');
     }
 
@@ -58,6 +59,7 @@ final class ApplicationTest extends TestCase
         $this->assertTrue($app->has('policy'));
         $this->assertTrue($app->has('docs:sync'));
         $this->assertTrue($app->has('upgrade'));
+        $this->assertFalse($app->has('lens'), 'TAW Lens is classic-only for now');
         foreach (['content:export', 'content:import', 'content:diff', 'content:journals', 'content:defaults'] as $name) {
             $this->assertTrue($app->has($name), "{$name}: block themes pull and publish too");
         }

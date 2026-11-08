@@ -114,6 +114,8 @@ final class Application
             new CanonLawInstallCommand($themeDir),
             new CanonLawExportCommand(),
             new ConfigsSyncCommand($themeDir),
+            // TAW Lens is classic-only for now (umbrella ADR-0006 § 5).
+            new LensCommand($themeDir),
             // Retired with taw-hub (v1.77.0): hidden, they say what replaced them.
             new HubInstallCommand(),
             new HubEnrollCommand(),

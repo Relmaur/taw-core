@@ -8,6 +8,7 @@ use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use TAW\Core\Assets\Vite;
+use TAW\Core\Lens\Bridge;
 use TAW\Core\Lens\ClassicAdapter;
 use TAW\Core\Lens\Lens;
 use TAW\Core\Lens\SourceMap;
@@ -70,11 +71,14 @@ final class LensTest extends TestCase
         });
         Functions\when('get_translations_for_domain')->justReturn((object) ['entries' => []]);
         Functions\when('determine_locale')->justReturn('en_US');
+        Functions\when('rest_url')->alias(static fn (string $path = ''): string => 'http://taw.local/wp-json/' . ltrim($path, '/'));
+        Functions\when('wp_create_nonce')->justReturn('nonce123');
     }
 
     protected function tearDown(): void
     {
         Lens::resetForTests();
+        Bridge::useAliveCheck(null);
         SourceMap::resetForTests();
         ClassicAdapter::resetForTests();
         exec('rm -rf ' . escapeshellarg($this->root));
@@ -88,6 +92,61 @@ final class LensTest extends TestCase
 
         $this->assertSame(10, has_action('wp_enqueue_scripts', [Lens::class, 'enqueue']));
         $this->assertSame(PHP_INT_MAX, has_action('template_redirect', [Lens::class, 'startSourceMap']));
+        $this->assertSame(10, has_action('rest_api_init', [Lens::class, 'registerRoutes']));
+    }
+
+    public function test_the_bridge_route_exists_only_while_the_toggle_is_on(): void
+    {
+        $routes = [];
+        Functions\when('register_rest_route')->alias(function (string $ns, string $route, array $args) use (&$routes): bool {
+            $routes[] = [$ns . $route, $args['methods'], $args['permission_callback']];
+
+            return true;
+        });
+
+        $this->site['toggle'] = '';
+        Lens::registerRoutes();
+        $this->assertSame([], $routes, "a production site's REST index doesn't list it");
+
+        $this->site['toggle'] = '1';
+        Lens::registerRoutes();
+        $this->assertSame([['taw/v1/lens/bridge', 'GET', [Lens::class, 'allowed']]], $routes);
+    }
+
+    public function test_the_route_answers_only_under_the_gate_without_the_page_check(): void
+    {
+        $this->site['admin'] = true; // REST requests aren't the frontend; the rest of the gate still applies.
+        $this->assertTrue(Lens::allowed());
+        foreach (['toggle' => '', 'loggedIn' => false, 'can' => false, 'dev' => false] as $gate => $closed) {
+            $open = $this->site[$gate];
+            $this->site[$gate] = $closed;
+            $this->assertFalse(Lens::allowed(), $gate);
+            $this->site[$gate] = $open;
+        }
+    }
+
+    public function test_the_route_hands_the_page_the_running_bridge_and_is_never_cached(): void
+    {
+        mkdir($this->root . '/theme/.taw/lens', 0777, true);
+        Functions\when('get_stylesheet_directory')->justReturn($this->root . '/theme');
+        Bridge::useAliveCheck(static fn (int $pid): bool => $pid === 4321);
+
+        $this->assertSame(['running' => false], Lens::bridgeRoute()->get_data());
+
+        file_put_contents($this->root . '/theme/' . Bridge::RUN_FILE, (string) json_encode(['pid' => 4321, 'port' => 47615, 'token' => str_repeat('ab', 24), 'protocol' => 1]));
+        $response = Lens::bridgeRoute();
+        $this->assertSame(['running' => true, 'url' => 'http://127.0.0.1:47615', 'token' => str_repeat('ab', 24), 'protocol' => 1], $response->get_data());
+        $this->assertSame('no-store', $response->headers['Cache-Control']);
+    }
+
+    public function test_the_page_learns_where_to_ask_for_the_bridge_but_never_its_token(): void
+    {
+        $config = Lens::config();
+
+        $this->assertSame('http://taw.local/wp-json/taw/v1/lens/bridge', $config['bridge']);
+        $this->assertSame('nonce123', $config['nonce']);
+        $this->assertSame(Bridge::PROTOCOL, $config['protocol']);
+        $this->assertArrayNotHasKey('token', $config);
     }
 
     public function test_the_source_map_starts_only_under_the_gate(): void

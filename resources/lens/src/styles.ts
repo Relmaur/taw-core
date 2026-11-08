@@ -721,6 +721,429 @@ export const panelCss = (): string =>
             color: var(--lens-muted-soft);
         }
 
+        /* Header status (screen 07): not connected, connecting. */
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--lens-muted);
+            white-space: nowrap;
+        }
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--lens-muted-soft);
+        }
+        .spinner {
+            flex: 0 0 auto;
+        }
+        @media (prefers-reduced-motion: no-preference) {
+            .spinner {
+                animation: lens-spin 0.9s linear infinite;
+            }
+        }
+        @keyframes lens-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Conversation (component 01). */
+        .conversation {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            padding: 20px;
+        }
+        .panel[data-mode='sheet'] .conversation {
+            padding: 16px;
+        }
+        .turn {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .message {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+        }
+        .message-chips {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 6px;
+            max-width: 100%;
+        }
+        .bubble {
+            max-width: 88%;
+            background: var(--lens-bubble);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 14px;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+        .reply {
+            font-size: 14px;
+            line-height: 1.6;
+            overflow-wrap: anywhere;
+        }
+        .md > * {
+            margin: 0;
+        }
+        .md > * + * {
+            margin-top: 10px;
+        }
+        .md ul,
+        .md ol {
+            padding-left: 20px;
+        }
+        .md li + li {
+            margin-top: 4px;
+        }
+        .md code,
+        .step-text code,
+        .notice-text code {
+            font-family: var(--lens-font-mono);
+            font-size: 0.88em;
+        }
+        .md pre {
+            background: var(--lens-bubble);
+            border-radius: 8px;
+            padding: 10px 12px;
+            overflow-x: auto;
+            font-family: var(--lens-font-mono);
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: pre;
+        }
+        .md pre code {
+            font-size: inherit;
+        }
+        .md a {
+            color: inherit;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .turn-note,
+        .busy-line {
+            font-size: 12px;
+            color: var(--lens-muted-soft);
+        }
+
+        /* The activity line: quiet, one line per step kind. */
+        .activity {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+            font-size: 13px;
+            color: var(--lens-muted);
+        }
+        .step-icon {
+            flex: 0 0 auto;
+            display: flex;
+            color: var(--lens-muted);
+        }
+        .step-text {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .step-text code {
+            color: var(--lens-text);
+        }
+        .step .step-details {
+            margin-left: auto;
+            flex: 0 0 auto;
+        }
+        .step-list {
+            list-style: none;
+            margin: 0;
+            padding: 0 0 0 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 12px;
+            color: var(--lens-muted);
+        }
+        .step-list li {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+        }
+        .step-list code {
+            font-family: var(--lens-font-mono);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Approval card: amber means "needs your OK", and only that. */
+        .approval,
+        .busy {
+            border: 1px solid var(--lens-amber-line);
+            background: var(--lens-amber-fill);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .approval-head,
+        .busy-head {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            min-width: 0;
+        }
+        .approval-dot {
+            flex: 0 0 auto;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--lens-amber-dot);
+            align-self: center;
+        }
+        .approval-file {
+            font-family: var(--lens-font-mono);
+            font-size: 12px;
+            font-weight: 400;
+            color: var(--lens-amber-text);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+        .diff,
+        .approval-body {
+            margin: 0;
+            border-top: 1px solid var(--lens-amber-rule);
+            border-bottom: 1px solid var(--lens-amber-rule);
+            background: var(--lens-surface);
+        }
+        .diff {
+            padding: 8px 0;
+            font-family: var(--lens-font-mono);
+            font-size: 12px;
+            line-height: 1.75;
+            max-height: 320px;
+            overflow: auto;
+        }
+        .diff-line {
+            padding: 0 16px;
+            white-space: pre;
+            color: var(--lens-muted);
+        }
+        .diff-line[data-kind='removed'] {
+            background: var(--lens-diff-removed-fill);
+            color: var(--lens-diff-removed-text);
+        }
+        .diff-line[data-kind='added'] {
+            background: var(--lens-diff-added-fill);
+            color: var(--lens-diff-added-text);
+        }
+        .diff-sign {
+            display: inline-block;
+            width: 1.4em;
+        }
+        .diff-more {
+            font-style: italic;
+        }
+        .approval-body {
+            padding: 10px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .approval-note {
+            font-size: 12px;
+            color: var(--lens-muted);
+        }
+        .approval-code {
+            margin: 0;
+            font-family: var(--lens-font-mono);
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            max-height: 240px;
+            overflow: auto;
+        }
+        .approval-actions,
+        .busy-actions,
+        .notice-actions {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px 14px;
+        }
+        .approval-actions .card-button {
+            height: 40px;
+            font-size: 14px;
+        }
+        .busy-actions .card-button,
+        .notice-actions .card-button {
+            flex: 0 0 auto;
+            padding: 0 14px;
+        }
+        .card-button:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+        .approval-done {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--lens-muted);
+            min-width: 0;
+        }
+
+        /* Theme busy (screen 07): warn, don't block. */
+        .busy-text {
+            margin: 0;
+            padding: 0 16px;
+            font-size: 13px;
+            line-height: 1.55;
+            color: var(--lens-amber-text);
+        }
+        .busy-compact {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            font-size: 12px;
+            color: var(--lens-amber-text);
+        }
+        .busy-compact .text-button {
+            margin-left: auto;
+            flex: 0 0 auto;
+        }
+
+        /* Error (screen 07): ink, not red. */
+        .notice {
+            border: 1px solid var(--lens-line);
+            border-radius: 10px;
+            background: var(--lens-surface);
+        }
+        .notice-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px 0;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .notice-text {
+            margin: 6px 0 0;
+            padding: 0 16px;
+            font-size: 13px;
+            line-height: 1.55;
+            color: var(--lens-muted);
+        }
+        .notice-detail {
+            margin: 0 16px 14px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: var(--lens-bubble);
+            font-family: var(--lens-font-mono);
+            font-size: 11.5px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            max-height: 200px;
+            overflow: auto;
+        }
+
+        /* Not connected (screen 07): the command to run. */
+        .command {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            width: 100%;
+            max-width: 300px;
+            border: 1px solid var(--lens-composer-line);
+            background: var(--lens-bubble);
+            border-radius: 8px;
+            padding: 6px 6px 6px 12px;
+        }
+        .command code {
+            font-family: var(--lens-font-mono);
+            font-size: 13px;
+        }
+        .command-copy {
+            height: 28px;
+            padding: 0 10px;
+            border-radius: 6px;
+            border: 1px solid var(--lens-button-line);
+            background: var(--lens-surface);
+            color: var(--lens-text);
+            font-size: 12px;
+        }
+        .command-copy:hover {
+            background: var(--lens-chip);
+        }
+        .empty-note {
+            font-size: 12px;
+            color: var(--lens-muted-soft);
+        }
+
+        /* Connecting (screen 07): skeleton lines. */
+        .skeleton {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 20px;
+        }
+        .skeleton span {
+            display: block;
+            height: 10px;
+            border-radius: 5px;
+            background: var(--lens-chip);
+        }
+
+        /* Composer: grows with the message; Send becomes Stop while Claude works. */
+        textarea.composer-input {
+            resize: none;
+            height: 30px;
+            padding: 6px 0;
+            font: inherit;
+            font-size: 14px;
+            line-height: 1.3;
+        }
+        .composer-box {
+            align-items: flex-end;
+        }
+        .stop {
+            flex: 0 0 auto;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 12px;
+            border-radius: 6px;
+            border: 1px solid var(--lens-button-line);
+            background: var(--lens-surface);
+            color: var(--lens-text);
+            font-size: 13px;
+        }
+        .stop:hover {
+            background: var(--lens-bubble);
+        }
+
         @media (prefers-reduced-motion: no-preference) {
             .icon-button,
             .send,

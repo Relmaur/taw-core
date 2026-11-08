@@ -8,6 +8,7 @@
  * itself is the margin that makes room for the docked panel (one <style> element, removed when it undocks).
  */
 import { render } from 'preact';
+import { connectBridge, PROTOCOL } from './bridge';
 import { Panel, type PageEnv, type PanelEnv } from './Panel';
 import { pushCss } from './layout';
 import { pageMap, pageSampler, startPicking } from './page';
@@ -18,7 +19,14 @@ export { tokensCss } from './tokens';
 
 declare global {
     interface Window {
-        tawLens?: { host?: string; version?: string; editor?: string };
+        tawLens?: {
+            host?: string;
+            version?: string;
+            editor?: string;
+            bridge?: string;
+            nonce?: string;
+            protocol?: number;
+        };
     }
 }
 
@@ -52,12 +60,14 @@ export function pageAccess(doc: Document, host: HTMLElement, editor = EDITOR_URL
             }
         },
         editor,
+        url: win.location.href,
     };
 }
 
 /** The page around the panel: the real document. */
 export function pageEnv(doc: Document, host: HTMLElement): PanelEnv {
     const win = doc.defaultView ?? window;
+    const config = window.tawLens;
 
     return {
         viewport() {
@@ -98,6 +108,10 @@ export function pageEnv(doc: Document, host: HTMLElement): PanelEnv {
             return () => win.removeEventListener('resize', callback);
         },
         page: pageAccess(doc, host, window.tawLens?.editor || EDITOR_URL),
+        bridge: config?.bridge
+            ? (handlers) =>
+                  connectBridge({ bridge: config.bridge!, nonce: config.nonce ?? '', protocol: PROTOCOL }, handlers)
+            : undefined,
     };
 }
 

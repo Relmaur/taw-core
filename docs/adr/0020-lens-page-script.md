@@ -57,6 +57,9 @@ Facts that shape the build:
 - New: `resources/lens/`, `assets/lens/` (committed build), CI job `lens`; `TAW\Core\Lens\Lens` loads the build
   under the gate (build step 2). The source map it reads (umbrella ADR-0006 § 7) is `TAW\Core\Lens\SourceMap`,
   fed by `ClassicAdapter` and the block render methods (build step 3).
+- The chat (build step 4) is part of the same package: the panel finds the bridge `taw lens` runs through
+  `GET taw/v1/lens/bridge` and talks to it over 127.0.0.1 (umbrella ADR-0006 § 8). The bridge itself is
+  `resources/lens-bridge/` (plain Node, shipped as is, not built); its tests are in `tests/js/`.
 - Any change under `resources/lens/src/` is rebuilt and committed with it, or CI fails.
 - Accessibility checks live next to the code: the token tests assert WCAG 2.2 AA contrast for every text
   and UI pair in both themes.

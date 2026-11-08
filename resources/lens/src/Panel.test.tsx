@@ -34,18 +34,15 @@ describe('docked (default)', () => {
         expect(panel).toHaveAttribute('data-mode', 'docked');
         expect(panel).toHaveAttribute('data-side', 'right');
         expect(env.push).toHaveBeenLastCalledWith('right');
-        expect(screen.getByText('taw.local')).toBeInTheDocument();
     });
 
-    it('shows the first-open state and the gestures', () => {
+    it('says how to start Lens while no bridge runs; the composer stays off', () => {
         setup();
-        expect(screen.getByText('Point at anything on the page')).toBeInTheDocument();
-        expect(screen.getByText('stop picking')).toBeInTheDocument();
-    });
-
-    it('keeps the composer off until the bridge connects (build step 4)', () => {
-        setup();
+        expect(screen.getByText('Lens isn’t connected')).toBeInTheDocument();
+        expect(screen.getByText('taw lens')).toBeInTheDocument();
+        expect(screen.getByText('Not connected')).toBeInTheDocument();
         expect(screen.getByLabelText('Message')).toBeDisabled();
+        expect(screen.getByLabelText('Message')).toHaveAttribute('placeholder', 'Start Lens to chat');
         expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
     });
 
@@ -183,6 +180,7 @@ describe('picking and inspecting (build step 3)', () => {
             sampler: null,
             onAsset: () => () => {},
             reveal: vi.fn(),
+            url: 'https://acme.local/',
             editor: 'vscode://file/{path}:{line}',
         };
         const env = { ...fakeEnv(), page };
@@ -235,7 +233,7 @@ describe('picking and inspecting (build step 3)', () => {
         act(() => picker().pick($('h1'), false));
         fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
         expect(screen.queryByRole('region', { name: 'Inspect' })).toBeNull();
-        expect(screen.getByText('Point at anything on the page')).toBeInTheDocument();
+        expect(screen.queryByText('hero_heading')).toBeNull();
     });
 
     it('browses the structure tree: select a row, back to chat for its card, "Show in tree" finds it again', () => {

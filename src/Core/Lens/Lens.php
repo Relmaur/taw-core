@@ -27,6 +27,9 @@ if (!defined('ABSPATH')) {
  * Under the same gate it starts the source map (SourceMap, ClassicAdapter): markers around blocks and template
  * parts plus one JSON manifest of what rendered them, which the page script reads.
  *
+ * The chat goes to the bridge `taw lens` starts (Bridge): the page asks `GET taw/v1/lens/bridge` for its
+ * address and per-run token. That route exists only while the toggle is on, and answers only under the gate.
+ *
  * Wired by Theme::boot() (classic themes), never by Boot::data(): it injects frontend output.
  */
 final class Lens
@@ -47,6 +50,10 @@ final class Lens
     /** "Open in editor" by default: VS Code's URL handler. */
     public const EDITOR_URL = 'vscode://file/{path}:{line}';
 
+    public const REST_NAMESPACE = 'taw/v1';
+
+    public const REST_ROUTE = '/lens/bridge';
+
     private static bool $registered = false;
 
     private static ?Vite $vite = null;
@@ -63,6 +70,35 @@ final class Lens
 
         add_action('wp_enqueue_scripts', [self::class, 'enqueue']);
         add_action('template_redirect', [self::class, 'startSourceMap'], PHP_INT_MAX);
+        add_action('rest_api_init', [self::class, 'registerRoutes']);
+    }
+
+    /**
+     * rest_api_init: `GET taw/v1/lens/bridge`, where the page finds the running bridge. Registered only while
+     * the toggle is on, so a production site's REST index doesn't list it.
+     */
+    public static function registerRoutes(): void
+    {
+        if (!(bool) OptionsPage::get(self::OPTION_FIELD)) {
+            return;
+        }
+        register_rest_route(self::REST_NAMESPACE, self::REST_ROUTE, [
+            'methods'             => 'GET',
+            'callback'            => [self::class, 'bridgeRoute'],
+            'permission_callback' => [self::class, 'allowed'],
+        ]);
+    }
+
+    /**
+     * The running bridge's address and token (Bridge::forPage()), or `running: false`. The token is per run
+     * and only ever handed to this logged-in developer, under the gate (umbrella ADR-0006 § 8).
+     */
+    public static function bridgeRoute(): \WP_REST_Response
+    {
+        $response = new \WP_REST_Response(Bridge::forPage(get_stylesheet_directory()));
+        $response->header('Cache-Control', 'no-store');
+
+        return $response;
     }
 
     /**
@@ -85,6 +121,16 @@ final class Lens
         if (is_admin() || wp_doing_ajax() || is_customize_preview()) {
             return false;
         }
+
+        return self::allowed();
+    }
+
+    /**
+     * The gate without the page check (the REST route uses it too): the toggle, a user who can edit the
+     * theme, the dev server.
+     */
+    public static function allowed(): bool
+    {
         if (!(bool) OptionsPage::get(self::OPTION_FIELD)) {
             return false;
         }
@@ -114,14 +160,14 @@ final class Lens
     }
 
     /**
-     * What the page script needs to know about the site. No secrets: the bridge token arrives with the chat
-     * (build step 4), and the page itself is only ever served to this logged-in developer.
+     * What the page script needs to know about the site. No secrets: the bridge's token comes from the REST
+     * route (`bridge`, with the REST nonce), only while the bridge runs.
      *
      * `editor` is the link "Open in editor" follows, with `{path}` (the file's absolute path) and `{line}`;
      * VS Code's by default. A theme or a developer's mu-plugin changes it with the `taw_lens_editor_url`
      * filter, e.g. `cursor://file/{path}:{line}` or `phpstorm://open?file={path}&line={line}`.
      *
-     * @return array{host: string, version: string, editor: string}
+     * @return array{host: string, version: string, editor: string, bridge: string, nonce: string, protocol: int}
      */
     public static function config(): array
     {
@@ -130,9 +176,12 @@ final class Lens
         $editor = apply_filters('taw_lens_editor_url', self::EDITOR_URL);
 
         return [
-            'host'    => is_string($host) ? $host . (is_int($port) ? ':' . $port : '') : '',
-            'version' => Framework::version(),
-            'editor'  => is_string($editor) && $editor !== '' ? $editor : self::EDITOR_URL,
+            'host'     => is_string($host) ? $host . (is_int($port) ? ':' . $port : '') : '',
+            'version'  => Framework::version(),
+            'editor'   => is_string($editor) && $editor !== '' ? $editor : self::EDITOR_URL,
+            'bridge'   => rest_url(self::REST_NAMESPACE . self::REST_ROUTE),
+            'nonce'    => wp_create_nonce('wp_rest'),
+            'protocol' => Bridge::PROTOCOL,
         ];
     }
 

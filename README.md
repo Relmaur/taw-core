@@ -1760,9 +1760,50 @@ branch. So far:
 - **the structure tree:** the page → template parts and blocks → the fields and template text each put on the
   page. Hover a row to ring its element, click to select, arrow keys to move;
 - **the rings:** drawn over the page, never on the element. Ink or white, whichever contrasts more with what's
-  actually behind the element (its background colour, gradient or image pixels), with a halo of the other.
+  actually behind the element (its background colour, gradient or image pixels), with a halo of the other;
+- **the chat:** tell Claude what to change. The message goes with what's selected, described from the source
+  map (the field and where it's stored, or the file and line). Replies stream in; Claude's tool work shows as
+  one quiet activity line ("Read 3 files in `Blocks/Hero/`", Details for every step); a change your Claude
+  settings would ask about shows as a card with its diff, **Apply** or **Skip**. **Stop** ends a turn.
 
-The chat comes next.
+Editing text in place comes next.
+
+**Starting the chat: `taw lens`.** Run it in the theme folder and leave it running; an open Lens panel
+connects on its own (it shows `taw lens` with a Copy button until then). Ctrl-C stops it.
+
+```bash
+taw lens                          # start a conversation
+taw lens --resume                 # continue the last one (or --resume=<session id>)
+taw lens --check                  # what it would use: Node, Claude Code, the site's address
+taw lens --prompt                 # the instructions Claude gets (also the guide to doing it by hand)
+taw lens --permission-mode=default --model=sonnet --origin=https://acme.test
+```
+
+It needs Node 20+ and Claude Code 2.1.319+ (`claude update`), and runs **your own** `claude` CLI in the theme
+folder: your login, your settings and your permission mode (in auto mode, fewer changes ask first;
+`--permission-mode=default` makes every change ask in the panel for that session). Your MCP servers are
+never loaded (`--strict-mcp-config`), and the agent gets only `Read`, `Glob`, `Grep`, `Edit`, `Write`, `Bash`,
+`Skill` and `TodoWrite`. The site's address comes from Local's site list (also when the theme is a symlink
+into a site); elsewhere pass `--origin`.
+
+How it fits together (umbrella ADR-0006 § 8):
+- **The bridge** is `resources/lens-bridge/bridge.mjs` (Node, no dependencies), started by `TAW\CLI\LensCommand`.
+  It drives the CLI over its stream-json protocol (approvals are `can_use_tool` requests; Stop is `interrupt`),
+  listens on **127.0.0.1 only**, and answers only the site's origin, a `Host` naming the loopback address
+  (against DNS rebinding) and its per-run token. A page that connects or reloads gets the session so far.
+- **The run file** `<theme>/.taw/lens/bridge.json` (owner-only, in a folder that git-ignores itself) holds the
+  bridge's port and token; `.taw/lens/last-session` keeps the session for `--resume`. One bridge per theme.
+- **The page finds it** through `GET /wp-json/taw/v1/lens/bridge` (`Lens::bridgeRoute()`, `TAW\Core\Lens\Bridge`):
+  registered only while Enable Lens is on, answered only under the gate (logged in, `edit_theme_options`, dev
+  server), never cached. While no bridge runs, the page asks again every 3 seconds.
+- **Theme busy** (warn, don't block): while another Claude Code session works in the theme folder (a terminal
+  included; found by its command line and working folder), the panel says so and the bridge refuses every
+  file write and command through a PreToolUse hook, even ones your settings allow. Picking and asking still
+  work; **Take over** (asked twice) lets Lens write again until a new session starts. macOS and Linux.
+- In Chrome, a `.local` site that resolves to 127.0.0.1 talks to the bridge with no Local Network Access
+  prompt (checked in Chrome 156).
+- `tests/js/lens-bridge-contract.test.mjs` checks the protocol against your installed CLI (it spends a few
+  cents): `TAW_LENS_CONTRACT=1 node --test tests/js/lens-bridge-contract.test.mjs`.
 
 **The gate.** `TAW\Core\Lens\Lens` (wired by `Theme::boot()`, never by `Boot::data()`) prints nothing unless
 all of these hold, so Lens never reaches production and the page is byte-identical with it off:
@@ -1791,7 +1832,8 @@ around values is **mixed**, with its pieces.
 **What it adds to the page.** One `<taw-lens>` element at the end of `<html>` whose shadow root holds the
 whole panel (its own Preact, its own styles; the site's CSS doesn't reach it and its CSS doesn't reach the
 site), and, while docked, one `<style id="taw-lens-push">` that gives `<html>` a 400px margin on that side.
-While picking, one `<style id="taw-lens-pick">` sets the crosshair cursor.
+While picking, one `<style id="taw-lens-pick">` sets the crosshair cursor. Nothing else: the chat talks to
+127.0.0.1 from the panel, and only while `taw lens` runs.
 Layout, side, sheet position and theme are remembered per browser (`localStorage`, key `taw-lens:prefs`).
 
 **Building it.** The page script is `resources/lens/` (Preact + TypeScript, `npm run check`), built into the
@@ -1805,6 +1847,7 @@ committed `assets/lens/` like the data panel. `npm run dev` there (port 5176) ta
 | `POST` | `/taw/v1/visual-editor/save`   | Save visual editor changes |
 | `GET`  | `/taw/v1/visual-editor/fields` | Load all registered fields + current values for the editor panel |
 | `GET`  | `/taw/v1/search-posts`         | Post search for `post_select` fields |
+| `GET`  | `/taw/v1/lens/bridge`          | TAW Lens: the running bridge's address and token (only while Enable Lens is on; dev server, `edit_theme_options`) |
 | `GET`  | `/taw/v1/icons`                | Lucide icon search for the `icon` field type — only registered when `Lucide::enable()` was called |
 | `POST` | `/taw/v1/chat`                 | Hybrid-RAG chatbot — see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot). Public by default, rate-limited |
 | `GET`  | `/taw/v1/bible/books`          | Bible reader — see [Bible Reader Corpus](#bible-reader-corpus). Opt-in, rate-limited |
@@ -2207,6 +2250,7 @@ taw seo:inject 42 --input=.taw/seo-optimized.json      # copy audit: write rewri
 taw wp post list --post_type=page                      # WP-CLI passthrough, socket/--path auto-resolved (see below)
 php bin/taw icons:sync                                          # re-vendor the Lucide icon set, run in taw-core itself (see Icon System)
 taw log:tail --level=error --limit=100                  # read back the structured log (see Logging)
+taw lens                                                # TAW Lens: start the chat bridge for this theme (see TAW Lens)
 taw content:export --output=/tmp/site.json              # portable content snapshot (see Content Interchange)
 taw content:import /tmp/site.json                       # dry-run diff; add --yes to apply (rollback snapshot written first)
 taw content:diff a.json b.json --out=changes.json       # two snapshots → a change-set for content:import

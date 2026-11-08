@@ -1,11 +1,15 @@
 /**
- * The Lens panel shell (component 01, screens 01–03; first-open state from component 04, screen 07).
+ * The Lens panel (component 01, screens 01–04; the states of component 04, screen 07): the shell, picking, the
+ * inspect card, the structure tree, and the chat with Claude through the bridge `taw lens` runs.
  *
  * Docked (default): full height on the right or left edge, pushing the page. Sheet: a 400×600 floating
  * panel dragged by its header; dropped within reach of an edge, it docks there. Hidden: a small tab on
  * the docked edge brings it back. The Dock/Undock button is the keyboard equivalent of dragging.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import type { BridgeClient, BridgeHandlers, Connection } from './bridge';
+import { Connecting, Conversation, NotConnected } from './Chat';
+import { dropped, emptyChat, markApproval, reduce, type BridgeEvent, type Chat, type Turn } from './chatModel';
 import { chipLabel, shortName, type Target } from './describe';
 import { __ } from './i18n';
 import { InspectCard } from './InspectCard';
@@ -17,6 +21,8 @@ import {
     LensMark,
     PickIcon,
     SendIcon,
+    SpinnerIcon,
+    StopIcon,
     ThemeDarkIcon,
     ThemeLightIcon,
     ThemeSystemIcon,
@@ -37,6 +43,7 @@ import { Overlay, type RingSpec } from './Overlay';
 import type { PickHandlers } from './page';
 import { nextTheme, type Prefs, type Side, type ThemeChoice } from './prefs';
 import type { Sampler } from './ring';
+import { messageChips, selectionsPayload } from './payload';
 import type { PageMap } from './sourcemap';
 import { Tree } from './Tree';
 import { buildTree, rowIdFor } from './treeModel';
@@ -52,6 +59,8 @@ export interface PanelEnv {
     onResize(callback: () => void): () => void;
     /** The page under the panel: its source map, the picker, the contrast engine. Absent in shell-only tests. */
     page?: PageEnv;
+    /** Connects to the bridge `taw lens` runs (bridge.ts). Absent: the chat stays "not connected". */
+    bridge?: (handlers: BridgeHandlers) => BridgeClient;
 }
 
 export interface PageEnv {
@@ -66,6 +75,8 @@ export interface PageEnv {
     reveal(el: Element): void;
     /** "Open in editor" link pattern, with {path} and {line}. */
     editor: string;
+    /** The page's address, for what Claude receives about the selections. */
+    url: string;
 }
 
 /** A stable key per page element, for selections made by clicking. */
@@ -120,6 +131,71 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
     const [hover, setHover] = useState<{ target: Target; label: boolean } | null>(null);
     const [reveal, setReveal] = useState<string | null>(null);
     const [assets, setAssets] = useState(0);
+    // The inspect card shows for a new selection; once it's sent with a message, the chips stand for it.
+    const [cardOpen, setCardOpen] = useState(true);
+
+    // Build step 4: the chat, through the bridge.
+    const [connection, setConnection] = useState<Connection>(env.bridge ? 'connecting' : 'off');
+    const [chat, setChat] = useState<Chat>(emptyChat);
+    const [draft, setDraft] = useState('');
+    const client = useRef<BridgeClient | null>(null);
+    const lastConnection = useRef<Connection>(connection);
+    const lastSent = useRef<{ text: string; context: string; chips: string[] } | null>(null);
+    const bodyRef = useRef<HTMLDivElement>(null);
+    const stick = useRef(true);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        if (!env.bridge) {
+            return;
+        }
+        const announceEvent = (event: BridgeEvent) => {
+            if (event.type === 'approval') {
+                setAnnouncement(__('Claude needs your OK for a change', 'taw-core'));
+            } else if (event.type === 'done') {
+                setAnnouncement(
+                    event.outcome === 'ok'
+                        ? __('Claude finished', 'taw-core')
+                        : event.outcome === 'stopped'
+                          ? __('Stopped', 'taw-core')
+                          : __('Claude stopped before finishing', 'taw-core'),
+                );
+            }
+        };
+        const bridge = env.bridge({
+            status(next) {
+                if (lastConnection.current === 'connected' && next !== 'connected') {
+                    setChat(dropped);
+                }
+                lastConnection.current = next;
+                setConnection(next);
+            },
+            event(event) {
+                setChat((current) => reduce(current, event));
+                announceEvent(event);
+            },
+        });
+        client.current = bridge;
+
+        return () => {
+            bridge.close();
+            client.current = null;
+        };
+    }, [env]);
+
+    // Follow the conversation as it grows, unless the developer scrolled up to read.
+    useLayoutEffect(() => {
+        const body = bodyRef.current;
+        if (body && stick.current) {
+            body.scrollTop = body.scrollHeight;
+        }
+    }, [chat]);
+    const onBodyScroll = () => {
+        const body = bodyRef.current;
+        if (body) {
+            stick.current = body.scrollHeight - body.scrollTop - body.clientHeight < 48;
+        }
+    };
 
     const freshMap = useCallback(() => {
         const next = page?.map(true) ?? null;
@@ -149,6 +225,7 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                     : [...current, target];
             });
             setPrimary(target.key);
+            setCardOpen(true);
             setAnnouncement(`${__('Selected', 'taw-core')} ${map ? shortName(map.manifest, target) : ''}`.trim());
         },
         [map],
@@ -216,6 +293,75 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
     };
 
     const active = selection.find((t) => t.key === primary) ?? selection[selection.length - 1] ?? null;
+
+    const connected = connection === 'connected';
+    const send = async (message: { text: string; context: string; chips: string[] }) => {
+        const bridge = client.current;
+        if (!bridge || !connected || chat.working || message.text.trim() === '') {
+            return;
+        }
+        stick.current = true;
+        const result = await bridge.send('/message', message);
+        if (result.ok) {
+            lastSent.current = message;
+            return true;
+        }
+        setAnnouncement(
+            result.status === 409
+                ? __('Claude is still working on the last message', 'taw-core')
+                : __('Lens couldn’t send that. Is taw lens still running?', 'taw-core'),
+        );
+
+        return false;
+    };
+    const submit = async () => {
+        const text = draft.trim();
+        if (text === '') {
+            return;
+        }
+        const message = {
+            text,
+            context: selectionsPayload(map?.manifest ?? null, selection, {
+                url: page?.url ?? '',
+                title: map?.manifest.nodes.get(0)?.label ?? '',
+            }),
+            chips: messageChips(map?.manifest ?? null, selection),
+        };
+        setDraft('');
+        if (await send(message)) {
+            setCardOpen(false);
+        } else {
+            setDraft(text);
+        }
+    };
+    const retry = (turn: Turn) => {
+        const sent = lastSent.current;
+        void send(sent && sent.text === turn.text ? sent : { text: turn.text, context: '', chips: turn.chips });
+    };
+    const answer = async (id: string, allow: boolean) => {
+        setChat((current) => markApproval(current, id, 'sending'));
+        const result = await client.current?.send('/approve', { id, allow });
+        if (!result?.ok) {
+            setChat((current) => markApproval(current, id, 'pending'));
+            setAnnouncement(__('Lens couldn’t send your answer. Try again.', 'taw-core'));
+        }
+    };
+    const stop = () => void client.current?.send('/stop', {});
+    const takeOver = () => void client.current?.send('/take-over', {});
+    const onComposerKey = (event: KeyboardEvent) => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+            event.preventDefault();
+            void submit();
+        }
+    };
+    // The composer grows with what's typed, up to six lines.
+    useLayoutEffect(() => {
+        const input = inputRef.current;
+        if (input) {
+            input.style.height = 'auto';
+            input.style.height = `${Math.min(input.scrollHeight, 132)}px`;
+        }
+    }, [draft]);
     const rings: RingSpec[] =
         prefs.mode === 'hidden'
             ? []
@@ -392,7 +538,20 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                             </span>
                         )}
                         <span class="brand-name">{__('Lens', 'taw-core')}</span>
-                        {docked && host && <span class="brand-host">{host}</span>}
+                        {docked && host && connected && <span class="brand-host">{host}</span>}
+                        {connection === 'connecting' ? (
+                            <span class="status">
+                                <SpinnerIcon size={12} />
+                                {__('Connecting…', 'taw-core')}
+                            </span>
+                        ) : connection !== 'connected' ? (
+                            <span class="status">
+                                <span class="status-dot" aria-hidden="true" />
+                                {connection === 'outdated'
+                                    ? __('Restart needed', 'taw-core')
+                                    : __('Not connected', 'taw-core')}
+                            </span>
+                        ) : null}
                     </div>
                     <div class="tools">
                         <button
@@ -460,7 +619,7 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                     </div>
                 </div>
 
-                <div class="body">
+                <div class="body" ref={bodyRef} onScroll={onBodyScroll}>
                     {view === 'tree' ? (
                         tree ? (
                             <Tree
@@ -482,6 +641,18 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                                 </div>
                             </div>
                         )
+                    ) : chat.turns.length > 0 || (chat.busy && connected) ? (
+                        <Conversation
+                            chat={chat}
+                            connection={connection}
+                            onAnswer={(id: string, allow: boolean) => void answer(id, allow)}
+                            onRetry={retry}
+                            onTakeOver={takeOver}
+                        />
+                    ) : connection === 'connecting' ? (
+                        <Connecting />
+                    ) : connection !== 'connected' ? (
+                        <NotConnected outdated={connection === 'outdated'} />
                     ) : active ? (
                         <div class="empty">
                             <div class="empty-text">
@@ -517,7 +688,7 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                     )}
                 </div>
 
-                {view === 'chat' && active && map && page && (
+                {view === 'chat' && cardOpen && active && map && page && (
                     <InspectCard
                         manifest={map.manifest}
                         target={active}
@@ -527,7 +698,7 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                     />
                 )}
 
-                {selection.length > 0 && (view === 'tree' || selection.length > 1) && (
+                {selection.length > 0 && (view === 'tree' || selection.length > 1 || !cardOpen) && (
                     <div class="chips" role="list" aria-label={__('Selection', 'taw-core')}>
                         {selection.map((target) => (
                             <span role="listitem" key={target.key}>
@@ -541,6 +712,7 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                                     onBlur={() => setHover(null)}
                                     onClick={() => {
                                         setPrimary(target.key);
+                                        setCardOpen(true);
                                         setView('chat');
                                     }}
                                 >
@@ -554,21 +726,44 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                     </div>
                 )}
 
-                {/* The chat connects to the bridge in build step 4; until then, the "not connected" composer. */}
                 <div class="composer">
                     <label class="sr-only" for="lens-message">
                         {__('Message', 'taw-core')}
                     </label>
-                    <div class="composer-box" data-disabled="">
-                        <input
+                    <div class="composer-box" data-disabled={connected && !chat.working ? undefined : ''}>
+                        <textarea
                             id="lens-message"
+                            ref={inputRef}
                             class="composer-input"
-                            disabled
-                            placeholder={__('Start Lens to chat', 'taw-core')}
+                            rows={1}
+                            value={draft}
+                            disabled={!connected || chat.working}
+                            placeholder={
+                                connection === 'off' || connection === 'outdated'
+                                    ? __('Start Lens to chat', 'taw-core')
+                                    : chat.working
+                                      ? __('Claude is working…', 'taw-core')
+                                      : __('Tell Claude what to change…', 'taw-core')
+                            }
+                            onInput={(event) => setDraft((event.currentTarget as HTMLTextAreaElement).value)}
+                            onKeyDown={onComposerKey}
                         />
-                        <button type="button" class="send" aria-label={__('Send', 'taw-core')} disabled>
-                            <SendIcon />
-                        </button>
+                        {chat.working && connected ? (
+                            <button type="button" class="stop" onClick={stop}>
+                                <StopIcon />
+                                {__('Stop', 'taw-core')}
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                class="send"
+                                aria-label={__('Send', 'taw-core')}
+                                disabled={!connected || draft.trim() === ''}
+                                onClick={() => void submit()}
+                            >
+                                <SendIcon />
+                            </button>
+                        )}
                     </div>
                 </div>
             </aside>

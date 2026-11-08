@@ -166,3 +166,55 @@ export const TextIcon = ({ size = 14 }: Props) => (
         <path d="M6 6h12M12 6v12" />
     </Stroke>
 );
+
+/* Chat (screens 01, 07). */
+export const CheckIcon = ({ size = 14 }: Props) => (
+    <Stroke size={size} width={2}>
+        <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </Stroke>
+);
+
+/** A step that failed or was refused: ink, never red. */
+export const FailedIcon = ({ size = 14 }: Props) => (
+    <Stroke size={size} width={2}>
+        <path d="M7 7l10 10M17 7L7 17" />
+    </Stroke>
+);
+
+/** The working spinner: a three-quarter ring, turned by CSS (still when motion is reduced). */
+export const SpinnerIcon = ({ size = 14 }: Props) => (
+    <svg
+        class="spinner"
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+        focusable="false"
+    >
+        <path d="M12 3.5a8.5 8.5 0 1 1-8.5 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+    </svg>
+);
+
+/** "Claude stopped before finishing" (screen 07 error). */
+export const AlertIcon = ({ size = 16 }: Props) => (
+    <Stroke size={size}>
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 7.5v5.5M12 16.4v.1" />
+    </Stroke>
+);
+
+/** "Lens isn't connected" (screen 07): a broken link. */
+export const UnlinkIcon = ({ size = 22 }: Props) => (
+    <Stroke size={size}>
+        <path d="M9.5 8H8a4 4 0 0 0 0 8h1.5M14.5 8H16a4 4 0 0 1 0 8h-1.5" />
+        <path d="M10 12h.01M14 12h.01" />
+    </Stroke>
+);
+
+/** Stop (the Send button while Claude works). */
+export const StopIcon = ({ size = 10 }: Props) => (
+    <svg width={size} height={size} viewBox="0 0 10 10" fill="currentColor" aria-hidden="true" focusable="false">
+        <rect width="10" height="10" rx="1.5" />
+    </svg>
+);
