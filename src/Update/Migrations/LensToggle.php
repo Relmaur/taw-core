@@ -116,7 +116,9 @@ final class LensToggle implements \TAW\Update\Migration
     private static function read(string $themeDir): ?string
     {
         $path = $themeDir . '/' . self::FILE;
-        if (!is_file($path)) {
+        // Another process (git, a sync) may have removed or replaced it since PHP last looked.
+        clearstatcache(true, $path);
+        if (!is_file($path) || !is_readable($path)) {
             return null;
         }
         $code = file_get_contents($path);

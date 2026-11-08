@@ -127,7 +127,8 @@ final class LensToggleTest extends TestCase
         $this->options(str_replace("'css_studio_enabled'", "'company_email'", self::SCAFFOLD));
         $this->assertFalse((new LensToggle())->pending($this->dir));
 
-        exec('rm -rf ' . escapeshellarg($this->dir . '/inc'));
+        unlink($this->dir . '/' . LensToggle::FILE);
+        rmdir($this->dir . '/inc');
         $this->assertFalse((new LensToggle())->pending($this->dir), 'no inc/options.php at all');
     }
 
