@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { BridgeClient, BridgeHandlers, Connection } from './bridge';
 import { Connecting, Conversation, NotConnected, type EditNote } from './Chat';
+import { ConversationMenu, TitleButton } from './ConversationMenu';
 import { dropped, emptyChat, markApproval, reduce, type BridgeEvent, type Chat, type Turn } from './chatModel';
 import { chipLabel, fieldName, shortName, type Target } from './describe';
 import { fieldRequest, planEdit, templateMessage, type EditPlan, type FieldRequest } from './edit';
@@ -216,6 +217,23 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
     const lastSent = useRef<{ text: string; context: string; chips: string[] } | null>(null);
     const bodyRef = useRef<HTMLDivElement>(null);
     const stick = useRef(true);
+    // Round 2: the conversation menu (component 06).
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [opening, setOpening] = useState<string | null>(null);
+    const titleRef = useRef<HTMLButtonElement | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const switching = useRef(false);
+    const lastSession = useRef<string | null>(null);
+    // This page's own saves carry a key the bridge records, so it doesn't show them twice.
+    const noteToken = useRef(Math.random().toString(36).slice(2, 10));
+    // This page's path: messages carry it, and chips sent from another page show dashed.
+    const here = useMemo(() => {
+        try {
+            return page?.url ? new URL(page.url).pathname : '';
+        } catch {
+            return '';
+        }
+    }, [page]);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
     // Build step 5: editing text in place.
@@ -259,6 +277,16 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                 setConnection(next);
             },
             event(event) {
+                if (event.type === 'hello') {
+                    // Another conversation (from the menu, or another tab): this page's notes were the old one's.
+                    const other = lastSession.current !== null && event.session !== lastSession.current;
+                    if (switching.current || other) {
+                        setNotes([]);
+                    }
+                    switching.current = false;
+                    lastSession.current = event.session;
+                    setOpening(null);
+                }
                 setChat((current) => reduce(current, event));
                 announceEvent(event);
             },
@@ -462,7 +490,7 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
             return;
         }
         stick.current = true;
-        const result = await bridge.send('/message', message);
+        const result = await bridge.send('/message', here ? { ...message, page: here } : message);
         if (result.ok) {
             lastSent.current = message;
             return true;
@@ -509,6 +537,57 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
     };
     const stop = () => void client.current?.send('/stop', {});
     const takeOver = () => void client.current?.send('/take-over', {});
+
+    const closeMenu = (focusTitle: boolean) => {
+        setMenuOpen(false);
+        if (focusTitle) {
+            titleRef.current?.focus();
+        }
+    };
+    const switchTo = async (session: string | null, title: string) => {
+        setMenuOpen(false);
+        if (session === null && chat.turns.length === 0) {
+            return;
+        }
+        switching.current = true;
+        setOpening(session === null ? null : title);
+        stick.current = true;
+        const result = await client.current?.send('/conversation', { session });
+        if (!result?.ok) {
+            switching.current = false;
+            setOpening(null);
+            setAnnouncement(
+                result?.status === 409
+                    ? __('Stop Claude first, or wait for it to finish.', 'taw-core')
+                    : __('Lens couldn’t open that conversation. Is taw lens still running?', 'taw-core'),
+            );
+            return;
+        }
+        setAnnouncement(session === null ? __('New chat', 'taw-core') : title);
+    };
+    // The menu closes when a click lands anywhere else (the panel or the page).
+    useEffect(() => {
+        if (!menuOpen) {
+            return;
+        }
+        const outside = (event: Event) => {
+            const path = event.composedPath();
+            if (!path.includes(menuRef.current as EventTarget) && !path.includes(titleRef.current as EventTarget)) {
+                setMenuOpen(false);
+            }
+        };
+        window.addEventListener('pointerdown', outside, true);
+        return () => window.removeEventListener('pointerdown', outside, true);
+    }, [menuOpen]);
+    useEffect(() => {
+        if (connection !== 'connected') {
+            setMenuOpen(false);
+            setOpening(null);
+            switching.current = false;
+        }
+    }, [connection]);
+    const record = (note: { key: string; name: string }, undone = false) =>
+        void client.current?.send('/note', { id: note.key, name: note.name, ...(undone ? { undone: true } : {}) });
 
     // Template text needs Claude: why Save can't send it right now.
     const blocked =
@@ -585,10 +664,16 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
         session.current = null;
         setEditing(null);
         const name = fieldName(plan.source.read, plan.source.path);
+        const id = ++nextNote.current;
+        const key = `${noteToken.current}-${id}`;
+        if (connected) {
+            record({ key, name });
+        }
         setNotes((list) => [
             ...list,
             {
-                id: ++nextNote.current,
+                id,
+                key,
                 after: chat.turns.length,
                 name,
                 state: 'saved',
@@ -620,6 +705,9 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
             note.el.innerHTML = note.html;
         }
         mark({ state: 'undone' });
+        if (connected && note.key) {
+            record({ key: note.key, name: note.name }, true);
+        }
         remap(note.source.read, note.source.path, result.saved, result.isDefault);
         setAnnouncement(`${__('Undid the change to', 'taw-core')} ${note.name}`);
     };
@@ -900,7 +988,14 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                             </span>
                         )}
                         <span class="brand-name">{__('Lens', 'taw-core')}</span>
-                        {docked && host && connected && <span class="brand-host">{host}</span>}
+                        {connected && (
+                            <TitleButton
+                                chat={chat}
+                                open={menuOpen}
+                                buttonRef={titleRef}
+                                onToggle={() => setMenuOpen((open) => !open)}
+                            />
+                        )}
                         {connection === 'connecting' ? (
                             <span class="status">
                                 <SpinnerIcon size={12} />
@@ -981,6 +1076,19 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                     </div>
                 </div>
 
+                {menuOpen && connected && (
+                    <div ref={menuRef}>
+                        <ConversationMenu
+                            chat={chat}
+                            host={host}
+                            onNew={() => void switchTo(null, '')}
+                            onOpen={(id: string) =>
+                                void switchTo(id, chat.conversations.find((c) => c.id === id)?.title ?? '')
+                            }
+                            onClose={closeMenu}
+                        />
+                    </div>
+                )}
                 <div class="body" ref={bodyRef} onScroll={onBodyScroll}>
                     {view === 'tree' ? (
                         tree ? (
@@ -1003,11 +1111,27 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                                 </div>
                             </div>
                         )
-                    ) : chat.turns.length > 0 || (chat.busy && connected) || notes.length > 0 ? (
+                    ) : opening !== null ? (
+                        <div class="opening-state" role="status">
+                            <div class="opening">
+                                <SpinnerIcon size={14} />
+                                {__('Opening “%s”…', 'taw-core').replace('%s', opening)}
+                            </div>
+                            <div class="skeleton" aria-hidden="true">
+                                <span style={{ width: '60%' }} />
+                                <span style={{ width: '85%' }} />
+                                <span style={{ width: '40%' }} />
+                            </div>
+                        </div>
+                    ) : chat.turns.length > 0 ||
+                      (chat.busy && connected) ||
+                      notes.length > 0 ||
+                      chat.saves.length > 0 ? (
                         <Conversation
                             chat={chat}
                             connection={connection}
                             notes={notes}
+                            here={here}
                             onAnswer={(id: string, allow: boolean) => void answer(id, allow)}
                             onRetry={retry}
                             onTakeOver={takeOver}
@@ -1121,14 +1245,17 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                     <label class="sr-only" for="lens-message">
                         {__('Message', 'taw-core')}
                     </label>
-                    <div class="composer-box" data-disabled={connected && !chat.working ? undefined : ''}>
+                    <div
+                        class="composer-box"
+                        data-disabled={connected && !chat.working && opening === null ? undefined : ''}
+                    >
                         <textarea
                             id="lens-message"
                             ref={inputRef}
                             class="composer-input"
                             rows={1}
                             value={draft}
-                            disabled={!connected || chat.working}
+                            disabled={!connected || chat.working || opening !== null}
                             placeholder={
                                 connection === 'off' || connection === 'outdated'
                                     ? __('Start Lens to chat', 'taw-core')
@@ -1149,7 +1276,7 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                                 type="button"
                                 class="send"
                                 aria-label={__('Send', 'taw-core')}
-                                disabled={!connected || draft.trim() === ''}
+                                disabled={!connected || opening !== null || draft.trim() === ''}
                                 onClick={() => void submit()}
                             >
                                 <SendIcon />

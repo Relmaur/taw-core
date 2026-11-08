@@ -103,6 +103,11 @@ msgid_plural "%d blocks"
 msgstr[0] "%d bloque"
 msgstr[1] "%d bloques"
 
+#: resources/lens/src/conversations.ts
+#, php-format
+msgid "%d changes"
+msgstr "%d cambios"
+
 #: src/Core/Content/ContentAdminScreen.php
 #, php-format
 msgid "%d edited since were kept."
@@ -240,6 +245,10 @@ msgstr "0 = sin páginas. Cada bucle pagina por su cuenta."
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "0.25 as 25%."
 msgstr "0.25 como 25%."
+
+#: resources/lens/src/conversations.ts
+msgid "1 change"
+msgstr "1 cambio"
 
 #: resources/lens/src/InspectCard.tsx
 msgid "1 row"
@@ -804,6 +813,15 @@ msgstr "Contenido, por tipo de contenido"
 msgid "Conversation"
 msgstr "Conversación"
 
+#: resources/lens/src/ConversationMenu.tsx
+#, php-format
+msgid "Conversation: %s. New chat and recent conversations"
+msgstr "Conversación: %s. Nueva conversación y conversaciones recientes"
+
+#: resources/lens/src/ConversationMenu.tsx
+msgid "Conversations"
+msgstr "Conversaciones"
+
 #: resources/lens/src/Chat.tsx
 msgid "Copied"
 msgstr "Copiado"
@@ -951,6 +969,15 @@ msgstr "Arrastre para reordenar"
 #: src/Core/Media/MediaFolders.php
 msgid "Drop to upload here"
 msgstr "Suelta aquí para subir"
+
+#: resources/lens/src/Chat.tsx
+msgid "Earlier"
+msgstr "Antes"
+
+#: resources/lens/src/Chat.tsx
+#, php-format
+msgid "Earlier · %s"
+msgstr "Antes · %s"
 
 #: resources/data-panel/src/bindings/DynamicSettings.tsx resources/data-panel/src/controls/RichContent.tsx
 msgid "Edit"
@@ -1290,6 +1317,10 @@ msgstr[1] "Importación deshecha: se revirtieron %d cambios."
 msgid "In progress"
 msgstr "En curso"
 
+#: resources/lens/src/ConversationMenu.tsx
+msgid "In this theme"
+msgstr "En este tema"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Include"
 msgstr "Incluir"
@@ -1481,6 +1512,10 @@ msgstr "Lens"
 #: resources/lens/src/Panel.tsx
 msgid "Lens can’t save fields on this page. Reload it."
 msgstr "Lens no puede guardar campos en esta página. Vuelve a cargarla."
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens couldn’t open that conversation. Is taw lens still running?"
+msgstr "Lens no pudo abrir esa conversación. ¿Sigue corriendo taw lens?"
 
 #: resources/lens/src/fields.ts
 msgid "Lens couldn’t reach the site to save. Is it still running?"
@@ -1728,6 +1763,10 @@ msgstr "El nombre y la descripción son obligatorios."
 msgid "New Folder"
 msgstr "Nueva carpeta"
 
+#: resources/lens/src/ConversationMenu.tsx resources/lens/src/Panel.tsx resources/lens/src/conversations.ts
+msgid "New chat"
+msgstr "Nueva conversación"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Media/MediaFolders.php
 msgid "Newest first"
 msgstr "Más recientes primero"
@@ -1755,6 +1794,10 @@ msgstr "Aún no hay conversación. Selecciona algo en la página o dile a Claude
 #: resources/data-panel/src/DataPanel.tsx
 msgid "No data fields apply to this template."
 msgstr "Ningún campo de datos aplica a esta plantilla."
+
+#: resources/lens/src/ConversationMenu.tsx
+msgid "No earlier conversations in this theme yet. They appear here once you send a message."
+msgstr "Todavía no hay conversaciones anteriores en este tema. Aparecen aquí cuando envías un mensaje."
 
 #: src/Core/Content/ContentAdminScreen.php src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "No file was uploaded."
@@ -1847,6 +1890,10 @@ msgstr "No es un valor de esta entrada:"
 #: resources/lens/src/Panel.tsx
 msgid "Not connected"
 msgstr "Sin conexión"
+
+#: resources/lens/src/Chat.tsx
+msgid "Not on this page"
+msgstr "No está en esta página"
 
 #: src/Core/Metabox/Metabox.php
 msgid "Not saved:"
@@ -1955,6 +2002,11 @@ msgstr "Abrir en wp-admin"
 #: src/Core/Editor/VisualEditor.php
 msgid "Open the visual content editor"
 msgstr "Abrir el editor visual de contenido"
+
+#: resources/lens/src/Panel.tsx
+#, php-format
+msgid "Opening “%s”…"
+msgstr "Abriendo “%s”…"
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Opens in a new tab"
@@ -2311,6 +2363,25 @@ msgstr "Resuelta"
 #: resources/lens/src/Panel.tsx
 msgid "Restart needed"
 msgstr "Hay que reiniciar"
+
+#: resources/lens/src/conversations.ts
+msgid "Resumed"
+msgstr "Retomada"
+
+#: resources/lens/src/conversations.ts
+#, php-format
+msgid "Resumed %s"
+msgstr "Retomada el %s"
+
+#: resources/lens/src/conversations.ts
+#, php-format
+msgid "Resumed today, %s"
+msgstr "Retomada hoy, %s"
+
+#: resources/lens/src/conversations.ts
+#, php-format
+msgid "Resumed yesterday, %s"
+msgstr "Retomada ayer, %s"
 
 #: src/Core/Editor/VisualEditor.php
 msgid "Return to normal view"
@@ -2727,6 +2798,10 @@ msgstr "Entradas fijas"
 #: resources/lens/src/Panel.tsx
 msgid "Stop"
 msgstr "Detener"
+
+#: resources/lens/src/Panel.tsx resources/lens/src/conversations.ts
+msgid "Stop Claude first, or wait for it to finish."
+msgstr "Primero detén a Claude, o espera a que termine."
 
 #: resources/lens/src/Panel.tsx
 msgid "Stop picking (Esc)"
@@ -3191,6 +3266,11 @@ msgstr "Para cambiar un valor que ya está en el texto, haz clic en él."
 msgid "Today"
 msgstr "Hoy"
 
+#: resources/lens/src/conversations.ts
+#, php-format
+msgid "Today, %s"
+msgstr "Hoy, %s"
+
 #: src/Core/Auth/PagePassword.php
 msgid "Too many attempts. Please wait a few minutes and try again."
 msgstr "Demasiados intentos. Espera unos minutos e inténtalo de nuevo."
@@ -3510,6 +3590,11 @@ msgstr "Sí"
 msgid "Yes / no"
 msgstr "Sí / no"
 
+#: resources/lens/src/conversations.ts
+#, php-format
+msgid "Yesterday, %s"
+msgstr "Ayer, %s"
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "You"
 msgstr "Tú"
@@ -3778,6 +3863,10 @@ msgstr "minúsculas."
 msgid "mixed"
 msgstr "mixto"
 
+#: resources/lens/src/conversations.ts
+msgid "no changes"
+msgstr "sin cambios"
+
 #: src/Core/Content/ContentAdminScreen.php src/Core/Editing/EditingAdminScreen.php
 msgid "none"
 msgstr "ninguno"
@@ -3891,6 +3980,10 @@ msgstr "hasta %1$d caracteres de entrada, %2$d tokens por respuesta, %3$d rondas
 #: src/Core/Content/ContentAdminScreen.php
 msgid "update it (overwrite)"
 msgstr "actualizarlo (sobrescribir)"
+
+#: resources/lens/src/conversations.ts
+msgid "working…"
+msgstr "trabajando…"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "ƒ Functions"

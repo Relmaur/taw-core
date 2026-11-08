@@ -82,7 +82,9 @@ describe('connecting (screen 07)', () => {
         const { connect } = setup();
         connect();
         expect(screen.getByText('Point at anything on the page')).toBeInTheDocument();
-        expect(screen.getByText('taw.local')).toBeInTheDocument();
+        // Round 2: the conversation's title takes the host's place; the host moved to the menu's foot.
+        expect(screen.getByRole('button', { name: /^Conversation: New chat\./ })).toBeInTheDocument();
+        expect(screen.queryByText('taw.local')).toBeNull();
         expect(screen.queryByText('Connecting…')).toBeNull();
         expect(screen.getByLabelText('Message')).toBeEnabled();
         expect(screen.getByLabelText('Message')).toHaveAttribute('placeholder', 'Tell Claude what to change…');
@@ -343,5 +345,161 @@ describe('theme busy (screen 07): warn, don’t block', () => {
         expect(send).toHaveBeenLastCalledWith('/take-over', {});
         emit({ type: 'busy', busy, takenOver: true });
         expect(screen.getByText(/You took over this theme/)).toBeInTheDocument();
+    });
+});
+
+describe('conversations (component 06, screen 15)', () => {
+    const conversations = [
+        { id: 's1', title: 'Make the hero smaller', at: '2026-11-08T10:12:00Z', changes: 2, current: true },
+        { id: 's0', title: 'Footer copy for the launch', at: '2026-11-05T11:40:00Z', changes: 0, current: false },
+    ];
+    const history: BridgeEvent[] = [
+        {
+            type: 'turn',
+            turn: 1,
+            text: 'Make the hero smaller',
+            chips: ['hero_title · field'],
+            at: '2026-11-07T16:31:00Z',
+            page: '/lens-test/',
+        },
+        { type: 'text', turn: 1, delta: 'Done.' },
+        { type: 'done', turn: 1, outcome: 'ok', message: '', changed: ['style.css'] },
+        { type: 'turn', turn: 2, text: 'Now the grid', chips: ['Work grid · block'], page: '/other-page/' },
+        {
+            type: 'approval',
+            turn: 2,
+            id: 'a1',
+            tool: 'Edit',
+            kind: 'edit',
+            target: 'grid.css',
+            input: { file: 'grid.css', edits: [{ old: 'a', new: 'b' }] },
+        },
+        { type: 'approval-done', id: 'a1', allow: true },
+        { type: 'done', turn: 2, outcome: 'ok', message: '', changed: ['grid.css'] },
+        { type: 'saved', id: 'x-1', name: 'hero_intro' },
+        { type: 'resumed', at: '2026-11-08T10:12:00Z' },
+    ];
+
+    it('names the conversation in the header and lists the others in its menu, with the host at its foot', () => {
+        const { connect } = setup();
+        connect([], { conversations });
+        const title = screen.getByRole('button', { name: /^Conversation: Make the hero smaller\./ });
+        expect(title).toHaveAttribute('aria-expanded', 'false');
+        fireEvent.click(title);
+        const menu = screen.getByRole('menu', { name: 'Conversations' });
+        expect(title).toHaveAttribute('aria-expanded', 'true');
+        expect(within(menu).getByRole('menuitem', { name: 'New chat' })).toHaveFocus();
+        const rows = within(menu).getAllByRole('menuitemradio');
+        expect(rows.map((r) => r.getAttribute('aria-checked'))).toEqual(['true', 'false']);
+        expect(rows[1]).toHaveTextContent('Footer copy for the launch');
+        expect(rows[1]).toHaveTextContent('no changes');
+        expect(within(menu).getByText('taw.local')).toBeInTheDocument();
+    });
+
+    it('moves with the arrow keys and closes on Esc, back on the title', () => {
+        const { connect } = setup();
+        connect([], { conversations });
+        const title = screen.getByRole('button', { name: /^Conversation:/ });
+        fireEvent.click(title);
+        const menu = screen.getByRole('menu');
+        fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+        expect(within(menu).getAllByRole('menuitemradio')[0]).toHaveFocus();
+        fireEvent.keyDown(document.activeElement!, { key: 'ArrowUp' });
+        expect(within(menu).getByRole('menuitem', { name: 'New chat' })).toHaveFocus();
+        fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+        expect(screen.queryByRole('menu')).toBeNull();
+        expect(title).toHaveFocus();
+    });
+
+    it('starts a new chat without asking, and shows the empty first-open panel when the bridge says so', async () => {
+        const { connect, send, emit } = setup();
+        connect(history, { conversations });
+        fireEvent.click(screen.getByRole('button', { name: /^Conversation:/ }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'New chat' }));
+        await flush();
+        expect(send).toHaveBeenCalledWith('/conversation', { session: null });
+        emit({
+            type: 'hello',
+            protocol: 2,
+            session: null,
+            working: false,
+            busy: null,
+            takenOver: false,
+            history: [],
+            conversations: [{ ...conversations[0], current: false }],
+        });
+        expect(screen.getByText('Point at anything on the page')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /^Conversation: New chat\./ })).toBeInTheDocument();
+    });
+
+    it('opens an earlier conversation: “Opening…” until its history arrives', async () => {
+        const { connect, send, emit } = setup();
+        connect([], { conversations });
+        fireEvent.click(screen.getByRole('button', { name: /^Conversation:/ }));
+        fireEvent.click(screen.getByRole('menuitemradio', { name: /Footer copy/ }));
+        expect(screen.getByText('Opening “Footer copy for the launch”…')).toBeInTheDocument();
+        expect(screen.getByLabelText('Message')).toBeDisabled();
+        await flush();
+        expect(send).toHaveBeenCalledWith('/conversation', { session: 's0' });
+        emit({
+            type: 'hello',
+            protocol: 2,
+            session: 's0',
+            working: false,
+            busy: null,
+            takenOver: false,
+            history: [
+                { type: 'turn', turn: 1, text: 'Footer copy for the launch', chips: [] },
+                { type: 'done', turn: 1, outcome: 'ok', message: '', changed: [] },
+                { type: 'resumed', at: new Date().toISOString() },
+            ],
+            conversations,
+        });
+        expect(screen.queryByText(/^Opening/)).toBeNull();
+        expect(screen.getByText('Footer copy for the launch', { selector: '.bubble' })).toBeInTheDocument();
+        expect(screen.getByText(/^Resumed today, /)).toBeInTheDocument();
+    });
+
+    it('turns New chat and the other conversations off while Claude works, and says why', () => {
+        const { connect } = setup();
+        connect([{ type: 'turn', turn: 1, text: 'slow', chips: [] }], { conversations, working: true });
+        fireEvent.click(screen.getByRole('button', { name: /^Conversation:/ }));
+        expect(screen.getByRole('menuitem', { name: 'New chat' })).toHaveAttribute('aria-disabled', 'true');
+        expect(screen.getByRole('menuitemradio', { name: /Footer copy/ })).toHaveAttribute('aria-disabled', 'true');
+        expect(screen.getByText('Stop Claude first, or wait for it to finish.')).toBeInTheDocument();
+        expect(screen.getAllByRole('menuitemradio')[0]).toHaveTextContent('working…');
+    });
+
+    it('replays a reopened conversation read-only: dividers, outcomes, saves without Undo, chips from elsewhere dashed', () => {
+        const { connect } = setup();
+        connect(history, { conversations });
+        expect(screen.getByText(/^Earlier · /)).toBeInTheDocument();
+        expect(screen.getByText(/^Resumed /)).toBeInTheDocument();
+        expect(document.querySelector('.conversation')!.textContent).toContain('Applied: grid.css');
+        expect(screen.queryByRole('button', { name: 'Apply' })).toBeNull();
+        const saved = screen.getByText('hero_intro').closest('.saved')!;
+        expect(within(saved as HTMLElement).queryByRole('button', { name: 'Undo' })).toBeNull();
+        expect(screen.getByText('Work grid · block')).toHaveClass('chip-away');
+        expect(screen.getByText('Work grid · block')).toHaveAttribute('title', 'Not on this page');
+        expect(screen.getByText('hero_title · field')).not.toHaveClass('chip-away');
+    });
+
+    it('sends the page’s path with every message', async () => {
+        const { connect, send, type, enter } = setup();
+        connect();
+        type('Make it bigger');
+        enter();
+        await flush();
+        expect(send).toHaveBeenCalledWith(
+            '/message',
+            expect.objectContaining({ text: 'Make it bigger', page: '/lens-test/' }),
+        );
+    });
+
+    it('has no title or menu while not connected: the status takes its place', () => {
+        const { status } = setup();
+        status('off');
+        expect(screen.getByText('Not connected')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /^Conversation:/ })).toBeNull();
     });
 });

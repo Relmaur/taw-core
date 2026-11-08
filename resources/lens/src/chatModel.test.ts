@@ -122,3 +122,54 @@ describe('the conversation', () => {
         expect(reduce(emptyChat, { type: 'text', turn: 9, delta: 'x' })).toBe(emptyChat);
     });
 });
+
+describe('conversations (protocol 2)', () => {
+    const play = (...events: BridgeEvent[]) => events.reduce(reduce, emptyChat);
+
+    it('keeps the menu’s list from hello and from later updates', () => {
+        const list = [{ id: 's1', title: 'A', at: null, changes: 0, current: true }];
+        const chat = play({
+            type: 'hello',
+            protocol: 2,
+            session: 's1',
+            working: false,
+            busy: null,
+            takenOver: false,
+            history: [],
+            conversations: list,
+        });
+        expect(chat.conversations).toEqual(list);
+        expect(reduce(chat, { type: 'conversations', conversations: [] }).conversations).toEqual([]);
+    });
+
+    it('places recorded saves after the turns before them, and folds an undo into the save', () => {
+        const chat = play(
+            { type: 'turn', turn: 1, text: 'hi', chips: [], at: '2026-11-08T10:00:00Z', page: '/about/' },
+            { type: 'done', turn: 1, outcome: 'ok', message: '', changed: [] },
+            { type: 'saved', id: 'n1', name: 'hero_title' },
+            { type: 'saved', id: 'n1', name: 'hero_title', undone: true },
+        );
+        expect(chat.saves).toEqual([{ id: 'n1', name: 'hero_title', undone: true, after: 1 }]);
+        expect(chat.turns[0]).toMatchObject({ at: '2026-11-08T10:00:00Z', page: '/about/' });
+    });
+
+    it('marks where a reopened conversation’s history ends', () => {
+        const chat = play(
+            { type: 'turn', turn: 1, text: 'hi', chips: [] },
+            { type: 'done', turn: 1, outcome: 'ok', message: '', changed: [] },
+            { type: 'saved', id: 'n1', name: 'hero_title' },
+            { type: 'resumed', at: '2026-11-08T10:12:00Z' },
+        );
+        expect(chat.resumed).toEqual({ after: 1, saves: 1, at: '2026-11-08T10:12:00Z' });
+        const fresh = reduce(chat, {
+            type: 'hello',
+            protocol: 2,
+            session: null,
+            working: false,
+            busy: null,
+            takenOver: false,
+            history: [],
+        });
+        expect([fresh.resumed, fresh.saves, fresh.turns]).toEqual([null, [], []]);
+    });
+});

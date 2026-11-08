@@ -240,3 +240,11 @@ export const NumberedListIcon = (props: Props) => (
         <path d="M10 6h10M10 12h10M10 18h10M4 5h1v4M4 15h2l-2 3h2" />
     </Stroke>
 );
+
+/** New chat (component 06): a page with a pen. */
+export const NewChatIcon = (props: Props) => (
+    <Stroke {...props}>
+        <path d="M12 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-6" />
+        <path d="M17.5 3.5a2.1 2.1 0 0 1 3 3L13 14l-4 1 1-4z" />
+    </Stroke>
+);

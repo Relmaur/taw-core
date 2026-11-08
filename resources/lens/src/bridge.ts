@@ -9,7 +9,7 @@
 import type { BridgeEvent } from './chatModel';
 
 /** The page protocol this build speaks (resources/lens-bridge/lib/bridge.mjs PROTOCOL, TAW\Core\Lens\Bridge::PROTOCOL). */
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;
 
 export interface BridgeConfig {
     /** The REST route's URL. */
@@ -35,7 +35,7 @@ export interface BridgeHandlers {
 export interface BridgeClient {
     /** POSTs to the bridge; false when it isn't connected or refused. */
     send(
-        path: '/message' | '/approve' | '/stop' | '/take-over',
+        path: '/message' | '/approve' | '/stop' | '/take-over' | '/conversation' | '/note',
         body: object,
     ): Promise<{ ok: boolean; status: number }>;
     close(): void;

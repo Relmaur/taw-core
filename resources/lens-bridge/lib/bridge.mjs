@@ -5,6 +5,10 @@
  * A page that connects (or reconnects after a reload) gets the session so far in its `hello`, so the
  * conversation survives reloads; pending approvals come back as cards.
  *
+ * Conversations (taw-core ADR-0021): every conversation's events go to a transcript in the theme's ignored
+ * `.taw/lens/conversations/` (transcript.mjs). `--resume` and the page's conversation menu reopen one: its
+ * transcript replays in `hello`, followed by a `resumed` marker, and Claude resumes its session.
+ *
  * Security (umbrella ADR-0006 § 8): it listens on 127.0.0.1 only; every request needs the one allowed origin
  * (the dev site), a Host header naming the loopback address (against DNS rebinding) and the per-run token,
  * which only the site's PHP hands out, to a logged-in user who can edit the theme.
@@ -13,15 +17,24 @@ import { timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import { Agent } from './agent.mjs';
 import { otherSessions } from './busy.mjs';
+import * as transcripts from './transcript.mjs';
 import { Turns } from './translate.mjs';
 
-/** The page protocol's version; the page refuses a bridge it doesn't know. */
-export const PROTOCOL = 1;
+/** The page protocol's version; the page refuses a bridge it doesn't know. 2: conversations (ADR-0021). */
+export const PROTOCOL = 2;
 
 const TEXT_MAX = 20_000;
 const CONTEXT_MAX = 400_000;
 const HISTORY_MAX = 5_000;
 const BODY_MAX = 1_000_000;
+const PAGE_MAX = 300;
+const NAME_MAX = 200;
+
+/** Events stamped with the time they happened (the menu's "last active", the history's dividers). */
+const STAMPED = new Set(['turn', 'done', 'saved']);
+
+/** Events that describe the bridge now, not the conversation: never written to a transcript. */
+const UNRECORDED = new Set(['busy']);
 
 export const BUSY_REASON =
     'Another Claude session is working in this theme, so TAW Lens writes no files until it is free. ' +
@@ -39,19 +52,19 @@ export class Bridge {
         this.options = options;
         this.busyCheck = options.busyCheck ?? otherSessions;
         this.log = options.log ?? (() => {});
-        this.history = [];
+        this.now = options.now ?? (() => new Date().toISOString());
         this.clients = new Set();
         this.pending = new Map();
-        this.turns = new Turns(options.theme);
         this.busy = null;
         this.takenOver = false;
         this.takenPids = [];
         this.lastText = '';
+        const resume = this.load(options.resume || null) ?? (options.resume || '');
         this.agent = new Agent({
             claude: options.claude,
             theme: options.theme,
             model: options.model,
-            resume: options.resume,
+            resume,
             prompt: options.prompt,
             permissionMode: options.permissionMode,
             guard: () => this.guard(),
@@ -81,7 +94,38 @@ export class Bridge {
         this.agent.start();
     }
 
+    /**
+     * Makes `session`'s conversation the current one (null: a new one): its transcript becomes the history,
+     * followed by a `resumed` marker. Returns the session id to resume Claude with, or null.
+     */
+    load(session) {
+        const theme = this.options.theme;
+        const id = session ? transcripts.find(theme, session) : null;
+        const { events, session: latest } = id ? transcripts.load(theme, id) : { events: [], session: null };
+        this.transcript = new transcripts.Transcript(theme, id);
+        this.history = events.length > 0 ? [...events, { type: 'resumed', at: this.now() }] : [];
+        this.turns = new Turns(theme);
+        this.turns.turn = events.reduce((max, e) => (e.type === 'turn' && e.turn > max ? e.turn : max), 0);
+
+        return latest;
+    }
+
+    /** The menu's list: the current conversation (once something was said), then the newest others. */
+    conversations() {
+        const current = transcripts.summary(this.history);
+        const others = transcripts
+            .list(this.options.theme, transcripts.LIST_MAX + 1)
+            .filter((c) => c.id !== this.transcript.id)
+            .map((c) => ({ ...c, current: false }));
+        const head = current.title !== '' ? [{ id: this.transcript.id ?? '', ...current, current: true }] : [];
+
+        return [...head, ...others].slice(0, transcripts.LIST_MAX);
+    }
+
     onAgentEvent(ev) {
+        if (typeof ev.session_id === 'string') {
+            this.transcript.named(ev.session_id);
+        }
         if (ev.type === 'control_cancel_request' && this.pending.has(ev.request_id)) {
             this.pending.delete(ev.request_id);
             this.emit({ type: 'approval-done', id: String(ev.request_id), allow: false });
@@ -98,8 +142,14 @@ export class Bridge {
         }
     }
 
-    /** Sends one event to every page and keeps it for pages that connect later. */
+    /** Sends one event to every page and keeps it for pages that connect later (and in the transcript). */
     emit(event) {
+        if (STAMPED.has(event.type) && typeof event.at !== 'string') {
+            event = { ...event, at: this.now() };
+        }
+        if (!UNRECORDED.has(event.type)) {
+            this.transcript.record(event);
+        }
         const last = this.history[this.history.length - 1];
         if (event.type === 'text' && last?.type === 'text' && last.turn === event.turn) {
             this.history[this.history.length - 1] = { ...last, delta: last.delta + event.delta };
@@ -109,6 +159,14 @@ export class Bridge {
                 this.history.splice(0, this.history.length - HISTORY_MAX);
             }
         }
+        this.send(event);
+        if (event.type === 'turn' || event.type === 'done' || event.type === 'saved') {
+            this.send({ type: 'conversations', conversations: this.conversations() });
+        }
+    }
+
+    /** Sends to every page without keeping it. */
+    send(event) {
         const line = `data: ${JSON.stringify(event)}\n\n`;
         for (const res of this.clients) {
             res.write(line);
@@ -124,6 +182,7 @@ export class Bridge {
             busy: this.busy,
             takenOver: this.takenOver,
             history: this.history,
+            conversations: this.conversations(),
         };
     }
 
@@ -133,7 +192,7 @@ export class Bridge {
      * page wrote for an edit made on the page (template text, which Lens never saves itself).
      * @returns {{turn: number}|{error: string, status: number}}
      */
-    message({ text, context = '', chips = [], from }) {
+    message({ text, context = '', chips = [], from, page }) {
         if (typeof text !== 'string' || text.trim() === '' || text.length > TEXT_MAX) {
             return { error: 'text', status: 422 };
         }
@@ -151,12 +210,55 @@ export class Bridge {
             text,
             chips: chips.filter((c) => typeof c === 'string').slice(0, 20).map((c) => c.slice(0, 80)),
             ...(from === 'edit' ? { from } : {}),
+            ...(typeof page === 'string' && page.startsWith('/') && page.length <= PAGE_MAX ? { page } : {}),
         });
         this.log(`Turn ${turn}: ${text.length > 70 ? `${text.slice(0, 69)}…` : text}`);
         this.agent.send(context ? `${text}\n\n${context}` : text);
         void this.refreshBusy();
 
         return { turn };
+    }
+
+    /**
+     * Opens another conversation (a session id from the menu), or starts a new one (null). Refused while a
+     * turn runs or an approval waits: the page says to stop Claude first.
+     * @returns {{ok: true}|{error: string, status: number}}
+     */
+    conversation(session) {
+        if (session !== null && !transcripts.validId(session)) {
+            return { error: 'session', status: 422 };
+        }
+        if (this.working || this.pending.size > 0) {
+            return { error: 'working', status: 409 };
+        }
+        if (session !== null && session === this.transcript.id) {
+            return { ok: true };
+        }
+        if (session !== null && transcripts.load(this.options.theme, session).events.length === 0) {
+            return { error: 'unknown', status: 404 };
+        }
+        this.transcript.close();
+        const resume = this.load(session);
+        this.agent.reset(resume);
+        this.lastText = '';
+        const title = transcripts.summary(this.history).title;
+        this.log(session ? `Opened the conversation “${title}”.` : 'Started a new conversation.');
+        this.send(this.hello());
+
+        return { ok: true };
+    }
+
+    /**
+     * A field the page saved (or undid) while connected: it goes in the conversation, so the transcript and
+     * every open page show it. `id` is the page's own, so it doesn't show its own save twice.
+     */
+    note({ id, name, undone }) {
+        if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(id) || typeof name !== 'string' || name === '' || name.length > NAME_MAX) {
+            return false;
+        }
+        this.emit({ type: 'saved', id, name, ...(undone === true ? { undone: true } : {}) });
+
+        return true;
     }
 
     approve(id, allow) {
@@ -211,6 +313,7 @@ export class Bridge {
     }
 
     close() {
+        this.transcript.close();
         for (const res of this.clients) {
             res.end();
         }
@@ -320,6 +423,15 @@ export function serve(bridge, { port = 0, token, origins, busyEvery = 4000 }) {
             case '/take-over':
                 bridge.takeOver();
                 json(res, 204);
+                return;
+            case '/conversation': {
+                const session = body?.session ?? null;
+                const result = bridge.conversation(typeof session === 'string' || session === null ? session : '');
+                json(res, 'error' in result ? result.status : 204, 'error' in result ? { error: result.error } : undefined);
+                return;
+            }
+            case '/note':
+                json(res, bridge.note(body ?? {}) ? 204 : 422);
                 return;
             default:
                 json(res, 404);

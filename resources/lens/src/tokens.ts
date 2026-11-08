@@ -45,6 +45,8 @@ export interface LensTokens {
     diffRemovedText: string;
     diffAddedFill: string;
     diffAddedText: string;
+    /** The conversation menu's popover shadow (component 06): deeper in dark, where shadows read less. */
+    menuShadow: string;
 }
 
 export const light: LensTokens = {
@@ -68,6 +70,7 @@ export const light: LensTokens = {
     diffRemovedText: '#9F2430',
     diffAddedFill: '#EAF6EF',
     diffAddedText: '#1C6B3E',
+    menuShadow: '0 12px 32px rgba(20,24,33,.10)',
 };
 
 export const dark: LensTokens = {
@@ -91,6 +94,7 @@ export const dark: LensTokens = {
     diffRemovedText: '#F4B9BF',
     diffAddedFill: '#173023',
     diffAddedText: '#A6E0BE',
+    menuShadow: '0 12px 32px rgba(0,0,0,.40)',
 };
 
 /** Layout and type tokens: the same in both themes. */
