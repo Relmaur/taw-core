@@ -3,7 +3,7 @@
  * picker's event capture, and the source map. Nothing here changes the site's markup or its elements'
  * styles; while picking, one <style> sets the crosshair cursor, removed when picking stops.
  */
-import { readManifest } from './manifest';
+import { MANIFEST_ID, readManifest } from './manifest';
 import { parseColor, type Rgba, type Sampler } from './ring';
 import { PageMap } from './sourcemap';
 
@@ -122,6 +122,8 @@ export function pageSampler(doc: Document, host: Element, onAsset: () => void): 
 export interface PickHandlers {
     hover(el: Element | null): void;
     pick(el: Element, add: boolean): void;
+    /** A double-click: edit the element's text in place (component 05). */
+    edit?(el: Element): void;
     stop(): void;
 }
 
@@ -129,8 +131,8 @@ const BLOCKED = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'd
 
 /**
  * Picking: hovering a page element reports it; clicking selects it (shift adds) instead of doing what the
- * page would do, so links don't navigate and buttons don't fire. Esc stops. Lens's own panel keeps working.
- * Returns the function that stops listening.
+ * page would do, so links don't navigate and buttons don't fire; double-clicking edits its text. Esc stops.
+ * Lens's own panel keeps working. Returns the function that stops listening.
  */
 export function startPicking(doc: Document, host: Element, handlers: PickHandlers): () => void {
     const win = doc.defaultView ?? window;
@@ -155,10 +157,12 @@ export function startPicking(doc: Document, host: Element, handlers: PickHandler
         }
         event.preventDefault();
         event.stopImmediatePropagation();
-        if (event.type === 'click') {
+        if (event.type === 'click' || event.type === 'dblclick') {
             const target = pageTarget(event);
-            if (target) {
+            if (target && event.type === 'click') {
                 handlers.pick(target, (event as MouseEvent).shiftKey);
+            } else if (target) {
+                handlers.edit?.(target);
             }
         }
     };
@@ -202,4 +206,82 @@ export function pageMap(doc: Document, host: Element): PageMap | null {
     const manifest = readManifest(doc);
 
     return manifest ? new PageMap(doc, manifest, host) : null;
+}
+
+/**
+ * Double-clicking a page element while Lens isn't picking (to edit a selected element's text). Returns the
+ * function that stops listening.
+ */
+export function onDoubleClick(doc: Document, host: Element, callback: (el: Element) => boolean): () => void {
+    const win = doc.defaultView ?? window;
+    const listener = (event: MouseEvent) => {
+        const target = event.target;
+        if (target instanceof Element && target !== host && !host.contains(target) && callback(target)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+    };
+    win.addEventListener('dblclick', listener, true);
+
+    return () => win.removeEventListener('dblclick', listener, true);
+}
+
+/**
+ * After Lens saved a field, its manifest says so: the read's value (a repeater row's sub-field inside its rows)
+ * changes in the `taw-lens-map` script, so the next scan attributes the page's new text to the field.
+ */
+export function patchManifest(
+    doc: Document,
+    read: { store: string; object: number | string; key: string },
+    path: string,
+    value: string,
+    isDefault: boolean,
+): void {
+    const script = doc.getElementById(MANIFEST_ID);
+    if (!script?.textContent) {
+        return;
+    }
+    let raw: { nodes?: unknown };
+    try {
+        raw = JSON.parse(script.textContent) as { nodes?: unknown };
+    } catch {
+        return;
+    }
+    const row = /^(.+)\[(\d+)\]\.(.+)$/.exec(path);
+    const nodes = Array.isArray(raw.nodes)
+        ? raw.nodes
+        : raw.nodes && typeof raw.nodes === 'object'
+          ? Object.values(raw.nodes)
+          : [];
+    for (const node of nodes as { reads?: Record<string, unknown>[] }[]) {
+        for (const entry of node.reads ?? []) {
+            if (entry.store !== read.store || String(entry.object) !== String(read.object) || entry.key !== read.key) {
+                continue;
+            }
+            if (row) {
+                const asString = typeof entry.value === 'string';
+                try {
+                    const rows = (asString ? JSON.parse(entry.value as string) : entry.value) as Record<
+                        string,
+                        unknown
+                    >[];
+                    const list = rows.filter((r) => typeof r === 'object' && r !== null);
+                    if (list[Number(row[2])]) {
+                        list[Number(row[2])][row[3]] = value;
+                    }
+                    entry.value = asString ? JSON.stringify(rows) : rows;
+                } catch {
+                    continue;
+                }
+            } else {
+                entry.value = value;
+            }
+            if (isDefault) {
+                entry.default = true;
+            } else {
+                delete entry.default;
+            }
+        }
+    }
+    script.textContent = JSON.stringify(raw);
 }

@@ -218,3 +218,25 @@ export const StopIcon = ({ size = 10 }: Props) => (
         <rect width="10" height="10" rx="1.5" />
     </svg>
 );
+
+/** The rich-text toolbar (screen 10). */
+export const LinkIcon = (props: Props) => (
+    <Stroke {...props} width={2}>
+        <path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" />
+    </Stroke>
+);
+
+export const BulletListIcon = (props: Props) => (
+    <Stroke {...props} width={2}>
+        <path d="M9 6h11M9 12h11M9 18h11" />
+        <circle cx="4.5" cy="6" r="1" />
+        <circle cx="4.5" cy="12" r="1" />
+        <circle cx="4.5" cy="18" r="1" />
+    </Stroke>
+);
+
+export const NumberedListIcon = (props: Props) => (
+    <Stroke {...props} width={2}>
+        <path d="M10 6h10M10 12h10M10 18h10M4 5h1v4M4 15h2l-2 3h2" />
+    </Stroke>
+);

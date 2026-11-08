@@ -9,9 +9,11 @@
  */
 import { render } from 'preact';
 import { connectBridge, PROTOCOL } from './bridge';
+import { startEditing } from './editing';
+import { fieldClient } from './fields';
 import { Panel, type PageEnv, type PanelEnv } from './Panel';
 import { pushCss } from './layout';
-import { pageMap, pageSampler, startPicking } from './page';
+import { onDoubleClick, pageMap, pageSampler, patchManifest, startPicking } from './page';
 import { loadPrefs, savePrefs } from './prefs';
 import { panelCss } from './styles';
 
@@ -24,6 +26,8 @@ declare global {
             version?: string;
             editor?: string;
             bridge?: string;
+            field?: string;
+            search?: string;
             nonce?: string;
             protocol?: number;
         };
@@ -61,6 +65,11 @@ export function pageAccess(doc: Document, host: HTMLElement, editor = EDITOR_URL
         },
         editor,
         url: win.location.href,
+        edit: (el, mode, handlers) => startEditing(el as HTMLElement, mode, handlers),
+        onDoubleClick: (callback) => onDoubleClick(doc, host, callback),
+        patch(read, path, value, isDefault) {
+            patchManifest(doc, read, path, value, isDefault);
+        },
     };
 }
 
@@ -108,6 +117,14 @@ export function pageEnv(doc: Document, host: HTMLElement): PanelEnv {
             return () => win.removeEventListener('resize', callback);
         },
         page: pageAccess(doc, host, window.tawLens?.editor || EDITOR_URL),
+        fields: config?.field
+            ? fieldClient({
+                  field: config.field,
+                  search: config.search ?? '',
+                  nonce: config.nonce ?? '',
+                  home: win.location.origin,
+              })
+            : undefined,
         bridge: config?.bridge
             ? (handlers) =>
                   connectBridge({ bridge: config.bridge!, nonce: config.nonce ?? '', protocol: PROTOCOL }, handlers)

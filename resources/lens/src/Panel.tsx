@@ -1,6 +1,7 @@
 /**
- * The Lens panel (component 01, screens 01–04; the states of component 04, screen 07): the shell, picking, the
- * inspect card, the structure tree, and the chat with Claude through the bridge `taw lens` runs.
+ * The Lens panel (component 01, screens 01–04; the states of component 04, screen 07; editing in place,
+ * component 05, screens 08–10): the shell, picking, the inspect card, the structure tree, the chat with Claude
+ * through the bridge `taw lens` runs, and text edited on the page.
  *
  * Docked (default): full height on the right or left edge, pushing the page. Sheet: a 400×600 floating
  * panel dragged by its header; dropped within reach of an edge, it docks there. Hidden: a small tab on
@@ -8,9 +9,13 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { BridgeClient, BridgeHandlers, Connection } from './bridge';
-import { Connecting, Conversation, NotConnected } from './Chat';
+import { Connecting, Conversation, NotConnected, type EditNote } from './Chat';
 import { dropped, emptyChat, markApproval, reduce, type BridgeEvent, type Chat, type Turn } from './chatModel';
-import { chipLabel, shortName, type Target } from './describe';
+import { chipLabel, fieldName, shortName, type Target } from './describe';
+import { fieldRequest, planEdit, templateMessage, type EditPlan, type FieldRequest } from './edit';
+import { EditCard, type LinkRow } from './EditCard';
+import type { EditHandlers, EditSession, FormatState } from './editing';
+import type { FieldClient, PageLink } from './fields';
 import { __ } from './i18n';
 import { InspectCard } from './InspectCard';
 import {
@@ -44,7 +49,9 @@ import type { PickHandlers } from './page';
 import { nextTheme, type Prefs, type Side, type ThemeChoice } from './prefs';
 import type { Sampler } from './ring';
 import { messageChips, selectionsPayload } from './payload';
-import type { PageMap } from './sourcemap';
+import type { Read } from './manifest';
+import { blocksText, readHtml, sameBlocks, toStored } from './rich';
+import { normalize, type FieldSource, type PageMap } from './sourcemap';
 import { Tree } from './Tree';
 import { buildTree, rowIdFor } from './treeModel';
 
@@ -61,6 +68,8 @@ export interface PanelEnv {
     page?: PageEnv;
     /** Connects to the bridge `taw lens` runs (bridge.ts). Absent: the chat stays "not connected". */
     bridge?: (handlers: BridgeHandlers) => BridgeClient;
+    /** Saves fields edited on the page (fields.ts). Absent: fields can't be saved from the page. */
+    fields?: FieldClient;
 }
 
 export interface PageEnv {
@@ -77,7 +86,71 @@ export interface PageEnv {
     editor: string;
     /** The page's address, for what Claude receives about the selections. */
     url: string;
+    /** Makes one element editable in place (editing.ts). Absent: Lens doesn't offer editing. */
+    edit?(el: Element, mode: 'text' | 'rich', handlers: EditHandlers): EditSession;
+    /** Double-clicks on the page while Lens isn't picking; the callback says whether it used one. */
+    onDoubleClick?(callback: (el: Element) => boolean): () => void;
+    /** Tells the page's source map a field's new value after a save. */
+    patch?(read: Read, path: string, value: string, isDefault: boolean): void;
 }
+
+/** An edit in progress (component 05). */
+interface Editing {
+    plan: EditPlan;
+    target: Target;
+    /** The element's HTML before the edit, for Undo. */
+    html: string;
+    /** What the edit shows now, as text, when it differs from before. */
+    after: string | null;
+    saving: boolean;
+    error: string | null;
+    link: LinkRow | null;
+    state: FormatState;
+}
+
+/** A field saved from the page, with what puts it back. */
+type Note = EditNote & { undo: FieldRequest; source: FieldSource; el: Element; html: string };
+
+/** Template text sent to Claude from an edit: the page shows the new text until the turn ends. */
+interface PendingTemplate {
+    /** The turn's place in the conversation. */
+    index: number;
+    el: Element;
+    html: string;
+    file: string;
+    label: string;
+}
+
+const NO_FORMATS: FormatState = { bold: false, italic: false, link: false, ul: false, ol: false };
+
+const beforeText = (plan: EditPlan): string =>
+    plan.kind === 'field' && plan.mode === 'rich' ? blocksText(plan.blocks) : normalize(plan.original);
+
+/** What the edit shows now, as text, or null while it's unchanged. */
+function changeOf(plan: EditPlan, session: EditSession): string | null {
+    if (plan.kind === 'field' && plan.mode === 'rich') {
+        const now = readHtml(session.html(), plan.formats, session.el.ownerDocument).blocks;
+        if (sameBlocks(now, plan.blocks)) {
+            return null;
+        }
+        const text = blocksText(now, session.el.ownerDocument);
+        // Only the formatting changed: the text alone would read as no change.
+        return text === blocksText(plan.blocks, session.el.ownerDocument)
+            ? `${text} (${__('formatting changed', 'taw-core')})`
+            : text;
+    }
+    const text = session.text();
+
+    return text === normalize(plan.original) ? null : text;
+}
+
+const editLabel = (plan: EditPlan): string =>
+    __('Editing · %s', 'taw-core').replace(
+        '%s',
+        plan.kind === 'field'
+            ? fieldName(plan.source.read, plan.source.path)
+            : `${plan.source.file.split('/').pop() ?? plan.source.file}:${plan.source.line}`,
+    );
 
 /** A stable key per page element, for selections made by clicking. */
 const elementKeys = new WeakMap<Element, string>();
@@ -144,6 +217,21 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
     const bodyRef = useRef<HTMLDivElement>(null);
     const stick = useRef(true);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    // Build step 5: editing text in place.
+    const [editing, setEditing] = useState<Editing | null>(null);
+    const session = useRef<EditSession | null>(null);
+    const [notes, setNotes] = useState<Note[]>([]);
+    const nextNote = useRef(0);
+    const [pending, setPending] = useState<PendingTemplate | null>(null);
+    const [pages, setPages] = useState<PageLink[]>([]);
+    const pagesTimer = useRef(0);
+    // The editing.ts handlers outlive renders: they call the latest actions through this.
+    const actions = useRef<{ save(): void; cancel(): void; link(): void }>({
+        save: () => undefined,
+        cancel: () => undefined,
+        link: () => undefined,
+    });
 
     useEffect(() => {
         if (!env.bridge) {
@@ -214,8 +302,22 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
         [],
     );
 
+    /** Ends the edit in progress: `restore` puts back what the element showed before. */
+    const endEdit = useCallback((restore: boolean) => {
+        const current = session.current;
+        if (current) {
+            if (restore) {
+                current.restore();
+            }
+            current.stop();
+        }
+        session.current = null;
+        setEditing(null);
+    }, []);
+
     const select = useCallback(
         (target: Target, add: boolean) => {
+            endEdit(true);
             setSelection((current) => {
                 if (!add) {
                     return [target];
@@ -228,9 +330,10 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
             setCardOpen(true);
             setAnnouncement(`${__('Selected', 'taw-core')} ${map ? shortName(map.manifest, target) : ''}`.trim());
         },
-        [map],
+        [map, endEdit],
     );
     const clearSelection = () => {
+        endEdit(true);
         setSelection([]);
         setPrimary(null);
         setAnnouncement(__('Selection cleared', 'taw-core'));
@@ -255,6 +358,11 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                 if (row) {
                     setReveal(row);
                 }
+            },
+            edit: (el) => {
+                const target = targetFor(current, el);
+                select(target, false);
+                startEditRef.current(target);
             },
             stop: () => setPicking(false),
         });
@@ -293,6 +401,59 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
     };
 
     const active = selection.find((t) => t.key === primary) ?? selection[selection.length - 1] ?? null;
+    const verdict = useMemo(() => (map && active && page?.edit ? planEdit(map, active) : null), [map, active, page]);
+
+    /** After a save: the page's map knows the new value, and click-made selections are read again. */
+    const remap = (read: Read, path: string, value: string, isDefault: boolean) => {
+        page?.patch?.(read, path, value, isDefault);
+        const next = freshMap();
+        if (next) {
+            setSelection((current) =>
+                current.map((t) => (t.key.startsWith('e:') && t.elements[0] ? targetFor(next, t.elements[0]) : t)),
+            );
+        }
+    };
+
+    const startEdit = (target: Target): boolean => {
+        if (!map || !page?.edit) {
+            return false;
+        }
+        const result = planEdit(map, target);
+        if (!result || !('plan' in result)) {
+            return false;
+        }
+        endEdit(true);
+        setPicking(false);
+        const plan = result.plan;
+        const html = plan.el.innerHTML;
+        session.current = page.edit(plan.el, plan.kind === 'field' && plan.mode === 'rich' ? 'rich' : 'text', {
+            change: () =>
+                setEditing((current) =>
+                    current && session.current
+                        ? { ...current, after: changeOf(current.plan, session.current), error: null }
+                        : current,
+                ),
+            select: () =>
+                setEditing((current) =>
+                    current && session.current ? { ...current, state: session.current.state() } : current,
+                ),
+            save: () => actions.current.save(),
+            cancel: () => actions.current.cancel(),
+            link: () => actions.current.link(),
+        });
+        setEditing({ plan, target, html, after: null, saving: false, error: null, link: null, state: NO_FORMATS });
+        setCardOpen(true);
+        setView('chat');
+        setAnnouncement(
+            plan.kind === 'field' && plan.mode === 'rich'
+                ? `${editLabel(plan)}. ${__('Esc cancels.', 'taw-core')}`
+                : `${editLabel(plan)}. ${__('Enter saves, Esc cancels.', 'taw-core')}`,
+        );
+
+        return true;
+    };
+    const startEditRef = useRef(startEdit);
+    startEditRef.current = startEdit;
 
     const connected = connection === 'connected';
     const send = async (message: { text: string; context: string; chips: string[] }) => {
@@ -348,6 +509,194 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
     };
     const stop = () => void client.current?.send('/stop', {});
     const takeOver = () => void client.current?.send('/take-over', {});
+
+    // Template text needs Claude: why Save can't send it right now.
+    const blocked =
+        editing?.plan.kind !== 'template'
+            ? null
+            : !connected
+              ? __('Template text is saved by Claude: start taw lens to send this.', 'taw-core')
+              : chat.working
+                ? __('Claude is still working on the last message. Save when it’s done.', 'taw-core')
+                : null;
+
+    const saveEdit = async () => {
+        const current = editing;
+        const live = session.current;
+        if (!current || !live || current.saving) {
+            return;
+        }
+        const plan = current.plan;
+        if (changeOf(plan, live) === null) {
+            endEdit(false);
+            return;
+        }
+        if (plan.kind === 'template') {
+            if (blocked || !map) {
+                setEditing({ ...current, error: blocked });
+                return;
+            }
+            setEditing({ ...current, saving: true, error: null });
+            const index = chat.turns.length;
+            const sent = await send(
+                templateMessage(map.manifest, current.target, plan.source, live.text(), {
+                    url: page?.url ?? '',
+                    title: map.manifest.nodes.get(0)?.label ?? '',
+                }),
+            );
+            if (!sent) {
+                setEditing(
+                    (now) =>
+                        now && {
+                            ...now,
+                            saving: false,
+                            error: __('Lens couldn’t send that to Claude. Is taw lens still running?', 'taw-core'),
+                        },
+                );
+                return;
+            }
+            live.stop();
+            session.current = null;
+            setEditing(null);
+            setCardOpen(false);
+            setPending({ index, el: plan.el, html: current.html, file: plan.source.file, label: editLabel(plan) });
+            return;
+        }
+
+        if (!env.fields) {
+            setEditing({ ...current, error: __('Lens can’t save fields on this page. Reload it.', 'taw-core') });
+            return;
+        }
+        const value =
+            plan.mode === 'rich'
+                ? toStored(readHtml(live.html(), plan.formats, plan.el.ownerDocument).blocks)
+                : live.text();
+        setEditing({ ...current, saving: true, error: null });
+        const result = await env.fields.save(fieldRequest(plan.source, value, plan.original));
+        if (!result.ok) {
+            setEditing((now) => now && { ...now, saving: false, error: result.message });
+            return;
+        }
+        if (plan.mode === 'text' && result.saved !== value) {
+            // Saved as sanitized: the page shows what's stored.
+            plan.el.textContent = result.saved;
+        }
+        live.stop();
+        session.current = null;
+        setEditing(null);
+        const name = fieldName(plan.source.read, plan.source.path);
+        setNotes((list) => [
+            ...list,
+            {
+                id: ++nextNote.current,
+                after: chat.turns.length,
+                name,
+                state: 'saved',
+                undo: fieldRequest(plan.source, result.previous, result.saved),
+                source: plan.source,
+                el: plan.el,
+                html: current.html,
+            },
+        ]);
+        stick.current = true;
+        remap(plan.source.read, plan.source.path, result.saved, result.isDefault);
+        setAnnouncement(`${__('Saved to', 'taw-core')} ${name}`);
+    };
+
+    const undo = async (id: number) => {
+        const note = notes.find((n) => n.id === id);
+        if (!note || !env.fields || note.state !== 'saved') {
+            return;
+        }
+        const mark = (change: Partial<Note>) =>
+            setNotes((list) => list.map((n) => (n.id === id ? { ...n, ...change } : n)));
+        mark({ state: 'undoing', error: undefined });
+        const result = await env.fields.save(note.undo);
+        if (!result.ok) {
+            mark({ state: 'saved', error: result.message });
+            return;
+        }
+        if (note.el.isConnected) {
+            note.el.innerHTML = note.html;
+        }
+        mark({ state: 'undone' });
+        remap(note.source.read, note.source.path, result.saved, result.isDefault);
+        setAnnouncement(`${__('Undid the change to', 'taw-core')} ${note.name}`);
+    };
+
+    const openLink = () => {
+        const live = session.current;
+        if (!live) {
+            return;
+        }
+        live.keepSelection();
+        const url = live.linkUrl();
+        setPages([]);
+        setEditing((current) => current && { ...current, link: { text: live.linkText(), url, existing: url !== '' } });
+    };
+    const closeLink = () => {
+        setEditing((current) => current && { ...current, link: null });
+        session.current?.focus();
+    };
+    const applyLink = (url: string) => {
+        const live = session.current;
+        live?.link(url);
+        setEditing(
+            (current) =>
+                current && live && { ...current, link: null, after: changeOf(current.plan, live), state: live.state() },
+        );
+    };
+    const lookupPages = (query: string) => {
+        window.clearTimeout(pagesTimer.current);
+        pagesTimer.current = window.setTimeout(() => {
+            void env.fields?.pages(query).then(setPages);
+        }, 200);
+    };
+
+    actions.current = {
+        save: () => void saveEdit(),
+        cancel: () => {
+            endEdit(true);
+            setAnnouncement(__('Edit cancelled', 'taw-core'));
+        },
+        link: openLink,
+    };
+
+    // Template text sent from an edit: once Claude's turn ends without changing the file, the page shows the
+    // old text again (Apply changed the file: the page reloads with it).
+    useEffect(() => {
+        if (!pending) {
+            return;
+        }
+        const turn = chat.turns[pending.index];
+        if (!turn || turn.outcome === undefined) {
+            return;
+        }
+        const changed = (turn.changed ?? []).some((file) => file === pending.file || file.endsWith(`/${pending.file}`));
+        if (!changed && pending.el.isConnected) {
+            pending.el.innerHTML = pending.html;
+        }
+        setPending(null);
+    }, [chat, pending]);
+
+    // Picking, hiding Lens or closing the panel ends an edit without saving it.
+    useEffect(() => {
+        if (picking || prefs.mode === 'hidden') {
+            endEdit(true);
+        }
+    }, [picking, prefs.mode, endEdit]);
+    useEffect(() => () => endEdit(true), [endEdit]);
+
+    // Double-clicking a selected element edits it (while picking, the picker reports it).
+    useEffect(() => {
+        if (!page?.onDoubleClick || picking || selection.length === 0 || editing) {
+            return;
+        }
+        return page.onDoubleClick((el) => {
+            const target = selection.find((t) => t.elements.some((e) => e === el || e.contains(el)));
+            return target ? startEditRef.current(target) : false;
+        });
+    }, [page, picking, selection, editing]);
     const onComposerKey = (event: KeyboardEvent) => {
         if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
             event.preventDefault();
@@ -362,17 +711,30 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
             input.style.height = `${Math.min(input.scrollHeight, 132)}px`;
         }
     }, [draft]);
+    const editingEl = editing?.plan.el ?? pending?.el ?? null;
     const rings: RingSpec[] =
         prefs.mode === 'hidden'
             ? []
             : [
+                  ...(editingEl
+                      ? [
+                            {
+                                key: 'editing',
+                                el: editingEl,
+                                state: 'editing' as const,
+                                label: editing ? editLabel(editing.plan) : pending?.label,
+                            },
+                        ]
+                      : []),
                   ...selection.flatMap((target) =>
-                      target.elements.map((el, i) => ({
-                          key: `${target.key}:${i}`,
-                          el,
-                          state: 'selected' as const,
-                          label: i === 0 && map ? chipLabel(map.manifest, target) : undefined,
-                      })),
+                      target.elements
+                          .filter((el) => el !== editingEl && !(editing && editingEl?.contains(el)))
+                          .map((el, i) => ({
+                              key: `${target.key}:${i}`,
+                              el,
+                              state: 'selected' as const,
+                              label: i === 0 && map ? chipLabel(map.manifest, target) : undefined,
+                          })),
                   ),
                   ...(hover
                       ? hover.target.elements
@@ -641,13 +1003,15 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                                 </div>
                             </div>
                         )
-                    ) : chat.turns.length > 0 || (chat.busy && connected) ? (
+                    ) : chat.turns.length > 0 || (chat.busy && connected) || notes.length > 0 ? (
                         <Conversation
                             chat={chat}
                             connection={connection}
+                            notes={notes}
                             onAnswer={(id: string, allow: boolean) => void answer(id, allow)}
                             onRetry={retry}
                             onTakeOver={takeOver}
+                            onUndo={(id: number) => void undo(id)}
                         />
                     ) : connection === 'connecting' ? (
                         <Connecting />
@@ -688,17 +1052,44 @@ export function Panel({ host, initial, env }: { host: string; initial: Prefs; en
                     )}
                 </div>
 
-                {view === 'chat' && cardOpen && active && map && page && (
-                    <InspectCard
-                        manifest={map.manifest}
-                        target={active}
-                        editor={page.editor}
-                        onClose={clearSelection}
-                        onShowInTree={showInTree}
+                {view === 'chat' && editing ? (
+                    <EditCard
+                        plan={editing.plan}
+                        before={beforeText(editing.plan)}
+                        after={editing.after}
+                        saving={editing.saving}
+                        error={editing.error}
+                        blocked={blocked}
+                        state={editing.state}
+                        link={editing.link}
+                        pages={pages}
+                        onSave={() => void saveEdit()}
+                        onCancel={() => actions.current.cancel()}
+                        onFormat={(format) => session.current?.format(format)}
+                        onLinkOpen={openLink}
+                        onLinkClose={closeLink}
+                        onLinkUrl={lookupPages}
+                        onLinkApply={applyLink}
                     />
+                ) : (
+                    view === 'chat' &&
+                    cardOpen &&
+                    active &&
+                    map &&
+                    page && (
+                        <InspectCard
+                            manifest={map.manifest}
+                            target={active}
+                            editor={page.editor}
+                            edit={verdict}
+                            onEdit={() => startEdit(active)}
+                            onClose={clearSelection}
+                            onShowInTree={showInTree}
+                        />
+                    )
                 )}
 
-                {selection.length > 0 && (view === 'tree' || selection.length > 1 || !cardOpen) && (
+                {selection.length > 0 && (view === 'tree' || selection.length > 1 || !cardOpen || editing) && (
                     <div class="chips" role="list" aria-label={__('Selection', 'taw-core')}>
                         {selection.map((target) => (
                             <span role="listitem" key={target.key}>

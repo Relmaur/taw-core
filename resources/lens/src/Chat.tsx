@@ -3,6 +3,7 @@
  * chips, Claude's streamed replies, the quiet activity line, approval cards (amber: needs your OK), and the
  * error, theme-busy, not-connected and connecting states. Errors are ink, never red.
  */
+import { Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 import { activity, stepDetail } from './activity';
 import type { Connection } from './bridge';
@@ -384,6 +385,9 @@ function TurnView({
                     </div>
                 )}
                 <div class="bubble">{turn.text}</div>
+                {turn.from === 'edit' && (
+                    <span class="message-from">{__('Sent from an edit on the page', 'taw-core')}</span>
+                )}
             </div>
             {turn.items.map((item, i) =>
                 item.type === 'text' ? (
@@ -410,34 +414,85 @@ function TurnView({
     );
 }
 
+/** A field saved from an edit on the page (component 05, screen 09), in the conversation where it happened. */
+export interface EditNote {
+    id: number;
+    /** Shown after this many turns. */
+    after: number;
+    /** The field's name. */
+    name: string;
+    state: 'saved' | 'undoing' | 'undone';
+    error?: string;
+}
+
+export function SavedNote({ note, onUndo }: { note: EditNote; onUndo(id: number): void }) {
+    return (
+        <div class="saved">
+            <div class="saved-line">
+                <CheckIcon />
+                <span class="saved-text">
+                    {note.state === 'undone' ? __('Undid the change to', 'taw-core') : __('Saved to', 'taw-core')}{' '}
+                    <code class="mono">{note.name}</code>
+                </span>
+                {note.state === 'saved' && (
+                    <button type="button" class="saved-undo" onClick={() => onUndo(note.id)}>
+                        {__('Undo', 'taw-core')}
+                    </button>
+                )}
+                {note.state === 'undoing' && (
+                    <span class="saved-undo" aria-label={__('Undoing…', 'taw-core')}>
+                        <SpinnerIcon size={12} />
+                    </span>
+                )}
+            </div>
+            {note.error && (
+                <div class="saved-error" role="alert">
+                    {note.error}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export function Conversation({
     chat,
     connection,
+    notes = [],
     onAnswer,
     onRetry,
     onTakeOver,
+    onUndo = () => undefined,
 }: {
     chat: Chat;
     connection: Connection;
+    notes?: EditNote[];
     onAnswer(id: string, allow: boolean): void;
     onRetry(turn: Turn): void;
     onTakeOver(): void;
+    onUndo?(id: number): void;
 }) {
     const live = connection === 'connected';
+    const notesAt = (i: number) =>
+        notes
+            .filter((note) => (i < chat.turns.length ? note.after === i : note.after >= i))
+            .map((note) => <SavedNote key={`note-${note.id}`} note={note} onUndo={onUndo} />);
     return (
         <div class="conversation" role="log" aria-label={__('Conversation', 'taw-core')}>
             {chat.busy && live && <BusyCard busy={chat.busy} takenOver={chat.takenOver} onTakeOver={onTakeOver} />}
             {chat.turns.map((turn, i) => (
-                <TurnView
-                    key={turn.turn}
-                    turn={turn}
-                    last={i === chat.turns.length - 1}
-                    working={chat.working}
-                    onAnswer={onAnswer}
-                    onRetry={onRetry}
-                    retry={live && !chat.working && i === chat.turns.length - 1}
-                />
+                <Fragment key={turn.turn}>
+                    {notesAt(i)}
+                    <TurnView
+                        turn={turn}
+                        last={i === chat.turns.length - 1}
+                        working={chat.working}
+                        onAnswer={onAnswer}
+                        onRetry={onRetry}
+                        retry={live && !chat.working && i === chat.turns.length - 1}
+                    />
+                </Fragment>
             ))}
+            {notesAt(chat.turns.length)}
         </div>
     );
 }

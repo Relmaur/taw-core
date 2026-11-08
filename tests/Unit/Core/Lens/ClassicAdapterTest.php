@@ -75,9 +75,31 @@ final class ClassicAdapterTest extends TestCase
         self::assertSame([
             'store' => 'post', 'object' => 5, 'key' => 'hero_title', 'value' => 'Welcome',
             'admin' => 'https://site.test/wp-admin/post.php?post=5&action=edit', 'default' => true, 'type' => 'text', 'label' => 'Title',
+            'edit' => 'text',
         ], $reads['hero_title']);
-        self::assertSame(['q' => ['label' => 'Question', 'type' => 'text']], $reads['hero_items']['subs']);
+        self::assertSame(['q' => ['label' => 'Question', 'type' => 'text', 'edit' => 'text']], $reads['hero_items']['subs']);
         self::assertSame('hero-photo', $reads['hero_image']['stem'], 'any size or format of the image matches');
+    }
+
+    public function testEachReadSaysWhetherThePageCanEditIt(): void
+    {
+        new Metabox(['id' => 'taw_more', 'title' => 'More', 'screens' => ['page'], 'fields' => [
+            ['id' => 'more_intro', 'label' => 'Intro', 'type' => 'wysiwyg'],
+            ['id' => 'more_short', 'label' => 'Short', 'type' => 'wysiwyg', 'blocks' => ['core/paragraph']],
+            ['id' => 'more_embed', 'label' => 'Embed', 'type' => 'textarea', 'sanitize' => 'code'],
+            ['id' => 'more_rows', 'label' => 'Rows', 'type' => 'repeater', 'fields' => [['id' => 'body', 'type' => 'wysiwyg', 'teeny' => true]]],
+        ]]);
+        foreach (['_taw_more_intro', '_taw_more_short', '_taw_more_embed', '_taw_more_rows', '_taw_hero_image'] as $key) {
+            ClassicAdapter::postMeta(null, 5, $key, true);
+        }
+
+        $reads = $this->reads();
+        self::assertSame(['edit' => 'rich', 'formats' => ['bold', 'italic', 'link', 'lists']], array_intersect_key($reads['more_intro'], ['edit' => 1, 'formats' => 1]));
+        self::assertSame(['bold', 'italic', 'link'], $reads['more_short']['formats'], 'no lists unless its blocks have them');
+        self::assertArrayNotHasKey('edit', $reads['more_embed'], 'raw code is never edited on the page');
+        self::assertArrayNotHasKey('edit', $reads['more_rows'], 'a repeater is edited row by row');
+        self::assertSame('rich', $reads['more_rows']['subs']['body']['edit']);
+        self::assertArrayNotHasKey('edit', $reads['hero_image']);
     }
 
     public function testAStoredValueIsNotADefault(): void

@@ -110,7 +110,10 @@ final class LensTest extends TestCase
 
         $this->site['toggle'] = '1';
         Lens::registerRoutes();
-        $this->assertSame([['taw/v1/lens/bridge', 'GET', [Lens::class, 'allowed']]], $routes);
+        $this->assertSame([
+            ['taw/v1/lens/bridge', 'GET', [Lens::class, 'allowed']],
+            ['taw/v1/lens/field', 'POST', [Lens::class, 'allowed']],
+        ], $routes);
     }
 
     public function test_the_route_answers_only_under_the_gate_without_the_page_check(): void
@@ -144,6 +147,8 @@ final class LensTest extends TestCase
         $config = Lens::config();
 
         $this->assertSame('http://taw.local/wp-json/taw/v1/lens/bridge', $config['bridge']);
+        $this->assertSame('http://taw.local/wp-json/taw/v1/lens/field', $config['field'], 'where a field edited on the page is saved');
+        $this->assertSame('http://taw.local/wp-json/wp/v2/search', $config['search']);
         $this->assertSame('nonce123', $config['nonce']);
         $this->assertSame(Bridge::PROTOCOL, $config['protocol']);
         $this->assertArrayNotHasKey('token', $config);

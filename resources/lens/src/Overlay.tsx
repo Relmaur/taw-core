@@ -2,8 +2,9 @@
  * The rings and label chips on the page (component 02, screen 05). An overlay in Lens's shadow root: fixed,
  * click-through, above the site and below the panel. Nothing is added to or changed on the site's elements.
  *
- * Hover: a 1px ring. Selected: a 2px ring 5px outside the element, with a halo of the other colour. The label
- * chip sits above the ring (below it when there's no room) in the ring's colour.
+ * Hover: a 1px ring. Selected: a 2px ring 5px outside the element, with a halo of the other colour. Editing
+ * (component 05): the same ring, dashed. The label chip sits above the ring (below it when there's no room) in
+ * the ring's colour.
  */
 import { useEffect, useMemo, useReducer, useRef } from 'preact/hooks';
 import { ringBox, type Area } from './layout';
@@ -12,12 +13,12 @@ import { ringColors, type RingColors, type Sampler } from './ring';
 export interface RingSpec {
     key: string;
     el: Element;
-    state: 'hover' | 'selected';
+    state: 'hover' | 'selected' | 'editing';
     label?: string;
 }
 
 /** How far each ring's outer edge sits outside the element. */
-const OUTSET = { hover: 4, selected: 7 } as const;
+const OUTSET = { hover: 4, selected: 7, editing: 7 } as const;
 const CHIP_HEIGHT = 24;
 
 export function Overlay({

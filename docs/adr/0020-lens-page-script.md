@@ -60,6 +60,10 @@ Facts that shape the build:
 - The chat (build step 4) is part of the same package: the panel finds the bridge `taw lens` runs through
   `GET taw/v1/lens/bridge` and talks to it over 127.0.0.1 (umbrella ADR-0006 § 8). The bridge itself is
   `resources/lens-bridge/` (plain Node, shipped as is, not built); its tests are in `tests/js/`.
+- Editing in place (build step 5) saves fields through `POST taw/v1/lens/field` (`TAW\Core\Lens\FieldWriter`),
+  in WordPress, not through the bridge: a field save needs no `taw lens` and no WordPress boot from the CLI.
+  Template text still goes to Claude. Rich text is stored through WordPress's `removep()`, so the page script
+  adds the `wp-autop` script dependency next to `wp-i18n`; nothing is bundled for it.
 - Any change under `resources/lens/src/` is rebuilt and committed with it, or CI fails.
 - Accessibility checks live next to the code: the token tests assert WCAG 2.2 AA contrast for every text
   and UI pair in both themes.

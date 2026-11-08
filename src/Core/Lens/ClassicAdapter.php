@@ -300,8 +300,9 @@ final class ClassicAdapter
     }
 
     /**
-     * Adds what the page script needs from a field's config: its label and type, the labels of a repeater's
-     * sub-fields, and an image's file name (any size or format variant of it then matches).
+     * Adds what the page script needs from a field's config: its label and type, whether it can be edited on the
+     * page, the labels of a repeater's sub-fields, and an image's file name (any size or format variant of it then
+     * matches).
      *
      * @param array<string, mixed> $config
      * @param array<string, mixed> $read
@@ -311,11 +312,12 @@ final class ClassicAdapter
     {
         $read['type'] = (string) ($config['type'] ?? 'text');
         $read['label'] = (string) ($config['label'] ?? $read['key']);
+        $read += self::editing($config);
         if ($read['type'] === 'repeater' && is_array($config['fields'] ?? null)) {
             $subs = [];
             foreach ($config['fields'] as $sub) {
                 if (is_array($sub) && isset($sub['id'])) {
-                    $subs[(string) $sub['id']] = ['label' => (string) ($sub['label'] ?? $sub['id']), 'type' => (string) ($sub['type'] ?? 'text')];
+                    $subs[(string) $sub['id']] = ['label' => (string) ($sub['label'] ?? $sub['id']), 'type' => (string) ($sub['type'] ?? 'text')] + self::editing($sub);
                 }
             }
             $read['subs'] = $subs;
@@ -328,6 +330,23 @@ final class ClassicAdapter
         }
 
         return $read;
+    }
+
+    /**
+     * Whether the page may edit a field in place (FieldWriter::editMode()): `edit` is `text` or `rich`, and a
+     * rich-text field lists the formats its toolbar offers.
+     *
+     * @param array<string, mixed> $config
+     * @return array{edit?: string, formats?: list<string>}
+     */
+    private static function editing(array $config): array
+    {
+        $mode = FieldWriter::editMode($config);
+        if ($mode === null) {
+            return [];
+        }
+
+        return $mode === 'rich' ? ['edit' => $mode, 'formats' => FieldWriter::formats($config)] : ['edit' => $mode];
     }
 
     private static function themeRelative(string $file): string

@@ -129,10 +129,11 @@ export class Bridge {
 
     /**
      * A message from the page. `context` is the page's description of the selections (built from the
-     * source map); `chips` are their short names for the transcript.
+     * source map); `chips` are their short names for the transcript. `from: 'edit'` marks a message the
+     * page wrote for an edit made on the page (template text, which Lens never saves itself).
      * @returns {{turn: number}|{error: string, status: number}}
      */
-    message({ text, context = '', chips = [] }) {
+    message({ text, context = '', chips = [], from }) {
         if (typeof text !== 'string' || text.trim() === '' || text.length > TEXT_MAX) {
             return { error: 'text', status: 422 };
         }
@@ -149,6 +150,7 @@ export class Bridge {
             turn,
             text,
             chips: chips.filter((c) => typeof c === 'string').slice(0, 20).map((c) => c.slice(0, 80)),
+            ...(from === 'edit' ? { from } : {}),
         });
         this.log(`Turn ${turn}: ${text.length > 70 ? `${text.slice(0, 69)}…` : text}`);
         this.agent.send(context ? `${text}\n\n${context}` : text);

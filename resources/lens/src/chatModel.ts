@@ -29,7 +29,7 @@ export type BridgeEvent =
           takenOver: boolean;
           history: BridgeEvent[];
       }
-    | { type: 'turn'; turn: number; text: string; chips: string[] }
+    | { type: 'turn'; turn: number; text: string; chips: string[]; from?: 'edit' }
     | { type: 'text'; turn: number; delta: string }
     | { type: 'tool'; turn: number; id: string; name: string; kind: StepKind; target: string }
     | { type: 'tool-done'; turn: number; id: string; ok: boolean }
@@ -72,6 +72,8 @@ export interface Turn {
     turn: number;
     text: string;
     chips: string[];
+    /** The page wrote this message for an edit made on the page (template text). */
+    from?: 'edit';
     items: Item[];
     outcome?: 'ok' | 'stopped' | 'error';
     message?: string;
@@ -132,7 +134,16 @@ export function reduce(chat: Chat, event: BridgeEvent): Chat {
             return {
                 ...chat,
                 working: true,
-                turns: [...chat.turns, { turn: event.turn, text: event.text, chips: event.chips ?? [], items: [] }],
+                turns: [
+                    ...chat.turns,
+                    {
+                        turn: event.turn,
+                        text: event.text,
+                        chips: event.chips ?? [],
+                        items: [],
+                        ...(event.from === 'edit' ? { from: 'edit' as const } : {}),
+                    },
+                ],
             };
         case 'text':
             return withTurn(chat, event.turn, (t) => {

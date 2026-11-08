@@ -210,7 +210,7 @@ msgstr ""
 msgid "(empty for this post)"
 msgstr ""
 
-#: resources/lens/src/InspectCard.tsx
+#: resources/lens/src/EditCard.tsx resources/lens/src/InspectCard.tsx
 msgid "(empty)"
 msgstr ""
 
@@ -385,6 +385,10 @@ msgstr ""
 msgid "Add item"
 msgstr ""
 
+#: resources/lens/src/EditCard.tsx
+msgid "Add link"
+msgstr ""
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Add page links"
 msgstr ""
@@ -421,6 +425,10 @@ msgstr ""
 msgid "Advanced"
 msgstr ""
 
+#: resources/lens/src/EditCard.tsx
+msgid "After:"
+msgstr ""
+
 #: src/Core/Media/MediaFolders.php
 msgid "All Files"
 msgstr ""
@@ -439,6 +447,10 @@ msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Allowed blocks"
+msgstr ""
+
+#: resources/lens/src/EditCard.tsx
+msgid "Allowed by this field"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -531,6 +543,10 @@ msgstr ""
 msgid "Background"
 msgstr ""
 
+#: resources/lens/src/EditCard.tsx
+msgid "Before:"
+msgstr ""
+
 #: resources/lens/src/InspectCard.tsx
 msgid "Block"
 msgstr ""
@@ -543,8 +559,16 @@ msgstr ""
 msgid "Block text:"
 msgstr ""
 
+#: resources/lens/src/EditCard.tsx
+msgid "Bold"
+msgstr ""
+
 #: resources/data-panel/src/bindings/DynamicSettings.tsx
 msgid "Border color"
+msgstr ""
+
+#: resources/lens/src/EditCard.tsx
+msgid "Bulleted list"
 msgstr ""
 
 #: resources/data-panel/src/bindings/targets.ts
@@ -559,7 +583,7 @@ msgstr ""
 msgid "Calls"
 msgstr ""
 
-#: resources/data-panel/src/rich/MiniEditor.tsx resources/lens/src/Chat.tsx src/Core/Content/ContentAdminScreen.php
+#: resources/data-panel/src/rich/MiniEditor.tsx resources/lens/src/Chat.tsx resources/lens/src/EditCard.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Cancel"
 msgstr ""
 
@@ -575,8 +599,13 @@ msgstr ""
 msgid "Categories, tags or any taxonomy: the post’s own, or all of them."
 msgstr ""
 
-#: resources/data-panel/src/controls/PostSelect.tsx
+#: resources/data-panel/src/controls/PostSelect.tsx resources/lens/src/EditCard.tsx
 msgid "Change"
+msgstr ""
+
+#: resources/lens/src/edit.ts
+#, php-format
+msgid "Change \"%1$s\" to \"%2$s\"."
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -662,6 +691,10 @@ msgstr ""
 
 #: resources/lens/src/Panel.tsx
 msgid "Claude is still working on the last message"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Claude is still working on the last message. Save when it’s done."
 msgstr ""
 
 #: resources/lens/src/Panel.tsx
@@ -934,8 +967,16 @@ msgstr ""
 msgid "Edit Visually"
 msgstr ""
 
+#: resources/lens/src/Panel.tsx
+msgid "Edit cancelled"
+msgstr ""
+
 #: resources/lens/src/InspectCard.tsx
 msgid "Edit here"
+msgstr ""
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Edit the text on the page (or double-click it)"
 msgstr ""
 
 #: resources/lens/src/activity.ts
@@ -948,8 +989,13 @@ msgstr ""
 msgid "Editing %s"
 msgstr ""
 
-#: resources/lens/src/InspectCard.tsx
-msgid "Editing in place is coming in a later build"
+#: resources/lens/src/EditCard.tsx
+msgid "Editing on the page"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+#, php-format
+msgid "Editing · %s"
 msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
@@ -973,7 +1019,15 @@ msgid "Enter"
 msgstr ""
 
 #: resources/lens/src/Panel.tsx
+msgid "Enter saves, Esc cancels."
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
 msgid "Esc"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Esc cancels."
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -1021,7 +1075,7 @@ msgstr ""
 msgid "Feeds the \"sameAs\" entity signal — link every profile that represents this same organization/brand (LinkedIn, Instagram, etc.)."
 msgstr ""
 
-#: resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/lens/src/InspectCard.tsx src/Core/Content/ContentAdminScreen.php
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/lens/src/EditCard.tsx resources/lens/src/InspectCard.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Field"
 msgstr ""
 
@@ -1091,6 +1145,10 @@ msgstr ""
 
 #: src/Core/Metabox/Metabox.php
 msgid "Format"
+msgstr ""
+
+#: resources/lens/src/EditCard.tsx
+msgid "Formatting"
 msgstr ""
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
@@ -1337,6 +1395,10 @@ msgstr ""
 msgid "It has an error, so it’s skipped."
 msgstr ""
 
+#: resources/lens/src/EditCard.tsx
+msgid "Italic"
+msgstr ""
+
 #. translators: %d: item number.
 #: resources/data-panel/src/controls/Repeater.tsx
 #, php-format
@@ -1420,6 +1482,22 @@ msgid "Lens"
 msgstr ""
 
 #: resources/lens/src/Panel.tsx
+msgid "Lens can’t save fields on this page. Reload it."
+msgstr ""
+
+#: resources/lens/src/fields.ts
+msgid "Lens couldn’t reach the site to save. Is it still running?"
+msgstr ""
+
+#: resources/lens/src/fields.ts
+msgid "Lens couldn’t save that. Try again."
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens couldn’t send that to Claude. Is taw lens still running?"
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
 msgid "Lens couldn’t send that. Is taw lens still running?"
 msgstr ""
 
@@ -1451,6 +1529,10 @@ msgstr ""
 msgid "Lens reconnects on its own once it’s running."
 msgstr ""
 
+#: src/Core/Lens/FieldWriter.php
+msgid "Lens sent something it shouldn’t have. Reload the page and try again."
+msgstr ""
+
 #: resources/lens/src/Panel.tsx
 msgid "Lens undocked into a sheet"
 msgstr ""
@@ -1459,8 +1541,13 @@ msgstr ""
 msgid "Lens will write files again while the other session keeps running. If you both change the same file, one of you overwrites the other."
 msgstr ""
 
-#: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/targets.ts
+#: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/targets.ts resources/lens/src/EditCard.tsx
 msgid "Link"
+msgstr ""
+
+#: resources/lens/src/EditCard.tsx
+#, php-format
+msgid "Link for \"%s\""
 msgstr ""
 
 #: resources/data-panel/src/bindings/targets.ts
@@ -1796,7 +1883,7 @@ msgstr ""
 msgid "Number of items"
 msgstr ""
 
-#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/lens/src/EditCard.tsx
 msgid "Numbered list"
 msgstr ""
 
@@ -1918,6 +2005,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/loop/parts.tsx
 msgid "Page links"
+msgstr ""
+
+#: resources/lens/src/EditCard.tsx
+msgid "Pages on this site are suggested as you type."
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/parts.tsx src/Core/Loop/Loop.php
@@ -2141,7 +2232,7 @@ msgstr ""
 msgid "Release to dock right"
 msgstr ""
 
-#: resources/data-panel/src/bindings/chips.tsx resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+#: resources/data-panel/src/bindings/chips.tsx resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx resources/lens/src/EditCard.tsx src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Remove"
 msgstr ""
 
@@ -2308,7 +2399,7 @@ msgstr ""
 msgid "Same author as this post"
 msgstr ""
 
-#: resources/data-panel/src/bindings/chips.tsx
+#: resources/data-panel/src/bindings/chips.tsx resources/lens/src/EditCard.tsx
 msgid "Save"
 msgstr ""
 
@@ -2322,8 +2413,20 @@ msgstr ""
 msgid "Saved %d defaults to the database."
 msgstr ""
 
+#: resources/lens/src/Chat.tsx resources/lens/src/Panel.tsx
+msgid "Saved to"
+msgstr ""
+
+#: resources/lens/src/EditCard.tsx
+msgid "Saves in TAW’s rich-text format, the same the wp-admin editor writes."
+msgstr ""
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Saving changes this value"
+msgstr ""
+
+#: resources/lens/src/EditCard.tsx
+msgid "Saving…"
 msgstr ""
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
@@ -2432,8 +2535,12 @@ msgstr ""
 msgid "Sending..."
 msgstr ""
 
-#: src/Core/Form/Form.php
+#: resources/lens/src/EditCard.tsx src/Core/Form/Form.php
 msgid "Sending…"
+msgstr ""
+
+#: resources/lens/src/Chat.tsx
+msgid "Sent from an edit on the page"
 msgstr ""
 
 #: src/Core/Editing/EditingAdminScreen.php
@@ -2734,7 +2841,7 @@ msgstr ""
 msgid "Template part"
 msgstr ""
 
-#: resources/lens/src/InspectCard.tsx
+#: resources/lens/src/EditCard.tsx resources/lens/src/InspectCard.tsx
 msgid "Template text"
 msgstr ""
 
@@ -2742,7 +2849,11 @@ msgstr ""
 msgid "Template text around values. Made of:"
 msgstr ""
 
-#: resources/lens/src/InspectCard.tsx
+#: resources/lens/src/Panel.tsx
+msgid "Template text is saved by Claude: start taw lens to send this."
+msgstr ""
+
+#: resources/lens/src/EditCard.tsx resources/lens/src/InspectCard.tsx
 msgid "Template text · translatable"
 msgstr ""
 
@@ -2770,6 +2881,10 @@ msgstr ""
 msgid "Thank you! Your message has been sent."
 msgstr ""
 
+#: src/Core/Lens/FieldWriter.php
+msgid "That field isn’t on this page any more. Reload the page."
+msgstr ""
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "That file is not a valid SQLite database."
 msgstr ""
@@ -2780,6 +2895,10 @@ msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "That import couldn't be found (or was undone already), so nothing was undone."
+msgstr ""
+
+#: src/Core/Lens/FieldWriter.php
+msgid "That row isn’t there any more. Reload the page to edit what’s stored now."
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -2872,6 +2991,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "The number and the word that fits it: “3 awards”."
+msgstr ""
+
+#: resources/lens/src/edit.ts
+msgid "The page shows this field differently from how it’s stored, so Lens can’t edit it here. Open it in wp-admin."
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -2982,12 +3105,28 @@ msgstr ""
 msgid "This SVG file could not be safely sanitized and was rejected."
 msgstr ""
 
+#: src/Core/Lens/FieldWriter.php
+msgid "This field can’t be edited on the page. Open it in wp-admin."
+msgstr ""
+
+#: src/Core/Lens/FieldWriter.php
+msgid "This field changed since the page loaded. Reload the page to edit what’s stored now."
+msgstr ""
+
+#: resources/lens/src/edit.ts
+msgid "This field has formatting Lens can’t edit on the page, such as images or headings. Open it in wp-admin."
+msgstr ""
+
 #: src/Core/Form/Form.php
 msgid "This field is required."
 msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "This formula doesn’t read right here: check operators, commas, quotes and parentheses."
+msgstr ""
+
+#: resources/lens/src/edit.ts
+msgid "This kind of field can’t be edited on the page. Open it in wp-admin."
 msgstr ""
 
 #: src/Core/Auth/PagePassword.php
@@ -3013,6 +3152,14 @@ msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "This site has its own value, and there is no telling which is newer."
+msgstr ""
+
+#: resources/lens/src/edit.ts
+msgid "This text has line breaks, which editing on the page would lose. Open it in wp-admin."
+msgstr ""
+
+#: resources/lens/src/edit.ts
+msgid "This text shares its element with other markup. Ask Claude to change it."
 msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
@@ -3083,6 +3230,10 @@ msgstr ""
 msgid "Twitter / X Handle"
 msgstr ""
 
+#: src/Core/Lens/FieldWriter.php
+msgid "Two fields share this name here. Edit it in wp-admin."
+msgstr ""
+
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Type"
 msgstr ""
@@ -3093,6 +3244,14 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Type @ to add a value, then . for a function."
+msgstr ""
+
+#: resources/lens/src/EditCard.tsx
+msgid "Type on the page. Saving writes the field value directly; nothing else changes."
+msgstr ""
+
+#: resources/lens/src/EditCard.tsx
+msgid "Type on the page. Template text lives in a theme file, so Save sends the change to Claude, and you apply the diff."
 msgstr ""
 
 #: resources/data-panel/src/bindings/functionDocs.ts
@@ -3111,6 +3270,14 @@ msgstr ""
 msgid "Unclosed parenthesis or quote."
 msgstr ""
 
+#: resources/lens/src/Chat.tsx resources/lens/src/Panel.tsx
+msgid "Undid the change to"
+msgstr ""
+
+#: resources/lens/src/Chat.tsx
+msgid "Undo"
+msgstr ""
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Undo it"
 msgstr ""
@@ -3121,6 +3288,10 @@ msgstr ""
 
 #: resources/lens/src/Panel.tsx
 msgid "Undock into a sheet"
+msgstr ""
+
+#: resources/lens/src/Chat.tsx
+msgid "Undoing…"
 msgstr ""
 
 #: src/Core/Content/ContentAdminScreen.php
@@ -3142,6 +3313,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Unknown value name."
+msgstr ""
+
+#: resources/lens/src/EditCard.tsx
+msgid "Update link"
 msgstr ""
 
 #: resources/lens/src/activity.ts
@@ -3244,6 +3419,10 @@ msgstr ""
 msgid "What changes"
 msgstr ""
 
+#: src/Core/Lens/FieldWriter.php
+msgid "What this field is stored on isn’t there any more. Reload the page."
+msgstr ""
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "When a record already exists:"
 msgstr ""
@@ -3292,6 +3471,10 @@ msgstr ""
 msgid "WordPress"
 msgstr ""
 
+#: resources/lens/src/fields.ts
+msgid "WordPress refused the save. Reload the page and try again."
+msgstr ""
+
 #: src/Core/Rag/Usage/UsageAdminScreen.php
 msgid "Worst case per message"
 msgstr ""
@@ -3336,6 +3519,14 @@ msgstr ""
 
 #: resources/lens/src/Chat.tsx
 msgid "You can keep picking and asking; Lens won’t write files until it’s free."
+msgstr ""
+
+#: src/Core/Lens/FieldWriter.php
+msgid "You can’t change this site’s options."
+msgstr ""
+
+#: src/Core/Lens/FieldWriter.php
+msgid "You can’t edit what this field is stored on."
 msgstr ""
 
 #: resources/data-panel/src/controls/MediaControls.tsx
@@ -3410,6 +3601,10 @@ msgstr ""
 msgid "block"
 msgstr ""
 
+#: resources/lens/src/EditCard.tsx
+msgid "cancel"
+msgstr ""
+
 #: resources/lens/src/describe.ts
 msgid "choice"
 msgstr ""
@@ -3452,6 +3647,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "fill in what to compare with."
+msgstr ""
+
+#: resources/lens/src/Panel.tsx
+msgid "formatting changed"
 msgstr ""
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
@@ -3624,6 +3823,10 @@ msgstr ""
 
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "rule"
+msgstr ""
+
+#: resources/lens/src/EditCard.tsx
+msgid "save"
 msgstr ""
 
 #: resources/lens/src/Panel.tsx

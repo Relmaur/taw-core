@@ -8,6 +8,7 @@
  * says so: ambiguous lists every candidate, mixed lists the pieces; Lens never picks one.
  */
 import type { ComponentChildren } from 'preact';
+import { useEffect, useState } from 'preact/hooks';
 import {
     editorUrl,
     fieldName,
@@ -19,6 +20,7 @@ import {
     typeLabel,
     type Target,
 } from './describe';
+import type { Verdict } from './edit';
 import { __ } from './i18n';
 import { CloseIcon } from './icons';
 import type { Manifest } from './manifest';
@@ -28,6 +30,9 @@ interface Props {
     manifest: Manifest;
     target: Target;
     editor: string;
+    /** Whether the selection can be edited on the page (edit.ts). */
+    edit?: Verdict;
+    onEdit?(): void;
     onClose(): void;
     onShowInTree(target: Target): void;
 }
@@ -53,17 +58,28 @@ function Head({ title, mono, badge, onClose }: { title: string; mono?: boolean; 
 
 const Actions = ({ children }: { children: ComponentChildren }) => <div class="card-actions">{children}</div>;
 
-/** Editing in place arrives with build step 5; until then the button says so instead of doing nothing. */
-const EditHere = () => (
-    <button
-        type="button"
-        class="card-button primary"
-        aria-disabled="true"
-        title={__('Editing in place is coming in a later build', 'taw-core')}
-    >
-        {__('Edit here', 'taw-core')}
-    </button>
-);
+/**
+ * "Edit here" (component 05): edits the text on the page. When Lens can't edit this one in place, the button
+ * stays, and pressing it says why and where to change it instead.
+ */
+function EditHere({ edit, onEdit, onWhy }: { edit?: Verdict; onEdit?: () => void; onWhy(reason: string): void }) {
+    if (!edit) {
+        return null;
+    }
+    const can = 'plan' in edit;
+
+    return (
+        <button
+            type="button"
+            class="card-button primary"
+            aria-disabled={can ? undefined : 'true'}
+            title={can ? __('Edit the text on the page (or double-click it)', 'taw-core') : edit.reason}
+            onClick={() => (can ? onEdit?.() : onWhy(edit.reason))}
+        >
+            {__('Edit here', 'taw-core')}
+        </button>
+    );
+}
 
 const External = ({ href, children, primary }: { href: string; children: ComponentChildren; primary?: boolean }) => (
     <a class={primary ? 'card-button primary' : 'card-button'} href={href} target="_blank" rel="noopener noreferrer">
@@ -149,9 +165,17 @@ function RenderedBy({ manifest, node }: { manifest: Manifest; node: number }) {
     ) : null;
 }
 
-export function InspectCard({ manifest, target, editor, onClose, onShowInTree }: Props) {
+export function InspectCard({ manifest, target, editor, edit, onEdit, onClose, onShowInTree }: Props) {
     const a = target.attribution;
     const at = manifest.nodes.get(target.at);
+    const [why, setWhy] = useState<string | null>(null);
+    useEffect(() => setWhy(null), [target]);
+    const editHere = <EditHere edit={edit} onEdit={onEdit} onWhy={setWhy} />;
+    const whyNote = why && (
+        <div class="card-note card-why" role="status">
+            {why}
+        </div>
+    );
 
     if (a.kind === 'field') {
         const { read } = a.source;
@@ -173,8 +197,9 @@ export function InspectCard({ manifest, target, editor, onClose, onShowInTree }:
                 )}
                 {a.source.part && <div class="card-note">{__('Part of this rich-text field.', 'taw-core')}</div>}
                 <RenderedBy manifest={manifest} node={target.at} />
+                {whyNote}
                 <Actions>
-                    {wp ? null : <EditHere />}
+                    {wp ? null : editHere}
                     {read.admin && <External href={read.admin}>{__('Open in wp-admin', 'taw-core')}</External>}
                 </Actions>
             </section>
@@ -212,8 +237,9 @@ export function InspectCard({ manifest, target, editor, onClose, onShowInTree }:
                 <div class="card-meta mono">
                     {source.file}:{source.line}
                 </div>
+                {whyNote}
                 <Actions>
-                    <EditHere />
+                    {editHere}
                     {file?.abs && (
                         <External href={editorUrl(editor, file.abs, source.line)}>
                             {__('Open in editor', 'taw-core')}

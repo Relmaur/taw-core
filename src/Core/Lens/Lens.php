@@ -28,7 +28,8 @@ if (!defined('ABSPATH')) {
  * parts plus one JSON manifest of what rendered them, which the page script reads.
  *
  * The chat goes to the bridge `taw lens` starts (Bridge): the page asks `GET taw/v1/lens/bridge` for its
- * address and per-run token. That route exists only while the toggle is on, and answers only under the gate.
+ * address and per-run token. A field edited on the page is saved by `POST taw/v1/lens/field` (FieldWriter), with
+ * no bridge needed. Both routes exist only while the toggle is on, and answer only under the gate.
  *
  * Wired by Theme::boot() (classic themes), never by Boot::data(): it injects frontend output.
  */
@@ -44,8 +45,8 @@ final class Lens
 
     public const SCRIPT_SOURCE = 'src/index.tsx';
 
-    /** WordPress scripts the page script uses: translations only. */
-    public const SCRIPT_DEPS = ['wp-i18n'];
+    /** WordPress scripts the page script uses: translations, and removep() for rich-text fields edited on the page. */
+    public const SCRIPT_DEPS = ['wp-i18n', 'wp-autop'];
 
     /** "Open in editor" by default: VS Code's URL handler. */
     public const EDITOR_URL = 'vscode://file/{path}:{line}';
@@ -53,6 +54,9 @@ final class Lens
     public const REST_NAMESPACE = 'taw/v1';
 
     public const REST_ROUTE = '/lens/bridge';
+
+    /** Where a field edited on the page is saved (FieldWriter). */
+    public const FIELD_ROUTE = '/lens/field';
 
     private static bool $registered = false;
 
@@ -74,8 +78,9 @@ final class Lens
     }
 
     /**
-     * rest_api_init: `GET taw/v1/lens/bridge`, where the page finds the running bridge. Registered only while
-     * the toggle is on, so a production site's REST index doesn't list it.
+     * rest_api_init: `GET taw/v1/lens/bridge`, where the page finds the running bridge, and `POST
+     * taw/v1/lens/field`, where a field edited on the page is saved. Registered only while the toggle is on, so a
+     * production site's REST index doesn't list them.
      */
     public static function registerRoutes(): void
     {
@@ -87,6 +92,11 @@ final class Lens
             'callback'            => [self::class, 'bridgeRoute'],
             'permission_callback' => [self::class, 'allowed'],
         ]);
+        register_rest_route(self::REST_NAMESPACE, self::FIELD_ROUTE, [
+            'methods'             => 'POST',
+            'callback'            => [self::class, 'fieldRoute'],
+            'permission_callback' => [self::class, 'allowed'],
+        ]);
     }
 
     /**
@@ -96,6 +106,20 @@ final class Lens
     public static function bridgeRoute(): \WP_REST_Response
     {
         $response = new \WP_REST_Response(Bridge::forPage(get_stylesheet_directory()));
+        $response->header('Cache-Control', 'no-store');
+
+        return $response;
+    }
+
+    /**
+     * Saves one field edited on the page (FieldWriter): the gate is the permission callback, the object's own
+     * capability and the stale-value check are FieldWriter's.
+     */
+    public static function fieldRoute(\WP_REST_Request $request): \WP_REST_Response
+    {
+        // The JSON body (get_params() merges it with the query string; only the body's keys are read).
+        $result = FieldWriter::write($request->get_params());
+        $response = new \WP_REST_Response($result['body'], $result['status']);
         $response->header('Cache-Control', 'no-store');
 
         return $response;
@@ -167,7 +191,9 @@ final class Lens
      * VS Code's by default. A theme or a developer's mu-plugin changes it with the `taw_lens_editor_url`
      * filter, e.g. `cursor://file/{path}:{line}` or `phpstorm://open?file={path}&line={line}`.
      *
-     * @return array{host: string, version: string, editor: string, bridge: string, nonce: string, protocol: int}
+     * `field` is where a field edited on the page is saved; `search` suggests this site's pages for a link.
+     *
+     * @return array{host: string, version: string, editor: string, bridge: string, field: string, search: string, nonce: string, protocol: int}
      */
     public static function config(): array
     {
@@ -180,6 +206,8 @@ final class Lens
             'version'  => Framework::version(),
             'editor'   => is_string($editor) && $editor !== '' ? $editor : self::EDITOR_URL,
             'bridge'   => rest_url(self::REST_NAMESPACE . self::REST_ROUTE),
+            'field'    => rest_url(self::REST_NAMESPACE . self::FIELD_ROUTE),
+            'search'   => rest_url('wp/v2/search'),
             'nonce'    => wp_create_nonce('wp_rest'),
             'protocol' => Bridge::PROTOCOL,
         ];

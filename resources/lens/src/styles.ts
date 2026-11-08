@@ -340,6 +340,12 @@ export const panelCss = (): string =>
                 inset 0 0 0 2px var(--halo),
                 0 0 0 3px var(--halo);
         }
+        .ring[data-state='editing'] {
+            border: 2px dashed var(--ring);
+            box-shadow:
+                inset 0 0 0 2px var(--halo),
+                0 0 0 3px var(--halo);
+        }
         .ring[data-state='hover'] {
             border: 1px solid var(--ring);
             box-shadow:
@@ -917,7 +923,13 @@ export const panelCss = (): string =>
             background: var(--lens-amber-dot);
             align-self: center;
         }
+        /* A long path gives way, never the title ("Edit 1 file" stays on one line). */
+        .approval-title {
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
         .approval-file {
+            flex: 1 1 auto;
             font-family: var(--lens-font-mono);
             font-size: 12px;
             font-weight: 400;
@@ -1142,6 +1154,202 @@ export const panelCss = (): string =>
         }
         .stop:hover {
             background: var(--lens-bubble);
+        }
+
+        /* Editing in place (component 05, screens 08–10): the card stays in the panel, the page gets the caret. */
+        .card.edit {
+            border-color: var(--lens-accent);
+            display: flex;
+            flex-direction: column;
+            max-height: 75%;
+        }
+        .edit-status {
+            margin-left: auto;
+            flex: 0 0 auto;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .edit-change {
+            margin: 0 14px;
+            padding: 8px 10px;
+            background: var(--lens-bubble);
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.6;
+            overflow-wrap: anywhere;
+            max-height: 140px;
+            overflow-y: auto;
+        }
+        .edit-before {
+            color: var(--lens-diff-removed-text);
+            text-decoration: line-through;
+        }
+        .edit-after {
+            color: var(--lens-diff-added-text);
+        }
+        .edit-hint {
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--lens-muted-soft);
+        }
+        .edit-note {
+            margin: 10px 14px 0;
+        }
+        .edit-error,
+        .card-why {
+            margin: 10px 14px 0;
+            padding: 0;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--lens-text);
+        }
+        .edit-error {
+            font-weight: 500;
+        }
+        .edit-actions {
+            align-items: center;
+            padding-top: 12px;
+            /* Save and Cancel stay in view when the card scrolls (a short sheet, the link row open). */
+            position: sticky;
+            bottom: 0;
+            background: var(--lens-surface);
+        }
+        .edit-actions .card-button {
+            flex: 0 0 auto;
+            padding: 0 16px;
+            gap: 6px;
+        }
+        .edit-keys {
+            margin-left: auto;
+            font-size: 12px;
+            color: var(--lens-muted-soft);
+            white-space: nowrap;
+        }
+        .edit-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            margin: 0 14px 10px;
+            padding: 4px;
+            border: 1px solid var(--lens-line);
+            border-radius: 8px;
+        }
+        .tool {
+            flex: 0 0 auto;
+            width: 32px;
+            height: 32px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--lens-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tool:hover {
+            background: var(--lens-chip);
+            color: var(--lens-text);
+        }
+        .tool[aria-pressed='true'] {
+            background: var(--lens-accent);
+            color: var(--lens-on-accent);
+        }
+        .tool-b {
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .tool-i {
+            font-style: italic;
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 15px;
+        }
+        .tool-rule {
+            width: 1px;
+            height: 18px;
+            background: var(--lens-line);
+            margin: 0 4px;
+        }
+        .tool-note {
+            margin-left: auto;
+            padding-right: 6px;
+            font-size: 11px;
+            color: var(--lens-muted-soft);
+            white-space: nowrap;
+        }
+        .edit-link {
+            margin: 0 14px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .edit-link-label {
+            font-size: 12px;
+            color: var(--lens-muted);
+        }
+        .edit-link-row {
+            display: flex;
+            gap: 6px;
+        }
+        .edit-link-row .card-button {
+            flex: 0 0 auto;
+            height: 32px;
+            padding: 0 12px;
+        }
+        .edit-link-input {
+            flex: 1 1 auto;
+            min-width: 0;
+            height: 32px;
+            border: 1px solid var(--lens-accent);
+            border-radius: 6px;
+            padding: 0 10px;
+            background: var(--lens-surface);
+            color: var(--lens-text);
+            font-size: 13px;
+            outline: none;
+        }
+        .edit-link-input:focus-visible {
+            box-shadow:
+                0 0 0 2px var(--lens-surface),
+                0 0 0 4px var(--lens-accent);
+        }
+
+        /* "Saved to hero_title · Undo" (screen 09), in the conversation where it happened. */
+        .saved {
+            border: 1px solid var(--lens-line);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 13px;
+        }
+        .saved-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .saved-text code {
+            font-family: var(--lens-font-mono);
+            font-size: 12px;
+        }
+        .saved-undo {
+            margin-left: auto;
+            border: 0;
+            padding: 0;
+            background: transparent;
+            color: var(--lens-text);
+            font-size: 12px;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            display: flex;
+            align-items: center;
+        }
+        .saved-error {
+            margin-top: 6px;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .message-from {
+            font-size: 11px;
+            color: var(--lens-muted-soft);
         }
 
         @media (prefers-reduced-motion: no-preference) {

@@ -25,8 +25,12 @@ export interface Read {
     stem?: string;
     /** A menu item that links to this post. */
     target?: number;
+    /** Can be edited on the page (TAW\Core\Lens\FieldWriter): as plain text, or as rich text. */
+    edit?: 'text' | 'rich';
+    /** A rich-text field's formats: bold, italic, link, lists. */
+    formats?: string[];
     /** A repeater's sub-fields. */
-    subs?: Record<string, { label: string; type: string }>;
+    subs?: Record<string, { label: string; type: string; edit?: 'text' | 'rich'; formats?: string[] }>;
 }
 
 export interface MapNode {

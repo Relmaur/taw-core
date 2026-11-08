@@ -1764,9 +1764,22 @@ branch. So far:
 - **the chat:** tell Claude what to change. The message goes with what's selected, described from the source
   map (the field and where it's stored, or the file and line). Replies stream in; Claude's tool work shows as
   one quiet activity line ("Read 3 files in `Blocks/Hero/`", Details for every step); a change your Claude
-  settings would ask about shows as a card with its diff, **Apply** or **Skip**. **Stop** ends a turn.
+  settings would ask about shows as a card with its diff, **Apply** or **Skip**. **Stop** ends a turn;
+- **editing text in place:** **Edit here** on the inspect card, or double-click a selected element, and type
+  on the page; the panel shows the change as a before/after line, **Save** (Enter) and **Cancel** (Esc).
+  - A **text field** (text, long text, a repeater row's sub-field) saves straight away, as plain text (paste is
+    stripped), and the panel says "Saved to `hero_title`" with **Undo**. It needs no `taw lens`.
+  - A **rich-text field** (wysiwyg) gets a toolbar with only the formats that field allows (bold, italic,
+    link, and lists unless its `blocks` leave them out); ⌘B ⌘I ⌘K work on the page, ⌘Enter saves. A link
+    gets a row for its address, with this site's pages suggested. It saves in the classic editor's format
+    (paragraphs as blank lines, through WordPress's own `removep()`), the same as wp-admin.
+  - **Template text** is never saved by Lens: Save sends it to Claude as a message ("Sent from an edit on
+    the page"), and you apply or skip the diff as usual. Skipped, the page shows the old text again.
 
-Editing text in place comes next.
+  Lens only edits what the page shows exactly as stored, in an element holding nothing else. Otherwise
+  **Edit here** says why and where to change it (wp-admin, or Claude): images and headings in a rich-text
+  field, a long text with line breaks, text that shares its element with other markup, `'sanitize' => 'code'`
+  fields.
 
 **Starting the chat: `taw lens`.** Run it in the theme folder and leave it running; an open Lens panel
 connects on its own (it shows `taw lens` with a Copy button until then). Ctrl-C stops it.
@@ -1793,6 +1806,12 @@ How it fits together (umbrella ADR-0006 § 8):
   (against DNS rebinding) and its per-run token. A page that connects or reloads gets the session so far.
 - **The run file** `<theme>/.taw/lens/bridge.json` (owner-only, in a folder that git-ignores itself) holds the
   bridge's port and token; `.taw/lens/last-session` keeps the session for `--resume`. One bridge per theme.
+- **Fields edited on the page** are saved by `POST /wp-json/taw/v1/lens/field` (`TAW\Core\Lens\FieldWriter`),
+  under the same gate plus the object's own capability (`edit_post`, `edit_term`, `edit_user`, or
+  `manage_options` for an options page), through the same write as `taw fields:set` and an admin save.
+  The page sends the value it showed; if the field changed since, nothing is written (409). The answer
+  carries the old value for Undo (`null`: nothing was stored, the page showed the default). Each save is
+  logged as `lens.field_saved`.
 - **The page finds it** through `GET /wp-json/taw/v1/lens/bridge` (`Lens::bridgeRoute()`, `TAW\Core\Lens\Bridge`):
   registered only while Enable Lens is on, answered only under the gate (logged in, `edit_theme_options`, dev
   server), never cached. While no bridge runs, the page asks again every 3 seconds.
@@ -1832,7 +1851,10 @@ around values is **mixed**, with its pieces.
 **What it adds to the page.** One `<taw-lens>` element at the end of `<html>` whose shadow root holds the
 whole panel (its own Preact, its own styles; the site's CSS doesn't reach it and its CSS doesn't reach the
 site), and, while docked, one `<style id="taw-lens-push">` that gives `<html>` a 400px margin on that side.
-While picking, one `<style id="taw-lens-pick">` sets the crosshair cursor. Nothing else: the chat talks to
+While picking, one `<style id="taw-lens-pick">` sets the crosshair cursor. While editing in place, the one
+element being edited gets `contenteditable` and a `data-taw-lens-editing` attribute, and one
+`<style id="taw-lens-editing">` hides the browser's focus outline on it; all three go when the edit ends.
+Nothing else: the chat talks to
 127.0.0.1 from the panel, and only while `taw lens` runs.
 Layout, side, sheet position and theme are remembered per browser (`localStorage`, key `taw-lens:prefs`).
 
@@ -1848,6 +1870,7 @@ committed `assets/lens/` like the data panel. `npm run dev` there (port 5176) ta
 | `GET`  | `/taw/v1/visual-editor/fields` | Load all registered fields + current values for the editor panel |
 | `GET`  | `/taw/v1/search-posts`         | Post search for `post_select` fields |
 | `GET`  | `/taw/v1/lens/bridge`          | TAW Lens: the running bridge's address and token (only while Enable Lens is on; dev server, `edit_theme_options`) |
+| `POST` | `/taw/v1/lens/field`           | TAW Lens: save one field edited on the page (same gate, plus the object's own capability; 409 when it changed since the page loaded) |
 | `GET`  | `/taw/v1/icons`                | Lucide icon search for the `icon` field type — only registered when `Lucide::enable()` was called |
 | `POST` | `/taw/v1/chat`                 | Hybrid-RAG chatbot — see [Sovereign Hybrid-RAG Chatbot](#sovereign-hybrid-rag-chatbot). Public by default, rate-limited |
 | `GET`  | `/taw/v1/bible/books`          | Bible reader — see [Bible Reader Corpus](#bible-reader-corpus). Opt-in, rate-limited |

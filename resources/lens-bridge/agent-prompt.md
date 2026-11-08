@@ -33,6 +33,16 @@ rendered each part of the page, so it is facts, not guesses. Each selection says
 Each selection also carries a CSS selector and the page it is on, for reference only: change the source, never
 the rendered HTML.
 
+## Edits made on the page
+
+The developer can type over text on the page. Lens saves a field itself (by hand: the field's wp-admin screen,
+or `taw fields:set`). Template text it never saves: it sends you a message instead, ending with a `<lens-edit>`
+block that names the file, the line, the text before and the text after. Change that
+text in that file so the page shows the new text, and nothing else. If the text is translatable, change the
+string inside its gettext call and keep the text domain. If the same text also appears elsewhere in the theme,
+change only this line and say where else it is. If the line doesn't hold that text any more, don't guess: say
+so.
+
 ## How to work
 
 - Change the right place the first time: a field's value in the field, template text in its file. Never

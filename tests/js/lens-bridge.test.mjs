@@ -286,6 +286,17 @@ describe('the bridge', () => {
         later.close();
     });
 
+    it('marks a message the page wrote for an edit on the page, and only that', async () => {
+        const events = await stream();
+        await call('POST', '/message', { body: { text: 'Change "A" to "B".', chips: ['“A” · template text'], from: 'edit' } });
+        assert.equal((await events.next((e) => e.type === 'turn')).from, 'edit');
+        await events.next((e) => e.type === 'done');
+        await call('POST', '/message', { body: { text: 'hi', from: 'anything else' } });
+        const plain = await events.next((e) => e.type === 'turn' && e.turn === 2);
+        assert.equal('from' in plain, false);
+        events.close();
+    });
+
     it('waits for the developer’s OK before a change, and lists what changed', async () => {
         const events = await stream();
         await call('POST', '/message', { body: { text: 'edit the hero' } });

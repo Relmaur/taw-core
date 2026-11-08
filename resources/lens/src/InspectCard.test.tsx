@@ -50,7 +50,8 @@ describe('a field (screen 06, column 1)', () => {
             'href',
             '/wp-admin/post.php?post=12&action=edit',
         );
-        expect(screen.getByRole('button', { name: 'Edit here' })).toHaveAttribute('aria-disabled', 'true');
+        // No editing without the page's edit support (Edit.test.tsx covers it with the panel).
+        expect(screen.queryByRole('button', { name: 'Edit here' })).toBeNull();
     });
 
     it('names a repeater row and shows only its value', () => {
