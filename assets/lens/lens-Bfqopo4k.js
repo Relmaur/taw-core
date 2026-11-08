@@ -49,8 +49,9 @@ $1
             -webkit-font-smoothing: antialiased;
             cursor: auto;
         }
-        .lens button,
-        .lens input {
+        /* :where() keeps this reset at zero specificity, so a button's own class sets its colour
+           (.send's icon was taking the panel's text colour, the same as its background). */
+        :where(.lens button, .lens input) {
             font: inherit;
             color: inherit;
             margin: 0;
@@ -258,6 +259,10 @@ $1
         }
         .composer-input:disabled {
             cursor: not-allowed;
+        }
+        /* No focus ring on the message field (owner, 2026-11-08): the caret shows where you type. */
+        .composer-input:focus-visible {
+            outline: none;
         }
         .send {
             width: 32px;
