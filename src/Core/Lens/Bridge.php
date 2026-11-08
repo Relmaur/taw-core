@@ -23,7 +23,7 @@ final class Bridge
     public const LAST_SESSION = '.taw/lens/last-session';
 
     /** The page protocol this taw/core speaks (resources/lens-bridge/lib/bridge.mjs PROTOCOL). */
-    public const PROTOCOL = 1;
+    public const PROTOCOL = 2;
 
     /** @var (\Closure(int): bool)|null */
     private static ?\Closure $alive = null;

@@ -8,6 +8,7 @@ import { useState } from 'preact/hooks';
 import { activity, stepDetail } from './activity';
 import type { Connection } from './bridge';
 import { DROPPED, type Busy, type Chat, type Item, type Step, type Turn } from './chatModel';
+import { resumedAt, when } from './conversations';
 import { changeLines, SHOWN_MAX } from './diff';
 import { __ } from './i18n';
 import { AlertIcon, CheckIcon, FailedIcon, SpinnerIcon, UnlinkIcon } from './icons';
@@ -354,6 +355,7 @@ function TurnView({
     turn,
     last,
     working,
+    here = '',
     onAnswer,
     onRetry,
     retry,
@@ -361,6 +363,7 @@ function TurnView({
     turn: Turn;
     last: boolean;
     working: boolean;
+    here?: string;
     onAnswer(id: string, allow: boolean): void;
     onRetry(turn: Turn): void;
     retry: boolean;
@@ -377,11 +380,17 @@ function TurnView({
             <div class="message">
                 {turn.chips.length > 0 && (
                     <div class="message-chips">
-                        {turn.chips.map((chip, i) => (
-                            <span class="chip" key={i}>
-                                {chip}
-                            </span>
-                        ))}
+                        {turn.chips.map((chip, i) =>
+                            turn.page && here && turn.page !== here ? (
+                                <span class="chip chip-away" key={i} title={__('Not on this page', 'taw-core')}>
+                                    {chip}
+                                </span>
+                            ) : (
+                                <span class="chip" key={i}>
+                                    {chip}
+                                </span>
+                            ),
+                        )}
                     </div>
                 )}
                 <div class="bubble">{turn.text}</div>
@@ -417,6 +426,8 @@ function TurnView({
 /** A field saved from an edit on the page (component 05, screen 09), in the conversation where it happened. */
 export interface EditNote {
     id: number;
+    /** The id the bridge recorded this save under, so the page doesn't show it twice. */
+    key?: string;
     /** Shown after this many turns. */
     after: number;
     /** The field's name. */
@@ -425,7 +436,8 @@ export interface EditNote {
     error?: string;
 }
 
-export function SavedNote({ note, onUndo }: { note: EditNote; onUndo(id: number): void }) {
+/** `past`: a save the conversation recorded (replayed, or from another page): no Undo here. */
+export function SavedNote({ note, onUndo, past }: { note: EditNote; onUndo?(id: number): void; past?: boolean }) {
     return (
         <div class="saved">
             <div class="saved-line">
@@ -434,7 +446,7 @@ export function SavedNote({ note, onUndo }: { note: EditNote; onUndo(id: number)
                     {note.state === 'undone' ? __('Undid the change to', 'taw-core') : __('Saved to', 'taw-core')}{' '}
                     <code class="mono">{note.name}</code>
                 </span>
-                {note.state === 'saved' && (
+                {note.state === 'saved' && !past && onUndo && (
                     <button type="button" class="saved-undo" onClick={() => onUndo(note.id)}>
                         {__('Undo', 'taw-core')}
                     </button>
@@ -458,6 +470,7 @@ export function Conversation({
     chat,
     connection,
     notes = [],
+    here = '',
     onAnswer,
     onRetry,
     onTakeOver,
@@ -466,33 +479,81 @@ export function Conversation({
     chat: Chat;
     connection: Connection;
     notes?: EditNote[];
+    /** This page's path: chips sent from another page are dashed ("Not on this page"). */
+    here?: string;
     onAnswer(id: string, allow: boolean): void;
     onRetry(turn: Turn): void;
     onTakeOver(): void;
     onUndo?(id: number): void;
 }) {
     const live = connection === 'connected';
+    const count = chat.turns.length;
+    const at = (after: number, i: number) => (i < count ? after === i : after >= i);
+    const resumed = chat.resumed;
+    const own = new Set(notes.map((note) => note.key).filter(Boolean));
+    // Saves the conversation recorded that this page didn't make just now: no Undo (component 06).
+    const recorded = chat.saves.map((save, n) => ({ save, n })).filter(({ save }) => !own.has(save.id));
+    const savesAt = (i: number, part: 'all' | 'before' | 'after') =>
+        recorded
+            .filter(
+                ({ save, n }) =>
+                    at(save.after, i) &&
+                    (part === 'all' || !resumed || (part === 'before' ? n < resumed.saves : n >= resumed.saves)),
+            )
+            .map(({ save }) => (
+                <SavedNote
+                    key={`save-${save.id}`}
+                    past
+                    note={{ id: 0, after: save.after, name: save.name, state: save.undone ? 'undone' : 'saved' }}
+                />
+            ));
     const notesAt = (i: number) =>
         notes
-            .filter((note) => (i < chat.turns.length ? note.after === i : note.after >= i))
+            .filter((note) => at(note.after, i))
             .map((note) => <SavedNote key={`note-${note.id}`} note={note} onUndo={onUndo} />);
+    // Everything shown before turn i (or after the last one): saves, the resumed divider, the page's own notes.
+    const before = (i: number) =>
+        resumed && (i < count ? resumed.after === i : resumed.after >= i) ? (
+            <>
+                {savesAt(i, 'before')}
+                <div class="divider" role="separator">
+                    {resumedAt(resumed.at)}
+                </div>
+                {notesAt(i)}
+                {savesAt(i, 'after')}
+            </>
+        ) : (
+            <>
+                {savesAt(i, 'all')}
+                {notesAt(i)}
+            </>
+        );
+    const first = chat.turns[0];
     return (
         <div class="conversation" role="log" aria-label={__('Conversation', 'taw-core')}>
             {chat.busy && live && <BusyCard busy={chat.busy} takenOver={chat.takenOver} onTakeOver={onTakeOver} />}
+            {resumed && resumed.after > 0 && first && (
+                <div class="divider" role="separator">
+                    {first.at
+                        ? __('Earlier · %s', 'taw-core').replace('%s', when(first.at))
+                        : __('Earlier', 'taw-core')}
+                </div>
+            )}
             {chat.turns.map((turn, i) => (
                 <Fragment key={turn.turn}>
-                    {notesAt(i)}
+                    {before(i)}
                     <TurnView
                         turn={turn}
-                        last={i === chat.turns.length - 1}
+                        last={i === count - 1}
                         working={chat.working}
+                        here={here}
                         onAnswer={onAnswer}
                         onRetry={onRetry}
-                        retry={live && !chat.working && i === chat.turns.length - 1}
+                        retry={live && !chat.working && i === count - 1 && (!resumed || i >= resumed.after)}
                     />
                 </Fragment>
             ))}
-            {notesAt(chat.turns.length)}
+            {before(count)}
         </div>
     );
 }

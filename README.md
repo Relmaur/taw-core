@@ -1765,6 +1765,13 @@ under TAW Settings → Developer Tools → **Enable Lens**, with the theme's Vit
   map (the field and where it's stored, or the file and line). Replies stream in; Claude's tool work shows as
   one quiet activity line ("Read 3 files in `Blocks/Hero/`", Details for every step); a change your Claude
   settings would ask about shows as a card with its diff, **Apply** or **Skip**. **Stop** ends a turn;
+- **conversations** (v1.102.0, ADR-0021): the header names the conversation (its first message); its menu has
+  **New chat** and the recent conversations for this theme, each with when it was last active and how many
+  changes it made. New chat asks nothing: the conversation you leave stays in the menu. Reopening one (or
+  `taw lens --resume`) replays it in the panel, under "Earlier · …" and "Resumed …" dividers: approvals show
+  their outcome, earlier field saves have no Undo, and chips sent from another page are dashed. Switching is
+  off while Claude works or an approval waits. Each conversation is kept in the theme's ignored
+  `.taw/lens/conversations/` (the newest 50); Lens never reads Claude Code's own session files;
 - **editing text in place:** **Edit here** on the inspect card, or double-click a selected element, and type
   on the page; the panel shows the change as a before/after line, **Save** (Enter) and **Cancel** (Esc).
   - A **text field** (text, long text, a repeater row's sub-field) saves straight away, as plain text (paste is
@@ -1786,7 +1793,7 @@ connects on its own (it shows `taw lens` with a Copy button until then). Ctrl-C 
 
 ```bash
 taw lens                          # start a conversation
-taw lens --resume                 # continue the last one (or --resume=<session id>)
+taw lens --resume                 # continue the last one in the panel too (or --resume=<session id>)
 taw lens --check                  # what it would use: Node, Claude Code, the site's address
 taw lens --prompt                 # the instructions Claude gets (also the guide to doing it by hand)
 taw lens --permission-mode=default --model=sonnet --origin=https://acme.test

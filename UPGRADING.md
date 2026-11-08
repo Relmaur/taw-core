@@ -82,6 +82,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.99.2 | Sites with Wordfence (or another plugin that bundles Composer) can hit a random "critical error": update |
 | < v1.100 | Content snapshots name featured images by path (schema 1.9); update Local and production together before publishing |
 | < v1.101 | TAW Settings → Developer Tools gains "Enable Lens" (off); `taw upgrade --apply` adds it to `inc/options.php` |
+| < v1.102 | Restart `taw lens` after updating (Lens page protocol 2) |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -1018,6 +1019,17 @@ while the toggle is on: `GET taw/v1/lens/bridge` and `POST taw/v1/lens/field`.
 right after Enable CSS Studio (and to the Developer Tools tab). It edits only a file that still has the scaffold's
 shape; otherwise it prints the line to add by hand. Commit the change with the update. `.taw/` (Lens's run file) is
 ignored by the folder's own `.gitignore`. **Undo:** none needed; the toggle is off until someone ticks it.
+
+### v1.102.0: TAW Lens conversations
+
+**What changed.** The Lens panel's header names the conversation; its menu starts a new one or reopens a recent
+one, and a reopened conversation (or `taw lens --resume`) replays in the panel. `taw lens` keeps each conversation
+in `.taw/lens/conversations/` (inside the self-ignored `.taw/lens/`, files `0600`, the newest 50 kept). The page
+protocol is now 2: two new bridge routes, `POST /conversation` and `POST /note`, on the local bridge only.
+
+**Check:** restart `taw lens` after the update; an open page shows "Restart needed" until it runs the same
+version. Nothing to migrate, and nothing changes on a site without Lens on. **Undo:** none needed; deleting
+`.taw/lens/conversations/` only empties the menu.
 
 ## Opt-in features you may want
 

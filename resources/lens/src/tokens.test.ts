@@ -24,6 +24,8 @@ const PAIRS: [fg: keyof LensTokens, bg: keyof LensTokens, min: number, what: str
     ['mutedSoft', 'surface', 4.5, 'quiet text'],
     ['text', 'bubble', 4.5, 'your message'],
     ['text', 'chip', 4.5, 'chip label'],
+    ['text', 'bubble', 4.5, 'the current conversation in the menu'],
+    ['muted', 'bubble', 4.5, 'a menu row’s detail on the current row'],
     ['muted', 'chip', 4.5, 'chip secondary label'],
     ['onAccent', 'accent', 4.5, 'primary button label'],
     ['accent', 'surface', 3, 'focus ring and selection on the panel'],
@@ -44,9 +46,11 @@ describe.each([
         expect(contrast(tokens[fg], tokens[bg])).toBeGreaterThanOrEqual(min);
     });
 
-    it('are all hex colours', () => {
-        for (const value of Object.values(tokens)) {
-            expect(() => parseHex(value)).not.toThrow();
+    it('are all hex colours (shadows aside)', () => {
+        for (const [name, value] of Object.entries(tokens)) {
+            if (!name.endsWith('Shadow')) {
+                expect(() => parseHex(value)).not.toThrow();
+            }
         }
     });
 });

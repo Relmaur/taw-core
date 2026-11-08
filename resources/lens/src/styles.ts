@@ -1352,6 +1352,172 @@ export const panelCss = (): string =>
             color: var(--lens-muted-soft);
         }
 
+        /* The conversation menu (component 06, screen 15): the header's title button and its menu. */
+        .conv-title {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            min-width: 0;
+            max-width: 136px;
+            height: 28px;
+            padding: 0 6px 0 8px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--lens-text);
+            font: 500 13px var(--lens-font-ui);
+            cursor: pointer;
+        }
+        .conv-title:hover,
+        .conv-title[aria-expanded='true'] {
+            background: var(--lens-chip);
+        }
+        .conv-title-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .conv-title svg {
+            flex: 0 0 auto;
+        }
+        .conv-menu {
+            position: absolute;
+            top: 58px;
+            left: 12px;
+            z-index: 2;
+            width: 312px;
+            max-width: calc(100% - 24px);
+            max-height: calc(100% - 70px);
+            overflow-y: auto;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 6px;
+            background: var(--lens-surface);
+            border: 1px solid var(--lens-line);
+            border-radius: 10px;
+            box-shadow: var(--lens-menu-shadow);
+        }
+        .panel[data-mode='sheet'] .conv-menu {
+            top: 54px;
+        }
+        .conv-new,
+        .conv-item {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            border: 0;
+            border-radius: 6px;
+            padding: 8px 10px;
+            background: transparent;
+            color: var(--lens-text);
+            text-align: left;
+            font: 500 13px var(--lens-font-ui);
+            cursor: pointer;
+        }
+        .conv-new {
+            align-items: center;
+        }
+        .conv-item {
+            align-items: flex-start;
+        }
+        .conv-new:hover,
+        .conv-item:hover,
+        .conv-item[aria-checked='true'] {
+            background: var(--lens-bubble);
+        }
+        .conv-new[aria-disabled='true'],
+        .conv-item[aria-disabled='true'] {
+            color: var(--lens-muted-soft);
+            background: transparent;
+            cursor: default;
+        }
+        .conv-reason {
+            padding: 2px 10px 6px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--lens-text);
+        }
+        .conv-rule {
+            height: 1px;
+            margin: 4px;
+            background: var(--lens-line);
+        }
+        .conv-label {
+            padding: 6px 10px 2px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--lens-muted);
+        }
+        .conv-tick {
+            display: flex;
+            flex: 0 0 14px;
+            padding-top: 2px;
+        }
+        .conv-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+        .conv-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .conv-detail {
+            font-weight: 400;
+            font-size: 12px;
+            color: var(--lens-muted);
+        }
+        .conv-empty {
+            padding: 4px 10px 8px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--lens-muted-soft);
+        }
+        .conv-host {
+            padding: 6px 10px 4px;
+            font-family: var(--lens-font-mono);
+            font-size: 11px;
+            color: var(--lens-muted-soft);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        /* A replayed conversation: the dividers, and chips for what isn't on this page. */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 11px;
+            color: var(--lens-muted-soft);
+        }
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1 1 auto;
+            height: 1px;
+            background: var(--lens-line);
+        }
+        .chip.chip-away {
+            background: transparent;
+            border: 1px dashed var(--lens-button-line);
+            color: var(--lens-muted-soft);
+            padding: 2px 7px;
+        }
+        .opening {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 20px 20px 0;
+            font-size: 12px;
+            color: var(--lens-muted-soft);
+        }
+
         @media (prefers-reduced-motion: no-preference) {
             .icon-button,
             .send,

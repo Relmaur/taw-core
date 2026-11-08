@@ -12,7 +12,9 @@ if (process.env.FAKE_CLAUDE_ARGS) {
     writeFileSync(process.env.FAKE_CLAUDE_ARGS, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd() }));
 }
 
-const session = 'fake-session-1';
+// Its session: the one it resumes (`--resume <id>`), else FAKE_CLAUDE_SESSION, else fake-session-1.
+const resumeAt = process.argv.indexOf('--resume');
+const session = resumeAt > 0 ? process.argv[resumeAt + 1] : (process.env.FAKE_CLAUDE_SESSION ?? 'fake-session-1');
 const out = (ev) => process.stdout.write(`${JSON.stringify({ ...ev, session_id: session })}\n`);
 const waiting = new Map();
 let n = 0;

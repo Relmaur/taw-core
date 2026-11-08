@@ -95,6 +95,10 @@ export class Agent extends EventEmitter {
         let buffer = '';
         child.stdout.setEncoding('utf8');
         child.stdout.on('data', (chunk) => {
+            // A process left behind by reset() may still be talking: it belongs to another conversation.
+            if (this.child !== child) {
+                return;
+            }
             buffer += chunk;
             let end;
             while ((end = buffer.indexOf('\n')) >= 0) {
@@ -107,16 +111,19 @@ export class Agent extends EventEmitter {
         });
         child.stderr.setEncoding('utf8');
         child.stderr.on('data', (chunk) => {
-            this.stderr = (this.stderr + chunk).slice(-8000);
+            if (this.child === child) {
+                this.stderr = (this.stderr + chunk).slice(-8000);
+            }
         });
         child.stdin.on('error', () => {});
         child.on('error', (error) => {
             this.stderr += `\n${error.message}`;
         });
         child.on('close', (code) => {
-            if (this.child === child) {
-                this.child = null;
+            if (this.child !== child) {
+                return;
             }
+            this.child = null;
             this.emit('exit', code, this.stderr);
         });
 
@@ -186,6 +193,22 @@ export class Agent extends EventEmitter {
     interrupt() {
         this.requests += 1;
         this.write({ type: 'control_request', request_id: `lens-stop-${this.requests}`, request: { subtype: 'interrupt' } });
+    }
+
+    /**
+     * Another conversation: ends this process and starts one for `session` (resumed), or for a new session (null).
+     * The old process gets no say any more: its last lines and its exit are ignored.
+     */
+    reset(session) {
+        const child = this.child;
+        this.child = null;
+        this.session = session || null;
+        if (child) {
+            child.stdin.end();
+            const timer = setTimeout(() => child.kill('SIGTERM'), 2000);
+            timer.unref();
+        }
+        this.start();
     }
 
     /** Ends the process (the session is kept on disk, so a later start resumes it). */

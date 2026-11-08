@@ -133,6 +133,31 @@ describe('editing a text field in place (screen 08)', () => {
         expect(document.querySelector('.saved')).toHaveTextContent('Undid the change to hero_heading');
     });
 
+    it('records a save (and its undo) in the conversation while connected, and doesn’t show it twice', async () => {
+        const { pick, typeOnPage, send, emit, connect } = setup((body) => ({
+            ok: true,
+            saved: (body as { value: string }).value,
+            previous: 'Point at anything',
+            isDefault: false,
+        }));
+        connect();
+        pick('h1');
+        editHere();
+        typeOnPage('h1', 'Point and tell');
+        fireEvent.keyDown($('h1'), { key: 'Enter' });
+        await flush();
+        const note = send.mock.calls.find(([path]) => path === '/note')?.[1] as { id: string; name: string };
+        expect(note).toMatchObject({ name: 'hero_heading' });
+        expect(note.id).toMatch(/^[a-z0-9]+-1$/);
+        emit({ type: 'saved', id: note.id, name: 'hero_heading' });
+        expect(document.querySelectorAll('.saved')).toHaveLength(1);
+        expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+        await flush();
+        expect(send).toHaveBeenLastCalledWith('/note', { id: note.id, name: 'hero_heading', undone: true });
+    });
+
     it('Esc or Cancel puts the text back and saves nothing', () => {
         const { pick, typeOnPage, save } = setup();
         pick('h1');

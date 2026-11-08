@@ -19,6 +19,26 @@ export interface ApprovalInput {
     json?: string;
 }
 
+/** One conversation in the menu (taw-core ADR-0021). `id` is '' for a new one Claude hasn't named yet. */
+export interface ConversationInfo {
+    id: string;
+    title: string;
+    /** When it was last active (ISO), if known. */
+    at: string | null;
+    /** Files Claude changed and fields saved from the page, each counted once. */
+    changes: number;
+    current: boolean;
+}
+
+/** A field saved from the page, as the conversation recorded it (no Undo: that's the page's own note). */
+export interface Save {
+    id: string;
+    name: string;
+    undone: boolean;
+    /** Shown after this many turns. */
+    after: number;
+}
+
 export type BridgeEvent =
     | {
           type: 'hello';
@@ -28,8 +48,9 @@ export type BridgeEvent =
           busy: Busy | null;
           takenOver: boolean;
           history: BridgeEvent[];
+          conversations?: ConversationInfo[];
       }
-    | { type: 'turn'; turn: number; text: string; chips: string[]; from?: 'edit' }
+    | { type: 'turn'; turn: number; text: string; chips: string[]; from?: 'edit'; at?: string; page?: string }
     | { type: 'text'; turn: number; delta: string }
     | { type: 'tool'; turn: number; id: string; name: string; kind: StepKind; target: string }
     | { type: 'tool-done'; turn: number; id: string; ok: boolean }
@@ -42,8 +63,13 @@ export type BridgeEvent =
           message: string;
           detail?: string;
           changed: string[];
+          at?: string;
       }
-    | { type: 'busy'; busy: Busy | null; takenOver: boolean };
+    | { type: 'busy'; busy: Busy | null; takenOver: boolean }
+    | { type: 'saved'; id: string; name: string; undone?: boolean; at?: string }
+    /** The conversation was reopened here: what came before is its replayed history. */
+    | { type: 'resumed'; at: string }
+    | { type: 'conversations'; conversations: ConversationInfo[] };
 
 export type StepKind = 'read' | 'search' | 'edit' | 'write' | 'run' | 'skill' | 'plan' | 'other';
 
@@ -74,6 +100,9 @@ export interface Turn {
     chips: string[];
     /** The page wrote this message for an edit made on the page (template text). */
     from?: 'edit';
+    /** When it was sent (ISO), and the path of the page it was sent from. */
+    at?: string;
+    page?: string;
     items: Item[];
     outcome?: 'ok' | 'stopped' | 'error';
     message?: string;
@@ -87,9 +116,25 @@ export interface Chat {
     busy: Busy | null;
     takenOver: boolean;
     session: string | null;
+    conversations: ConversationInfo[];
+    saves: Save[];
+    /**
+     * Where a reopened conversation's replayed history ends: after this many turns and recorded saves, and
+     * when it was reopened.
+     */
+    resumed: { after: number; saves: number; at: string } | null;
 }
 
-export const emptyChat: Chat = { turns: [], working: false, busy: null, takenOver: false, session: null };
+export const emptyChat: Chat = {
+    turns: [],
+    working: false,
+    busy: null,
+    takenOver: false,
+    session: null,
+    conversations: [],
+    saves: [],
+    resumed: null,
+};
 
 /** A turn the connection dropped in the middle of: ended as an error, with what it had changed so far. */
 export const DROPPED = 'connection';
@@ -124,7 +169,11 @@ export function reduce(chat: Chat, event: BridgeEvent): Chat {
     switch (event.type) {
         case 'hello':
             return {
-                ...event.history.reduce(reduce, { ...emptyChat, session: event.session }),
+                ...event.history.reduce(reduce, {
+                    ...emptyChat,
+                    session: event.session,
+                    conversations: event.conversations ?? [],
+                }),
                 working: event.working,
                 busy: event.busy,
                 takenOver: event.takenOver,
@@ -142,6 +191,8 @@ export function reduce(chat: Chat, event: BridgeEvent): Chat {
                         chips: event.chips ?? [],
                         items: [],
                         ...(event.from === 'edit' ? { from: 'edit' as const } : {}),
+                        ...(event.at ? { at: event.at } : {}),
+                        ...(event.page ? { page: event.page } : {}),
                     },
                 ],
             };
@@ -233,6 +284,23 @@ export function reduce(chat: Chat, event: BridgeEvent): Chat {
             }));
         case 'busy':
             return { ...chat, busy: event.busy, takenOver: event.takenOver };
+        case 'saved':
+            return chat.saves.some((s) => s.id === event.id)
+                ? {
+                      ...chat,
+                      saves: chat.saves.map((s) => (s.id === event.id ? { ...s, undone: event.undone === true } : s)),
+                  }
+                : {
+                      ...chat,
+                      saves: [
+                          ...chat.saves,
+                          { id: event.id, name: event.name, undone: event.undone === true, after: chat.turns.length },
+                      ],
+                  };
+        case 'resumed':
+            return { ...chat, resumed: { after: chat.turns.length, saves: chat.saves.length, at: event.at } };
+        case 'conversations':
+            return { ...chat, conversations: event.conversations };
         default:
             return chat;
     }
