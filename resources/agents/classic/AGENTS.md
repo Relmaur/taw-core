@@ -1874,6 +1874,18 @@ When a session is active, this agent applies incoming changes following the TAW-
 
 ---
 
+## TAW Lens (Development)
+
+TAW Lens (taw/core 1.101+) is taw/core's own dev-only panel on the site's frontend: point at anything, see what TAW knows about it (field, template text, block, files), tell Claude what to change, or edit text in place.
+
+**Toggle:** WP Admin → TAW Settings → Developer Tools → Enable Lens
+**Requires:** Vite dev server running (`npm run dev`), a user who can `edit_theme_options`
+**Start the chat:** `taw lens` in the theme folder (Node 20+, Claude Code 2.1.319+); `taw lens --resume` continues the last conversation
+
+When you are the agent behind Lens, your instructions are `vendor/taw/core/resources/lens-bridge/agent-prompt.md` (`taw lens --prompt`): read the `<lens-selections>` block as facts from the source map; change a field's value with `taw fields:set`, never in the template; template text edited on the page arrives as a `<lens-edit>` block (change that line only). Lens saves fields edited on the page itself (`POST taw/v1/lens/field`). Lens never runs in production.
+
+---
+
 ## Tech Stack
 
 | Technology | Version | Purpose |

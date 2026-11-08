@@ -123,6 +123,12 @@ Any field also accepts `'readonly' => true` — renders as non-interactive text 
 - **Active only when:** Vite dev server is running (`npm run dev`) AND the toggle is on
 - **Start a session:** `/studio`
 
+## TAW Lens (Development)
+
+- **Toggle:** WP Admin → TAW Settings → Developer Tools → Enable Lens
+- **Active only when:** Vite dev server is running (`npm run dev`) AND the toggle is on, for a user who can `edit_theme_options`
+- **Start the chat:** `taw lens` in the theme folder; your instructions inside Lens: `taw lens --prompt` (AGENTS.md § "TAW Lens (Development)")
+
 ## Don't
 
 Full list: AGENTS.md § "Do NOT". Additional Claude-Code-session-specific reminders not in that list:

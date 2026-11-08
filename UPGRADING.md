@@ -81,6 +81,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.93 | Theme CI fails when a database dump, snapshot or credentials file is committed |
 | < v1.99.2 | Sites with Wordfence (or another plugin that bundles Composer) can hit a random "critical error": update |
 | < v1.100 | Content snapshots name featured images by path (schema 1.9); update Local and production together before publishing |
+| < v1.101 | TAW Settings → Developer Tools gains "Enable Lens" (off); `taw upgrade --apply` adds it to `inc/options.php` |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -1004,12 +1005,27 @@ the importing user keep that author: re-pull `--with-users`, or set them by hand
 needs production on v1.100.0 too:** an older production looks a featured image's path up by its name (taw-fleet
 1.34.1+ refuses to publish to it). Update it with the same release (`u`, then merge and deploy). **Undo:** none needed.
 
+### v1.101.0: TAW Lens (dev-only)
+
+**What changed.** TAW Lens, a dev-only panel on a classic site's frontend: pick anything to see what TAW knows about
+it (the field and where it's stored, template text with its file and line, a block's files), talk to Claude about
+it (`taw lens` runs your own Claude Code in the theme folder), and edit text in place (fields save at once with Undo;
+template text goes to Claude as a diff). It loads only with the Vite dev server running, the new **Enable Lens**
+toggle on, and a user who can `edit_theme_options`; otherwise the page is byte-identical. Two REST routes exist only
+while the toggle is on: `GET taw/v1/lens/bridge` and `POST taw/v1/lens/field`.
+
+**Check:** `taw upgrade --apply` runs the `1.101.0/lens-toggle` migration, which adds the toggle to `inc/options.php`
+right after Enable CSS Studio (and to the Developer Tools tab). It edits only a file that still has the scaffold's
+shape; otherwise it prints the line to add by hand. Commit the change with the update. `.taw/` (Lens's run file) is
+ignored by the folder's own `.gitignore`. **Undo:** none needed; the toggle is off until someone ticks it.
+
 ## Opt-in features you may want
 
 These appeared since v1.22, and none is on until the site asks for it:
 - **Fields:** the data panel (`"ui": "panel"`), the `link` field, and term and user fieldsets.
 - **Reading and REST:** typed reads (`Taw::post()`), Block Bindings (`taw/field`), and options over REST.
 - **Content:** content snapshots (`bin/taw content:export` / `content:import`).
+- **Development:** TAW Lens (Enable Lens, then `taw lens`): point at the page, talk to Claude, edit text in place.
 - **Lockdown:** editing policies (`Boot::editing()`), including `allowBound` for field-only blocks.
 - **Integrations:** Lucide icons (`Lucide::enable()`), media folders (`MediaFolders::enable()`), the
   RAG chatbot, and the Bible, Catechism and Code of Canon Law readers.

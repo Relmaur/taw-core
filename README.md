@@ -1744,11 +1744,11 @@ Annotations give the editor a direct DOM reference, making live updates exact an
 
 ---
 
-## TAW Lens (in development)
+## TAW Lens
 
-A dev-only tool for classic TAW themes: point at anything on the site's frontend and tell Claude what to
-change (umbrella ADR-0006, taw-core ADR-0020; issue #221). It's being built in steps on the `feature/lens`
-branch. So far:
+A dev-only tool for classic TAW themes (since v1.101.0): point at anything on the site's frontend and tell
+Claude what to change, or edit its text in place (umbrella ADR-0006, taw-core ADR-0020; #221). Turn it on
+under TAW Settings → Developer Tools → **Enable Lens**, with the theme's Vite dev server running. What it does:
 - **the panel:** docked on either edge and pushing the page, or a floating sheet you drag by its header and
   drop on an edge to dock it, or hidden behind a small tab; light and dark themes that follow the system
   unless you pick one;
