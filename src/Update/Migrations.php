@@ -23,6 +23,7 @@ final class Migrations
             new Migrations\AgentDocsToCore(),
             new Migrations\ConfigsToCore(),
             new Migrations\PreCommitHook(),
+            new Migrations\LensToggle(),
         ], self::$added);
     }
 

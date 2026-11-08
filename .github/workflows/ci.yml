@@ -95,6 +95,36 @@ jobs:
           git status --porcelain -- assets/data-panel
           test -z "$(git status --porcelain -- assets/data-panel)" || { echo "assets/data-panel is stale: run npm run build in resources/data-panel and commit it."; exit 1; }
 
+  # TAW Lens page script (ADR-0020): same shape as data-panel.
+  lens:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: resources/lens
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: resources/lens/package-lock.json
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint, format, typecheck, Vitest, build
+        run: npm run check
+
+      # The build is committed (ADR-0020): a fresh one must match it exactly.
+      - name: Committed build is current
+        working-directory: .
+        run: |
+          git status --porcelain -- assets/lens
+          test -z "$(git status --porcelain -- assets/lens)" || { echo "assets/lens is stale: run npm run build in resources/lens and commit it."; exit 1; }
+
   # Content interchange fidelity: a real two-site round trip (tests/fidelity/run.sh).
   # Site A is seeded with everything an import has to carry by natural key, exported,
   # and imported into site B (its IDs offset); a second import must report 0 changes,

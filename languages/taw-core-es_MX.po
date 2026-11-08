@@ -119,6 +119,11 @@ msgstr "%d mensajes por minuto"
 msgid "%d of %d records would change. Nothing has been written."
 msgstr "Cambiarían %d de %d registros. Todavía no se ha escrito nada."
 
+#: resources/lens/src/InspectCard.tsx
+#, php-format
+msgid "%d rows"
+msgstr "%d filas"
+
 #. translators: %s: a field label. The numeric entry binds core/image's attachment ID.
 #: src/Core/Bindings/EditorFields.php
 #, php-format
@@ -202,6 +207,10 @@ msgstr "(se agrega a todas las listas de permitidos)"
 msgid "(empty for this post)"
 msgstr "(vacío en esta entrada)"
 
+#: resources/lens/src/EditCard.tsx resources/lens/src/InspectCard.tsx
+msgid "(empty)"
+msgstr "(vacío)"
+
 #: src/Core/Metabox/Metabox.php
 msgid "(new tab)"
 msgstr "(nueva pestaña)"
@@ -232,6 +241,10 @@ msgstr "0 = sin páginas. Cada bucle pagina por su cuenta."
 msgid "0.25 as 25%."
 msgstr "0.25 como 25%."
 
+#: resources/lens/src/InspectCard.tsx
+msgid "1 row"
+msgstr "1 fila"
+
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "@ value"
 msgstr "@ valor"
@@ -243,6 +256,15 @@ msgstr "@( fórmula )"
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "@if( … )"
 msgstr "@if( … )"
+
+#: resources/lens/src/Chat.tsx
+msgid "A Claude session holds the theme."
+msgstr "Una sesión de Claude tiene el tema."
+
+#: resources/lens/src/Chat.tsx
+#, php-format
+msgid "A Claude session started at %s holds the theme."
+msgstr "Una sesión de Claude iniciada a las %s tiene el tema."
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "A capital first letter."
@@ -360,6 +382,10 @@ msgstr "Agregar grupo"
 msgid "Add item"
 msgstr "Agregar elemento"
 
+#: resources/lens/src/EditCard.tsx
+msgid "Add link"
+msgstr "Agregar enlace"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Add page links"
 msgstr "Agregar enlaces de páginas"
@@ -380,6 +406,10 @@ msgstr "Agregar seleccionados"
 msgid "Add to the expression"
 msgstr "Añadir a la expresión"
 
+#: resources/lens/src/Chat.tsx
+msgid "Added:"
+msgstr "Agregado:"
+
 #: src/Core/Seo/SeoMeta.php
 msgid "Adds noindex — the page stays live but search engines are asked not to list it."
 msgstr "Agrega noindex: la página sigue publicada, pero se pide a los buscadores que no la muestren."
@@ -391,6 +421,10 @@ msgstr "Suma los números."
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Advanced"
 msgstr "Avanzado"
+
+#: resources/lens/src/EditCard.tsx
+msgid "After:"
+msgstr "Después:"
 
 #: src/Core/Media/MediaFolders.php
 msgid "All Files"
@@ -404,9 +438,17 @@ msgstr "Todas las carpetas"
 msgid "All terms"
 msgstr "Todos los términos"
 
+#: resources/lens/src/Chat.tsx
+msgid "Allow"
+msgstr "Permitir"
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Allowed blocks"
 msgstr "Bloques permitidos"
+
+#: resources/lens/src/EditCard.tsx
+msgid "Allowed by this field"
+msgstr "Permitidos por este campo"
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Also apply environment-settings options (permalinks, timezone, sticky posts, …)"
@@ -424,6 +466,10 @@ msgstr "Siempre desactivado: dejarlo todo a otro plugin de SEO"
 msgid "Always on — ignore detection, always use TAW's own SEO output"
 msgstr "Siempre activado: ignorar la detección y usar siempre el SEO de TAW"
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Ambiguous"
+msgstr "Ambiguo"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "An empty item to design yourself."
 msgstr "Un elemento vacío para diseñarlo tú."
@@ -432,11 +478,20 @@ msgstr "Un elemento vacío para diseñarlo tú."
 msgid "Anchor (id)"
 msgstr "Ancla (id)"
 
+#: resources/lens/src/Chat.tsx
+msgid "Another Claude session is editing this theme"
+msgstr "Otra sesión de Claude está editando este tema"
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Any .sqlite file uploaded here becomes searchable by the chatbot — every table and text column is chunked, embedded, and semantically searched. No particular schema is required."
 msgstr "Cualquier archivo .sqlite que subas aquí se vuelve consultable por el chatbot: cada tabla y columna de texto se divide en fragmentos, se vectoriza y se busca por significado. No se requiere ningún esquema en particular."
 
-#: resources/data-panel/src/rich/MiniEditor.tsx
+#: resources/lens/src/Chat.tsx
+#, php-format
+msgid "Applied: %s"
+msgstr "Aplicado: %s"
+
+#: resources/data-panel/src/rich/MiniEditor.tsx resources/lens/src/Chat.tsx
 msgid "Apply"
 msgstr "Aplicar"
 
@@ -477,9 +532,21 @@ msgstr "Automático: detectar Yoast/RankMath/SmartCrawl y hacerse a un lado si a
 msgid "Back"
 msgstr "Atrás"
 
+#: resources/lens/src/Tree.tsx
+msgid "Back to chat"
+msgstr "Volver al chat"
+
 #: resources/data-panel/src/bindings/DynamicSettings.tsx
 msgid "Background"
 msgstr "Fondo"
+
+#: resources/lens/src/EditCard.tsx
+msgid "Before:"
+msgstr "Antes:"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Block"
+msgstr "Bloque"
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Block text"
@@ -489,9 +556,17 @@ msgstr "Texto del bloque"
 msgid "Block text:"
 msgstr "Texto del bloque:"
 
+#: resources/lens/src/EditCard.tsx
+msgid "Bold"
+msgstr "Negritas"
+
 #: resources/data-panel/src/bindings/DynamicSettings.tsx
 msgid "Border color"
 msgstr "Color del borde"
+
+#: resources/lens/src/EditCard.tsx
+msgid "Bulleted list"
+msgstr "Lista con viñetas"
 
 #: resources/data-panel/src/bindings/targets.ts
 msgid "Button text"
@@ -505,7 +580,7 @@ msgstr "Exención"
 msgid "Calls"
 msgstr "Llamadas"
 
-#: resources/data-panel/src/rich/MiniEditor.tsx src/Core/Content/ContentAdminScreen.php
+#: resources/data-panel/src/rich/MiniEditor.tsx resources/lens/src/Chat.tsx resources/lens/src/EditCard.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Cancel"
 msgstr "Cancelar"
 
@@ -521,9 +596,14 @@ msgstr "Tarjetas"
 msgid "Categories, tags or any taxonomy: the post’s own, or all of them."
 msgstr "Categorías, etiquetas o cualquier taxonomía: las de la entrada o todas."
 
-#: resources/data-panel/src/controls/PostSelect.tsx
+#: resources/data-panel/src/controls/PostSelect.tsx resources/lens/src/EditCard.tsx
 msgid "Change"
 msgstr "Cambiar"
+
+#: resources/lens/src/edit.ts
+#, php-format
+msgid "Change \"%1$s\" to \"%2$s\"."
+msgstr "Cambia \"%1$s\" por \"%2$s\"."
 
 #: src/Core/Content/ContentAdminScreen.php
 #, php-format
@@ -602,9 +682,49 @@ msgstr "Fragmentos"
 msgid "Classes"
 msgstr "Clases"
 
+#: resources/lens/src/Panel.tsx
+msgid "Claude finished"
+msgstr "Claude terminó"
+
+#: resources/lens/src/Panel.tsx
+msgid "Claude is still working on the last message"
+msgstr "Claude sigue trabajando en el último mensaje"
+
+#: resources/lens/src/Panel.tsx
+msgid "Claude is still working on the last message. Save when it’s done."
+msgstr "Claude sigue trabajando en el último mensaje. Guarda cuando termine."
+
+#: resources/lens/src/Panel.tsx
+msgid "Claude is working…"
+msgstr "Claude está trabajando…"
+
+#: resources/lens/src/Panel.tsx
+msgid "Claude needs your OK for a change"
+msgstr "Claude necesita tu visto bueno para un cambio"
+
+#: resources/lens/src/Chat.tsx
+msgid "Claude reported an error."
+msgstr "Claude reportó un error."
+
+#: resources/lens/src/Chat.tsx resources/lens/src/Panel.tsx
+msgid "Claude stopped before finishing"
+msgstr "Claude se detuvo antes de terminar"
+
 #: resources/data-panel/src/controls/PickerControls.tsx src/Core/Media/MediaFolders.php
 msgid "Clear"
 msgstr "Borrar"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Clear selection"
+msgstr "Borrar selección"
+
+#: resources/lens/src/Panel.tsx
+msgid "Click"
+msgstr "Clic"
+
+#: resources/lens/src/Panel.tsx
+msgid "Click an element to see what TAW knows about it, or open the structure tree. Then tell Claude what to change."
+msgstr "Haz clic en un elemento para ver lo que TAW sabe de él, o abre el árbol de estructura. Luego dile a Claude qué cambiar."
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Click into the text where the value should go, then open this again."
@@ -668,6 +788,10 @@ msgstr "Conectar a campo TAW"
 msgid "Connect to TAW field…"
 msgstr "Conectar a campo TAW…"
 
+#: resources/lens/src/Panel.tsx
+msgid "Connecting…"
+msgstr "Conectando…"
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Content the theme shows from its code while a field is empty. Saving writes it into those empty fields, so it can be edited here and travels with exports. Fields that have a value are never touched."
 msgstr "Contenido que el tema muestra desde su código mientras un campo está vacío. Al guardarlo se escribe en esos campos vacíos, para que pueda editarse aquí y viaje con las exportaciones. Los campos que ya tienen un valor nunca se tocan."
@@ -676,9 +800,26 @@ msgstr "Contenido que el tema muestra desde su código mientras un campo está v
 msgid "Content, per post type"
 msgstr "Contenido, por tipo de contenido"
 
+#: resources/lens/src/Chat.tsx
+msgid "Conversation"
+msgstr "Conversación"
+
+#: resources/lens/src/Chat.tsx
+msgid "Copied"
+msgstr "Copiado"
+
+#: resources/lens/src/Chat.tsx
+msgid "Copy"
+msgstr "Copiar"
+
 #: src/Core/Rag/Usage/UsageAdminScreen.php
 msgid "Cost"
 msgstr "Costo"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Couldn’t read %s"
+msgstr "No pudo leer %s"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Current year"
@@ -736,9 +877,32 @@ msgstr "Descripción"
 msgid "Design"
 msgstr "Diseño"
 
+#: resources/lens/src/Chat.tsx
+msgid "Details"
+msgstr "Detalles"
+
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Did you mean"
 msgstr "¿Quisiste decir"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Didn’t edit %s"
+msgstr "No editó %s"
+
+#: resources/lens/src/Chat.tsx
+msgid "Didn’t finish"
+msgstr "No terminó"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Didn’t run %s"
+msgstr "No ejecutó %s"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Didn’t write %s"
+msgstr "No escribió %s"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Direction"
@@ -768,7 +932,11 @@ msgstr "Mostrar los ID de carpeta"
 msgid "Division by zero."
 msgstr "División entre cero."
 
-#: resources/data-panel/src/bindings/DynamicSettings.tsx
+#: resources/lens/src/Panel.tsx
+msgid "Dock as Inspector"
+msgstr "Fijar como inspector"
+
+#: resources/data-panel/src/bindings/DynamicSettings.tsx resources/lens/src/Chat.tsx
 msgid "Done"
 msgstr "Listo"
 
@@ -788,13 +956,52 @@ msgstr "Suelta aquí para subir"
 msgid "Edit"
 msgstr "Editar"
 
+#: resources/lens/src/Chat.tsx
+msgid "Edit 1 file"
+msgstr "Editar 1 archivo"
+
 #: src/Core/Editor/VisualEditor.php
 msgid "Edit Visually"
 msgstr "Editar visualmente"
 
+#: resources/lens/src/Panel.tsx
+msgid "Edit cancelled"
+msgstr "Edición cancelada"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Edit here"
+msgstr "Editar aquí"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Edit the text on the page (or double-click it)"
+msgstr "Edita el texto en la página (o haz doble clic en él)"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Edited %s"
+msgstr "Editó %s"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Editing %s"
+msgstr "Editando %s"
+
+#: resources/lens/src/EditCard.tsx
+msgid "Editing on the page"
+msgstr "Editando en la página"
+
+#: resources/lens/src/Panel.tsx
+#, php-format
+msgid "Editing · %s"
+msgstr "Editando · %s"
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Editor features"
 msgstr "Funciones del editor"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Element"
+msgstr "Elemento"
 
 #: src/Core/Metabox/Metabox.php
 msgid "Empty"
@@ -807,6 +1014,18 @@ msgstr "Vacío en esta entrada: no cambia nada."
 #: src/Core/Auth/PagePassword.php
 msgid "Enter"
 msgstr "Entrar"
+
+#: resources/lens/src/Panel.tsx
+msgid "Enter saves, Esc cancels."
+msgstr "Enter guarda, Esc cancela."
+
+#: resources/lens/src/Panel.tsx
+msgid "Esc"
+msgstr "Esc"
+
+#: resources/lens/src/Panel.tsx
+msgid "Esc cancels."
+msgstr "Esc cancela."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Every field with a default already has a value."
@@ -853,7 +1072,7 @@ msgstr "Si está vacío, se usa el título del sitio."
 msgid "Feeds the \"sameAs\" entity signal — link every profile that represents this same organization/brand (LinkedIn, Instagram, etc.)."
 msgstr "Alimenta la señal de entidad “sameAs”: enlaza cada perfil que represente a esta misma organización o marca (LinkedIn, Instagram, etc.)."
 
-#: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Content/ContentAdminScreen.php
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/lens/src/EditCard.tsx resources/lens/src/InspectCard.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Field"
 msgstr "Campo"
 
@@ -885,6 +1104,10 @@ msgstr "Texto de campo"
 msgid "Fields"
 msgstr "Campos"
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Fields:"
+msgstr "Campos:"
+
 #. translators: %d: attachment ID.
 #: resources/data-panel/src/controls/MediaControls.tsx
 #, php-format
@@ -897,9 +1120,13 @@ msgstr "Archivo #%d (no encontrado)"
 msgid "Fill in the required data before saving: %s."
 msgstr "Completa los datos requeridos antes de guardar: %s."
 
-#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/lens/src/Tree.tsx
 msgid "Filter"
 msgstr "Filtro"
+
+#: resources/lens/src/Tree.tsx
+msgid "Filter blocks, fields, files…"
+msgstr "Filtrar bloques, campos, archivos…"
 
 #: src/Core/Media/MediaFolders.php
 msgid "Folder"
@@ -916,6 +1143,10 @@ msgstr "ID del formulario"
 #: src/Core/Metabox/Metabox.php
 msgid "Format"
 msgstr "Formatear"
+
+#: resources/lens/src/EditCard.tsx
+msgid "Formatting"
+msgstr "Formato"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "From"
@@ -941,6 +1172,14 @@ msgstr "Los bloques ocultos siguen en el contenido de la entrada: esto cambia lo
 msgid "Hidden for this post"
 msgstr "Oculto en esta entrada"
 
+#: resources/lens/src/Panel.tsx
+msgid "Hide Lens"
+msgstr "Ocultar Lens"
+
+#: resources/lens/src/Chat.tsx
+msgid "Hide details"
+msgstr "Ocultar detalles"
+
 #: src/Core/Media/MediaFolders.php
 msgid "Hide folder IDs"
 msgstr "Ocultar los ID de carpeta"
@@ -964,6 +1203,10 @@ msgstr "Historial reenviado"
 #: src/Core/Seo/Schema.php
 msgid "Home"
 msgstr "Inicio"
+
+#: resources/lens/src/Tree.tsx
+msgid "Hover a row to ring it on the page. Click to select; shift-click to add it to the chat."
+msgstr "Pasa el cursor sobre una fila para marcarla en la página. Haz clic para seleccionarla; mayús+clic para añadirla al chat."
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "How long ago: “3 days ago”, or “in 2 weeks”."
@@ -1043,6 +1286,10 @@ msgid_plural "Import undone: %d changes reversed."
 msgstr[0] "Importación deshecha: se revirtió %d cambio."
 msgstr[1] "Importación deshecha: se revirtieron %d cambios."
 
+#: resources/lens/src/Chat.tsx
+msgid "In progress"
+msgstr "En curso"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Include"
 msgstr "Incluir"
@@ -1095,6 +1342,10 @@ msgstr "Insertar como"
 msgid "Insert inline"
 msgstr "Insertar en el texto"
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Inspect"
+msgstr "Inspeccionar"
+
 #. translators: 1: line number, 2: column number, 3: the parser's message
 #: src/Core/Metabox/Metabox.php
 #, php-format
@@ -1132,9 +1383,18 @@ msgstr "Es el último"
 msgid "Is odd"
 msgstr "Es impar"
 
+#: resources/lens/src/Chat.tsx
+#, php-format
+msgid "It had changed %s by then."
+msgstr "Para entonces había cambiado %s."
+
 #: resources/data-panel/src/bindings/DynamicSettings.tsx
 msgid "It has an error, so it’s skipped."
 msgstr "Tiene un error, así que se omite."
+
+#: resources/lens/src/EditCard.tsx
+msgid "Italic"
+msgstr "Cursivas"
 
 #. translators: %d: item number.
 #: resources/data-panel/src/controls/Repeater.tsx
@@ -1170,6 +1430,10 @@ msgstr "Elementos por página"
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "Items, separated by commas"
 msgstr "Elementos, separados por comas"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Its text isn’t a TAW field or template text: it may be computed in the template, or added by JavaScript."
+msgstr "Su texto no es un campo de TAW ni texto de plantilla: puede calcularse en la plantilla o añadirse con JavaScript."
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Joins text together."
@@ -1210,9 +1474,78 @@ msgstr "Excluir"
 msgid "Leave out this post"
 msgstr "Excluir esta entrada"
 
-#: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/targets.ts
+#: resources/lens/src/Panel.tsx
+msgid "Lens"
+msgstr "Lens"
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens can’t save fields on this page. Reload it."
+msgstr "Lens no puede guardar campos en esta página. Vuelve a cargarla."
+
+#: resources/lens/src/fields.ts
+msgid "Lens couldn’t reach the site to save. Is it still running?"
+msgstr "Lens no pudo llegar al sitio para guardar. ¿Sigue corriendo?"
+
+#: resources/lens/src/fields.ts
+msgid "Lens couldn’t save that. Try again."
+msgstr "Lens no pudo guardar eso. Inténtalo de nuevo."
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens couldn’t send that to Claude. Is taw lens still running?"
+msgstr "Lens no pudo enviarle eso a Claude. ¿Sigue corriendo taw lens?"
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens couldn’t send that. Is taw lens still running?"
+msgstr "Lens no pudo enviar eso. ¿Sigue corriendo taw lens?"
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens couldn’t send your answer. Try again."
+msgstr "Lens no pudo enviar tu respuesta. Inténtalo de nuevo."
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens docked on the left"
+msgstr "Lens fijado a la izquierda"
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens docked on the right"
+msgstr "Lens fijado a la derecha"
+
+#: resources/lens/src/Chat.tsx
+msgid "Lens isn’t connected"
+msgstr "Lens no está conectado"
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens maps what TAW renders. Reload the page; if it stays empty, check that the theme calls wp_footer()."
+msgstr "Lens mapea lo que TAW muestra. Recarga la página; si sigue vacía, revisa que el tema llame a wp_footer()."
+
+#: resources/lens/src/Chat.tsx
+msgid "Lens needs a restart"
+msgstr "Lens necesita reiniciarse"
+
+#: resources/lens/src/Chat.tsx
+msgid "Lens reconnects on its own once it’s running."
+msgstr "Lens se reconecta solo en cuanto esté corriendo."
+
+#: src/Core/Lens/FieldWriter.php
+msgid "Lens sent something it shouldn’t have. Reload the page and try again."
+msgstr "Lens envió algo que no debía. Vuelve a cargar la página e inténtalo de nuevo."
+
+#: resources/lens/src/Panel.tsx
+msgid "Lens undocked into a sheet"
+msgstr "Lens desacoplado en un panel flotante"
+
+#: resources/lens/src/Chat.tsx
+msgid "Lens will write files again while the other session keeps running. If you both change the same file, one of you overwrites the other."
+msgstr "Lens volverá a escribir archivos mientras la otra sesión sigue corriendo. Si ambas cambian el mismo archivo, una sobrescribe a la otra."
+
+#: resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/targets.ts resources/lens/src/EditCard.tsx
 msgid "Link"
 msgstr "Enlace"
+
+#: resources/lens/src/EditCard.tsx
+#, php-format
+msgid "Link for \"%s\""
+msgstr "Enlace para \"%s\""
 
 #: resources/data-panel/src/bindings/targets.ts
 msgid "Link rel"
@@ -1295,9 +1628,17 @@ msgstr "Coincidencia"
 msgid "Media sideloaded"
 msgstr "Medios descargados"
 
+#: resources/lens/src/describe.ts
+msgid "Menu item"
+msgstr "Elemento de menú"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Menu order"
 msgstr "Orden del menú"
+
+#: resources/lens/src/Panel.tsx
+msgid "Message"
+msgstr "Mensaje"
 
 #: src/Core/Seo/SeoMeta.php
 msgid "Meta Description"
@@ -1306,6 +1647,10 @@ msgstr "Meta descripción"
 #: src/Core/Seo/SeoMeta.php
 msgid "Meta Title"
 msgstr "Meta título"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Mixed"
+msgstr "Mixto"
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Modified date"
@@ -1318,6 +1663,10 @@ msgstr "Más"
 #: src/Core/Form/Form.php
 msgid "More information"
 msgstr "Más información"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "More than one source holds this exact text, so Lens can’t tell which one rendered it. It doesn’t guess:"
+msgstr "Más de una fuente tiene exactamente este texto, así que Lens no puede saber cuál lo mostró. No adivina:"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Most comments"
@@ -1399,6 +1748,10 @@ msgstr "Ningún campo TAW encaja con este bloque."
 msgid "No content yet"
 msgstr "Aún no hay contenido"
 
+#: resources/lens/src/Panel.tsx
+msgid "No conversation yet. Select something on the page, or tell Claude what to change."
+msgstr "Aún no hay conversación. Selecciona algo en la página o dile a Claude qué cambiar."
+
 #: resources/data-panel/src/DataPanel.tsx
 msgid "No data fields apply to this template."
 msgstr "Ningún campo de datos aplica a esta plantilla."
@@ -1467,6 +1820,14 @@ msgstr "Aún no hay segmentos."
 msgid "No source"
 msgstr "Sin fuente"
 
+#: resources/lens/src/Panel.tsx
+msgid "No source map on this page"
+msgstr "Esta página no tiene mapa de origen"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "No text of its own. Its template rendered it."
+msgstr "No tiene texto propio. Su plantilla lo mostró."
+
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "No values match your search."
 msgstr "Ningún valor coincide con tu búsqueda."
@@ -1483,6 +1844,10 @@ msgstr "No es un color, así que se ignora. Usa un color de la paleta (accent) o
 msgid "Not a value this post has:"
 msgstr "No es un valor de esta entrada:"
 
+#: resources/lens/src/Panel.tsx
+msgid "Not connected"
+msgstr "Sin conexión"
+
 #: src/Core/Metabox/Metabox.php
 msgid "Not saved:"
 msgstr "No se guardó:"
@@ -1494,6 +1859,14 @@ msgstr "Nada"
 #: resources/data-panel/src/controls/PostSelect.tsx
 msgid "Nothing found."
 msgstr "No se encontró nada."
+
+#: resources/lens/src/Tree.tsx
+msgid "Nothing matches."
+msgstr "Nada coincide."
+
+#: resources/lens/src/Chat.tsx
+msgid "Nothing was changed after the last step you saw."
+msgstr "No se cambió nada después del último paso que viste."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Nothing was imported."
@@ -1507,7 +1880,7 @@ msgstr "Ahora"
 msgid "Number of items"
 msgstr "Número de elementos"
 
-#: resources/data-panel/src/bindings/loop/LoopEdit.tsx
+#: resources/data-panel/src/bindings/loop/LoopEdit.tsx resources/lens/src/EditCard.tsx
 msgid "Numbered list"
 msgstr "Lista numerada"
 
@@ -1567,9 +1940,17 @@ msgstr "Abrir TAW Data"
 msgid "Open in a new tab"
 msgstr "Abrir en una pestaña nueva"
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Open in editor"
+msgstr "Abrir en el editor"
+
 #: resources/data-panel/src/bindings/targets.ts
 msgid "Open in new tab"
 msgstr "Abrir en una pestaña nueva"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Open in wp-admin"
+msgstr "Abrir en wp-admin"
 
 #: src/Core/Editor/VisualEditor.php
 msgid "Open the visual content editor"
@@ -1615,13 +1996,25 @@ msgstr "Si no, mostrar"
 msgid "Output tokens"
 msgstr "Tokens de salida"
 
+#: resources/lens/src/InspectCard.tsx
+msgid "Page"
+msgstr "Página"
+
 #: resources/data-panel/src/bindings/loop/parts.tsx
 msgid "Page links"
 msgstr "Enlaces de páginas"
 
+#: resources/lens/src/EditCard.tsx
+msgid "Pages on this site are suggested as you type."
+msgstr "Se sugieren páginas de este sitio mientras escribes."
+
 #: resources/data-panel/src/bindings/loop/parts.tsx src/Core/Loop/Loop.php
 msgid "Pagination"
 msgstr "Paginación"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Part of this rich-text field."
+msgstr "Parte de este campo de texto enriquecido."
 
 #: src/Core/Auth/PagePassword.php
 msgid "Password"
@@ -1655,6 +2048,18 @@ msgstr "Elige un diseño inicial. Después puedes cambiar cada bloque."
 msgid "Pick a value…"
 msgstr "Elige un valor…"
 
+#: resources/lens/src/Panel.tsx
+msgid "Pick an element"
+msgstr "Elegir un elemento"
+
+#: resources/lens/src/Chat.tsx
+msgid "Picking and the inspect card still work."
+msgstr "Seleccionar elementos y la tarjeta de inspección siguen funcionando."
+
+#: resources/lens/src/Panel.tsx
+msgid "Point at anything on the page"
+msgstr "Señala cualquier cosa de la página"
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Portable content interchange — export a reviewable snapshot of this site's posts, TAW fields, options, terms and referenced media, or import one into it."
 msgstr "Intercambio portátil de contenido: exporta una instantánea revisable de las entradas, campos TAW, opciones, términos y medios referenciados de este sitio, o importa una."
@@ -1684,6 +2089,10 @@ msgstr "Número de entradas"
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Post fields"
 msgstr "Campos de la entrada"
+
+#: resources/lens/src/describe.ts
+msgid "Post title"
+msgstr "Título de la entrada"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx src/Core/Editing/EditingAdminScreen.php
 msgid "Post type"
@@ -1721,6 +2130,10 @@ msgstr "Anterior"
 msgid "Profile URL"
 msgstr "URL del perfil"
 
+#: resources/lens/src/Chat.tsx
+msgid "Proposed change"
+msgstr "Cambio propuesto"
+
 #: src/Core/Auth/PagePassword.php
 msgid "Protected Page"
 msgstr "Página protegida"
@@ -1737,6 +2150,11 @@ msgstr "Publicado el @post.date.format('j F Y') por @post.author"
 msgid "Query order"
 msgstr "Orden de la consulta"
 
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Ran %s"
+msgstr "Ejecutó %s"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Random"
 msgstr "Aleatorio"
@@ -1744,6 +2162,36 @@ msgstr "Aleatorio"
 #: src/Core/Rag/Usage/UsageAdminScreen.php
 msgid "Rate limits count messages per address. If \"Resolved\" below is not your own public IP but your host's proxy, every visitor shares one limit: add the proxy to TAW_TRUSTED_PROXIES in wp-config.php."
 msgstr "Los límites cuentan mensajes por dirección. Si «Resuelta» no es tu IP pública sino el proxy de tu hosting, todos los visitantes comparten un mismo límite: agrega el proxy a TAW_TRUSTED_PROXIES en wp-config.php."
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Read %d files"
+msgstr "Leyó %d archivos"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Read %d files in %s"
+msgstr "Leyó %d archivos en %s"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Read %s"
+msgstr "Leyó %s"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Reading %d files"
+msgstr "Leyendo %d archivos"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Reading %d files in %s"
+msgstr "Leyendo %d archivos en %s"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Reading %s"
+msgstr "Leyendo %s"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Recently updated"
@@ -1773,7 +2221,15 @@ msgstr "Palabras rel, p. ej. nofollow sponsored. Todo lo demás se omite; un res
 msgid "Related posts"
 msgstr "Entradas relacionadas"
 
-#: resources/data-panel/src/bindings/chips.tsx resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
+#: resources/lens/src/Panel.tsx
+msgid "Release to dock left"
+msgstr "Suelta para fijar a la izquierda"
+
+#: resources/lens/src/Panel.tsx
+msgid "Release to dock right"
+msgstr "Suelta para fijar a la derecha"
+
+#: resources/data-panel/src/bindings/chips.tsx resources/data-panel/src/controls/IconControl.tsx resources/data-panel/src/controls/MediaControls.tsx resources/lens/src/EditCard.tsx src/Core/Metabox/Metabox.php src/Core/OptionsPage/OptionsPage.php
 msgid "Remove"
 msgstr "Eliminar"
 
@@ -1816,9 +2272,17 @@ msgstr "Quitar regla"
 msgid "Remove segment %d"
 msgstr "Quitar el segmento %d"
 
+#: resources/lens/src/Chat.tsx
+msgid "Removed:"
+msgstr "Eliminado:"
+
 #: src/Core/Media/MediaFolders.php
 msgid "Rename"
 msgstr "Renombrar"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Rendered by"
+msgstr "Mostrado por"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Repeat a design for each item. What should it loop over?"
@@ -1843,6 +2307,10 @@ msgstr "Reemplaza texto."
 #: src/Core/Rag/Usage/UsageAdminScreen.php
 msgid "Resolved"
 msgstr "Resuelta"
+
+#: resources/lens/src/Panel.tsx
+msgid "Restart needed"
+msgstr "Hay que reiniciar"
 
 #: src/Core/Editor/VisualEditor.php
 msgid "Return to normal view"
@@ -1890,6 +2358,15 @@ msgstr "Regla"
 msgid "Run %1$s in that folder (%2$s while developing)."
 msgstr "Ejecuta %1$s en esa carpeta (%2$s mientras desarrollas)."
 
+#: resources/lens/src/Chat.tsx
+msgid "Run a command"
+msgstr "Ejecutar un comando"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Running %s"
+msgstr "Ejecutando %s"
+
 #: src/Core/Seo/SeoMeta.php
 msgid "SEO & Social"
 msgstr "SEO y redes sociales"
@@ -1919,7 +2396,7 @@ msgstr "Mismas %s que esta entrada"
 msgid "Same author as this post"
 msgstr "Mismo autor que esta entrada"
 
-#: resources/data-panel/src/bindings/chips.tsx
+#: resources/data-panel/src/bindings/chips.tsx resources/lens/src/EditCard.tsx
 msgid "Save"
 msgstr "Guardar"
 
@@ -1933,9 +2410,21 @@ msgstr "Guardar %d valores predeterminados en la base de datos"
 msgid "Saved %d defaults to the database."
 msgstr "Se guardaron %d valores predeterminados en la base de datos."
 
+#: resources/lens/src/Chat.tsx resources/lens/src/Panel.tsx
+msgid "Saved to"
+msgstr "Guardado en"
+
+#: resources/lens/src/EditCard.tsx
+msgid "Saves in TAW’s rich-text format, the same the wp-admin editor writes."
+msgstr "Se guarda en el formato de texto enriquecido de TAW, el mismo que escribe el editor de wp-admin."
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Saving changes this value"
 msgstr "Guardarlo cambia este valor"
+
+#: resources/lens/src/EditCard.tsx
+msgid "Saving…"
+msgstr "Guardando…"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Search"
@@ -1978,6 +2467,21 @@ msgstr "Busca para agregar…"
 msgid "Search values"
 msgstr "Buscar valores"
 
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Searched for %s"
+msgstr "Buscó %s"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Searched the theme %d times"
+msgstr "Buscó en el tema %d veces"
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Searching for %s"
+msgstr "Buscando %s"
+
 #. translators: %d: segment number.
 #: resources/data-panel/src/controls/CompositeControls.tsx
 #, php-format
@@ -2004,6 +2508,22 @@ msgstr "Seleccionar o subir archivos"
 msgid "Select or Upload Image"
 msgstr "Seleccionar o Subir Imagen"
 
+#: resources/lens/src/Panel.tsx
+msgid "Selected"
+msgstr "Seleccionado"
+
+#: resources/lens/src/Panel.tsx
+msgid "Selection"
+msgstr "Selección"
+
+#: resources/lens/src/Panel.tsx
+msgid "Selection cleared"
+msgstr "Selección borrada"
+
+#: resources/lens/src/Panel.tsx
+msgid "Send"
+msgstr "Enviar"
+
 #: src/Core/Form/Form.php
 msgid "Send Message"
 msgstr "Enviar mensaje"
@@ -2012,9 +2532,13 @@ msgstr "Enviar mensaje"
 msgid "Sending..."
 msgstr "Enviando..."
 
-#: src/Core/Form/Form.php
+#: resources/lens/src/EditCard.tsx src/Core/Form/Form.php
 msgid "Sending…"
 msgstr "Enviando…"
+
+#: resources/lens/src/Chat.tsx
+msgid "Sent from an edit on the page"
+msgstr "Enviado desde una edición en la página"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Set by"
@@ -2023,6 +2547,10 @@ msgstr "Definido por"
 #: resources/data-panel/src/bindings/DynamicSettings.tsx
 msgid "Set this block’s classes, colors and HTML attributes from values, e.g. a background from the genre’s color. They apply on the site; the canvas previews them."
 msgstr "Define las clases, los colores y los atributos HTML de este bloque a partir de valores, p. ej. un fondo con el color del género. Se aplican en el sitio; el lienzo los previsualiza."
+
+#: resources/lens/src/Panel.tsx
+msgid "Shift-click to add more"
+msgstr "Mayús+clic para añadir más"
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "Shortens to a number of characters, with “…”."
@@ -2033,9 +2561,17 @@ msgstr "Acorta a un número de caracteres, con “…”."
 msgid "Show %s when"
 msgstr "Mostrar %s cuando"
 
+#: resources/lens/src/Panel.tsx
+msgid "Show Lens"
+msgstr "Mostrar Lens"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Show at most"
 msgstr "Mostrar como máximo"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Show in tree"
+msgstr "Mostrar en el árbol"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Show items as"
@@ -2105,9 +2641,18 @@ msgstr "Estructura del sitio"
 msgid "Site title"
 msgstr "Título del sitio"
 
+#: resources/lens/src/Chat.tsx
+msgid "Skip"
+msgstr "Omitir"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Skip the first"
 msgstr "Omitir los primeros"
+
+#: resources/lens/src/Chat.tsx
+#, php-format
+msgid "Skipped: %s"
+msgstr "Omitido: %s"
 
 #: resources/data-panel/src/bindings/loop/data.ts
 msgid "Slug"
@@ -2155,9 +2700,17 @@ msgstr "Gastado este mes"
 msgid "Spent today"
 msgstr "Gastado hoy"
 
+#: resources/lens/src/Panel.tsx
+msgid "Start Lens to chat"
+msgstr "Inicia Lens para chatear"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Start blank"
 msgstr "Empezar en blanco"
+
+#: resources/lens/src/Chat.tsx
+msgid "Start it in this site’s theme folder:"
+msgstr "Inícialo en la carpeta del tema de este sitio:"
 
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "Starting template"
@@ -2170,6 +2723,30 @@ msgstr "Estado"
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Sticky posts"
 msgstr "Entradas fijas"
+
+#: resources/lens/src/Panel.tsx
+msgid "Stop"
+msgstr "Detener"
+
+#: resources/lens/src/Panel.tsx
+msgid "Stop picking (Esc)"
+msgstr "Dejar de seleccionar (Esc)"
+
+#: resources/lens/src/Panel.tsx
+msgid "Stopped"
+msgstr "Detenido"
+
+#: resources/lens/src/Chat.tsx
+msgid "Stopped."
+msgstr "Detenido."
+
+#: resources/lens/src/Tree.tsx
+msgid "Structure"
+msgstr "Estructura"
+
+#: resources/lens/src/Panel.tsx
+msgid "Structure tree"
+msgstr "Árbol de estructura"
 
 #: src/Core/Form/Form.php
 msgid "Submit"
@@ -2190,6 +2767,10 @@ msgstr "TAW Data"
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "TAW Editing"
 msgstr "Edición TAW"
+
+#: resources/lens/src/Panel.tsx
+msgid "TAW Lens"
+msgstr "TAW Lens"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "TAW Loop"
@@ -2233,13 +2814,45 @@ msgstr "Pestaña"
 msgid "Tagline"
 msgstr "Descripción corta"
 
+#: resources/lens/src/Chat.tsx
+msgid "Take over"
+msgstr "Tomar el control"
+
+#: resources/lens/src/Chat.tsx
+msgid "Take over the theme?"
+msgstr "¿Tomar el control del tema?"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Taxonomy"
 msgstr "Taxonomía"
 
+#: resources/lens/src/Panel.tsx
+msgid "Tell Claude what to change…"
+msgstr "Dile a Claude qué cambiar…"
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Tells the chatbot when to use this knowledge base — be specific about what it contains."
 msgstr "Le indica al chatbot cuándo usar esta base de conocimiento; sé específico sobre lo que contiene."
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Template part"
+msgstr "Parte de plantilla"
+
+#: resources/lens/src/EditCard.tsx resources/lens/src/InspectCard.tsx
+msgid "Template text"
+msgstr "Texto de plantilla"
+
+#: resources/lens/src/InspectCard.tsx
+msgid "Template text around values. Made of:"
+msgstr "Texto de plantilla alrededor de valores. Formado por:"
+
+#: resources/lens/src/Panel.tsx
+msgid "Template text is saved by Claude: start taw lens to send this."
+msgstr "El texto de plantilla lo guarda Claude: inicia taw lens para enviarlo."
+
+#: resources/lens/src/EditCard.tsx resources/lens/src/InspectCard.tsx
+msgid "Template text · translatable"
+msgstr "Texto de plantilla · traducible"
 
 #: resources/data-panel/src/bindings/logic.ts resources/data-panel/src/bindings/loop/data.ts resources/data-panel/src/bindings/tags.ts
 msgid "Term"
@@ -2265,6 +2878,10 @@ msgstr "Texto, u @otro_valor"
 msgid "Thank you! Your message has been sent."
 msgstr "¡Gracias! Tu mensaje se envió."
 
+#: src/Core/Lens/FieldWriter.php
+msgid "That field isn’t on this page any more. Reload the page."
+msgstr "Ese campo ya no está en esta página. Vuelve a cargarla."
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "That file is not a valid SQLite database."
 msgstr "Ese archivo no es una base de datos SQLite válida."
@@ -2276,6 +2893,10 @@ msgstr "Ese archivo no es un JSON válido."
 #: src/Core/Content/ContentAdminScreen.php
 msgid "That import couldn't be found (or was undone already), so nothing was undone."
 msgstr "No se encontró esa importación (o ya se deshizo), así que no se deshizo nada."
+
+#: src/Core/Lens/FieldWriter.php
+msgid "That row isn’t there any more. Reload the page to edit what’s stored now."
+msgstr "Esa fila ya no existe. Vuelve a cargar la página para editar lo que está guardado ahora."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "That save couldn't be found, so nothing was undone."
@@ -2313,6 +2934,10 @@ msgstr "El chat está rechazando todos los mensajes: no se puede leer su registr
 msgid "The chat is refusing every message: the human check is set to Turnstile, but TAW_TURNSTILE_SITE_KEY and TAW_TURNSTILE_SECRET_KEY are not defined in wp-config.php."
 msgstr "El chat está rechazando todos los mensajes: la verificación humana está configurada con Turnstile, pero TAW_TURNSTILE_SITE_KEY y TAW_TURNSTILE_SECRET_KEY no están definidas en wp-config.php."
 
+#: resources/lens/src/Chat.tsx
+msgid "The connection to Claude dropped."
+msgstr "Se perdió la conexión con Claude."
+
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "The day of the month."
 msgstr "El día del mes."
@@ -2324,6 +2949,10 @@ msgstr "La política de edición vigente en este sitio (solo lectura). Cámbiala
 #: resources/data-panel/src/bindings/tags.ts
 msgid "The expression is too long (1,000 characters at most)."
 msgstr "La expresión es demasiado larga (1,000 caracteres como máximo)."
+
+#: resources/lens/src/InspectCard.tsx
+msgid "The field’s default: nothing is saved yet."
+msgstr "El valor predeterminado del campo: aún no hay nada guardado."
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "The first item."
@@ -2361,6 +2990,10 @@ msgstr "El nombre del mes."
 msgid "The number and the word that fits it: “3 awards”."
 msgstr "El número y la palabra que le corresponde: “3 premios”."
 
+#: resources/lens/src/edit.ts
+msgid "The page shows this field differently from how it’s stored, so Lens can’t edit it here. Open it in wp-admin."
+msgstr "La página muestra este campo distinto a como está guardado, así que Lens no puede editarlo aquí. Ábrelo en wp-admin."
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "The pending import expired — please upload the file again."
 msgstr "La importación pendiente expiró; vuelve a subir el archivo."
@@ -2384,6 +3017,10 @@ msgstr "El resultado debe ser una fecha: un campo de fecha, @post.date o 2026-10
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "The result must be an image from the media library (an image field, or an image ID). Its alt text comes along."
 msgstr "El resultado debe ser una imagen de la biblioteca de medios (un campo de imagen o el ID de una imagen). Su texto alternativo la acompaña."
+
+#: resources/lens/src/Chat.tsx
+msgid "The running taw lens is from another taw/core version. Stop it (Ctrl-C) and start it again in this site’s theme folder:"
+msgstr "El taw lens en ejecución es de otra versión de taw/core. Detenlo (Ctrl-C) y vuelve a iniciarlo en la carpeta del tema de este sitio:"
 
 #: src/Core/Metabox/Metabox.php
 msgid "The saved value is unchanged; this is what you entered."
@@ -2429,6 +3066,18 @@ msgstr "El año. Un número de 4 dígitos se lee como año."
 msgid "Theme blocks"
 msgstr "Bloques del tema"
 
+#: resources/lens/src/Panel.tsx
+msgid "Theme: dark. Follow the system"
+msgstr "Tema: oscuro. Seguir al sistema"
+
+#: resources/lens/src/Panel.tsx
+msgid "Theme: follows the system. Switch to light"
+msgstr "Tema: sigue al sistema. Cambiar a claro"
+
+#: resources/lens/src/Panel.tsx
+msgid "Theme: light. Switch to dark"
+msgstr "Tema: claro. Cambiar a oscuro"
+
 #. translators: 1: comma-separated block names, 2: post type.
 #: src/Core/Editing/ContentLayer.php
 #, php-format
@@ -2445,9 +3094,25 @@ msgstr "Estos bloques no se pueden agregar aquí: %1$s. La política de edición
 msgid "These carry sensitive or bulky data — only for a deliberate full-site migration."
 msgstr "Contienen datos sensibles o voluminosos; úsalos solo en una migración completa del sitio hecha a propósito."
 
+#: resources/lens/src/Chat.tsx
+msgid "Thinking…"
+msgstr "Pensando…"
+
 #: src/Helpers/Svg.php
 msgid "This SVG file could not be safely sanitized and was rejected."
 msgstr "Este archivo SVG no se pudo limpiar de forma segura y se rechazó."
+
+#: src/Core/Lens/FieldWriter.php
+msgid "This field can’t be edited on the page. Open it in wp-admin."
+msgstr "Este campo no se puede editar en la página. Ábrelo en wp-admin."
+
+#: src/Core/Lens/FieldWriter.php
+msgid "This field changed since the page loaded. Reload the page to edit what’s stored now."
+msgstr "Este campo cambió desde que cargó la página. Vuelve a cargarla para editar lo que está guardado ahora."
+
+#: resources/lens/src/edit.ts
+msgid "This field has formatting Lens can’t edit on the page, such as images or headings. Open it in wp-admin."
+msgstr "Este campo tiene formato que Lens no puede editar en la página, como imágenes o encabezados. Ábrelo en wp-admin."
 
 #: src/Core/Form/Form.php
 msgid "This field is required."
@@ -2456,6 +3121,10 @@ msgstr "Este campo es obligatorio."
 #: resources/data-panel/src/bindings/tags.ts
 msgid "This formula doesn’t read right here: check operators, commas, quotes and parentheses."
 msgstr "Esta fórmula no se entiende aquí: revisa operadores, comas, comillas y paréntesis."
+
+#: resources/lens/src/edit.ts
+msgid "This kind of field can’t be edited on the page. Open it in wp-admin."
+msgstr "Este tipo de campo no se puede editar en la página. Ábrelo en wp-admin."
 
 #: src/Core/Auth/PagePassword.php
 msgid "This page is not available."
@@ -2481,6 +3150,14 @@ msgstr "Este sitio solo permite colores de la paleta, así que se ignora."
 #: src/Core/Content/ContentAdminScreen.php
 msgid "This site has its own value, and there is no telling which is newer."
 msgstr "Este sitio tiene su propio valor y no se puede saber cuál es más reciente."
+
+#: resources/lens/src/edit.ts
+msgid "This text has line breaks, which editing on the page would lose. Open it in wp-admin."
+msgstr "Este texto tiene saltos de línea, que se perderían al editarlo en la página. Ábrelo en wp-admin."
+
+#: resources/lens/src/edit.ts
+msgid "This text shares its element with other markup. Ask Claude to change it."
+msgstr "Este texto comparte su elemento con otro marcado. Pídele a Claude que lo cambie."
 
 #: resources/data-panel/src/bindings/tags.ts
 msgid "This value isn’t a date."
@@ -2534,6 +3211,10 @@ msgstr "Demasiadas reglas (20 como máximo)."
 msgid "Too many values (50 at most)."
 msgstr "Demasiados valores (50 como máximo)."
 
+#: resources/lens/src/Chat.tsx
+msgid "Try again"
+msgstr "Intentar de nuevo"
+
 #: src/Core/Rag/Usage/UsageAdminScreen.php
 msgid "Turnstile, but its keys are missing — chat is refusing messages"
 msgstr "Turnstile, pero faltan sus claves: el chat está rechazando mensajes"
@@ -2546,6 +3227,10 @@ msgstr "Turnstile, una vez por conversación"
 msgid "Twitter / X Handle"
 msgstr "Usuario de Twitter / X"
 
+#: src/Core/Lens/FieldWriter.php
+msgid "Two fields share this name here. Edit it in wp-admin."
+msgstr "Dos campos comparten este nombre aquí. Edítalo en wp-admin."
+
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Type"
 msgstr "Tipo"
@@ -2557,6 +3242,14 @@ msgstr "Escribe / para elegir un bloque"
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "Type @ to add a value, then . for a function."
 msgstr "Escribe @ para añadir un valor y luego . para una función."
+
+#: resources/lens/src/EditCard.tsx
+msgid "Type on the page. Saving writes the field value directly; nothing else changes."
+msgstr "Escribe en la página. Al guardar se escribe el valor del campo directamente; nada más cambia."
+
+#: resources/lens/src/EditCard.tsx
+msgid "Type on the page. Template text lives in a theme file, so Save sends the change to Claude, and you apply the diff."
+msgstr "Escribe en la página. El texto de plantilla vive en un archivo del tema, así que Guardar le envía el cambio a Claude, y tú aplicas el diff."
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "UPPER CASE."
@@ -2574,6 +3267,14 @@ msgstr "No autorizado"
 msgid "Unclosed parenthesis or quote."
 msgstr "Paréntesis o comilla sin cerrar."
 
+#: resources/lens/src/Chat.tsx resources/lens/src/Panel.tsx
+msgid "Undid the change to"
+msgstr "Se deshizo el cambio en"
+
+#: resources/lens/src/Chat.tsx
+msgid "Undo"
+msgstr "Deshacer"
+
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Undo it"
 msgstr "Deshacerlo"
@@ -2581,6 +3282,14 @@ msgstr "Deshacerlo"
 #: src/Core/Content/ContentAdminScreen.php
 msgid "Undo this import"
 msgstr "Deshacer esta importación"
+
+#: resources/lens/src/Panel.tsx
+msgid "Undock into a sheet"
+msgstr "Desacoplar en un panel flotante"
+
+#: resources/lens/src/Chat.tsx
+msgid "Undoing…"
+msgstr "Deshaciendo…"
 
 #: src/Core/Content/ContentAdminScreen.php
 #, php-format
@@ -2603,6 +3312,14 @@ msgstr "Función desconocida:"
 msgid "Unknown value name."
 msgstr "Nombre de valor desconocido."
 
+#: resources/lens/src/EditCard.tsx
+msgid "Update link"
+msgstr "Actualizar enlace"
+
+#: resources/lens/src/activity.ts
+msgid "Updated its plan"
+msgstr "Actualizó su plan"
+
 #: src/Core/Rag/KnowledgeBase/KnowledgeBaseAdminScreen.php
 msgid "Upload"
 msgstr "Subir"
@@ -2618,6 +3335,11 @@ msgstr "Subido: la indexación se hace en segundo plano y puede tardar unos minu
 #: src/Core/Media/MediaFolders.php
 msgid "Uploading"
 msgstr "Subiendo"
+
+#: resources/lens/src/Chat.tsx
+#, php-format
+msgid "Use %s"
+msgstr "Usar %s"
 
 #: resources/data-panel/src/bindings/popup.tsx
 msgid "Use as block text"
@@ -2644,9 +3366,19 @@ msgstr "Usar el del archivo"
 msgid "Use this image"
 msgstr "Usar esta imagen"
 
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Used %s"
+msgstr "Usó %s"
+
 #: src/Core/Seo/SeoMeta.php
 msgid "Used for Open Graph/Twitter card previews. Falls back to the featured image when empty."
 msgstr "Se usa en las vistas previas de Open Graph y Twitter. Si está vacía, se usa la imagen destacada."
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Used the %s skill"
+msgstr "Usó la habilidad %s"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx src/Core/Content/ContentAdminScreen.php
 msgid "Value"
@@ -2668,6 +3400,14 @@ msgstr "Visibilidad"
 msgid "Visitor and date"
 msgstr "Visitante y fecha"
 
+#: resources/lens/src/Chat.tsx
+msgid "Wait for it"
+msgstr "Esperar"
+
+#: resources/lens/src/Chat.tsx
+msgid "Waiting for the other Claude session. Lens writes no files until it’s free."
+msgstr "Esperando a la otra sesión de Claude. Lens no escribe archivos hasta que esté libre."
+
 #: src/Core/Form/Form.php
 msgid "We could not verify you are human. Please try again."
 msgstr "No pudimos verificar que eres humano. Inténtalo de nuevo."
@@ -2675,6 +3415,10 @@ msgstr "No pudimos verificar que eres humano. Inténtalo de nuevo."
 #: src/Core/Content/ContentAdminScreen.php
 msgid "What changes"
 msgstr "Qué cambia"
+
+#: src/Core/Lens/FieldWriter.php
+msgid "What this field is stored on isn’t there any more. Reload the page."
+msgstr "Donde se guarda este campo ya no existe. Vuelve a cargar la página."
 
 #: src/Core/Content/ContentAdminScreen.php
 msgid "When a record already exists:"
@@ -2720,6 +3464,14 @@ msgstr "Sin su signo."
 msgid "Without spaces at either end."
 msgstr "Sin espacios en los extremos."
 
+#: resources/lens/src/InspectCard.tsx resources/lens/src/payload.ts resources/lens/src/treeModel.ts
+msgid "WordPress"
+msgstr "WordPress"
+
+#: resources/lens/src/fields.ts
+msgid "WordPress refused the save. Reload the page and try again."
+msgstr "WordPress rechazó el guardado. Vuelve a cargar la página e inténtalo de nuevo."
+
 #: src/Core/Rag/Usage/UsageAdminScreen.php
 msgid "Worst case per message"
 msgstr "Peor caso por mensaje"
@@ -2728,13 +3480,27 @@ msgstr "Peor caso por mensaje"
 msgid "Write"
 msgstr "Escribir"
 
+#: resources/lens/src/Chat.tsx
+msgid "Write 1 file"
+msgstr "Escribir 1 archivo"
+
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "Write one value or formula, e.g. @count(@row.members) or @(@row.price * 2)."
 msgstr "Escribe un valor o una fórmula, p. ej. @count(@row.members) o @(@row.price * 2)."
 
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Writing %s"
+msgstr "Escribiendo %s"
+
 #: resources/data-panel/src/bindings/tags.ts
 msgid "Wrong arguments for this function."
 msgstr "Argumentos incorrectos para esta función."
+
+#: resources/lens/src/activity.ts
+#, php-format
+msgid "Wrote %s"
+msgstr "Escribió %s"
 
 #: src/Core/Metabox/Metabox.php
 msgid "Yes"
@@ -2748,6 +3514,18 @@ msgstr "Sí / no"
 msgid "You"
 msgstr "Tú"
 
+#: resources/lens/src/Chat.tsx
+msgid "You can keep picking and asking; Lens won’t write files until it’s free."
+msgstr "Puedes seguir seleccionando y preguntando; Lens no escribirá archivos hasta que esté libre."
+
+#: src/Core/Lens/FieldWriter.php
+msgid "You can’t change this site’s options."
+msgstr "No puedes cambiar las opciones de este sitio."
+
+#: src/Core/Lens/FieldWriter.php
+msgid "You can’t edit what this field is stored on."
+msgstr "No puedes editar donde se guarda este campo."
+
 #: resources/data-panel/src/controls/MediaControls.tsx
 msgid "You can’t upload or choose media."
 msgstr "No puedes subir ni elegir medios."
@@ -2759,6 +3537,10 @@ msgstr "No tienes permiso para acceder a esta página."
 #: src/Core/Content/ContentAdminScreen.php
 msgid "You do not have permission to import content."
 msgstr "No tienes permiso para importar contenido."
+
+#: resources/lens/src/Chat.tsx
+msgid "You took over this theme. The other Claude session is still running: you may overwrite each other’s changes."
+msgstr "Tomaste el control de este tema. La otra sesión de Claude sigue corriendo: pueden sobrescribir los cambios del otro."
 
 #: src/Core/Rag/Usage/UsageAdminScreen.php
 msgid "Your address, as this server sees it"
@@ -2776,6 +3558,10 @@ msgstr "Tu sesión expiró. Inténtalo de nuevo."
 msgid "accent, #c0392b or @genre_color"
 msgstr "accent, #c0392b o @genre_color"
 
+#: resources/lens/src/Panel.tsx
+msgid "add to selection"
+msgstr "añadir a la selección"
+
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx src/Core/Editing/EditingAdminScreen.php
 msgid "all"
 msgstr "todas"
@@ -2783,6 +3569,10 @@ msgstr "todas"
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "allowed"
 msgstr "permitido"
+
+#: resources/lens/src/describe.ts resources/lens/src/payload.ts
+msgid "ambiguous"
+msgstr "ambiguo"
 
 #: resources/data-panel/src/bindings/loop/LoopEdit.tsx
 msgid "an item"
@@ -2804,6 +3594,18 @@ msgstr "estás exento (exención)"
 msgid "are locked like everyone else"
 msgstr "estás bloqueado como todos los demás"
 
+#: resources/lens/src/payload.ts
+msgid "block"
+msgstr "bloque"
+
+#: resources/lens/src/EditCard.tsx
+msgid "cancel"
+msgstr "cancelar"
+
+#: resources/lens/src/describe.ts
+msgid "choice"
+msgstr "opción"
+
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "contains"
 msgstr "contiene"
@@ -2824,6 +3626,10 @@ msgstr "no tiene el elemento"
 msgid "e.g. 1.5rem or 24px"
 msgstr "p. ej. 1.5rem o 24px"
 
+#: resources/lens/src/payload.ts
+msgid "element"
+msgstr "elemento"
+
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "ends with"
 msgstr "termina con"
@@ -2832,9 +3638,17 @@ msgstr "termina con"
 msgid "fiction, poetry"
 msgstr "ficción, poesía"
 
+#: resources/lens/src/payload.ts resources/lens/src/treeModel.ts
+msgid "field"
+msgstr "campo"
+
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "fill in what to compare with."
 msgstr "indica con qué comparar."
+
+#: resources/lens/src/Panel.tsx
+msgid "formatting changed"
+msgstr "cambió el formato"
 
 #: resources/data-panel/src/bindings/ExpressionEditor.tsx
 msgid "function"
@@ -2851,6 +3665,10 @@ msgstr "tiene el elemento"
 #: resources/data-panel/src/controls/CompositeControls.tsx src/Core/Metabox/Metabox.php
 msgid "https:// or /path"
 msgstr "https:// o /ruta"
+
+#: resources/lens/src/describe.ts
+msgid "image"
+msgstr "imagen"
 
 #. translators: %s: a time span, e.g. "2 weeks"
 #: src/Core/Bindings/Expression/Library.php
@@ -2940,17 +3758,33 @@ msgstr "es sí / encendido"
 msgid "last %1$d turns, %2$d characters each"
 msgstr "últimos %1$d turnos, %2$d caracteres cada uno"
 
+#: resources/lens/src/describe.ts
+msgid "link"
+msgstr "enlace"
+
 #: src/Core/Editing/EditingAdminScreen.php
 msgid "locked"
 msgstr "bloqueado"
+
+#: resources/lens/src/describe.ts
+msgid "long text"
+msgstr "texto largo"
 
 #: resources/data-panel/src/bindings/functionDocs.ts
 msgid "lower case."
 msgstr "minúsculas."
 
+#: resources/lens/src/describe.ts resources/lens/src/payload.ts
+msgid "mixed"
+msgstr "mixto"
+
 #: src/Core/Content/ContentAdminScreen.php src/Core/Editing/EditingAdminScreen.php
 msgid "none"
 msgstr "ninguno"
+
+#: resources/lens/src/describe.ts
+msgid "number"
+msgstr "número"
 
 #: resources/data-panel/src/bindings/ConditionBuilder.tsx
 msgid "of these are true:"
@@ -2960,6 +3794,14 @@ msgstr "de estas se cumplen:"
 msgid "of these:"
 msgstr "de estas:"
 
+#: resources/lens/src/Tree.tsx
+msgid "on page"
+msgstr "en la página"
+
+#: resources/lens/src/payload.ts
+msgid "page"
+msgstr "página"
+
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "pick a comparison."
 msgstr "elige una comparación."
@@ -2968,9 +3810,25 @@ msgstr "elige una comparación."
 msgid "pick a value, or write one value like @book_year."
 msgstr "elige un valor, o escribe uno como @book_year."
 
+#: resources/lens/src/describe.ts
+msgid "repeater"
+msgstr "repetidor"
+
+#: resources/lens/src/describe.ts
+msgid "rich text"
+msgstr "texto enriquecido"
+
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "rule"
 msgstr "regla"
+
+#: resources/lens/src/EditCard.tsx
+msgid "save"
+msgstr "guardar"
+
+#: resources/lens/src/Panel.tsx
+msgid "select"
+msgstr "seleccionar"
 
 #: src/Core/Media/MediaFolders.php src/Core/Metabox/Metabox.php
 msgid "selected"
@@ -2987,6 +3845,22 @@ msgstr "omitirlo (solo crear nuevos)"
 #: resources/data-panel/src/bindings/conditions.ts
 msgid "starts with"
 msgstr "empieza con"
+
+#: resources/lens/src/Panel.tsx
+msgid "stop picking"
+msgstr "dejar de elegir"
+
+#: resources/lens/src/payload.ts
+msgid "template part"
+msgstr "parte de plantilla"
+
+#: resources/lens/src/payload.ts
+msgid "template text"
+msgstr "texto de plantilla"
+
+#: resources/lens/src/describe.ts
+msgid "text"
+msgstr "texto"
 
 #: resources/data-panel/src/bindings/visibility.tsx
 msgid "this block"
@@ -3033,6 +3907,15 @@ msgstr "Texto de “Siguiente”"
 #: resources/data-panel/src/bindings/loop/parts.tsx
 msgid "“Previous” text"
 msgstr "Texto de “Anterior”"
+
+#: resources/lens/src/Chat.tsx
+#, php-format
+msgid "… %d more lines"
+msgstr "… %d líneas más"
+
+#: resources/lens/src/Panel.tsx
+msgid "⇧ Click"
+msgstr "⇧ Clic"
 
 #: resources/blocks/loop-pagination/block.json
 msgctxt "block description"
