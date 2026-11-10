@@ -1733,6 +1733,8 @@ composer require emailit/emailit-php
 
 If the SDK isn't installed, the API key is empty, or the Emailit API call throws for any reason, `EmailConfig` falls back to normal `wp_mail()` transparently (logging the failure via `error_log()`) rather than silently dropping the email.
 
+What carries over from `wp_mail()`: the recipients, subject and body (HTML with a plain-text part when a `Content-Type: text/html` header is set), the `Reply-To`, `Cc` and `Bcc` headers, and attachments (sent base64; a string key in the attachments array is the file name shown). A `From` header is ignored: mail goes out from the address passed to `useEmailit()`, which must be on the domain verified in Emailit. If an attachment can't be read, that email goes through `wp_mail()` instead, so nothing is sent without it.
+
 ---
 
 ## Visual Editor

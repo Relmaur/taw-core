@@ -36,6 +36,13 @@ if (!defined('ABSPATH')) {
  * password resets, and WooCommerce emails — are routed through Emailit.
  * If the SDK is not installed or the API call fails, the call falls
  * back to wp_mail() transparently.
+ *
+ * What carries over from wp_mail(): to (array or comma-separated), subject,
+ * the message (HTML when a `Content-Type: text/html` header says so), the
+ * Reply-To, Cc and Bcc headers, and attachments (read from disk and sent
+ * base64). A From header is ignored: Emailit sends from the address given
+ * to useEmailit(), the one its domain verification covers. An attachment
+ * that can't be read falls back to wp_mail() rather than sending without it.
  */
 class EmailConfig
 {
@@ -110,14 +117,12 @@ class EmailConfig
 
         $subject = (string) ($atts['subject'] ?? '');
         $message = (string) ($atts['message'] ?? '');
-        $headers = (array)  ($atts['headers'] ?? []);
+        $parsed  = self::parseHeaders($atts['headers'] ?? []);
+        $isHtml  = $parsed['html'];
 
-        $isHtml = false;
-        foreach ($headers as $header) {
-            if (stripos((string) $header, 'content-type: text/html') !== false) {
-                $isHtml = true;
-                break;
-            }
+        $attachments = self::readAttachments($atts['attachments'] ?? []);
+        if ($attachments === null) {
+            return null;
         }
 
         $from = self::$fromName
@@ -130,8 +135,12 @@ class EmailConfig
                 'from'    => $from,
                 'to'      => $to,
                 'subject' => $subject,
-                'html'    => $isHtml ? $message : null,
-                'text'    => $isHtml ? wp_strip_all_tags($message, true) : $message,
+                'html'        => $isHtml ? $message : null,
+                'text'        => $isHtml ? wp_strip_all_tags($message, true) : $message,
+                'reply_to'    => $parsed['reply_to'],
+                'cc'          => $parsed['cc'] ?: null,
+                'bcc'         => $parsed['bcc'] ?: null,
+                'attachments' => $attachments ?: null,
             ], fn($v) => $v !== null));
 
             return true;
@@ -143,5 +152,85 @@ class EmailConfig
             );
             return null;
         }
+    }
+
+    /**
+     * wp_mail() headers (an array, or one string with a header per line) →
+     * whether the body is HTML, plus Reply-To / Cc / Bcc.
+     *
+     * @param mixed $headers
+     * @return array{html: bool, reply_to: ?string, cc: list<string>, bcc: list<string>}
+     */
+    private static function parseHeaders(mixed $headers): array
+    {
+        $lines = is_array($headers) ? $headers : preg_split('/\r\n|\r|\n/', (string) $headers);
+        $out   = ['html' => false, 'reply_to' => null, 'cc' => [], 'bcc' => []];
+
+        foreach ((array) $lines as $line) {
+            $line = (string) $line;
+            if (!str_contains($line, ':')) {
+                continue;
+            }
+            [$name, $value] = array_map('trim', explode(':', $line, 2));
+            $name = strtolower($name);
+            if ($value === '') {
+                continue;
+            }
+
+            if ($name === 'content-type' && stripos($value, 'text/html') !== false) {
+                $out['html'] = true;
+            } elseif ($name === 'reply-to' && $out['reply_to'] === null) {
+                $out['reply_to'] = $value;
+            } elseif ($name === 'cc' || $name === 'bcc') {
+                foreach (explode(',', $value) as $address) {
+                    if (($address = trim($address)) !== '') {
+                        $out[$name][] = $address;
+                    }
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * wp_mail() attachments (paths, as an array or one per line; a string key
+     * is the file name to show) → Emailit's base64 attachments. Null when a
+     * file can't be read, so the caller falls back to wp_mail() instead of
+     * sending without it.
+     *
+     * @param mixed $attachments
+     * @return list<array{filename: string, content: string, content_type?: string}>|null
+     */
+    private static function readAttachments(mixed $attachments): ?array
+    {
+        $list = is_array($attachments) ? $attachments : preg_split('/\r\n|\r|\n/', (string) $attachments);
+        $out  = [];
+
+        foreach ((array) $list as $key => $path) {
+            $path = trim((string) $path);
+            if ($path === '') {
+                continue;
+            }
+            $content = is_readable($path) ? file_get_contents($path) : false;
+            if ($content === false) {
+                Logger::error(
+                    'mail.emailit_attachment_unreadable',
+                    'An attachment could not be read — sending through wp_mail() instead.',
+                    ['file' => basename($path)],
+                );
+                return null;
+            }
+
+            $name = is_string($key) && $key !== '' ? $key : basename($path);
+            $file = ['filename' => $name, 'content' => base64_encode($content)];
+            $type = function_exists('wp_check_filetype') ? wp_check_filetype($name)['type'] : false;
+            if (is_string($type) && $type !== '') {
+                $file['content_type'] = $type;
+            }
+            $out[] = $file;
+        }
+
+        return $out;
     }
 }

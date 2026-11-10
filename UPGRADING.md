@@ -85,6 +85,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.102 | Restart `taw lens` after updating (Lens page protocol 2) |
 | < v1.103 | Text typed in the Visual editor of a repeater's WYSIWYG field saves again in the block editor (a bug fix); tabbed repeaters can be reordered |
 | < v1.104 | A `{{variable}}` value containing `$1` or `\0` now reaches the email as typed (a bug fix); forms can send no email (`'email' => false`); templates can have optional blocks |
+| < v1.104.1 | With Emailit on, emails keep their Reply-To, Cc, Bcc and attachments (a bug fix) |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -1043,6 +1044,17 @@ saves the metaboxes.
 
 **Check:** on a page with a WYSIWYG field in a repeater, type in its Visual tab, save, reload: the text is there.
 Nothing to migrate; stored data is unchanged. **Undo:** `composer update taw/core:1.102.1`.
+
+### v1.104.1: Emailit keeps Reply-To, Cc, Bcc and attachments
+
+**What changed.** A bug fix for sites with `EmailConfig::useEmailit()` on. Up to v1.104.0, Emailit sent only the
+recipients, subject and body: a `Reply-To`, `Cc` or `Bcc` header and every attachment were dropped. They now carry
+over. If an attachment can't be read, that email goes through `wp_mail()` instead, so it's never sent without it
+(logged as `mail.emailit_attachment_unreadable`). A `From` header is still ignored: Emailit sends from the address
+given to `useEmailit()`.
+
+**Check:** with Emailit on, send an email with an attachment; it arrives with it. Nothing to migrate.
+**Undo:** `composer update taw/core:1.104.0`.
 
 ### v1.104.0: forms without an email; optional blocks in mail templates
 
