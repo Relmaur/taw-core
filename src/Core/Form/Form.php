@@ -29,7 +29,7 @@ if (!defined('ABSPATH')) {
  *    per rule). Precedence: field-level '{rule}_message' > form-level 'messages.{rule}' > English default.
  *  - AJAX submission via admin-ajax.php — bypasses WP routing, no 404 risk
  *  - Inline field-level and general error display
- *  - Optional email delivery via Mailer + MJML templates
+ *  - Optional email delivery via Mailer + MJML templates; 'email' => false sends none
  *  - Submission persistence via SubmissionsHandler (CPT)
  *  - Multi-step wizard with Prev/Next navigation and step indicator
  *  - Structural field types: html, heading, divider
@@ -750,6 +750,12 @@ class Form
 
     private function sendEmail(array $data): bool
     {
+        // 'email' => false: the form sends nothing itself (e.g. its
+        // 'on_submit' callback sends its own designed email instead).
+        if (($this->config['email'] ?? null) === false) {
+            return true;
+        }
+
         $emailConfig = $this->config['email'] ?? [];
         $templateIn  = $emailConfig['to_self']['template']   ?? null;
         $templateOut = $emailConfig['to_client']['template'] ?? null;
