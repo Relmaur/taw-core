@@ -86,6 +86,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.103 | Text typed in the Visual editor of a repeater's WYSIWYG field saves again in the block editor (a bug fix); tabbed repeaters can be reordered |
 | < v1.104 | A `{{variable}}` value containing `$1` or `\0` now reaches the email as typed (a bug fix); forms can send no email (`'email' => false`); templates can have optional blocks |
 | < v1.104.1 | With Emailit on, emails keep their Reply-To, Cc, Bcc and attachments (a bug fix) |
+| < v1.105 | Mail templates can repeat a block once per row of a list (`<!--repeat:name-->`); nothing changes otherwise |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -1044,6 +1045,16 @@ saves the metaboxes.
 
 **Check:** on a page with a WYSIWYG field in a repeater, type in its Visual tab, save, reload: the text is there.
 Nothing to migrate; stored data is unchanged. **Undo:** `composer update taw/core:1.102.1`.
+
+### v1.105.0: repeat blocks in mail templates
+
+**What changed.** `MailTemplate` (and `Mailer::template()`) writes a `<!--repeat:name-->…<!--/repeat:name-->` block
+once per row when `name` is a list of rows, each an array of its own variables (the template's other variables
+still apply). Each row's optional blocks are resolved, and the markers are dropped. An empty list, or a value that
+isn't a list, removes the block. Row values aren't escaped either: escape them before `setVariables()`.
+
+**Check:** nothing on an existing site; only templates with the new markers change. Nothing to migrate.
+**Undo:** `composer update taw/core:1.104.1`.
 
 ### v1.104.1: Emailit keeps Reply-To, Cc, Bcc and attachments
 

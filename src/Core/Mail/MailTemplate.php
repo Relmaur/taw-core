@@ -29,6 +29,15 @@ if (!defined('ABSPATH')) {
  * empty string. When it has a value the block stays, markers included
  * (they're HTML comments, invisible in every mail client). Blocks with
  * different names may nest; a block can't contain another of the same name.
+ *
+ * Repeated blocks: wrap one row of the template in
+ *   <!--repeat:variable_name-->…<!--/repeat:variable_name-->
+ * and pass that variable as a list of rows, each an array of its own
+ * variables. compile() writes the block once per row, filled with that row's
+ * values (falling back to the template's other variables), with the row's
+ * own optional blocks resolved, and drops the markers. An empty list, or a
+ * value that isn't a list, removes the block. Row values are not escaped
+ * either.
  */
 class MailTemplate
 {
@@ -95,6 +104,7 @@ class MailTemplate
      */
     public static function fill(string $html, array $variables): string
     {
+        $html = self::expandRepeats($html, $variables);
         $html = self::stripOptional($html, $variables);
 
         foreach ($variables as $key => $value) {
@@ -107,6 +117,37 @@ class MailTemplate
         }
 
         return $html;
+    }
+
+    /**
+     * Writes each <!--repeat:x-->…<!--/repeat:x--> block once per row of the
+     * list in x, filled with that row's variables over the others.
+     *
+     * @param array<string, mixed> $variables
+     */
+    private static function expandRepeats(string $html, array $variables): string
+    {
+        return (string) preg_replace_callback(
+            '/<!--repeat:([A-Za-z0-9_]+)-->(.*?)<!--\/repeat:\1-->/s',
+            static function (array $m) use ($variables): string {
+                $rows = $variables[$m[1]] ?? [];
+                if (!is_array($rows)) {
+                    return '';
+                }
+                $globals = array_filter($variables, 'is_scalar');
+                $out     = '';
+                foreach ($rows as $row) {
+                    if (is_array($row)) {
+                        // Resolved for this row: drop its if-markers, or the
+                        // template-wide pass (which doesn't know the row's
+                        // values) would strip the blocks it kept.
+                        $out .= (string) preg_replace('/<!--\/?if:[A-Za-z0-9_]+-->/', '', self::fill($m[2], $row + $globals));
+                    }
+                }
+                return $out;
+            },
+            $html
+        );
     }
 
     /**
