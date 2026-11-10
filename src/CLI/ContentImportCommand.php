@@ -294,6 +294,7 @@ class ContentImportCommand extends Command
     private function renderPlan(SymfonyStyle $io, OutputInterface $output, array $plan, bool $asJson): void
     {
         if ($asJson) {
+            $plan['records'] = Importer::forJson($plan['records']);
             $output->writeln((string) json_encode($plan, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
             return;
         }

@@ -381,6 +381,28 @@ class Importer
     }
 
     /**
+     * Plan records ready for JSON: each record's `changes` is an object, also
+     * when it's empty. PHP writes an empty array as `[]`, and a reader that
+     * takes `changes` as a map (taw-fleet's review) refuses a list — a delete
+     * (`would-delete`) has no changes, so one in a publish broke the plan.
+     * Only for output: in PHP, `changes` stays an array.
+     *
+     * @param list<array<string, mixed>> $records
+     * @return list<array<string, mixed>>
+     */
+    public static function forJson(array $records): array
+    {
+        return array_map(static function (array $record): array {
+            $changes = $record['changes'] ?? [];
+            if (is_array($changes) && array_is_list($changes)) {
+                $record['changes'] = (object) $changes;
+            }
+
+            return $record;
+        }, $records);
+    }
+
+    /**
      * A record's changes as a hash: its op, and each change's status, old and
      * new value (not labels or conflict flags), so a review and an apply
      * that re-plans can tell whether a record still reads the same.

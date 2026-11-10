@@ -87,6 +87,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.104 | A `{{variable}}` value containing `$1` or `\0` now reaches the email as typed (a bug fix); forms can send no email (`'email' => false`); templates can have optional blocks |
 | < v1.104.1 | With Emailit on, emails keep their Reply-To, Cc, Bcc and attachments (a bug fix) |
 | < v1.105 | Mail templates can repeat a block once per row of a list (`<!--repeat:name-->`); nothing changes otherwise |
+| < v1.105.1 | A publish from taw-fleet that deletes a page or an option reads again (a bug fix); update production |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -1045,6 +1046,20 @@ saves the metaboxes.
 
 **Check:** on a page with a WYSIWYG field in a repeater, type in its Visual tab, save, reload: the text is there.
 Nothing to migrate; stored data is unchanged. **Undo:** `composer update taw/core:1.102.1`.
+
+### v1.105.1: a publish with a delete reads again
+
+**What changed.** A bug fix for publishing content (taw-fleet's `p`, `publish_content`). A record with no
+changes (a page or option the publish would delete, `op: would-delete`) went out in the plan as `"changes": []`,
+because PHP writes an empty array as a JSON array. taw-fleet reads `changes` as a map, so it refused the whole
+plan ("the plan isn't readable: json: cannot unmarshal array…"), and nothing could be published to that site
+until the delete was gone. A record's `changes` is now always a JSON object (`{}` when empty), from the publish
+plan and from `content:import --dry-run --json`. In PHP, `Importer::plan()` still gives an array; the new
+`Importer::forJson()` makes records ready for JSON. The plan has the same records as before.
+
+**Check:** publish to a production site where Local deleted a page or a `_taw_*` option: the review opens and
+lists the delete, unticked. Nothing to migrate. taw-fleet 1.35.1+ reads the old `[]` too, so a site still on
+an older taw/core can be published to from an updated taw-fleet. **Undo:** `composer update taw/core:1.105.0`.
 
 ### v1.105.0: repeat blocks in mail templates
 

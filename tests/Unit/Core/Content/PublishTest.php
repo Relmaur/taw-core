@@ -138,6 +138,20 @@ final class PublishTest extends TestCase
         $this->assertContains('content.publish.planned', $this->logged);
     }
 
+    public function test_a_delete_in_the_plan_goes_out_with_changes_as_an_object(): void
+    {
+        $this->importer->records[] = ['kind' => 'post', 'type' => 'post', 'slug' => 'news', 'op' => 'would-delete', 'changes' => [],
+            'record_key' => 'post:post:news', 'hash' => 'd'];
+
+        $plan = $this->publish()->plan($this->changeSet());
+        $json = (string) json_encode($plan);
+
+        $this->assertContains('post:post:news', array_column($plan['plan']['records'], 'record_key'), 'a delete matters without changes');
+        $this->assertStringContainsString('"op":"would-delete","changes":{}', $json);
+        $this->assertStringNotContainsString('"changes":[]', $json);
+        $this->assertStringContainsString('"changes":{"title":{', $json, 'a record with changes is unchanged');
+    }
+
     public function test_a_snapshot_is_not_a_publish(): void
     {
         try {
