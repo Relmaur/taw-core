@@ -969,6 +969,10 @@ msgstr ""
 msgid "Drag to reorder"
 msgstr ""
 
+#: src/Core/Metabox/Metabox.php
+msgid "Drag to reorder (or Alt + arrow keys)"
+msgstr ""
+
 #: src/Core/Media/MediaFolders.php
 msgid "Drop to upload here"
 msgstr ""

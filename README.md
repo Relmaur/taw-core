@@ -279,6 +279,8 @@ Each tab lists field IDs from `fields`; fields keep their declared order inside 
 
 Repeater data is JSON; survives WordPress's `wp_unslash()` in `update_post_meta()`. Callers must `json_decode()`.
 
+Rows can be reordered in every layout. In the accordion, drag a row by its ☰ handle. In the tabbed layouts (since v1.103.0), drag a tab, or focus it and press Alt + an arrow key; the rows are saved in tab order. Read-only repeaters can't be reordered.
+
 ### Gradient Text
 
 A `gradient_text` field authors a heading as an ordered list of plain/highlighted segments, rather than the older convention of a plain `heading` field plus one always-trailing `highlight` field — that convention can't express a heading like "How can **we help**?" where the highlighted run isn't the last word. Each segment is `{text: string, highlighted: bool}`; the admin UI is a lightweight Alpine-only segment editor (add/remove/toggle), no drag-reorder — reach for a real `repeater` instead if row reordering matters for a given field.

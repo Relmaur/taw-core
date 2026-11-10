@@ -1909,13 +1909,71 @@ class Metabox
                         var isTabbed = layout === 'tabbed_horizontal' || layout === 'tabbed_vertical';
                         var activeTabIndex = 0;
                         var $tabNav = null;
+                        var reorderHint = <?php echo wp_json_encode(__('Drag to reorder (or Alt + arrow keys)', 'taw-core')); ?>;
+
+                        // In tabbed mode the tabs carry the order: reordering moves a
+                        // tab, never its row, because moving a row in the DOM reloads
+                        // any wysiwyg iframe inside it. rowsInOrder() is what
+                        // serialize() reads, so the saved order is the tabs' order.
+                        function rowsInOrder() {
+                            var order = [];
+                            if (isTabbed && $tabNav) {
+                                $tabNav.children('.taw-repeater-tab').each(function() {
+                                    var row = $(this).data('row');
+                                    if (row && row.parentNode === $rows[0]) order.push(row);
+                                });
+                            }
+                            $rows.children('.taw-repeater-row').each(function() {
+                                if (order.indexOf(this) === -1) order.push(this);
+                            });
+                            return $(order);
+                        }
+
+                        function tabIndex(tab) {
+                            return $tabNav.children('.taw-repeater-tab').index(tab);
+                        }
+
+                        // After the tabs changed order: renumber, keep the same row
+                        // open, save the new order.
+                        function tabsReordered() {
+                            var active = tabIndex($tabNav.children('.taw-repeater-tab.active'));
+                            updateNumbers();
+                            setActiveTab(active < 0 ? 0 : active);
+                            serialize();
+                        }
+
+                        function moveTab($tab, step) {
+                            var $tabs = $tabNav.children('.taw-repeater-tab');
+                            var to = $tabs.index($tab) + step;
+                            if (to < 0 || to >= $tabs.length) return;
+                            if (step < 0) {
+                                $tab.insertBefore($tabs.eq(to));
+                            } else {
+                                $tab.insertAfter($tabs.eq(to));
+                            }
+                            $tab.trigger('focus');
+                            tabsReordered();
+                        }
 
                         function rebuildTabs() {
+                            var $order = rowsInOrder();
                             $tabNav.children('.taw-repeater-tab').remove();
-                            $rows.children('.taw-repeater-row').each(function(i) {
+                            $order.each(function(i) {
                                 var $row = $(this);
-                                var $tab = $('<button type="button" class="taw-repeater-tab">');
+                                var $tab = $('<button type="button" class="taw-repeater-tab">').data('row', this);
                                 $tab.append('<span class="taw-repeater-tab-label">#' + (i + 1) + '</span>');
+                                if (!isReadonly) {
+                                    $tab.attr('title', reorderHint);
+                                    $tab.on('keydown', function(e) {
+                                        if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+                                        var back = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
+                                        var forward = e.key === 'ArrowRight' || e.key === 'ArrowDown';
+                                        if (!back && !forward) return;
+                                        e.preventDefault();
+                                        setActiveTab(tabIndex(this));
+                                        moveTab($(this), back ? -1 : 1);
+                                    });
+                                }
                                 if (!isReadonly) {
                                     var $x = $('<span class="taw-repeater-tab-remove" title="Remove">&times;</span>');
                                     $x.on('click', function(e) {
@@ -1932,14 +1990,14 @@ class Metabox
                                     });
                                     $tab.append($x);
                                 }
-                                $tab.on('click', function() { setActiveTab(i); });
+                                $tab.on('click', function() { setActiveTab(tabIndex(this)); });
                                 $tab.insertBefore($tabNav.children('.taw-repeater-tab-add'));
                             });
                         }
 
                         function setActiveTab(index) {
                             activeTabIndex = index;
-                            $rows.children('.taw-repeater-row').each(function(i) {
+                            rowsInOrder().each(function(i) {
                                 $(this).children('.taw-repeater-row-content').toggle(i === index);
                             });
                             $tabNav.children('.taw-repeater-tab').each(function(i) {
@@ -1961,6 +2019,37 @@ class Metabox
                             rebuildTabs();
                             if ($rows.children('.taw-repeater-row').length > 0) {
                                 setActiveTab(0);
+                            }
+
+                            // Drag a tab to reorder. Tabs are buttons, which jQuery UI
+                            // cancels by default; only the × is excluded here. The
+                            // distance keeps a plain click a click.
+                            if (!isReadonly) {
+                                $tabNav.sortable({
+                                    items: '> .taw-repeater-tab',
+                                    cancel: '.taw-repeater-tab-remove',
+                                    axis: layout === 'tabbed_vertical' ? 'y' : false,
+                                    distance: 4,
+                                    tolerance: 'pointer',
+                                    placeholder: 'taw-repeater-tab-placeholder',
+                                    forcePlaceholderSize: true,
+                                    start: function(e, ui) {
+                                        // jQuery UI copies the tab's classes onto the
+                                        // placeholder; it must not count as a tab.
+                                        ui.placeholder.removeClass('taw-repeater-tab active')
+                                            .outerWidth(ui.item.outerWidth())
+                                            .outerHeight(ui.item.outerHeight());
+                                        setActiveTab(tabIndex(ui.item));
+                                    },
+                                    update: tabsReordered
+                                });
+                                // jQuery UI only sees floated or inline items as a row;
+                                // flex items count as stacked, so horizontal tabs never
+                                // swap. Treat them as floats (wrapped rows still work).
+                                var tabSortable = $tabNav.sortable('instance');
+                                if (layout === 'tabbed_horizontal' && tabSortable) {
+                                    tabSortable._isFloating = function() { return true; };
+                                }
                             }
                         }
 
@@ -2107,7 +2196,7 @@ class Metabox
 
                             var data = [];
 
-                            $rows.children('.taw-repeater-row').each(function() {
+                            rowsInOrder().each(function() {
                                 var $row = $(this);
                                 var rowData = {};
 
@@ -2190,6 +2279,48 @@ class Metabox
                         $('.taw-repeater').each(function() {
                             initRepeater($(this));
                         });
+
+                        // Visual (TinyMCE) editors in repeater rows type into an
+                        // iframe, so their textarea, which serialize() reads, only
+                        // changes when the editor saves. Save it as the user types,
+                        // and re-serialize the row's repeater whenever it saves:
+                        // the block editor saves metaboxes with tinymce.triggerSave()
+                        // and a fetch, never a form submit, so the pre-submit flush
+                        // below never runs there.
+                        function watchRowEditor(editor) {
+                            if (editor.tawRepeaterWatched) return;
+                            var textarea = editor.getElement && editor.getElement();
+                            if (!textarea || !$(textarea).closest('.taw-repeater-row').length) return;
+                            editor.tawRepeaterWatched = true;
+
+                            // Bound at init, after the plugins' own SaveContent
+                            // handlers (WordPress's removep, and its "keep the
+                            // textarea while hidden" rule), so e.content is final.
+                            function bind() {
+                                editor.on('SaveContent', function(e) {
+                                    if (e.element !== textarea) return;
+                                    if (!editor.isHidden()) textarea.value = e.content;
+                                    $(textarea).closest('.taw-repeater').trigger('taw-flush-serialize');
+                                });
+                                editor.on('input change undo redo', debounce(function() {
+                                    if (!editor.removed && !editor.isHidden()) editor.save();
+                                }, 200));
+                            }
+                            if (editor.initialized) {
+                                bind();
+                            } else {
+                                editor.on('init', bind);
+                            }
+                        }
+
+                        if (window.tinymce) {
+                            $.each(window.tinymce.editors || [], function(_, editor) {
+                                watchRowEditor(editor);
+                            });
+                            window.tinymce.on('AddEditor', function(e) {
+                                watchRowEditor(e.editor);
+                            });
+                        }
 
                         // Pre-submit flush: serialize all repeaters synchronously before
                         // the form is sent so that debounce lag never causes stale data.
