@@ -50,6 +50,15 @@ class EmailConfig
     private static string  $fromEmail     = '';
     private static string  $fromName      = '';
 
+    /** Retries after Emailit's rate limit (429) before falling back to wp_mail(). */
+    public const RATE_LIMIT_RETRIES = 2;
+
+    /** The longest wait honoured from a 429's Retry-After, in seconds. */
+    public const RATE_LIMIT_MAX_WAIT = 3.0;
+
+    /** @var (callable(float): void)|null test seam for the wait between retries */
+    private static $sleeper = null;
+
     /**
      * Route all wp_mail() calls through Emailit's REST API.
      *
@@ -129,28 +138,89 @@ class EmailConfig
             ? self::$fromName . ' <' . self::$fromEmail . '>'
             : self::$fromEmail;
 
-        try {
-            $client = new \Emailit\EmailitClient(self::$emailitApiKey);
-            $client->emails()->send(array_filter([
-                'from'    => $from,
-                'to'      => $to,
-                'subject' => $subject,
-                'html'        => $isHtml ? $message : null,
-                'text'        => $isHtml ? wp_strip_all_tags($message, true) : $message,
-                'reply_to'    => $parsed['reply_to'],
-                'cc'          => $parsed['cc'] ?: null,
-                'bcc'         => $parsed['bcc'] ?: null,
-                'attachments' => $attachments ?: null,
-            ], fn($v) => $v !== null));
+        $payload = [
+            'from'    => $from,
+            'to'      => $to,
+            'subject' => $subject,
+            'html'        => $isHtml ? $message : null,
+            'text'        => $isHtml ? wp_strip_all_tags($message, true) : $message,
+            'reply_to'    => $parsed['reply_to'],
+            'cc'          => $parsed['cc'] ?: null,
+            'bcc'         => $parsed['bcc'] ?: null,
+            'attachments' => $attachments ?: null,
+        ];
+        $payload = array_filter($payload, fn($v) => $v !== null);
 
-            return true;
-        } catch (\Throwable $e) {
-            Logger::error(
-                'mail.emailit_send_failed',
-                'Emailit send failed — falling back to wp_mail().',
-                ['exception' => get_class($e), 'error' => $e->getMessage()],
-            );
-            return null;
+        // Emailit allows a few messages a second per account. A second email
+        // in the same request (a client's copy right after the studio's) can
+        // hit that limit: wait and retry, instead of handing the message to
+        // the host's mail, which the domain's SPF/DKIM may not cover.
+        for ($attempt = 0; ; $attempt++) {
+            try {
+                $client = new \Emailit\EmailitClient(self::$emailitApiKey);
+                $client->emails()->send($payload);
+
+                if ($attempt > 0) {
+                    Logger::info('mail.emailit_rate_limit_retried', 'Emailit accepted the message after its rate limit.', ['retries' => $attempt]);
+                }
+                return true;
+            } catch (\Emailit\Exceptions\RateLimitException $e) {
+                if ($attempt < self::RATE_LIMIT_RETRIES) {
+                    self::wait(self::retryAfter($e->getHttpHeaders(), $attempt));
+                    continue;
+                }
+                Logger::error(
+                    'mail.emailit_send_failed',
+                    'Emailit send failed — falling back to wp_mail().',
+                    ['exception' => get_class($e), 'error' => $e->getMessage(), 'retries' => $attempt],
+                );
+                return null;
+            } catch (\Throwable $e) {
+                Logger::error(
+                    'mail.emailit_send_failed',
+                    'Emailit send failed — falling back to wp_mail().',
+                    ['exception' => get_class($e), 'error' => $e->getMessage()],
+                );
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Seconds to wait before retry $attempt (0-based): a 429's Retry-After
+     * when it sends one (capped), otherwise 1 s, then 2 s.
+     *
+     * @param array<string, mixed> $headers
+     */
+    public static function retryAfter(array $headers, int $attempt): float
+    {
+        foreach ($headers as $name => $value) {
+            if (strtolower((string) $name) !== 'retry-after') {
+                continue;
+            }
+            $value = is_array($value) ? reset($value) : $value;
+            if (is_numeric($value)) {
+                return max(0.0, min(self::RATE_LIMIT_MAX_WAIT, (float) $value));
+            }
+        }
+
+        return min(self::RATE_LIMIT_MAX_WAIT, (float) ($attempt + 1));
+    }
+
+    /** Tests replace the wait; null puts usleep() back. */
+    public static function setSleeper(?callable $sleeper): void
+    {
+        self::$sleeper = $sleeper;
+    }
+
+    private static function wait(float $seconds): void
+    {
+        if (self::$sleeper !== null) {
+            (self::$sleeper)($seconds);
+            return;
+        }
+        if ($seconds > 0) {
+            usleep((int) round($seconds * 1000000));
         }
     }
 
