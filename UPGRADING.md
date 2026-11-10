@@ -83,6 +83,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.100 | Content snapshots name featured images by path (schema 1.9); update Local and production together before publishing |
 | < v1.101 | TAW Settings → Developer Tools gains "Enable Lens" (off); `taw upgrade --apply` adds it to `inc/options.php` |
 | < v1.102 | Restart `taw lens` after updating (Lens page protocol 2) |
+| < v1.103 | Text typed in the Visual editor of a repeater's WYSIWYG field saves again in the block editor (a bug fix); tabbed repeaters can be reordered |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -1030,6 +1031,17 @@ protocol is now 2: two new bridge routes, `POST /conversation` and `POST /note`,
 **Check:** restart `taw lens` after the update; an open page shows "Restart needed" until it runs the same
 version. Nothing to migrate, and nothing changes on a site without Lens on. **Undo:** none needed; deleting
 `.taw/lens/conversations/` only empties the menu.
+
+### v1.103.0: reorder tabbed repeaters; repeater editors save in the block editor
+
+**What changed.** A repeater with `'layout' => 'tabbed_horizontal'` or `'tabbed_vertical'` can be reordered: drag a
+tab, or focus it and press Alt + an arrow key. Rows save in tab order. Separately, a bug fix: in the block editor,
+text typed in the Visual tab of a `wysiwyg` field inside a repeater row was lost on save (the Code tab and the
+classic editor were fine). Each such editor now writes its text into the repeater as you type and when WordPress
+saves the metaboxes.
+
+**Check:** on a page with a WYSIWYG field in a repeater, type in its Visual tab, save, reload: the text is there.
+Nothing to migrate; stored data is unchanged. **Undo:** `composer update taw/core:1.102.1`.
 
 ## Opt-in features you may want
 

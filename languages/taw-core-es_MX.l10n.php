@@ -227,6 +227,7 @@ return array (
     'Done' => 'Listo',
     'Download snapshot' => 'Descargar instantánea',
     'Drag to reorder' => 'Arrastre para reordenar',
+    'Drag to reorder (or Alt + arrow keys)' => 'Arrastre para reordenar (o Alt + flechas)',
     'Drop to upload here' => 'Suelta aquí para subir',
     'Earlier' => 'Antes',
     'Earlier · %s' => 'Antes · %s',

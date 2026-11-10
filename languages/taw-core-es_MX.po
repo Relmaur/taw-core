@@ -966,6 +966,10 @@ msgstr "Descargar instantánea"
 msgid "Drag to reorder"
 msgstr "Arrastre para reordenar"
 
+#: src/Core/Metabox/Metabox.php
+msgid "Drag to reorder (or Alt + arrow keys)"
+msgstr "Arrastre para reordenar (o Alt + flechas)"
+
 #: src/Core/Media/MediaFolders.php
 msgid "Drop to upload here"
 msgstr "Suelta aquí para subir"

@@ -721,6 +721,20 @@ div[id*="taw_"] .postbox-header h2.hndle:has(img) {
   font-weight: 600;
 }
 
+/* Dragging a tab to reorder (jQuery UI sortable on the tab nav) */
+.taw-repeater-tab-placeholder {
+  border: 2px dashed #c3c4c7;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.taw-repeater-tab.ui-sortable-helper {
+  background: #fff;
+  opacity: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: grabbing;
+}
+
 /* Remove × inside a tab */
 .taw-repeater-tab-remove {
   margin-left: auto;
