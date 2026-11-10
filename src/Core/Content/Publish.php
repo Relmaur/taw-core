@@ -155,7 +155,7 @@ final class Publish
             'publish_id' => $id,
             'token'      => $token,
             'expires_at' => gmdate('c', $state['expires_at']),
-            'plan'       => ['registry_drift' => $plan['registry_drift'], 'records' => $records, 'warnings' => $warnings],
+            'plan'       => ['registry_drift' => $plan['registry_drift'], 'records' => Importer::forJson($records), 'warnings' => $warnings],
             'media'      => ['needed' => array_values($needed)],
             'limits'     => $this->limits,
         ];

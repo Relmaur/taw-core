@@ -183,4 +183,41 @@ final class ImporterPublishTest extends TestCase
         $this->assertSame('555-0100', $change['base']);
         $this->assertSame('_taw_phone', $change['label'], 'no options page here: the option name');
     }
+
+    public function test_a_delete_has_no_changes_and_they_go_out_as_an_object(): void
+    {
+        // A publish that deletes a page and an option: neither record has a
+        // change, and PHP writes an empty array as `[]` — taw-fleet reads
+        // `changes` as a map and refused the whole plan (taw/core 1.105.1).
+        $this->production();
+        Functions\when('get_option')->alias(static fn (string $k, $d = null) => $k === '_taw_cta_label' ? 'Book now' : $d);
+        $changeSet = ['taw_changeset' => ['schema' => '1.8', 'base_fingerprint' => 'x'], 'operations' => [
+            ['op' => 'delete', 'target' => ['kind' => 'post', 'type' => 'post', 'slug' => 'news']],
+            ['op' => 'delete', 'target' => ['kind' => 'option', 'key' => '_taw_cta_label']],
+        ]];
+
+        $records = (new Importer())->plan($changeSet)['records'];
+
+        $this->assertSame(['would-delete', 'would-delete'], array_column($records, 'op'));
+        $this->assertSame([[], []], array_column($records, 'changes'), 'in PHP, changes stay an array');
+
+        $json = (string) json_encode(Importer::forJson($records));
+        $this->assertSame(2, substr_count($json, '"changes":{}'), $json);
+        $this->assertStringNotContainsString('"changes":[]', $json);
+        $decoded = json_decode($json);
+        $this->assertInstanceOf(\stdClass::class, $decoded[0]->changes);
+    }
+
+    public function test_for_json_leaves_a_record_with_changes_as_it_is(): void
+    {
+        $record = ['kind' => 'option', 'key' => 'blogname', 'op' => 'update',
+            'changes' => ['value' => ['status' => 'changed', 'old' => 'A', 'new' => 'B']]];
+
+        $this->assertSame([$record], Importer::forJson([$record]), 'a map already encodes as an object');
+        $this->assertSame(
+            '[{"kind":"option","key":"x","op":"would-delete","changes":{}}]',
+            json_encode(Importer::forJson([['kind' => 'option', 'key' => 'x', 'op' => 'would-delete']])),
+            'no changes key at all: still an object'
+        );
+    }
 }
