@@ -49,6 +49,7 @@ final class EmailConfigTest extends TestCase
         // otherwise leak between test methods (and even between test
         // classes, since PHPUnit runs the whole suite in one process).
         $ref = new \ReflectionClass(EmailConfig::class);
+        EmailConfig::setSleeper(null);
         foreach (['emailitApiKey' => null, 'fromEmail' => '', 'fromName' => ''] as $prop => $default) {
             $property = $ref->getProperty($prop);
             $property->setAccessible(true);
@@ -424,5 +425,75 @@ final class EmailConfigTest extends TestCase
 
         $this->assertNull($result, 'null = let wp_mail() send it, attachment included');
         $this->assertFalse($sent);
+    }
+
+    /**
+     * Emailit's per-second limit (429) on a second email in the same request
+     * used to fall straight back to wp_mail(), the host's mail. It now waits
+     * and retries; only a third 429 falls back.
+     */
+    public function test_rate_limit_waits_and_retries_before_falling_back(): void
+    {
+        $emailService = \Mockery::mock();
+        $emailService->shouldReceive('send')->twice()->andReturnUsing(
+            function () {
+                static $calls = 0;
+                if (++$calls === 1) {
+                    throw new \Emailit\Exceptions\RateLimitException('Rate limit exceeded', 429);
+                }
+                return (object) [];
+            }
+        );
+        $client = \Mockery::mock('overload:' . \Emailit\EmailitClient::class);
+        $client->shouldReceive('emails')->andReturn($emailService);
+
+        $waits = [];
+        EmailConfig::setSleeper(function (float $s) use (&$waits): void { $waits[] = $s; });
+        EmailConfig::useEmailit('fake-api-key', 'hello@example.com');
+
+        $this->assertTrue(EmailConfig::interceptForEmailit(null, $this->sampleMailAtts()));
+        $this->assertSame([1.0], $waits);
+    }
+
+    public function test_rate_limit_falls_back_after_the_last_retry(): void
+    {
+        $emailService = \Mockery::mock();
+        $emailService->shouldReceive('send')->times(EmailConfig::RATE_LIMIT_RETRIES + 1)
+            ->andThrow(new \Emailit\Exceptions\RateLimitException('Rate limit exceeded', 429));
+        $client = \Mockery::mock('overload:' . \Emailit\EmailitClient::class);
+        $client->shouldReceive('emails')->andReturn($emailService);
+
+        $waits = [];
+        EmailConfig::setSleeper(function (float $s) use (&$waits): void { $waits[] = $s; });
+        EmailConfig::useEmailit('fake-api-key', 'hello@example.com');
+
+        $this->assertNull(EmailConfig::interceptForEmailit(null, $this->sampleMailAtts()), 'null = wp_mail() sends it');
+        $this->assertSame([1.0, 2.0], $waits);
+    }
+
+    public function test_other_errors_fall_back_without_waiting(): void
+    {
+        $emailService = \Mockery::mock();
+        $emailService->shouldReceive('send')->once()
+            ->andThrow(new \Emailit\Exceptions\AuthenticationException('Bad key', 401));
+        $client = \Mockery::mock('overload:' . \Emailit\EmailitClient::class);
+        $client->shouldReceive('emails')->andReturn($emailService);
+
+        $waits = [];
+        EmailConfig::setSleeper(function (float $s) use (&$waits): void { $waits[] = $s; });
+        EmailConfig::useEmailit('fake-api-key', 'hello@example.com');
+
+        $this->assertNull(EmailConfig::interceptForEmailit(null, $this->sampleMailAtts()));
+        $this->assertSame([], $waits);
+    }
+
+    public function test_retry_after_header_is_honoured_and_capped(): void
+    {
+        $this->assertSame(1.0, EmailConfig::retryAfter([], 0));
+        $this->assertSame(2.0, EmailConfig::retryAfter([], 1));
+        $this->assertSame(2.0, EmailConfig::retryAfter(['Retry-After' => '2'], 0));
+        $this->assertSame(1.0, EmailConfig::retryAfter(['retry-after' => ['1']], 1));
+        $this->assertSame(EmailConfig::RATE_LIMIT_MAX_WAIT, EmailConfig::retryAfter(['retry-after' => '60'], 0));
+        $this->assertSame(1.0, EmailConfig::retryAfter(['retry-after' => 'Wed, 21 Oct 2026 07:28:00 GMT'], 0));
     }
 }
