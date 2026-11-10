@@ -316,4 +316,113 @@ final class EmailConfigTest extends TestCase
 
         $this->assertNull($result);
     }
+
+    /** Mocks the SDK and returns a reference to the params it was sent. */
+    private function captureSend(?array &$captured): void
+    {
+        $emailService = \Mockery::mock();
+        $emailService->shouldReceive('send')->andReturnUsing(
+            function (array $params) use (&$captured) {
+                $captured = $params;
+                return (object) [];
+            }
+        );
+        $client = \Mockery::mock('overload:' . \Emailit\EmailitClient::class);
+        $client->shouldReceive('emails')->andReturn($emailService);
+    }
+
+    public function test_reply_to_cc_and_bcc_headers_reach_emailit(): void
+    {
+        $captured = null;
+        $this->captureSend($captured);
+        EmailConfig::useEmailit('fake-api-key', 'hello@example.com');
+
+        $result = EmailConfig::interceptForEmailit(null, [
+            'to'      => 'studio@example.com',
+            'subject' => 'Test',
+            'message' => '<p>Hi</p>',
+            'headers' => [
+                'Content-Type: text/html; charset=UTF-8',
+                'From: Someone Else <other@example.com>',
+                'Reply-To: client@example.com',
+                'Cc: a@example.com, b@example.com',
+                'Bcc: c@example.com',
+            ],
+        ]);
+
+        $this->assertTrue($result);
+        $this->assertSame('client@example.com', $captured['reply_to']);
+        $this->assertSame(['a@example.com', 'b@example.com'], $captured['cc']);
+        $this->assertSame(['c@example.com'], $captured['bcc']);
+        $this->assertSame('Test Site <hello@example.com>', $captured['from'], 'the configured sender, not the From header');
+        $this->assertSame('<p>Hi</p>', $captured['html']);
+    }
+
+    public function test_headers_as_one_string_are_parsed_too(): void
+    {
+        $captured = null;
+        $this->captureSend($captured);
+        EmailConfig::useEmailit('fake-api-key', 'hello@example.com');
+
+        EmailConfig::interceptForEmailit(null, [
+            'to' => 'x@example.com', 'subject' => 'T', 'message' => '<b>x</b>',
+            'headers' => "Content-Type: text/html\r\nReply-To: r@example.com",
+        ]);
+
+        $this->assertSame('r@example.com', $captured['reply_to']);
+        $this->assertSame('<b>x</b>', $captured['html']);
+        $this->assertArrayNotHasKey('cc', $captured);
+        $this->assertArrayNotHasKey('attachments', $captured);
+    }
+
+    public function test_attachments_are_sent_base64_with_their_names(): void
+    {
+        Functions\when('wp_check_filetype')->alias(
+            fn (string $name): array => ['ext' => 'csv', 'type' => str_ends_with($name, '.csv') ? 'text/csv' : false]
+        );
+        $dir = sys_get_temp_dir() . '/taw-emailit-' . uniqid();
+        mkdir($dir);
+        file_put_contents($dir . '/guests.csv', "a,b\n1,2\n");
+        file_put_contents($dir . '/raw.bin', 'xyz');
+
+        $captured = null;
+        $this->captureSend($captured);
+        EmailConfig::useEmailit('fake-api-key', 'hello@example.com');
+
+        $result = EmailConfig::interceptForEmailit(null, [
+            'to' => 'x@example.com', 'subject' => 'T', 'message' => 'Body', 'headers' => [],
+            'attachments' => [$dir . '/guests.csv', 'Shown name.txt' => $dir . '/raw.bin'],
+        ]);
+
+        unlink($dir . '/guests.csv');
+        unlink($dir . '/raw.bin');
+        rmdir($dir);
+
+        $this->assertTrue($result);
+        $this->assertSame([
+            ['filename' => 'guests.csv', 'content' => base64_encode("a,b\n1,2\n"), 'content_type' => 'text/csv'],
+            ['filename' => 'Shown name.txt', 'content' => base64_encode('xyz')],
+        ], $captured['attachments']);
+    }
+
+    public function test_an_unreadable_attachment_falls_back_to_wp_mail_instead_of_dropping_it(): void
+    {
+        $sent = false;
+        $emailService = \Mockery::mock();
+        $emailService->shouldReceive('send')->andReturnUsing(function () use (&$sent) {
+            $sent = true;
+            return (object) [];
+        });
+        $client = \Mockery::mock('overload:' . \Emailit\EmailitClient::class);
+        $client->shouldReceive('emails')->andReturn($emailService);
+        EmailConfig::useEmailit('fake-api-key', 'hello@example.com');
+
+        $result = EmailConfig::interceptForEmailit(null, [
+            'to' => 'x@example.com', 'subject' => 'T', 'message' => 'Body', 'headers' => [],
+            'attachments' => ['/nonexistent/' . uniqid() . '.csv'],
+        ]);
+
+        $this->assertNull($result, 'null = let wp_mail() send it, attachment included');
+        $this->assertFalse($sent);
+    }
 }
