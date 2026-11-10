@@ -19,7 +19,16 @@ if (!defined('ABSPATH')) {
  *
  *   add_filter('taw_mail_templates_dir', fn() => get_template_directory() . '/resources/mails');
  *
- * Variable replacement uses {{variable_name}} syntax.
+ * Variable replacement uses {{variable_name}} syntax. Values are inserted
+ * literally (no regex backreferences: "$1" or "\\0" in a value stays as typed)
+ * and are NOT escaped — escape them before setVariables().
+ *
+ * Optional blocks: wrap a part of the template in
+ *   <!--if:variable_name-->…<!--/if:variable_name-->
+ * and compile() removes the whole block when that variable is unset or an
+ * empty string. When it has a value the block stays, markers included
+ * (they're HTML comments, invisible in every mail client). Blocks with
+ * different names may nest; a block can't contain another of the same name.
  */
 class MailTemplate
 {
@@ -75,11 +84,50 @@ class MailTemplate
             );
         }
 
-        foreach ($this->variables as $key => $value) {
-            $html = preg_replace('/\{\{\s*' . preg_quote($key, '/') . '\s*\}\}/', $value, $html);
+        return self::fill((string) $html, $this->variables);
+    }
+
+    /**
+     * Removes the optional blocks whose variable is empty, then replaces
+     * every {{variable}} with its value, literally.
+     *
+     * @param array<string, mixed> $variables
+     */
+    public static function fill(string $html, array $variables): string
+    {
+        $html = self::stripOptional($html, $variables);
+
+        foreach ($variables as $key => $value) {
+            $value = is_scalar($value) ? (string) $value : '';
+            $html  = (string) preg_replace_callback(
+                '/\{\{\s*' . preg_quote((string) $key, '/') . '\s*\}\}/',
+                static fn (): string => $value,
+                $html
+            );
         }
 
         return $html;
+    }
+
+    /**
+     * Removes each <!--if:x-->…<!--/if:x--> block whose x is empty; a kept
+     * block is searched again for the blocks nested inside it.
+     *
+     * @param array<string, mixed> $variables
+     */
+    private static function stripOptional(string $html, array $variables): string
+    {
+        return (string) preg_replace_callback(
+            '/<!--if:([A-Za-z0-9_]+)-->(.*?)<!--\/if:\1-->/s',
+            static function (array $m) use ($variables): string {
+                $value = $variables[$m[1]] ?? '';
+                if (!is_scalar($value) || (string) $value === '') {
+                    return '';
+                }
+                return '<!--if:' . $m[1] . '-->' . self::stripOptional($m[2], $variables) . '<!--/if:' . $m[1] . '-->';
+            },
+            $html
+        );
     }
 
     /**

@@ -84,6 +84,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.101 | TAW Settings → Developer Tools gains "Enable Lens" (off); `taw upgrade --apply` adds it to `inc/options.php` |
 | < v1.102 | Restart `taw lens` after updating (Lens page protocol 2) |
 | < v1.103 | Text typed in the Visual editor of a repeater's WYSIWYG field saves again in the block editor (a bug fix); tabbed repeaters can be reordered |
+| < v1.104 | A `{{variable}}` value containing `$1` or `\0` now reaches the email as typed (a bug fix); forms can send no email (`'email' => false`); templates can have optional blocks |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -1042,6 +1043,20 @@ saves the metaboxes.
 
 **Check:** on a page with a WYSIWYG field in a repeater, type in its Visual tab, save, reload: the text is there.
 Nothing to migrate; stored data is unchanged. **Undo:** `composer update taw/core:1.102.1`.
+
+### v1.104.0: forms without an email; optional blocks in mail templates
+
+**What changed.** Three things, none of which changes existing forms or templates:
+- `Form::register([... 'email' => false])` sends no email at all, for a form whose `on_submit` callback sends
+  its own (`Mailer` with computed variables). Without an `email` key a form still sends its plain-text email to
+  `admin_email`.
+- `MailTemplate` (and `Mailer::template()`) removes `<!--if:name-->…<!--/if:name-->` blocks when `name` is unset
+  or empty. `MailTemplate::fill($html, $variables)` does the same for any HTML string.
+- A bug fix: a value with `$1`, `$12` or `\0` in it (a price, a typed message) used to lose those characters,
+  because values were inserted as regular-expression replacements. They're now inserted as typed.
+
+**Check:** send a form whose message contains `$1`; it arrives as typed. Nothing to migrate.
+**Undo:** `composer update taw/core:1.103.0`.
 
 ## Opt-in features you may want
 

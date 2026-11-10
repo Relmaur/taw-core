@@ -1369,6 +1369,10 @@ Form::register([
 
 No `template` → plain-text fallback via `wp_mail()`. `to_client` requires an `email` field in the form and always goes only to the submitter — it has no `to` override. `to_self.to` accepts a single address, an array of addresses, or a pre-joined comma-separated string; omit it to keep sending to `admin_email` as before.
 
+`'email' => false` sends nothing at all: use it when the form's `on_submit` callback sends its own email (with
+`Mailer` and computed variables) instead. Without an `email` key the form still sends its plain-text email to
+`admin_email`.
+
 ### Field Types
 
 **Input fields**
@@ -1677,6 +1681,30 @@ password.
 ---
 
 ## Email
+
+### Templates (`Mailer` / `MailTemplate`)
+
+```php
+(new Mailer())
+    ->to('studio@example.com')
+    ->subject('New request')
+    ->template('studio-request')              // mails/html/studio-request.html
+    ->setVariables(['name' => esc_html($name), 'date' => esc_html($date)])
+    ->send();
+```
+
+`{{name}}` placeholders are replaced literally (a value with `$1` or `\0` stays as typed) and **not escaped**:
+escape every value before `setVariables()`. A part of the template that only makes sense with a value goes
+between optional-block markers, and is removed when that variable is unset or empty:
+
+```html
+<!--if:date--><p>Your date: {{date}}</p><!--/if:date-->
+```
+
+When the variable has a value the block stays, markers included (HTML comments, invisible in mail clients).
+Differently named blocks may nest.
+
+### Transport (Emailit)
 
 `TAW\Support\EmailConfig::useEmailit()` routes **all** `wp_mail()` calls — form submissions, password resets, WooCommerce order emails, anything else in WordPress that goes through `wp_mail()` — through [Emailit](https://emailit.com)'s API instead of the site's default mail transport (usually PHP's `mail()`, which is unreliable for deliverability on most hosts).
 
