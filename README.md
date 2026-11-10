@@ -1704,6 +1704,20 @@ between optional-block markers, and is removed when that variable is unset or em
 When the variable has a value the block stays, markers included (HTML comments, invisible in mail clients).
 Differently named blocks may nest.
 
+A row that repeats goes between repeat markers, and its variable is a list of rows, each with its own values:
+
+```html
+<!--repeat:guest--><tr><td>{{name}}<!--if:note--> · {{note}}<!--/if:note--></td></tr><!--/repeat:guest-->
+```
+
+```php
+->setVariables(['guest' => [['name' => esc_html('Ana'), 'note' => ''], ['name' => esc_html('Luis'), 'note' => esc_html('+2')]]])
+```
+
+The block is written once per row, filled with that row's values (the template's other variables still apply),
+with each row's optional blocks resolved, and the markers dropped. An empty list removes it. Escape row values
+too.
+
 ### Transport (Emailit)
 
 `TAW\Support\EmailConfig::useEmailit()` routes **all** `wp_mail()` calls — form submissions, password resets, WooCommerce order emails, anything else in WordPress that goes through `wp_mail()` — through [Emailit](https://emailit.com)'s API instead of the site's default mail transport (usually PHP's `mail()`, which is unreliable for deliverability on most hosts).

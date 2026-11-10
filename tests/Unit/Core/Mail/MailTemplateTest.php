@@ -41,4 +41,30 @@ final class MailTemplateTest extends TestCase
         $this->assertSame('<p>7 7</p>', MailTemplate::fill('<p>{{n}} {{n}}</p>', ['n' => 7]));
         $this->assertSame('<p>{{other}}</p>', MailTemplate::fill('<p>{{other}}</p>', ['n' => 7]), 'unknown placeholders stay');
     }
+
+    public function test_a_repeat_block_is_written_once_per_row_without_its_markers(): void
+    {
+        $html = '<h1>{{title}}</h1><!--repeat:row--><li>{{name}}<!--if:note--> ({{note}})<!--/if:note--> · {{title}}</li><!--/repeat:row--><p>end</p>';
+
+        $this->assertSame(
+            '<h1>Hoy</h1><li>Ana (vegetariana) · Hoy</li><li>Luis · Hoy</li><p>end</p>',
+            MailTemplate::fill($html, ['title' => 'Hoy', 'row' => [['name' => 'Ana', 'note' => 'vegetariana'], ['name' => 'Luis', 'note' => '']]])
+        );
+    }
+
+    public function test_an_empty_or_missing_list_removes_the_repeat_block(): void
+    {
+        $html = '<p>a</p><!--repeat:row--><li>{{name}}</li><!--/repeat:row--><p>b</p>';
+
+        $this->assertSame('<p>a</p><p>b</p>', MailTemplate::fill($html, ['row' => []]));
+        $this->assertSame('<p>a</p><p>b</p>', MailTemplate::fill($html, []));
+        $this->assertSame('<p>a</p><p>b</p>', MailTemplate::fill($html, ['row' => 'not a list']));
+    }
+
+    public function test_row_values_are_literal_and_win_over_the_others(): void
+    {
+        $html = '<!--repeat:row-->[{{name}} {{city}}]<!--/repeat:row-->';
+
+        $this->assertSame('[$1 Zac][Ana León]', MailTemplate::fill($html, ['city' => 'Zac', 'row' => [['name' => '$1'], ['name' => 'Ana', 'city' => 'León']]]));
+    }
 }
