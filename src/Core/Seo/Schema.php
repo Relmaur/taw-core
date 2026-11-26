@@ -185,19 +185,44 @@ final class Schema
             $this->breadcrumbListNode(),
         ]));
 
-        $graph = array_merge($graph, self::$graph);
+        $graph = self::filterGraph(array_merge($graph, self::$graph));
 
         if (empty($graph)) {
             return;
         }
 
-        printf(
-            '<script type="application/ld+json">%s</script>' . "\n",
-            wp_json_encode(
-                ['@context' => 'https://schema.org', '@graph' => $graph],
-                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-            )
+        $json = wp_json_encode(
+            ['@context' => 'https://schema.org', '@graph' => $graph],
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         );
+        if (!is_string($json)) {
+            return;
+        }
+
+        // A string in a node can't end the script element early.
+        printf('<script type="application/ld+json">%s</script>' . "\n", str_replace('</', '<\/', $json));
+    }
+
+    /**
+     * The `taw_seo_schema_graph` filter: a theme adds to or changes the
+     * nodes (Organization `description`, `areaServed`, `sameAs` from its own
+     * options…) with `add_filter('taw_seo_schema_graph', fn (array $graph) => …)`.
+     * `$graph` is the list of nodes (Organization, WebSite, Article,
+     * BreadcrumbList, then what blocks pushed); `@context` is added after.
+     * Nodes that aren't arrays are dropped; an answer that isn't an array
+     * leaves no nodes, so nothing prints.
+     *
+     * @param list<array<string, mixed>> $graph
+     * @return list<array<string, mixed>>
+     */
+    private static function filterGraph(array $graph): array
+    {
+        $filtered = apply_filters('taw_seo_schema_graph', $graph);
+        if (!is_array($filtered)) {
+            return [];
+        }
+
+        return array_values(array_filter($filtered, 'is_array'));
     }
 
     /**

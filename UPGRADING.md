@@ -88,6 +88,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.104.1 | With Emailit on, emails keep their Reply-To, Cc, Bcc and attachments (a bug fix) |
 | < v1.105 | Mail templates can repeat a block once per row of a list (`<!--repeat:name-->`); nothing changes otherwise |
 | < v1.105.1 | A publish from taw-fleet that deletes a page or an option reads again (a bug fix); update production |
+| < v1.106 | Forms can redirect after a successful submit (`'redirect'`); three opt-in SEO filters; `content:import --staged` dry runs list staged files as sideloaded (a bug fix); nothing changes otherwise |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -1046,6 +1047,24 @@ saves the metaboxes.
 
 **Check:** on a page with a WYSIWYG field in a repeater, type in its Visual tab, save, reload: the text is there.
 Nothing to migrate; stored data is unchanged. **Undo:** `composer update taw/core:1.102.1`.
+
+### v1.106.0: form redirects, SEO filters, `--staged` dry runs
+
+**What changed.** Four things, none of which changes an existing site:
+- `Form::register([... 'redirect' => '/thank-you/'])` (a site path or a URL on this site / `allowed_redirect_hosts`)
+  sends the visitor there after a successful submission, after showing the success message. An invalid or
+  external value is ignored (the inline message shows; one `form.redirect_rejected` warning). Without the key a
+  form behaves as before.
+- `taw_seo_meta_screens` (post types the SEO & Social box shows on, default `page` and `post`) and
+  `taw_seo_meta_context` (the head values before they print, e.g. for description fallbacks). The `<title>` tag
+  isn't affected by the second.
+- `taw_seo_schema_graph` (the JSON-LD nodes before they print). Also, a `</` inside a JSON-LD string is now
+  written as `<\/`, so it can't end the script element.
+- A bug fix: `content:import --staged=<dir>` without `--yes` listed every staged file as missing although the
+  apply imported it; the dry run now says it would sideload them.
+
+**Check:** nothing on an existing site; only themes that add the key or the filters change. Nothing to migrate.
+**Undo:** `composer update taw/core:1.105.2`.
 
 ### v1.105.1: a publish with a delete reads again
 

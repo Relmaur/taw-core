@@ -109,4 +109,36 @@ final class ContentImportCommandTest extends TestCase
         $this->assertSame(1, $exit);
         $this->assertStringContainsString('not valid JSON', $tester->getDisplay());
     }
+
+    /**
+     * `--staged` used to reach only the apply: the dry run listed every
+     * staged file as missing although the apply imported it.
+     */
+    public function test_a_dry_run_with_staged_files_says_it_would_sideload_them(): void
+    {
+        Functions\when('wp_basename')->alias(static fn (string $p): string => basename($p));
+        @mkdir($this->tmp . '/staged/2026/10', 0777, true);
+        file_put_contents($this->tmp . '/staged/2026/10/hero.jpg', 'bytes');
+        $snap = $this->writeSnapshot([
+            'meta'    => ['schema' => '1.8'],
+            'options' => [],
+            'terms'   => [],
+            'posts'   => [],
+            'media'   => [['id' => 4, 'filename' => 'hero.jpg', 'file' => '2026/10/hero.jpg']],
+        ]);
+
+        $themeDir = $this->tmp . '/wp/wp-content/themes/taw-theme';
+        $run = function (array $options) use ($themeDir, $snap): array {
+            $tester = new CommandTester(new ContentImportCommand($themeDir));
+            $tester->execute(['file' => $snap, '--json' => true] + $options);
+            $plan = json_decode($tester->getDisplay(), true);
+            $this->assertIsArray($plan);
+            $media = array_values(array_filter($plan['records'], fn (array $r) => ($r['kind'] ?? '') === 'media'));
+            $this->assertCount(1, $media);
+            return $media[0];
+        };
+
+        $this->assertSame('missing', $run([])['op'], 'without the file: missing, as before');
+        $this->assertSame('create', $run(['--staged' => $this->tmp . '/staged'])['op']);
+    }
 }

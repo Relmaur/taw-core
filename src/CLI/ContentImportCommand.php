@@ -144,7 +144,8 @@ class ContentImportCommand extends Command
             return $this->undo($io, $output, $importer, is_string($undo) ? $undo : '', $apply, $asJson);
         }
 
-        $plan = $importer->plan($data, ['keep' => $keep]);
+        // The staged files too: without them the dry run lists each as missing.
+        $plan = $importer->plan($data, ['keep' => $keep, 'media' => $staged]);
 
         if (!$apply) {
             $this->renderPlan($io, $output, $plan, $asJson);

@@ -231,12 +231,17 @@ class Importer
      * the same option doesn't write them.
      *
      * @param array<string, mixed> $input
-     * @param array{keep?: array<string, list<string>>} $options
+     * `$options['media']` is the staged-files map {@see self::apply()} takes:
+     * the dry run then says those files would be sideloaded (and, as the
+     * apply would, that a file not among them is missing).
+     *
+     * @param array{keep?: array<string, list<string>>, media?: array<string, string>} $options
      * @return array{registry_drift: list<string>, records: list<array<string, mixed>>, warnings: list<string>}
      */
     public function plan(array $input, array $options = []): array
     {
         $this->keep = self::keepFrom($options['keep'] ?? []);
+        $this->staged = is_array($options['media'] ?? null) ? array_map('strval', $options['media']) : [];
 
         return $this->planRecords($input);
     }
@@ -251,7 +256,7 @@ class Importer
         $this->withBase = is_array($input['taw_changeset'] ?? null) && isset($input['taw_changeset']['base_fingerprint']);
         $this->checkSchema($input);
         $this->rememberIncoming($input);
-        $media = new MediaResolver();
+        $media = (new MediaResolver())->withStaged($this->staged);
         $media->build(is_array($input['media'] ?? null) ? $input['media'] : [], false);
         // Files this import would bring: a field pointing at one still holds the source's ID.
         $this->incomingMedia = [];

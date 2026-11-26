@@ -1269,6 +1269,23 @@ Form::register([
 
 The icon renders inside its own `<span class="taw-btn-icon" aria-hidden="true">` (decorative — the button's accessible name already comes from the label), after the label span, alongside the button's existing loading spinner. Nothing renders when `submit_icon` is unset, empty, or an icon name `Lucide::render()` doesn't recognize.
 
+### Redirect After Submit
+
+By default a successful submission shows the inline `messages.success` text. `redirect` (taw/core ≥ v1.106.0) sends the visitor to another page instead, such as a thank-you page or a download:
+
+```php
+Form::register([
+    'id'       => 'guide',
+    'redirect' => '/thank-you/',          // a site-relative path (resolved with home_url()), or an absolute URL
+    'messages' => ['success' => 'Thanks! Taking you to your guide…'],
+    'fields'   => [...],
+]);
+```
+
+- The submission is handled as before (stored, then `on_submit`, then the email); the checked URL is added to the success response as `data.redirect`. The script shows the success message (in the `role="status"` region, so assistive tech hears it) and then calls `window.location.assign()`. Multi-step forms do the same.
+- The URL is checked at submission time with `wp_validate_redirect()`: this site's host, or one added with the `allowed_redirect_hosts` filter. Anything else (another host, `javascript:`, a non-string) is ignored: the inline message shows as without the key, and one `form.redirect_rejected` warning is logged with the form id only, never the submitted data.
+- Validation errors, `on_submit` rejections and other failures never redirect. Without `redirect`, nothing changes.
+
 ### Styling Hooks
 
 Per-form styling without an ancestor wrapper or `!important` (taw/core ≥ v1.40.0):
@@ -2427,6 +2444,23 @@ TAW has never owned meta title/description/social image natively — every real 
 - **Yoast active** (`defined('WPSEO_VERSION')`): TAW's own metabox and all of the above output stand down entirely — Yoast already owns it, and duplicating any of it would split/duplicate SEO signal. `SeoMeta::write()` and the `seo:extract`/`seo:inject` CLI commands read and write Yoast's own meta keys (`_yoast_wpseo_title`, `_yoast_wpseo_metadesc`, `_yoast_wpseo_opengraph-image-id`) directly in this case, so an agent-driven rewrite still lands somewhere the site owner's existing Yoast UI reflects it.
 - **A different plugin active** (RankMath, SmartCrawl): detected only far enough to stand TAW's own UI/output down (avoiding duplicates) — not to write its meta. `SeoMeta::targetMetaKeys()['source']` reports `'unsupported'` in this case; `seo:inject` refuses any `seo_meta` write with a clear reason rather than guessing at that plugin's own key scheme.
 
+**Extension points** (taw/core ≥ v1.106.0, both opt-in):
+
+- **`taw_seo_meta_screens`** — `apply_filters('taw_seo_meta_screens', ['page', 'post'])`: the post types the SEO & Social box shows on. Only non-empty strings that are registered post types are kept (a post type registered later on `init` at the default priority is waited for until `init:19`). The head tags already render on any singular post type; this only adds the editing UI.
+- **`taw_seo_meta_context`** — `apply_filters('taw_seo_meta_context', $context, $postId)`, applied once in `renderHeadTags()` before anything prints; `$postId` is `0` outside singular views. `$context` has `title`, `description`, `url`, `og_type`, `image_id` (attachment ID, `0` = none), `published`, `modified`. After the filter the shape is checked again: strings stay strings (a number is cast), `image_id` stays an int ≥ 0, a value of the wrong kind keeps the resolved one, unknown keys are dropped, and a non-array answer keeps the whole unfiltered context. **The `<title>` tag isn't affected** (`document_title_parts` still reads the meta title), so a filtered `title` changes only `og:title`/`twitter:title`.
+
+```php
+// A post type's SEO box, and a description fallback: meta description → summary field → site-wide text.
+add_filter('taw_seo_meta_screens', fn (array $types) => [...$types, 'guide']);
+add_filter('taw_seo_meta_context', function (array $context, int $postId): array {
+    if ($context['description'] === '') {
+        $context['description'] = ($postId ? (string) Metabox::get($postId, 'summary') : '')
+            ?: (string) OptionsPage::get('seo_fallback_description');
+    }
+    return $context;
+}, 10, 2);
+```
+
 **Auto-detection can be wrong** — it relies on version constants (`WPSEO_VERSION`, `RANK_MATH_VERSION`, `WPMU_DEV_SITE_ID`) that aren't guaranteed to be defined by every install of every plugin; a real production site running SmartCrawl produced simultaneous TAW + SmartCrawl output (duplicate `og:title`/canonical/JSON-LD) because `WPMU_DEV_SITE_ID` wasn't defined for that particular install. `SeoMeta::OUTPUT_MODE_FIELD` (on `Schema`'s **SEO Schema** settings page, since that page always registers regardless of detection state — see below) lets a site owner override detection explicitly:
 
 - **Automatic** (default) — today's detection-based behavior.
@@ -2467,6 +2501,21 @@ Schema::push(['@type' => 'HowTo', 'name' => '...', /* ... */]);
 ```
 
 `Schema::faqPage()` is the reference example — `taw-theme`'s `FAQ` block calls it in its `index.php` template, from the exact same `$items` array the accordion markup renders from, so the two can never drift out of sync.
+
+**`taw_seo_schema_graph`** (taw/core ≥ v1.106.0) — `apply_filters('taw_seo_schema_graph', $graph)` runs once, right before the graph prints on `wp_footer`. `$graph` is the list of nodes (Organization, WebSite, Article, BreadcrumbList, then what blocks pushed); `@context` is added afterwards. Nodes that aren't arrays are dropped, and nothing prints when the result is empty or not an array, or when it can't be encoded as JSON (so a bad filter never leaves broken JSON on the page). A string can't end the `<script>` element early (`</` is written as `<\/`).
+
+```php
+// Organization description, areaServed and sameAs from the theme's own options.
+add_filter('taw_seo_schema_graph', function (array $graph): array {
+    foreach ($graph as &$node) {
+        if (($node['@id'] ?? '') === home_url('/#organization')) {
+            $node['description'] = (string) OptionsPage::get('company_summary');
+            $node['areaServed'] = ['Austin', 'Round Rock'];
+        }
+    }
+    return $graph;
+});
+```
 
 ---
 
@@ -2563,7 +2612,7 @@ Scope options: `--meta=<prefix>[,…]` (also carry post meta with these key pref
 
 **Keep-list.** `plan()` and `apply()` take `keep: {record key: [change key, …]}`: those values stay as this site has them (not listed, not written; a post's own values are left out of the `wp_update_post()` call, a field's write is skipped, a term keeps its name/description/parent, an option, theme mod or menu is skipped). A record whose every change is kept is skipped. CLI `--keep=<record key>:<change key>`; Tools → TAW Data offers *Keep this site's* / *Use the file's* on each conflicting value, and a checkbox per record (unticked records are left out).
 
-**Media without downloading.** `apply()` takes `media: {uploads path: file on disk}` (`MediaResolver::withStaged()`): a file there is copied into the media library under its original name and month folder; with any given, nothing is downloaded, and an entry not among them is missing (its references cleared). CLI `--staged=<dir>`.
+**Media without downloading.** `apply()` takes `media: {uploads path: file on disk}` (`MediaResolver::withStaged()`): a file there is copied into the media library under its original name and month folder; with any given, nothing is downloaded, and an entry not among them is missing (its references cleared). CLI `--staged=<dir>`; since v1.106.0 the dry run takes the folder too (`plan()` accepts the same `media` option), so it lists those files as sideloaded instead of missing.
 
 **Undo preview.** `Importer::undoPreview()` (and `content:import --undo` without `--yes`) says what an undo would put back, delete and recreate, and what it would keep because it was edited since, writing nothing (`ImportJournal::preview()`). `Importer::journals()` / `content:journals` list every import, undone ones too.
 
