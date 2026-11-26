@@ -484,7 +484,8 @@ class Exporter
                 $this->usedTerms[(string) $taxonomy][(string) $slug] = true;
             }
             // An empty list is kept, so the importer clears what was removed.
-            $out[$taxonomy] = array_values(array_map('strval', $terms));
+            // array_values() stays: the stubs call it a list, a filter may not.
+            $out[$taxonomy] = array_values(array_map('strval', $terms)); // @phpstan-ignore arrayValues.list
         }
         return $out;
     }
