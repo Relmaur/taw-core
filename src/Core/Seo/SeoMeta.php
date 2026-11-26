@@ -234,12 +234,71 @@ final class SeoMeta
         }
     }
 
+    /** Set once registerMetabox() has waited for a post type registered later on init. */
+    private bool $deferred = false;
+
+    /**
+     * Post types the "SEO & Social" box shows on: `page` and `post`, or what
+     * the `taw_seo_meta_screens` filter returns (non-empty strings that are
+     * registered post types; anything else is dropped). The head tags render
+     * on any singular post type either way; this only adds the editing UI.
+     *
+     * @return list<string>
+     */
+    public static function screens(): array
+    {
+        return array_values(array_filter(self::requestedScreens(), 'post_type_exists'));
+    }
+
+    /**
+     * The filter's answer as unique non-empty strings, before the
+     * registered-post-type check. A non-array answer keeps the default.
+     *
+     * @return list<string>
+     */
+    private static function requestedScreens(): array
+    {
+        $default = ['page', 'post'];
+        $filtered = apply_filters('taw_seo_meta_screens', $default);
+        if (!is_array($filtered)) {
+            return $default;
+        }
+
+        $screens = [];
+        foreach ($filtered as $type) {
+            if (is_string($type) && $type !== '' && !in_array($type, $screens, true)) {
+                $screens[] = $type;
+            }
+        }
+
+        return $screens;
+    }
+
     public function registerMetabox(): void
     {
+        // A theme's post type often registers on init at the default
+        // priority after this callback was hooked. Wait for it once, until
+        // just before FieldMetaRegistrar (init:20) reads the fieldsets.
+        // The default (page, post: registered at init:0) never waits.
+        if (!$this->deferred && doing_action('init')) {
+            foreach (self::requestedScreens() as $type) {
+                if (!post_type_exists($type)) {
+                    $this->deferred = true;
+                    add_action('init', [$this, 'registerMetabox'], 19);
+                    return;
+                }
+            }
+        }
+
+        $screens = self::screens();
+        if ($screens === []) {
+            return;
+        }
+
         new Metabox([
             'id' => 'taw_seo_meta',
             'title' => __('SEO & Social', 'taw-core'),
-            'screens' => ['page', 'post'],
+            'screens' => $screens,
             'context' => 'normal',
             'priority' => 'low',
             'fields' => [
@@ -331,6 +390,7 @@ final class SeoMeta
         if ($context === null) {
             return;
         }
+        $context = self::filterContext($context, is_singular() ? (int) get_the_ID() : 0);
 
         $title = $context['title'];
         $description = $context['description'];
@@ -380,6 +440,52 @@ final class SeoMeta
         if ($imageUrl !== '') {
             printf('<meta name="twitter:image" content="%s">' . "\n", esc_url($imageUrl));
         }
+    }
+
+    /**
+     * The `taw_seo_meta_context` filter: a theme changes the resolved head
+     * values (e.g. a description fallback: meta description → a summary
+     * field → a site-wide text) with
+     * `add_filter('taw_seo_meta_context', fn (array $context, int $postId) => …, 10, 2)`;
+     * `$postId` is 0 outside singular views. Only the context's own keys
+     * survive: strings stay strings (a number is cast), `image_id` stays an
+     * int ≥ 0, a key with a value of the wrong kind keeps the resolved one,
+     * unknown keys are dropped, and an answer that isn't an array keeps the
+     * whole unfiltered context. `<title>` isn't affected
+     * (document_title_parts still reads the meta title): a changed `title`
+     * reaches og:title and twitter:title only.
+     *
+     * @param array{title: string, description: string, url: string, og_type: string, image_id: int, published: string, modified: string} $context
+     * @return array{title: string, description: string, url: string, og_type: string, image_id: int, published: string, modified: string}
+     */
+    private static function filterContext(array $context, int $postId): array
+    {
+        $filtered = apply_filters('taw_seo_meta_context', $context, $postId);
+        if (!is_array($filtered)) {
+            return $context;
+        }
+
+        foreach (array_keys($context) as $key) {
+            if (!array_key_exists($key, $filtered)) {
+                continue;
+            }
+            $value = $filtered[$key];
+            if ($key === 'image_id') {
+                if (is_int($value) && $value >= 0) {
+                    $context['image_id'] = $value;
+                } elseif (is_string($value) && ctype_digit($value)) {
+                    $context['image_id'] = (int) $value;
+                }
+                continue;
+            }
+            if (is_string($value)) {
+                $context[$key] = $value;
+            } elseif (is_int($value) || is_float($value)) {
+                $context[$key] = (string) $value;
+            }
+        }
+
+        return $context;
     }
 
     /**

@@ -987,6 +987,8 @@ Form::register([
 ]);
 ```
 
+**`redirect`** (`taw/core` ≥ v1.106.0) — after a successful submission, send the visitor to a page instead of only showing `messages.success`: `'redirect' => '/thank-you/'` (a site-relative path, resolved with `home_url()`) or an absolute URL. It's checked at submission time with `wp_validate_redirect()` (this site, or a host added with `allowed_redirect_hosts`); anything else is ignored (the inline message shows, one `form.redirect_rejected` warning with the form id only). The success JSON carries it as `data.redirect`; the script shows the success message (`role="status"`), then `window.location.assign()`s it, multi-step forms too. Errors and failures never redirect.
+
 **Per-form styling hooks** (`taw/core` ≥ v1.40.0): `'class' => 'contact-form'` appends to the `<form>`'s `taw-form`; `'button_class' => 'btn-black'` appends to the submit button's `taw-btn taw-btn-primary` (and Next on a multi-step form). Both *add to* the defaults — scope overrides as `.contact-form .taw-input { … }` instead of inventing an ancestor wrapper. A field's `width` is emitted as the `--taw-span` custom property (not an inline `grid-column`), so a theme can override `grid-column` on `.taw-form-field` with an ordinary selector — no `!important`.
 
 ```php
@@ -1055,6 +1057,14 @@ Registers a `taw_submission` CPT for viewing submissions in WP Admin. Also provi
 **Webhook payload:** always includes `page_url` — the full URL of the page the form was submitted from, captured server-side at render time — so a form embedded on several different pages (e.g. the same "Financiera" contact form on multiple pages) can still be routed differently downstream. A `taw_form_webhook_payload` filter (`add_filter('taw_form_webhook_payload', fn($payload, $formId, $postId, $data) => ..., 10, 4)` in `inc/customizations.php`) lets this specific site add or override anything else in the payload before it's sent — e.g. computing a `destination` key from `page_url` for an n8n workflow to route on.
 
 ---
+
+## SEO hooks
+
+`taw/core`'s `SeoMeta` (SEO & Social box, `<head>` tags) and `Schema` (JSON-LD on `wp_footer`) stand down when an SEO plugin is active. Three opt-in filters (`taw/core` ≥ v1.106.0), added in `inc/customizations.php`:
+
+- **`taw_seo_meta_screens`** `(array $types): array` — post types the SEO & Social box shows on; default `['page', 'post']`. Unregistered names are dropped. The head tags render on every singular post type anyway; this only adds the editing UI.
+- **`taw_seo_meta_context`** `(array $context, int $postId): array` — the resolved head values (`title`, `description`, `url`, `og_type`, `image_id`, `published`, `modified`) before they print; `$postId` is `0` outside singular views. Use it for fallbacks, e.g. meta description → a summary field → a site-wide text. The shape is checked afterwards (unknown keys dropped, wrong kinds keep the resolved value, a non-array is ignored). The `<title>` tag still comes from the meta title, so a filtered `title` changes only `og:title`/`twitter:title`.
+- **`taw_seo_schema_graph`** `(array $graph): array` — the list of JSON-LD nodes (Organization, WebSite, Article, BreadcrumbList, then pushed nodes) before it prints. Add `description`, `areaServed` or `sameAs` to the node whose `@id` is `home_url('/#organization')`. Non-array nodes are dropped; an empty or non-array result prints nothing.
 
 ## Mail System
 

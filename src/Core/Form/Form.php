@@ -52,6 +52,7 @@ if (!defined('ABSPATH')) {
  *       'button_class' => 'btn-black',    // optional — extra class(es) on the primary buttons, appended to `taw-btn taw-btn-primary`
  *       'rate_limit'   => ['max' => 5, 'window' => 60], // optional — this is the default; pass false to disable
  *       'turnstile'    => true, // optional — requires TAW_TURNSTILE_SITE_KEY/SECRET_KEY in wp-config.php
+ *       'redirect'     => '/thank-you/', // optional — after a successful submit, go here (a path, or a URL on this site / allowed_redirect_hosts)
  *       'fields'       => [
  *           ['id' => 'name',    'label' => 'Name',    'type' => 'text',  'required' => true, 'required_message' => 'Please tell us your name.', 'min_length' => 2, 'max_length' => 80],
  *           ['id' => 'email',   'label' => 'Email',   'type' => 'email', 'required' => true, 'email_message' => 'That doesn\'t look like a real email address.'],
@@ -475,9 +476,49 @@ class Form
             );
         }
 
-        wp_send_json_success([
+        $success = [
             'message' => $this->config['messages']['success'] ?? __('Thank you! Your message has been sent.', 'taw-core'),
-        ]);
+        ];
+        $redirect = $this->redirectUrl();
+        if ($redirect !== null) {
+            $success['redirect'] = $redirect;
+        }
+
+        wp_send_json_success($success);
+    }
+
+    /**
+     * The optional `'redirect'` config key as the URL to send the visitor to
+     * after a successful submission, or null to show the inline success
+     * message only (as without the key). A site-relative path (`/thank-you/`)
+     * resolves through home_url(); an absolute URL is taken as is. Checked
+     * here, at submission time, with wp_validate_redirect() (this site's host
+     * or an `allowed_redirect_hosts` one): anything else is ignored with one
+     * warning naming the form only, never what was submitted.
+     */
+    private function redirectUrl(): ?string
+    {
+        $configured = $this->config['redirect'] ?? null;
+        if ($configured === null || $configured === '' || $configured === false) {
+            return null;
+        }
+
+        $target = is_string($configured) ? trim($configured) : '';
+        if ($target !== '' && !preg_match('#^[a-z][a-z0-9+.\-]*:#i', $target) && !str_starts_with($target, '//')) {
+            $target = home_url('/' . ltrim($target, '/'));
+        }
+
+        $valid = $target !== '' ? (string) wp_validate_redirect($target, '') : '';
+        if ($valid === '') {
+            Logger::warning(
+                'form.redirect_rejected',
+                sprintf('The redirect for form "%s" is not a path or a URL on this site; the success message shows instead.', $this->id),
+                ['form_id' => $this->id],
+            );
+            return null;
+        }
+
+        return $valid;
     }
 
     /* -------------------------------------------------------------------------
@@ -1912,6 +1953,14 @@ class Form
                         if (successEl) {
                             successEl.textContent = json.data && json.data.message ? json.data.message : '';
                             successEl.classList.remove('taw-hidden');
+                        }
+
+                        // 'redirect' in the form's config: the server checked the
+                        // URL (this site, or an allowed host). The message above
+                        // (role="status") is what assistive tech hears meanwhile.
+                        if (json.data && typeof json.data.redirect === 'string' && json.data.redirect !== '') {
+                            if (submitBtn) submitBtn.disabled = true;
+                            window.location.assign(json.data.redirect);
                         }
                         return;
                     }
