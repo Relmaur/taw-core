@@ -89,6 +89,7 @@ release, so a rollback is `composer update taw/core:<old version>` (or restoring
 | < v1.105 | Mail templates can repeat a block once per row of a list (`<!--repeat:name-->`); nothing changes otherwise |
 | < v1.105.1 | A publish from taw-fleet that deletes a page or an option reads again (a bug fix); update production |
 | < v1.106 | Forms can redirect after a successful submit (`'redirect'`); three opt-in SEO filters; `content:import --staged` dry runs list staged files as sideloaded (a bug fix); nothing changes otherwise |
+| < v1.106.1 | `content:import --staged` dry runs list a file that isn't in the folder as missing, as the apply does (a bug fix) |
 | any | New, opt-in features you may want (see the end) |
 
 ## Per version
@@ -1047,6 +1048,16 @@ saves the metaboxes.
 
 **Check:** on a page with a WYSIWYG field in a repeater, type in its Visual tab, save, reload: the text is there.
 Nothing to migrate; stored data is unchanged. **Undo:** `composer update taw/core:1.102.1`.
+
+### v1.106.1: `--staged` dry runs list unstaged files as missing
+
+**What changed.** A bug fix for `content:import --staged=<dir>`. With staged files, the import downloads nothing:
+a media file that isn't in the folder is missing, and references to it are cleared. The dry run (without `--yes`)
+still listed such a file as one it would download when the file had a URL. It now lists it as missing, so the
+dry run matches the import. Without `--staged`, nothing changes. Publishing from taw-fleet isn't affected: a
+publish uploads every new file it writes before it applies.
+
+**Check:** nothing on an existing site. Nothing to migrate. **Undo:** `composer update taw/core:1.106.0`.
 
 ### v1.106.0: form redirects, SEO filters, `--staged` dry runs
 

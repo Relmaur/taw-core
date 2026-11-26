@@ -119,14 +119,16 @@ final class MediaResolver
                 continue;
             }
 
-            if (!$sideload) {
-                $this->outcomes[] = ['status' => 'would-sideload'] + $outcome;
-                continue;
-            }
-
+            // Checked before the dry-run stop, so a plan given the staged
+            // files says what the apply does: not among them = missing.
             if ($this->staged !== [] && $stagedFile === '') {
                 $this->warnings[] = "Media '{$filename}' wasn't uploaded — references to it are cleared.";
                 $this->outcomes[] = ['status' => 'missing'] + $outcome;
+                continue;
+            }
+
+            if (!$sideload) {
+                $this->outcomes[] = ['status' => 'would-sideload'] + $outcome;
                 continue;
             }
 

@@ -141,4 +141,49 @@ final class ContentImportCommandTest extends TestCase
         $this->assertSame('missing', $run([])['op'], 'without the file: missing, as before');
         $this->assertSame('create', $run(['--staged' => $this->tmp . '/staged'])['op']);
     }
+
+    /**
+     * With `--staged`, the apply downloads nothing: a file that isn't in the
+     * folder is missing even when it has a URL. The dry run used to say it
+     * would be sideloaded.
+     */
+    public function test_a_dry_run_with_staged_files_lists_a_file_not_among_them_as_missing(): void
+    {
+        Functions\when('wp_basename')->alias(static fn (string $p): string => basename($p));
+        @mkdir($this->tmp . '/staged/2026/10', 0777, true);
+        file_put_contents($this->tmp . '/staged/2026/10/hero.jpg', 'bytes');
+        $uploads = 'http://acme.local/wp-content/uploads/';
+        $snap = $this->writeSnapshot([
+            'meta'    => ['schema' => '1.8', 'source' => ['uploads_url' => $uploads]],
+            'options' => [],
+            'terms'   => [],
+            'posts'   => [],
+            'media'   => [
+                ['id' => 4, 'filename' => 'hero.jpg', 'url' => $uploads . '2026/10/hero.jpg', 'file' => '2026/10/hero.jpg'],
+                ['id' => 5, 'filename' => 'team.jpg', 'url' => $uploads . '2026/10/team.jpg', 'file' => '2026/10/team.jpg'],
+            ],
+        ]);
+
+        $themeDir = $this->tmp . '/wp/wp-content/themes/taw-theme';
+        $run = function (array $options) use ($themeDir, $snap): array {
+            $tester = new CommandTester(new ContentImportCommand($themeDir));
+            $tester->execute(['file' => $snap, '--json' => true] + $options);
+            $plan = json_decode($tester->getDisplay(), true);
+            $this->assertIsArray($plan);
+            $ops = [];
+            foreach ($plan['records'] as $record) {
+                if (($record['kind'] ?? '') === 'media') {
+                    $ops[basename((string) $record['key'])] = $record['op'];
+                }
+            }
+            ksort($ops);
+            return $ops;
+        };
+
+        $downloads = $run([]);
+        $this->assertSame(['hero.jpg' => 'create', 'team.jpg' => 'create'], $downloads, 'without --staged both download, as before');
+
+        $staged = $run(['--staged' => $this->tmp . '/staged']);
+        $this->assertSame(['hero.jpg' => 'create', 'team.jpg' => 'missing'], $staged, 'the apply downloads nothing: team.jpg is missing there too');
+    }
 }
